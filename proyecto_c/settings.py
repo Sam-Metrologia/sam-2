@@ -157,4 +157,4 @@ MESSAGE_TAGS = {
 
 # ¡MUY IMPORTANTE! Le dice a Django que use nuestro modelo CustomUser
 AUTH_USER_MODEL = 'core.CustomUser'
-# Prueba de modificacion settings
+# Prueba de modificacion setting
