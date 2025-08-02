@@ -31,9 +31,16 @@ if DEBUG:
     ALLOWED_HOSTS.append('localhost')
     ALLOWED_HOSTS.append('127.0.0.1')
 
+# --- INSERCIÓN IMPORTANTE: Configuración para CSRF en Render ---
+# Django necesita confiar en el dominio de Render para aceptar el token CSRF.
+if RENDER_EXTERNAL_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
+else:
+    CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
+# --- FIN DE LA INSERCIÓN IMPORTANTE ---
+
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
