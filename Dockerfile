@@ -34,3 +34,4 @@ RUN chmod +x start.sh
 # El comando principal para ejecutar la aplicación.
 # Usa CMD en lugar de ENTRYPOINT para que se pueda sobrescribir fácilmente.
 CMD ["./start.sh"]
+
