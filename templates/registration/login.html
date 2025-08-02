@@ -1,0 +1,50 @@
+{% extends 'base_login.html' %} {# Asegúrate de que esta plantilla base exista y sea adecuada para el login #}
+{% load static %}
+
+{% block title %}Iniciar Sesión{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Iniciar Sesión</h2>
+
+        {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                    <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} px-4 py-3 rounded-md relative mb-3" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'core:login' %}">
+            {% csrf_token %} {# ¡Importante para seguridad en formularios POST! #}
+            
+            <div class="mb-4">
+                <label for="id_username" class="block text-gray-700 text-sm font-bold mb-2">Nombre de usuario:</label>
+                <input type="text" id="id_username" name="username" 
+                       class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input"
+                       placeholder="Tu nombre de usuario" required>
+            </div>
+            
+            <div class="mb-6">
+                <label for="id_password" class="block text-gray-700 text-sm font-bold mb-2">Contraseña:</label>
+                <input type="password" id="id_password" name="password" 
+                       class="shadow-none rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline form-input"
+                       placeholder="Tu contraseña" required>
+            </div>
+            
+            <div class="flex items-center justify-between">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline w-full transition duration-300 ease-in-out">
+                    Iniciar Sesión
+                </button>
+            </div>
+            
+            <div class="text-center mt-4 text-gray-600 text-sm">
+                <p>¿Olvidaste tu contraseña? Para asistencia técnica, comunícate con **Sam Metrología S.A.S** al número **+57 324 7990534** o contacta a tu asesor.</p>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

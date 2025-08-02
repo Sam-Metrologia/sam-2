@@ -1,0 +1,438 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{# Título para la pestaña del navegador #}
+{% block title %}Detalle del Equipo - {{ equipo.nombre }}{% endblock %}
+
+{# Título para el encabezado de la página #}
+{% block header_title %}Detalle del Equipo{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+            <h1 class="text-3xl font-bold text-gray-800">Detalle del Equipo: {{ equipo.nombre }} ({{ equipo.codigo_interno }})</h1>
+            <div class="flex flex-wrap space-x-2 gap-2">
+                {% if perms.core.change_equipo %}
+                <a href="{% url 'core:editar_equipo' equipo.pk %}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Editar Equipo
+                </a>
+                {% endif %}
+                {# Botón para generar Hoja de Vida en PDF - Visible para todos los usuarios autenticados #}
+                <a href="{% url 'core:generar_hoja_vida_pdf' equipo.pk %}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-file-pdf mr-2"></i> Descargar Hoja de Vida PDF
+                </a>
+                
+                {# Botón para dar de baja el equipo (solo si NO está de baja y tiene permiso) #}
+                {% if equipo.estado != 'De Baja' and perms.core.add_bajaequipo %}
+                <a href="{% url 'core:dar_baja_equipo' equipo.pk %}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-minus-circle mr-2"></i> Dar de Baja
+                </a>
+                {# Botón para activar equipo (si existe un registro de baja Y el usuario es superusuario) #}
+                {% elif baja_registro and user.is_superuser %} {# CAMBIO AQUÍ #}
+                <a href="{% url 'core:activar_equipo' equipo.pk %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-check-circle mr-2"></i> Activar Equipo
+                </a>
+                {% endif %}
+                
+                {# Botón para eliminar equipo (solo superusuario) #}
+                {% if perms.core.delete_equipo %}
+                <button type="button" 
+                        onclick="showDeleteModal('{% url 'core:eliminar_equipo' equipo.pk %}', '{{ equipo.nombre }}')" 
+                        class="bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                    Eliminar Equipo
+                </button>
+                {% endif %}
+                <a href="{% url 'core:home' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Volver al Listado
+                </a>
+            </div>
+        </div>
+
+        {# Mensajes de Django #}
+        {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                    <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Detalles del Equipo #}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+            <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                <h2 class="text-xl font-semibold text-gray-800 mb-3">Información General</h2>
+                <p><strong>Código Interno:</strong> {{ equipo.codigo_interno }}</p>
+                <p><strong>Nombre:</strong> {{ equipo.nombre }}</p>
+                <p><strong>Empresa:</strong> {{ equipo.empresa.nombre|default:"N/A" }}</p>
+                <p><strong>Tipo de Equipo:</strong> {{ equipo.get_tipo_equipo_display }}</p>
+                <p><strong>Marca:</strong> {{ equipo.marca|default:"N/A" }}</p>
+                <p><strong>Modelo:</strong> {{ equipo.modelo|default:"N/A" }}</p>
+                <p><strong>Número de Serie:</strong> {{ equipo.numero_serie|default:"N/A" }}</p>
+                <p><strong>Ubicación:</strong> {{ equipo.ubicacion|default:"N/A" }}</p>
+                <p><strong>Responsable:</strong> {{ equipo.responsable|default:"N/A" }}</p>
+                <p><strong>Estado:</strong> <span class="font-bold {% if equipo.estado == 'Activo' %}text-green-600{% elif equipo.estado == 'De Baja' %}text-red-600{% else %}text-gray-600{% endif %}">{{ equipo.estado }}</span></p>
+                <p><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"d M Y"|default:"N/A" }}</p>
+                <p><strong>Fecha de Registro:</strong> {{ equipo.fecha_registro|date:"d M Y H:i"|default:"N/A" }}</p>
+                <p><strong>Observaciones:</strong> {{ equipo.observaciones|default:"N/A" }}</p>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                <h2 class="text-xl font-semibold text-gray-800 mb-3">Especificaciones Técnicas</h2>
+                <p><strong>Rango de Medida:</strong> {{ equipo.rango_medida|default:"N/A" }}</p>
+                <p><strong>Resolución:</strong> {{ equipo.resolucion|default:"N/A" }}</p>
+                <p><strong>Error Máximo Permisible:</strong> {{ equipo.error_maximo_permisible|default:"N/A" }}</p>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                <h2 class="text-xl font-semibold text-gray-800 mb-3">Información de Formato</h2>
+                <p><strong>Versión del Formato:</strong> {{ equipo.version_formato|default:"N/A" }}</p>
+                <p><strong>Fecha de Versión:</strong> {{ equipo.fecha_version_formato|date:"d M Y"|default:"N/A" }}</p>
+                <p><strong>Codificación del Formato:</strong> {{ equipo.codificacion_formato|default:"N/A" }}</p>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                <h2 class="text-xl font-semibold text-gray-800 mb-3">Próximas Actividades</h2>
+                <p><strong>Próxima Calibración:</strong> <span class="{{ equipo.proxima_calibracion_status }}">{{ equipo.proxima_calibracion|date:"d M Y"|default:"N/A" }}</span></p>
+                <p><strong>Frecuencia Calibración:</strong> {{ equipo.frecuencia_calibracion_meses|default:"N/A" }} meses</p>
+                <p><strong>Próximo Mantenimiento:</strong> <span class="{{ equipo.proximo_mantenimiento_status }}">{{ equipo.proximo_mantenimiento|date:"d M Y"|default:"N/A" }}</span></p>
+                <p><strong>Frecuencia Mantenimiento:</strong> {{ equipo.frecuencia_mantenimiento_meses|default:"N/A" }} meses</p>
+                <p><strong>Próxima Comprobación:</strong> <span class="{{ equipo.proxima_comprobacion_status }}">{{ equipo.proxima_comprobacion|date:"d M Y"|default:"N/A" }}</span></p>
+                <p><strong>Frecuencia Comprobación:</strong> {{ equipo.frecuencia_comprobacion_meses|default:"N/A" }} meses</p>
+            </div>
+
+            {% if equipo.imagen_equipo %}
+            <div class="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
+                <h2 class="text-xl font-semibold text-gray-800 mb-3">Imagen del Equipo</h2>
+                <img src="{{ equipo.imagen_equipo.url }}" alt="Imagen de {{ equipo.nombre }}" class="max-w-full h-auto rounded-md shadow-md mx-auto">
+            </div>
+            {% endif %}
+
+            {# Documentos Asociados al Equipo #}
+            <div class="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
+                <h2 class="text-xl font-semibold text-gray-800 mb-3">Documentos del Equipo</h2>
+                <ul class="list-disc list-inside space-y-1">
+                    {% if equipo.archivo_compra_pdf %}
+                        <li><a href="{{ equipo.archivo_compra_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Archivo de Compra</a></li>
+                    {% else %}
+                        <li>Archivo de Compra: N/A</li>
+                    {% endif %}
+                    {% if equipo.ficha_tecnica_pdf %}
+                        <li><a href="{{ equipo.ficha_tecnica_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Ficha Técnica</a></li>
+                    {% else %}
+                        <li>Ficha Técnica: N/A</li>
+                    {% endif %}
+                    {% if equipo.manual_pdf %}
+                        <li><a href="{{ equipo.manual_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Manual</a></li>
+                    {% else %}
+                        <li>Manual: N/A</li>
+                    {% endif %}
+                    {% if equipo.otros_documentos_pdf %}
+                        <li><a href="{{ equipo.otros_documentos_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Otros Documentos</a></li>
+                    {% else %}
+                        <li>Otros Documentos: N/A</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        {# Información de Baja (Visible solo si el equipo tiene un registro de baja) #}
+        {% if baja_registro %} {# CAMBIO AQUÍ: Ahora se muestra si existe baja_registro #}
+        <div class="mt-8 bg-red-50 border border-red-200 shadow-lg rounded-lg p-6 text-red-800">
+            <h2 class="text-2xl font-bold text-red-800 mb-4 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-3 text-red-600"></i> Información de Baja
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="font-semibold">Razón de Baja:</p>
+                    <p>{{ baja_registro.razon_baja|default:"N/A" }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold">Fecha de Baja:</p>
+                    <p>{{ baja_registro.fecha_baja|date:"d M Y H:i"|default:"N/A" }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold">Dado de Baja Por:</p>
+                    <p>{{ baja_registro.dado_de_baja_por.get_full_name|default:baja_registro.dado_de_baja_por.username|default:"N/A" }}</p>
+                </div>
+                <div>
+                    <p class="font-semibold">Observaciones Adicionales:</p>
+                    <p>{{ baja_registro.observaciones|default:"N/A" }}</p>
+                </div>
+                {% if baja_registro.documento_baja %}
+                <div class="md:col-span-2">
+                    <p class="font-semibold">Documento de Baja:</p>
+                    <a href="{{ baja_registro.documento_baja.url }}" target="_blank" class="text-blue-600 hover:underline flex items-center">
+                        <i class="fas fa-file-pdf mr-2"></i> Ver Documento de Baja
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Historial de Calibraciones #}
+        <div class="mt-8 bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Historial de Calibraciones</h2>
+            <div class="flex justify-end mb-4">
+                {% if perms.core.add_calibracion %}
+                <a href="{% url 'core:añadir_calibracion' equipo.pk %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-plus-circle mr-2"></i> Añadir Calibración
+                </a>
+                {% endif %}
+            </div>
+            {% if calibraciones %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                            <th class="py-3 px-6 text-left">Fecha Calibración</th>
+                            <th class="py-3 px-6 text-left">Proveedor</th>
+                            <th class="py-3 px-6 text-left">Resultado</th>
+                            <th class="py-3 px-6 text-left">Nº Certificado</th>
+                            <th class="py-3 px-6 text-left">Próxima Actividad (este registro)</th>
+                            <th class="py-3 px-6 text-left">Documentos</th>
+                            <th class="py-3 px-6 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700 text-sm">
+                        {% for cal in calibraciones %}
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-6 text-left whitespace-nowrap">{{ cal.fecha_calibracion|date:"d M Y" }}</td>
+                            <td class="py-3 px-6 text-left">{{ cal.nombre_proveedor|default:"N/A" }}</td> 
+                            <td class="py-3 px-6 text-left">{{ cal.resultado }}</td>
+                            <td class="py-3 px-6 text-left">{{ cal.numero_certificado|default:"N/A" }}</td>
+                            <td class="py-3 px-6 text-left">
+                                {% if cal.proxima_actividad_para_este_registro %}
+                                    {{ cal.proxima_actividad_para_este_registro|date:"d M Y" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-6 text-left">
+                                <ul class="list-disc list-inside">
+                                    {% if cal.documento_calibracion %}
+                                        <li><a href="{{ cal.documento_calibracion.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i> Certificado</a></li>
+                                    {% endif %}
+                                    {% if cal.confirmacion_metrologica_pdf %}
+                                        <li><a href="{{ cal.confirmacion_metrologica_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i> Confirmación Metrológica</a></li>
+                                    {% endif %}
+                                    {% if not cal.documento_calibracion and not cal.confirmacion_metrologica_pdf %}
+                                        <li>N/A</li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                <div class="flex item-center justify-center">
+                                    {% if perms.core.change_calibracion %}
+                                    <a href="{% url 'core:editar_calibracion' equipo.pk cal.pk %}" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if perms.core.delete_calibracion %}
+                                    <button type="button" 
+                                            onclick="showDeleteModal('{% url 'core:eliminar_calibracion' equipo.pk cal.pk %}', 'calibración del {{ cal.fecha_calibracion|date:'d M Y' }}')" 
+                                            class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-600">No hay calibraciones registradas para este equipo.</p>
+            {% endif %}
+        </div>
+
+        {# Historial de Mantenimientos #}
+        <div class="mt-8 bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Historial de Mantenimientos</h2>
+            <div class="flex justify-end mb-4">
+                {% if perms.core.add_mantenimiento %}
+                <a href="{% url 'core:añadir_mantenimiento' equipo.pk %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-plus-circle mr-2"></i> Añadir Mantenimiento
+                </a>
+                {% endif %}
+            </div>
+            {% if mantenimientos %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                            <th class="py-3 px-6 text-left">Fecha Mantenimiento</th>
+                            <th class="py-3 px-6 text-left">Tipo</th>
+                            <th class="py-3 px-6 text-left">Proveedor</th>
+                            <th class="py-3 px-6 text-left">Responsable</th>
+                            <th class="py-3 px-6 text-left">Costo</th>
+                            <th class="py-3 px-6 text-left">Próxima Actividad (este registro)</th>
+                            <th class="py-3 px-6 text-left">Documento</th>
+                            <th class="py-3 px-6 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700 text-sm">
+                        {% for mant in mantenimientos %}
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-6 text-left whitespace-nowrap">{{ mant.fecha_mantenimiento|date:"d M Y" }}</td>
+                            <td class="py-3 px-6 text-left">{{ mant.get_tipo_mantenimiento_display }}</td>
+                            <td class="py-3 px-6 text-left">{{ mant.nombre_proveedor|default:"N/A" }}</td> 
+                            <td class="py-3 px-6 text-left">{{ mant.responsable|default:"N/A" }}</td>
+                            <td class="py-3 px-6 text-left">${{ mant.costo|floatformat:2|default:"0.00" }}</td>
+                            <td class="py-3 px-6 text-left">
+                                {% if mant.proxima_actividad_para_este_registro %}
+                                    {{ mant.proxima_actividad_para_este_registro|date:"d M Y" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-6 text-left">
+                                {% if mant.documento_mantenimiento %}
+                                    <a href="{{ mant.documento_mantenimiento.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i> Ver Documento</a>
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                <div class="flex item-center justify-center">
+                                    {% if perms.core.change_mantenimiento %}
+                                    <a href="{% url 'core:editar_mantenimiento' equipo.pk mant.pk %}" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if perms.core.delete_mantenimiento %}
+                                    <button type="button" 
+                                            onclick="showDeleteModal('{% url 'core:eliminar_mantenimiento' equipo.pk mant.pk %}', 'mantenimiento del {{ mant.fecha_mantenimiento|date:'d M Y' }}')" 
+                                            class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-600">No hay mantenimientos registrados para este equipo.</p>
+            {% endif %}
+        </div>
+
+        {# Historial de Comprobaciones #}
+        <div class="mt-8 bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Historial de Comprobaciones</h2>
+            <div class="flex justify-end mb-4">
+                {% if perms.core.add_comprobacion %}
+                <a href="{% url 'core:añadir_comprobacion' equipo.pk %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-plus-circle mr-2"></i> Añadir Comprobación
+                </a>
+                {% endif %}
+            </div>
+            {% if comprobaciones %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                            <th class="py-3 px-6 text-left">Fecha Comprobación</th>
+                            <th class="py-3 px-6 text-left">Proveedor</th>
+                            <th class="py-3 px-6 text-left">Responsable</th>
+                            <th class="py-3 px-6 text-left">Resultado</th>
+                            <th class="py-3 px-6 text-left">Próxima Actividad (este registro)</th>
+                            <th class="py-3 px-6 text-left">Documento</th>
+                            <th class="py-3 px-6 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700 text-sm">
+                        {% for comp in comprobaciones %}
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-6 text-left whitespace-nowrap">{{ comp.fecha_comprobacion|date:"d M Y" }}</td>
+                            <td class="py-3 px-6 text-left">{{ comp.nombre_proveedor|default:"N/A" }}</td> 
+                            <td class="py-3 px-6 text-left">{{ comp.responsable|default:"N/A" }}</td>
+                            <td class="py-3 px-6 text-left">{{ comp.resultado }}</td>
+                            <td class="py-3 px-6 text-left">
+                                {% if comp.proxima_actividad_para_este_registro %}
+                                    {{ comp.proxima_actividad_para_este_registro|date:"d M Y" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-6 text-left">
+                                {% if comp.documento_comprobacion %}
+                                    <a href="{{ comp.documento_comprobacion.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-1"></i> Ver Documento</a>
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                <div class="flex item-center justify-center">
+                                    {% if perms.core.change_comprobacion %}
+                                    <a href="{% url 'core:editar_comprobacion' equipo.pk comp.pk %}" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if perms.core.delete_comprobacion %}
+                                    <button type="button" 
+                                            onclick="showDeleteModal('{% url 'core:eliminar_comprobacion' equipo.pk comp.pk %}', 'comprobación del {{ comp.fecha_comprobacion|date:'d M Y' }}')" 
+                                            class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-600">No hay comprobaciones registradas para este equipo.</p>
+            {% endif %}
+        </div>
+
+    </div>
+
+    {# Modal de Confirmación de Eliminación (se mantiene para actividades) #}
+    <div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar Eliminación</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">
+                        ¿Estás seguro de que quieres eliminar <strong id="entityName" class="font-semibold text-gray-700"></strong>?
+                        Esta acción no se puede deshacer.
+                    </p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <form id="deleteForm" method="post" action="">
+                        {% csrf_token %}
+                        <button type="submit" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Eliminar
+                        </button>
+                        <button type="button" onclick="hideDeleteModal()" class="mt-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
+                            Cancelar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showDeleteModal(deleteUrl, entityName) {
+        document.getElementById('entityName').innerText = entityName;
+        document.getElementById('deleteForm').action = deleteUrl;
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+
+    function hideDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,425 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Gestión de Metrología{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome CDN para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Variables CSS para una paleta de colores consistente */
+        :root {
+            --color-primary: #2563eb; /* Un azul más vibrante para elementos principales */
+            --color-primary-dark: #1e40af; /* Azul oscuro para hover/active */
+            --color-secondary: #6b7280; /* Gris medio para texto secundario */
+            --color-background-light: #f9fafb; /* Blanco grisáceo muy claro */
+            --color-background-dark: #1f2937; /* Gris oscuro para sidebar */
+            --color-text-dark: #111827; /* Gris muy oscuro para texto principal */
+            --color-text-light: #f3f4f6; /* Gris muy claro para texto en fondos oscuros */
+            --color-border: #e5e7eb; /* Gris claro para bordes */
+            --color-success: #10b981; /* Verde */
+            --color-warning: #f59e0b; /* Amarillo/Naranja */
+            --color-error: #ef4444; /* Rojo */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background-light);
+            color: var(--color-text-dark);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background-color: var(--color-background-dark);
+            color: var(--color-text-light);
+            height: 100vh;
+            position: fixed;
+            padding-top: 20px;
+            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+            transform: translateX(0);
+            z-index: 1000;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.15); /* Sombra más pronunciada */
+            overflow-y: auto; /* Permite scroll si el contenido es largo */
+        }
+        .sidebar.hidden {
+            transform: translateX(-100%);
+        }
+        .sidebar-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 0 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1); /* Separador sutil */
+            padding-bottom: 20px;
+        }
+        .sidebar-header h2 {
+            font-size: 1.8rem; /* Tamaño de fuente más grande */
+            font-weight: 700; /* Más negrita */
+            color: var(--color-text-light);
+            letter-spacing: 0.05em; /* Espaciado de letras */
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar ul li a {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--color-text-light);
+            text-decoration: none;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.2s ease-out;
+            border-radius: 8px;
+            margin: 0 10px 8px 10px; /* Más margen entre ítems */
+            font-weight: 500; /* Ligeramente más negrita */
+        }
+        .sidebar ul li a i {
+            margin-right: 15px;
+            font-size: 1.2rem; /* Iconos un poco más grandes */
+            color: rgba(255,255,255,0.7); /* Color sutil para iconos */
+        }
+        .sidebar ul li a:hover {
+            background-color: var(--color-primary-dark); /* Azul oscuro para hover */
+            color: #ffffff;
+            transform: translateX(5px); /* Pequeño efecto al pasar el ratón */
+        }
+        .sidebar ul li a.active {
+            background-color: var(--color-primary); /* Azul vibrante para activo */
+            color: #ffffff;
+            font-weight: 600; /* Más negrita para activo */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); /* Sombra más suave para activo */
+        }
+        .sidebar ul li a.active i {
+            color: #ffffff; /* Icono blanco en activo */
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px; /* Default margin for desktop */
+            transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
+            padding: 0; /* Padding se manejará dentro de main > div */
+            width: calc(100% - 250px); /* Default width for desktop */
+            min-height: 100vh; /* Asegura que el contenido principal ocupe toda la altura */
+            display: flex;
+            flex-direction: column;
+        }
+        .main-content.expanded {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        /* Navbar */
+        .navbar {
+            background-color: #ffffff;
+            padding: 15px 25px; /* Más padding */
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); /* Sombra más suave */
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+        .menu-toggle {
+            background: none;
+            border: none;
+            color: var(--color-secondary); /* Color más suave */
+            cursor: pointer;
+            font-size: 1.6rem; /* Icono más grande */
+            padding: 5px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        .menu-toggle:hover {
+            background-color: var(--color-border);
+        }
+        .user-menu {
+            position: relative;
+        }
+        .user-menu-button {
+            display: flex;
+            align-items: center;
+            space-x-2;
+            color: var(--color-text-dark); /* Color de texto principal */
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+        .user-menu-button:hover {
+            background-color: var(--color-background-light);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .user-menu-button i {
+            font-size: 1.3rem; /* Icono de usuario más grande */
+            color: var(--color-primary); /* Icono de usuario azul */
+        }
+        .user-menu-button span {
+            font-weight: 600; /* Nombre de usuario más negrita */
+            margin-left: 8px; /* Espacio entre icono y nombre */
+        }
+        .user-menu-button .fa-chevron-down {
+            font-size: 0.7rem; /* Flecha más pequeña */
+            margin-left: 8px;
+            color: var(--color-secondary);
+        }
+
+        .user-dropdown {
+            position: absolute;
+            right: 0;
+            background-color: #ffffff;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15); /* Sombra más profunda */
+            min-width: 200px; /* Ancho mínimo */
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, visibility 0.2s;
+            padding: 10px 0;
+        }
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .user-dropdown a {
+            display: block;
+            padding: 10px 20px;
+            color: var(--color-text-dark);
+            text-decoration: none;
+            transition: background-color 0.2s;
+            font-weight: 500;
+        }
+        .user-dropdown a:hover {
+            background-color: var(--color-background-light);
+            color: var(--color-primary); /* Texto azul al pasar el ratón */
+        }
+
+        /* Alertas (mantener Tailwind por consistencia) */
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem; /* Bordes más redondeados */
+            border: 1px solid transparent;
+            font-weight: 500;
+        }
+        .alert-success {
+            background-color: #d1fae5; /* Verde muy claro */
+            border-color: #34d399; /* Verde más oscuro */
+            color: #065f46; /* Verde oscuro */
+        }
+        .alert-info {
+            background-color: #dbeafe; /* Azul muy claro */
+            border-color: #60a5fa; /* Azul más oscuro */
+            color: #1e40af; /* Azul oscuro */
+        }
+        .alert-warning {
+            background-color: #fffbeb; /* Amarillo muy claro */
+            border-color: #fbbf24; /* Amarillo más oscuro */
+            color: #92400e; /* Naranja oscuro */
+        }
+        .alert-error {
+            background-color: #fee2e2; /* Rojo muy claro */
+            border-color: #f87171; /* Rojo más oscuro */
+            color: #991b1b; /* Rojo oscuro */
+        }
+
+        /* Footer */
+        .main-footer {
+            margin-top: auto; /* Empuja el footer al final */
+            padding: 20px;
+            text-align: center;
+            background-color: #ffffff;
+            border-top: 1px solid var(--color-border);
+            color: var(--color-secondary);
+            font-size: 0.9rem;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+        }
+        .main-footer a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .main-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed; /* Asegura que no se desplace con el contenido */
+                height: 100%;
+                z-index: 1001;
+                box-shadow: none; /* Eliminar sombra cuando está oculto en móvil */
+            }
+            .sidebar.show {
+                transform: translateX(0);
+                box-shadow: 2px 0 10px rgba(0,0,0,0.15); /* Sombra al mostrar en móvil */
+            }
+            .main-content {
+                margin-left: 0; /* Siempre 0 en móvil */
+                width: 100%; /* Siempre 100% en móvil */
+            }
+            /* Cuando el sidebar está abierto en móvil, el main-content no cambia su margen,
+               simplemente el sidebar se superpone. */
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h2>SAM</h2>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="{% url 'core:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a></li>
+                <li><a href="{% url 'core:home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <i class="fas fa-boxes"></i> Equipos
+                </a></li>
+                {# Nuevo elemento de menú para Proveedores #}
+                <li><a href="{% url 'core:listar_proveedores' %}" class="{% if request.resolver_match.url_name == 'listar_proveedores' %}active{% endif %}">
+                    <i class="fas fa-address-book"></i> Proveedores
+                </a></li>
+                {% if user.is_superuser %}
+                <li><a href="{% url 'core:listar_empresas' %}" class="{% if request.resolver_match.url_name == 'listar_empresas' %}active{% endif %}">
+                    <i class="fas fa-building"></i> Empresas
+                </a></li>
+                {% endif %}
+                {% if user.is_staff or user.is_superuser %}
+                <li><a href="{% url 'core:listar_usuarios' %}" class="{% if 'usuario' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-users"></i> Usuarios
+                </a></li>
+                {% endif %}
+                <li><a href="{% url 'core:informes' %}" class="{% if request.resolver_match.url_name == 'informes' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i> Informes
+                </a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div id="main-content" class="main-content">
+        <div class="navbar">
+            <button id="menu-toggle" class="menu-toggle">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+            <div class="user-menu">
+                <button id="user-menu-button" class="user-menu-button">
+                    <i class="fas fa-user-circle"></i>
+                    <span>{{ user.username }}</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div id="user-dropdown" class="user-dropdown">
+                    <a href="{% url 'core:perfil_usuario' %}">Mi Perfil</a>
+                    <a href="{% url 'core:password_change' %}">Cambiar Contraseña</a>
+                    <a href="{% url 'core:logout' %}">Cerrar Sesión</a>
+                </div>
+            </div>
+        </div>
+
+        <main class="flex-grow p-4 md:p-6 lg:p-8"> {# Añadido flex-grow y padding responsivo #}
+            {% block content %}
+            <!-- Contenido específico de cada página irá aquí -->
+            {% endblock %}
+        </main>
+
+        <footer class="main-footer">
+            <p>&copy; {% now "Y" %} SAM. Todos los derechos reservados.</p>
+            <p>Desarrollado por <a href="#" target="_blank">SAM METROLOGIA S.A.S</a></p> {# CAMBIO REALIZADO AQUÍ #}
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            const menuToggle = document.getElementById('menu-toggle');
+            const userMenuButton = document.getElementById('user-menu-button');
+            const userDropdown = document.getElementById('user-dropdown');
+            
+            // Function to toggle sidebar visibility and main content adjustment
+            function toggleSidebar() {
+                if (window.innerWidth <= 768) {
+                    // On small screens, just toggle 'show' class for sidebar
+                    sidebar.classList.toggle('show');
+                    // Add/remove overlay for mobile
+                    if (sidebar.classList.contains('show')) {
+                        document.body.classList.add('overflow-hidden'); // Prevent scrolling body
+                        const overlay = document.createElement('div');
+                        overlay.id = 'sidebar-overlay';
+                        overlay.className = 'fixed inset-0 bg-black opacity-50 z-999';
+                        document.body.appendChild(overlay);
+                        overlay.addEventListener('click', toggleSidebar); // Close sidebar on overlay click
+                    } else {
+                        document.body.classList.remove('overflow-hidden');
+                        const overlay = document.getElementById('sidebar-overlay');
+                        if (overlay) overlay.remove();
+                    }
+                } else {
+                    // On large screens, toggle 'hidden' class for sidebar and 'expanded' for main content
+                    sidebar.classList.toggle('hidden');
+                    mainContent.classList.toggle('expanded');
+                }
+            }
+
+            // Event listener for menu toggle button
+            menuToggle.addEventListener('click', toggleSidebar);
+
+            // Toggle user dropdown
+            userMenuButton.addEventListener('click', function() {
+                userDropdown.classList.toggle('show');
+            });
+
+            // Close dropdowns and sidebar if clicked outside
+            window.addEventListener('click', function(event) {
+                if (!userMenuButton.contains(event.target) && !userDropdown.contains(event.target)) {
+                    userDropdown.classList.remove('show');
+                }
+                // Close sidebar if clicked outside on mobile (and overlay is not clicked, which is handled separately)
+                if (window.innerWidth <= 768 && sidebar.classList.contains('show') && 
+                    !sidebar.contains(event.target) && !menuToggle.contains(event.target)) {
+                    toggleSidebar();
+                }
+            });
+
+            // Handle initial state and adjust on resize
+            function adjustLayout() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('hidden', 'show'); // Ensure sidebar is visible and not 'show'
+                    mainContent.classList.remove('expanded'); // Ensure main content is not expanded
+                    document.body.classList.remove('overflow-hidden'); // Remove overflow hidden
+                    const overlay = document.getElementById('sidebar-overlay');
+                    if (overlay) overlay.remove(); // Remove overlay if exists
+                } else {
+                    sidebar.classList.add('hidden'); // Hide sidebar by default on small screens
+                    mainContent.classList.remove('expanded'); // Ensure main content is not expanded (it's always 100% width)
+                }
+            }
+
+            // Initial layout adjustment
+            adjustLayout();
+
+            // Adjust on resize
+            window.addEventListener('resize', adjustLayout);
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

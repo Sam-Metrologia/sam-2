@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="flex justify-between items-center mb-6">
+        <a href="{% url 'core:añadir_proveedor' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+            <i class="fas fa-plus-circle mr-2"></i> Añadir Proveedor
+        </a>
+        <form method="GET" class="flex items-center space-x-4">
+            <input type="text" name="q" placeholder="Buscar proveedor..." value="{{ query }}" class="form-input px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select name="tipo_servicio" class="form-select px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Todos los Tipos</option>
+                {% for value, label in tipo_servicio_choices %}
+                    <option value="{{ value }}" {% if value == tipo_servicio_filter %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                <i class="fas fa-search mr-2"></i> Buscar
+            </button>
+        </form>
+    </div>
+
+    {% if proveedores %}
+        <div class="overflow-x-auto bg-white rounded-lg shadow-md">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre Empresa</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo Servicio</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for proveedor in proveedores %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ proveedor.nombre_empresa }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.get_tipo_servicio_display }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.nombre_contacto|default:"N/A" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.numero_contacto|default:"N/A" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.correo_electronico|default:"N/A" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="{% url 'core:editar_proveedor' pk=proveedor.pk %}" class="text-indigo-600 hover:text-indigo-900 mr-4">Editar</a>
+                            <button onclick="confirmDelete('{% url 'core:eliminar_proveedor' pk=proveedor.pk %}', 'proveedor')" class="text-red-600 hover:text-red-900">Eliminar</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Paginación #}
+        <div class="mt-6 flex justify-center">
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                {% if proveedores.has_previous %}
+                    <a href="?page={{ proveedores.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if tipo_servicio_filter %}&tipo_servicio={{ tipo_servicio_filter }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Anterior</span>
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                {% endif %}
+
+                {% for i in proveedores.paginator.page_range %}
+                    <a href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}{% if tipo_servicio_filter %}&tipo_servicio={{ tipo_servicio_filter }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium {% if proveedores.number == i %}bg-blue-500 text-white{% else %}text-gray-700 hover:bg-gray-50{% endif %}">
+                        {{ i }}
+                    </a>
+                {% endfor %}
+
+                {% if proveedores.has_next %}
+                    <a href="?page={{ proveedores.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if tipo_servicio_filter %}&tipo_servicio={{ tipo_servicio_filter }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Siguiente</span>
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </nav>
+        </div>
+    {% else %}
+        <p class="text-gray-600 text-lg text-center mt-8">No se encontraron proveedores.</p>
+    {% endif %}
+</div>
+
+<script>
+    function confirmDelete(deleteUrl, itemType) {
+        if (confirm(`¿Estás seguro de que deseas eliminar este ${itemType}? Esta acción no se puede deshacer.`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = deleteUrl;
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            form.appendChild(csrfInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+{% endblock content %}

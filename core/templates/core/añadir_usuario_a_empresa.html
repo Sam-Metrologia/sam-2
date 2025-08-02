@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block header_title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+
+        {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                    <div class="p-3 rounded-md shadow-sm mb-2 
+                        {% if message.tags == 'success' %}bg-green-100 text-green-800{% elif message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}" 
+                        role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            
+            <div>
+                <label for="user_id" class="block text-sm font-medium text-gray-700">Seleccionar Usuario:</label>
+                <select name="user_id" id="user_id" required
+                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                    <option value="">-- Selecciona un usuario --</option>
+                    {% for user in users_available %}
+                        <option value="{{ user.pk }}">{{ user.username }} ({{ user.first_name }} {{ user.last_name }})</option>
+                    {% empty %}
+                        <option value="" disabled>No hay usuarios disponibles para añadir a esta empresa.</option>
+                    {% endfor %}
+                </select>
+                {% if not users_available %}
+                    <p class="mt-2 text-sm text-gray-500">
+                        Todos los usuarios existentes ya están asociados a una empresa diferente o son superusuarios.
+                        Crea nuevos usuarios si necesitas asociarlos a esta empresa.
+                    </p>
+                {% endif %}
+            </div>
+
+            <div class="flex items-center justify-end space-x-3">
+                <button type="submit" 
+                        class="px-5 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300 ease-in-out">
+                    Añadir Usuario
+                </button>
+                <a href="{% url 'core:detalle_empresa' empresa.pk %}" 
+                   class="px-5 py-2 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300 ease-in-out">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

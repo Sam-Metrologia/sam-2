@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Hoja de Vida del Equipo - {{ equipo.codigo_interno }}</title>
+    <style>
+        /* Definición del tamaño de página y márgenes para PDF */
+        @page {
+            size: Letter; /* Tamaño Carta: 8.5 x 11 pulgadas */
+            margin: 1cm; /* Márgenes estándar para impresión */
+            
+            /* Frames para encabezado, contenido y pie de página */
+            @frame header_frame {
+                -pdf-frame-content: header_content;
+                margin-top: 0.5cm;
+                margin-left: 1cm;
+                margin-right: 1cm;
+                height: 3.5cm; /* Altura ajustada para el encabezado */
+            }
+            @frame content_frame {
+                -pdf-frame-content: content_content;
+                margin-top: 4cm; /* Debajo del encabezado (ajustado a la nueva altura del header) */
+                margin-left: 1cm;
+                margin-right: 1cm;
+                margin-bottom: 1cm;
+            }
+            @frame footer_frame {
+                -pdf-frame-content: footer_content;
+                margin-bottom: 0.5cm;
+                margin-left: 1cm;
+                margin-right: 1cm;
+                height: 1cm; /* Altura para el pie de página */
+            }
+        }
+
+        body {
+            font-family: 'Helvetica Neue', 'Helvetica', Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #333;
+        }
+
+        /* Estilos para el encabezado */
+        #header_content {
+            width: 100%;
+            border: 1px solid #000;
+            box-sizing: border-box;
+        }
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .header-table td {
+            border: 1px solid #000;
+            padding: 4px;
+            vertical-align: middle;
+        }
+        .header-logo-cell {
+            width: 25%;
+            text-align: center;
+        }
+        .header-logo {
+            max-width: 70px;
+            max-height: 70px;
+        }
+        .header-title-cell {
+            width: 50%;
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+        }
+        .header-info-cell {
+            width: 25%;
+            font-size: 8pt;
+        }
+
+        /* Contenido principal */
+        #content_content {
+            margin-top: 10px;
+        }
+
+        .section-title {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 9pt;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            color: #333;
+        }
+        td a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        td a:hover {
+            text-decoration: underline;
+        }
+
+        .no-records {
+            text-align: center;
+            color: #777;
+            font-style: italic;
+            padding: 10px;
+        }
+
+        .equipment-image-container {
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .equipment-image {
+            display: block;
+            max-width: 80%;
+            max-height: 250px;
+            margin: 0 auto;
+            border: 1px solid #ddd;
+            padding: 5px;
+            background-color: #fff;
+        }
+
+        /* Estilos para el pie de página */
+        #footer_content {
+            text-align: right; /* Alineado a la derecha como en tu ejemplo */
+            font-size: 8pt;
+            color: #777;
+            border-top: 1px solid #ccc;
+            padding-top: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="header_content">
+    <table class="header-table">
+        <tr>
+            <td class="header-logo-cell">
+                {% if logo_empresa_url %}<img src="{{ logo_empresa_url }}" class="header-logo" alt="Logo Empresa">{% endif %}
+            </td>
+            <td class="header-title-cell">
+                HOJA DE VIDA DE EQUIPOS
+            </td>
+            <td class="header-info-cell">
+                <strong>CÓDIGO:</strong> {{ equipo.codificacion_formato|default:"N/A" }}<br>
+                <strong>VERSIÓN:</strong> {{ equipo.version_formato|default:"N/A" }}<br>
+                <strong>FECHA:</strong> {{ equipo.fecha_version_formato|date:"d/m/Y"|default:"N/A" }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div id="content_content">
+    <h2 class="section-title">Información General del Equipo</h2>
+    <table>
+        <tr><td><strong>Código Interno:</strong> {{ equipo.codigo_interno|default:"N/A" }}</td><td><strong>Nombre:</strong> {{ equipo.nombre|default:"N/A" }}</td></tr>
+        <tr><td><strong>Empresa:</strong> {{ equipo.empresa.nombre|default:"N/A" }}</td><td><strong>Tipo de Equipo:</strong> {{ equipo.get_tipo_equipo_display|default:"N/A" }}</td></tr>
+        <tr><td><strong>Marca:</strong> {{ equipo.marca|default:"N/A" }}</td><td><strong>Modelo:</strong> {{ equipo.modelo|default:"N/A" }}</td></tr>
+        <tr><td><strong>Número de Serie:</strong> {{ equipo.numero_serie|default:"N/A" }}</td><td><strong>Ubicación:</strong> {{ equipo.ubicacion|default:"N/A" }}</td></tr>
+        <tr><td><strong>Responsable:</strong> {{ equipo.responsable|default:"N/A" }}</td><td><strong>Estado:</strong> {{ equipo.estado|default:"N/A" }}</td></tr>
+        <tr><td><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"d/m/Y"|default:"N/A" }}</td><td><strong>Fecha de Registro:</strong> {{ equipo.fecha_registro|date:"d/m/Y H:i"|default:"N/A" }}</td></tr>
+        <tr><td><strong>Rango de Medida:</strong> {{ equipo.rango_medida|default:"N/A" }}</td><td><strong>Resolución:</strong> {{ equipo.resolucion|default:"N/A" }}</td></tr>
+        <tr><td colspan="2"><strong>Error Máximo Permisible:</strong> {{ equipo.error_maximo_permisible|floatformat:"5"|default:"N/A" }}</td></tr>
+    </table>
+
+    <h2 class="section-title">Observaciones Generales</h2>
+    <p>{{ equipo.observaciones|default:"N/A" }}</p>
+
+    {% if baja_registro %}
+    <h2 class="section-title">Información de Baja del Equipo</h2>
+    <table>
+        <tr><td><strong>Razón de Baja:</strong> {{ baja_registro.razon_baja|default:"N/A" }}</td><td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"d/m/Y H:i"|default:"N/A" }}</td></tr>
+        <tr><td><strong>Dado de Baja Por:</strong> {{ baja_registro.dado_de_baja_por.get_full_name|default:baja_registro.dado_de_baja_por.username|default:"N/A" }}</td><td><strong>Observaciones:</strong> {{ baja_registro.observaciones|default:"N/A" }}</td></tr>
+    </table>
+    {% else %}
+    <p class="no-records">El equipo no ha sido dado de baja.</p>
+    {% endif %}
+
+    <h2 class="section-title">Documentos del Equipo</h2>
+    <table>
+        <tr><td><strong>Archivo de Compra:</strong> {% if archivo_compra_pdf_url %}<a href="{{ archivo_compra_pdf_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+            <td><strong>Ficha Técnica:</strong> {% if ficha_tecnica_pdf_url %}<a href="{{ ficha_tecnica_pdf_url }}">Ver</a>{% else %}N/A{% endif %}</td></tr>
+        <tr><td><strong>Manual:</strong> {% if manual_pdf_url %}<a href="{{ manual_pdf_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+            <td><strong>Otros Documentos:</strong> {% if otros_documentos_pdf_url %}<a href="{{ otros_documentos_pdf_url }}">Ver</a>{% else %}N/A{% endif %}</td></tr>
+    </table>
+
+    <table style="page-break-before: always;"><tr><td></td></tr></table>
+
+    <h2 class="section-title">Historial de Calibraciones</h2>
+    {% if calibraciones %}
+    <table>
+        <thead>
+            <tr><th>Fecha</th><th>Proveedor</th><th>Resultado</th><th>Certificado</th><th>Observaciones</th><th>Documento</th><th>Confirmación Metrológica</th></tr>
+        </thead>
+        <tbody>
+            {% for cal in calibraciones %}
+            <tr>
+                <td>{{ cal.fecha_calibracion|date:"d/m/Y"|default:"N/A" }}</td>
+                <td>{{ cal.nombre_proveedor|default:"N/A" }}</td>
+                <td>{{ cal.resultado|default:"N/A" }}</td>
+                <td>{{ cal.numero_certificado|default:"N/A" }}</td>
+                <td>{{ cal.observaciones|default:"N/A" }}</td>
+                <td>{% if cal.documento_calibracion_url %}<a href="{{ cal.documento_calibracion_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+                <td>{% if cal.confirmacion_metrologica_pdf_url %}<a href="{{ cal.confirmacion_metrologica_pdf_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="no-records">No hay calibraciones registradas.</p>{% endif %}
+
+    <h2 class="section-title">Historial de Mantenimientos</h2>
+    {% if mantenimientos %}
+    <table>
+        <thead>
+            <tr><th>Fecha</th><th>Tipo</th><th>Proveedor</th><th>Responsable</th><th>Costo</th><th>Descripción</th><th>Documento</th></tr>
+        </thead>
+        <tbody>
+            {% for m in mantenimientos %}
+            <tr>
+                <td>{{ m.fecha_mantenimiento|date:"d/m/Y"|default:"N/A" }}</td>
+                <td>{{ m.get_tipo_mantenimiento_display|default:"N/A" }}</td>
+                <td>{{ m.nombre_proveedor|default:"N/A" }}</td>
+                <td>{{ m.responsable|default:"N/A" }}</td>
+                <td>{{ m.costo|floatformat:"2"|default:"N/A" }}</td>
+                <td>{{ m.descripcion|default:"N/A" }}</td>
+                <td>{% if m.documento_mantenimiento_url %}<a href="{{ m.documento_mantenimiento_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="no-records">No hay mantenimientos registrados.</p>{% endif %}
+
+    <h2 class="section-title">Historial de Comprobaciones</h2>
+    {% if comprobaciones %}
+    <table>
+        <thead>
+            <tr><th>Fecha</th><th>Proveedor</th><th>Responsable</th><th>Resultado</th><th>Observaciones</th><th>Documento</th></tr>
+        </thead>
+        <tbody>
+            {% for comp in comprobaciones %}
+            <tr>
+                <td>{{ comp.fecha_comprobacion|date:"d/m/Y"|default:"N/A" }}</td>
+                <td>{{ comp.nombre_proveedor|default:"N/A" }}</td>
+                <td>{{ comp.responsable|default:"N/A" }}</td>
+                <td>{{ comp.resultado|default:"N/A" }}</td>
+                <td>{{ comp.observaciones|default:"N/A" }}</td>
+                <td>{% if comp.documento_comprobacion_url %}<a href="{{ comp.documento_comprobacion_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="no-records">No hay comprobaciones registradas.</p>{% endif %}
+
+    <h2 class="section-title">Imagen del Equipo</h2>
+    <div class="equipment-image-container">
+        {% if imagen_equipo_url %}
+            <img src="{{ imagen_equipo_url }}" class="equipment-image" alt="Imagen del Equipo">
+        {% else %}
+            <p class="no-records">Sin imagen disponible.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div id="footer_content">
+    Página <pdf:pagenumber /> de <pdf:pagecount />
+</div>
+
+</body>
+</html>

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<style>
+    /* Puedes añadir estilos específicos para esta página aquí si es necesario */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex space-x-2">
+            <a href="{% url 'core:editar_empresa' pk=empresa.pk %}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                <i class="fas fa-edit mr-2"></i> Editar Empresa
+            </a>
+            <button onclick="confirmDelete('{% url 'core:eliminar_empresa' pk=empresa.pk %}', 'empresa')" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                <i class="fas fa-trash-alt mr-2"></i> Eliminar Empresa
+            </button>
+            <a href="{% url 'core:listar_empresas' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                <i class="fas fa-arrow-left mr-2"></i> Volver al listado
+            </a>
+        </div>
+    </div>
+
+    {# Mensajes de Django #}
+    {% if messages %}
+        <ul class="messages mb-4">
+            {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }} p-3 rounded-md mb-2"{% endif %}>
+                    {{ message }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="bg-gray-50 p-4 rounded-md shadow-sm">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Datos de la Empresa</h2>
+            <p class="mb-2"><strong>Nombre:</strong> {{ empresa.nombre }}</p>
+            <p class="mb-2"><strong>NIT:</strong> {{ empresa.nit|default:"N/A" }}</p>
+            <p class="mb-2"><strong>Dirección:</strong> {{ empresa.direccion|default:"N/A" }}</p>
+            <p class="mb-2"><strong>Teléfono:</strong> {{ empresa.telefono|default:"N/A" }}</p>
+            <p class="mb-2"><strong>Email:</strong> {{ empresa.email|default:"N/A" }}</p>
+            <p class="mb-2"><strong>Fecha de Registro:</strong> {{ empresa.fecha_registro|date:"d/m/Y H:i" }}</p>
+            {% if empresa.logo_empresa %}
+                <div class="mt-4">
+                    <strong>Logo:</strong>
+                    <img src="{{ empresa.logo_empresa.url }}" alt="Logo de {{ empresa.nombre }}" class="mt-2 max-w-xs h-auto rounded-md shadow-md">
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-md shadow-sm">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Usuarios Asociados ({{ usuarios_empresa.count }})</h2>
+            {% if usuarios_empresa %}
+                <ul class="list-disc pl-5">
+                    {% for usuario in usuarios_empresa %}
+                        <li><a href="{% url 'core:detalle_usuario' pk=usuario.pk %}" class="text-blue-600 hover:underline">{{ usuario.username }} ({{ usuario.get_full_name|default:"N/A" }})</a></li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-gray-600">No hay usuarios asociados a esta empresa.</p>
+            {% endif %}
+            <a href="{% url 'core:añadir_usuario_a_empresa' empresa_pk=empresa.pk %}" class="mt-4 inline-block bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                <i class="fas fa-user-plus mr-2"></i> Añadir Usuario a esta Empresa
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-gray-50 p-4 rounded-md shadow-sm mt-6">
+        <h2 class="text-xl font-semibold text-gray-700 mb-4">Equipos de la Empresa ({{ equipos_empresa.count }})</h2>
+        {% if equipos_empresa %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-md">
+                    <thead>
+                        <tr>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Código Interno</th>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Nombre</th>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Tipo</th>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Estado</th>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Próxima Calibración</th>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Próximo Mantenimiento</th>
+                            <th class="py-2 px-4 border-b text-left text-gray-600">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for equipo in equipos_empresa %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-2 px-4 border-b">{{ equipo.codigo_interno }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.nombre }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.get_tipo_equipo_display }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.estado }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.proxima_calibracion|date:"d/m/Y"|default:"N/A" }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.proximo_mantenimiento|date:"d/m/Y"|default:"N/A" }}</td>
+                            <td class="py-2 px-4 border-b">
+                                <a href="{% url 'core:detalle_equipo' pk=equipo.pk %}" class="text-blue-600 hover:underline">Ver Detalle</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-gray-600">No hay equipos asociados a esta empresa.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function confirmDelete(deleteUrl, itemType) {
+        // Implementa un modal de confirmación aquí en lugar de alert/confirm
+        // Por ejemplo, puedes mostrar un modal Tailwind CSS o un div oculto
+        // con botones de "Sí" y "No".
+        // Por ahora, usaremos un simple confirm para la funcionalidad.
+        if (confirm(`¿Estás seguro de que deseas eliminar esta ${itemType}? Esta acción no se puede deshacer.`)) {
+            // Si el usuario confirma, redirige a la URL de eliminación (POST request)
+            // Para Django, necesitas un formulario POST con CSRF token para eliminar.
+            // Una forma sencilla es crear un formulario dinámicamente y enviarlo.
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = deleteUrl;
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}'; // Asegúrate de que csrf_token esté disponible en el contexto
+            form.appendChild(csrfInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+{% endblock content %}

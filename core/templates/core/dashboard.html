@@ -1,0 +1,780 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+    <style>
+        .chart-container {
+            position: relative;
+            height: 300px; /* Altura fija para las gráficas */
+            width: 100%;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0; /* border-gray-200 */
+            display: flex; /* Asegurar que el canvas dentro se ajuste */
+            justify-content: center;
+            align-items: center;
+            border-radius: 0.5rem; /* Rounded corners for chart containers */
+            overflow: hidden; /* Hide overflow for rounded corners */
+        }
+        canvas {
+            max-width: 100%;
+            height: 100%;
+            display: block; /* Asegurar que el canvas no tenga espacio extra */
+        }
+        .info-card {
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s ease-in-out;
+            /* Estilos por defecto para las tarjetas */
+            border: 1px solid #e2e8f0; /* Un borde sutil */
+        }
+        .info-card:hover {
+            transform: translateY(-5px);
+        }
+        .info-card h3 {
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            color: #4a5568; /* text-gray-700 */
+            margin-bottom: 0.5rem;
+        }
+        .info-card p {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+            color: #2d3748; /* text-gray-800 */
+        }
+        /* Colores específicos para los módulos de información */
+        .info-card.total-equipos {
+            background-color: #e0f7fa; /* Light Cyan */
+            border-color: #b2ebf2;
+        }
+        .info-card.equipos-activos {
+            background-color: #e8f5e9; /* Light Green */
+            border-color: #c8e6c9;
+        }
+        .info-card.calibraciones-vencidas {
+            background-color: #ffebee; /* Light Red */
+            border-color: #ffcdd2;
+        }
+        .info-card.calibraciones-proximas {
+            background-color: #fffde7; /* Light Yellow */
+            border-color: #fff9c4;
+        }
+        .info-card.mantenimientos-vencidos {
+            background-color: #ffebee; /* Light Red */
+            border-color: #ffcdd2;
+        }
+        .info-card.mantenimientos-proximas { {# CAMBIO AQUÍ: mantenimientos-proximos a mantenimientos-proximas #}
+            background-color: #fffde7; /* Light Yellow */
+            border-color: #fff9c4;
+        }
+        .info-card.comprobaciones-vencidas {
+            background-color: #ffebee; /* Light Red */
+            border-color: #ffcdd2;
+        }
+        .info-card.comprobaciones-proximas {
+            background-color: #fffde7; /* Light Yellow */
+            border-color: #fff9c4;
+        }
+
+        /* Colores para alertas (se mantienen, aunque las info-cards tendrán sus propios bg) */
+        .alert-info {
+            background-color: #e0f2f7; /* light blue */
+            color: #007bff; /* blue */
+        }
+        .alert-success {
+            background-color: #d4edda;
+            color: #28a745;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #dc3545;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            color: #ffc107;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .summary-table th, .summary-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .summary-table th {
+            background-color: #f8f8f8;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .summary-table td {
+            color: #2d3748;
+        }
+        .summary-table tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Filtro de empresa para superusuarios #}
+    {% if is_superuser %}
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <form method="get" class="flex flex-wrap items-center justify-start gap-4">
+            <div class="flex items-center gap-2">
+                <label for="company-filter" class="text-gray-700 font-bold">Filtrar por Empresa:</label>
+                <select name="empresa_id" id="company-filter" class="form-select" onchange="this.form.submit()">
+                    <option value="">Todas las Empresas</option>
+                    {% for empresa in empresas_disponibles %}
+                        <option value="{{ empresa.id }}" {% if selected_company_id == empresa.id|stringformat:"s" %}selected{% endif %}>
+                            {{ empresa.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div class="info-card total-equipos">
+            <h3>Total de Equipos</h3>
+            <p>{{ total_equipos }}</p>
+        </div>
+        <div class="info-card equipos-activos">
+            <h3>Equipos Activos</h3>
+            <p>{{ equipos_activos }}</p>
+        </div>
+        {# Calibraciones Vencidas #}
+        <div class="info-card calibraciones-vencidas {% if calibraciones_vencidas > 0 %}bg-red-100{% endif %}">
+            <h3>Calibraciones Vencidas</h3>
+            <p class="{% if calibraciones_vencidas > 0 %}text-red-700{% else %}text-gray-800{% endif %}">{{ calibraciones_vencidas }}</p>
+            {% if vencidos_calibracion_codigos %}
+                <small class="text-gray-600">({{ vencidos_calibracion_codigos|join:", " }})</small>
+            {% endif %}
+        </div>
+        {# Calibraciones Próximas #}
+        <div class="info-card calibraciones-proximas {% if calibraciones_proximas > 0 %}bg-yellow-100{% endif %}">
+            <h3>Calibraciones Próximas (30 días)</h3>
+            <p class="{% if calibraciones_proximas > 0 %}text-yellow-700{% else %}text-gray-800{% endif %}">{{ calibraciones_proximas }}</p>
+        </div>
+        {# Mantenimientos Vencidos #}
+        <div class="info-card mantenimientos-vencidos {% if mantenimientos_vencidos > 0 %}bg-red-100{% endif %}">
+            <h3>Mantenimientos Vencidos</h3>
+            <p class="{% if mantenimientos_vencidos > 0 %}text-red-700{% else %}text-gray-800{% endif %}">{{ mantenimientos_vencidos }}</p>
+            {% if vencidos_mantenimiento_codigos %}
+                <small class="text-gray-600">({{ vencidos_mantenimiento_codigos|join:", " }})</small>
+            {% endif %}
+        </div>
+        {# Mantenimientos Próximos #}
+        <div class="info-card mantenimientos-proximas {% if mantenimientos_proximas > 0 %}bg-yellow-100{% endif %}"> {# CAMBIO AQUÍ: mantenimientos_proximos a mantenimientos_proximas #}
+            <h3>Mantenimientos Próximos (30 días)</h3>
+            <p class="{% if mantenimientos_proximas > 0 %}text-yellow-700{% else %}text-gray-800{% endif %}">{{ mantenimientos_proximas }}</p> {# CAMBIO AQUÍ: mantenimientos_proximos a mantenimientos_proximas #}
+        </div>
+        {# Comprobaciones Vencidas #}
+        <div class="info-card comprobaciones-vencidas {% if comprobaciones_vencidas > 0 %}bg-red-100{% endif %}">
+            <h3>Comprobaciones Vencidas</h3>
+            <p class="{% if comprobaciones_vencidas > 0 %}text-red-700{% else %}text-gray-800{% endif %}">{{ comprobaciones_vencidas }}</p>
+            {% if vencidos_comprobacion_codigos %}
+                <small class="text-gray-600">({{ vencidos_comprobacion_codigos|join:", " }})</small>
+            {% endif %}
+        </div>
+        {# Comprobaciones Próximas #}
+        <div class="info-card comprobaciones-proximas {% if comprobaciones_proximas > 0 %}bg-yellow-100{% endif %}">
+            <h3>Comprobaciones Próximas (30 días)</h3>
+            <p class="{% if comprobaciones_proximas > 0 %}text-yellow-700{% else %}text-gray-800{% endif %}">{{ comprobaciones_proximas }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {# Gráfica de Torta para Calibraciones #}
+        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
+            <div class="w-full lg:w-1/2 p-2">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Calibraciones (Año Actual)</h2>
+                <div class="chart-container">
+                    <canvas id="calibracionesPieChart"></canvas>
+                </div>
+            </div>
+            <div class="w-full lg:w-1/2 p-2">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Resumen Calibraciones (Año Actual)</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Estado</th>
+                            <th>Cantidad</th>
+                            <th>Porcentaje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Total Programadas</td>
+                            <td>{{ cal_total_programmed_anual }}</td>
+                            <td>100%</td>
+                        </tr>
+                        <tr>
+                            <td>Realizadas</td>
+                            <td>{{ cal_realized_anual }}</td>
+                            <td>{{ cal_realized_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>No Cumplidas (Vencidas)</td>
+                            <td>{{ cal_no_cumplido_anual }}</td>
+                            <td>{{ cal_no_cumplido_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Pendientes/Programadas (Futuro)</td>
+                            <td>{{ cal_pendiente_anual }}</td>
+                            <td>{{ cal_pendiente_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Gráfica de Torta para Comprobaciones #}
+        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
+            <div class="w-full lg:w-1/2 p-2">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Comprobaciones (Año Actual)</h2>
+                <div class="chart-container">
+                    <canvas id="comprobacionesPieChart"></canvas>
+                </div>
+            </div>
+            <div class="w-full lg:w-1/2 p-2">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Resumen Comprobaciones (Año Actual)</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Estado</th>
+                            <th>Cantidad</th>
+                            <th>Porcentaje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Total Programadas</td>
+                            <td>{{ comp_total_programmed_anual }}</td>
+                            <td>100%</td>
+                        </tr>
+                        <tr>
+                            <td>Realizadas</td>
+                            <td>{{ comp_realized_anual }}</td>
+                            <td>{{ comp_realized_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>No Cumplidas (Vencidas)</td>
+                            <td>{{ comp_no_cumplido_anual }}</td>
+                            <td>{{ comp_no_cumplido_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Pendientes/Programadas (Futuro)</td>
+                            <td>{{ comp_pendiente_anual }}</td>
+                            <td>{{ comp_pendiente_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 mb-8">
+        {# Gráfica de Línea para Calibraciones #}
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Calibraciones Programadas vs. Realizadas (Seguimiento)</h2>
+            <div class="chart-container">
+                <canvas id="calibracionesLineChart"></canvas>
+            </div>
+        </div>
+
+        {# Gráfica de Línea para Mantenimientos #}
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Mantenimientos Programados vs. Realizados (Seguimiento)</h2>
+            <div class="chart-container">
+                <canvas id="mantenimientosLineChart"></canvas>
+            </div>
+        </div>
+
+        {# Gráfica de Línea para Comprobaciones #}
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Comprobaciones Programadas vs. Realizadas (Seguimiento)</h2>
+            <div class="chart-container">
+                <canvas id="comprobacionesLineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<script>
+    // Register the datalabels plugin globally
+    Chart.register(ChartDataLabels);
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Parse JSON data from Django context for Pie Charts
+        const calibracionesTortaLabels = JSON.parse(document.getElementById('calibraciones_torta_labels_json').innerHTML);
+        const calibracionesTortaData = JSON.parse(document.getElementById('calibraciones_torta_data_json').innerHTML);
+        const pieChartColorsCal = JSON.parse(document.getElementById('pie_chart_colors_cal_json').innerHTML);
+
+        const comprobacionesTortaLabels = JSON.parse(document.getElementById('comprobaciones_torta_labels_json').innerHTML);
+        const comprobacionesTortaData = JSON.parse(document.getElementById('comprobaciones_torta_data_json').innerHTML);
+        const pieChartColorsComp = JSON.parse(document.getElementById('pie_chart_colors_comp_json').innerHTML);
+
+        // Parse JSON data from Django context for Line Charts
+        const lineChartLabels = JSON.parse(document.getElementById('line_chart_labels_json').innerHTML);
+        const programmedCalibrationsLineData = JSON.parse(document.getElementById('programmed_calibrations_line_data_json').innerHTML);
+        const realizedCalibrationsLineData = JSON.parse(document.getElementById('realized_calibrations_line_data_json').innerHTML);
+        
+        const programmedMantenimientosLineData = JSON.parse(document.getElementById('programmed_mantenimientos_line_data_json').innerHTML);
+        const realizedPreventiveMantenimientosLineData = JSON.parse(document.getElementById('realized_preventive_mantenimientos_line_data_json').innerHTML);
+        const realizedCorrectiveMantenimientosLineData = JSON.parse(document.getElementById('realized_corrective_mantenimientos_line_data_json').innerHTML);
+        const realizedOtherMantenimientosLineData = JSON.parse(document.getElementById('realized_other_mantenimientos_line_data_json').innerHTML);
+
+        const programmedComprobacionesLineData = JSON.parse(document.getElementById('programmed_comprobaciones_line_data_json').innerHTML);
+        const realizedComprobacionesLineData = JSON.parse(document.getElementById('realized_comprobaciones_line_data_json').innerHTML);
+
+
+        // Helper to get total for percentage calculation in tooltips
+        const getTotal = (dataArray) => {
+            let sum = 0;
+            dataArray.forEach(value => {
+                sum += value;
+            });
+            return sum;
+        };
+
+        // --- Pie Chart for Calibraciones ---
+        const calibracionesPieCtx = document.getElementById('calibracionesPieChart').getContext('2d');
+        const totalCalibracionesTorta = getTotal(calibracionesTortaData);
+
+        new Chart(calibracionesPieCtx, {
+            type: 'doughnut', // Use doughnut for a modern look
+            data: {
+                labels: calibracionesTortaLabels,
+                datasets: [{
+                    data: calibracionesTortaData,
+                    backgroundColor: pieChartColorsCal,
+                    borderColor: '#ffffff', // White border between segments
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%', // Makes it a doughnut chart
+                plugins: {
+                    legend: {
+                        position: 'bottom', // Place legend at the bottom
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                const value = tooltipItem.parsed;
+                                const percentage = totalCalibracionesTorta > 0 ? ((value / totalCalibracionesTorta) * 100).toFixed(2) : 0;
+                                return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    datalabels: { // Plugin for displaying percentages directly on segments
+                        color: '#fff',
+                        formatter: (value, context) => {
+                            const total = getTotal(context.dataset.data);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+                            return percentage + '%';
+                        },
+                        font: {
+                            weight: 'bold',
+                            size: 16
+                        },
+                        display: 'auto' // Ensure labels are displayed
+                    },
+                    title: {
+                        display: false, // Title is in H2 tag above
+                    }
+                }
+            }
+        });
+
+        // --- Pie Chart for Comprobaciones ---
+        const comprobacionesPieCtx = document.getElementById('comprobacionesPieChart').getContext('2d');
+        const totalComprobacionesTorta = getTotal(comprobacionesTortaData);
+
+        new Chart(comprobacionesPieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: comprobacionesTortaLabels,
+                datasets: [{
+                    data: comprobacionesTortaData,
+                    backgroundColor: pieChartColorsComp,
+                    borderColor: '#ffffff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                const value = tooltipItem.parsed;
+                                const percentage = totalComprobacionesTorta > 0 ? ((value / totalComprobacionesTorta) * 100).toFixed(2) : 0;
+                                return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        color: '#fff',
+                        formatter: (value, context) => {
+                            const total = getTotal(context.dataset.data);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+                            return percentage + '%';
+                        },
+                        font: {
+                            weight: 'bold',
+                            size: 16
+                        },
+                        display: 'auto' // Ensure labels are displayed
+                    },
+                    title: {
+                        display: false,
+                    }
+                }
+            }
+        });
+
+        // --- Line Chart for Calibraciones ---
+        const calibracionesLineCtx = document.getElementById('calibracionesLineChart').getContext('2d');
+        new Chart(calibracionesLineCtx, {
+            type: 'line',
+            data: {
+                labels: lineChartLabels,
+                datasets: [
+                    {
+                        label: 'Programadas',
+                        data: programmedCalibrationsLineData,
+                        borderColor: '#007bff', // Blue
+                        backgroundColor: 'rgba(0, 123, 255, 0.2)', // Light blue fill
+                        fill: false, // No fill under the line
+                        tension: 0.3, // Smooth curves
+                        pointBackgroundColor: '#007bff',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#007bff',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Realizadas',
+                        data: realizedCalibrationsLineData,
+                        borderColor: '#28a745', // Green
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)', // Light green fill
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#28a745',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#28a745',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    title: {
+                        display: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Mes y Año',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false // Hide vertical grid lines
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Cantidad de Actividades',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            precision: 0 // Ensure integer ticks
+                        }
+                    }
+                }
+            }
+        });
+
+        // --- Line Chart for Mantenimientos (Desglosado por Tipo) ---
+        const mantenimientosLineCtx = document.getElementById('mantenimientosLineChart').getContext('2d');
+        new Chart(mantenimientosLineCtx, {
+            type: 'line',
+            data: {
+                labels: lineChartLabels,
+                datasets: [
+                    {
+                        label: 'Programados (Total)', // Programmed is general as per model
+                        data: programmedMantenimientosLineData,
+                        borderColor: '#6c757d', // Gris claro para programados totales
+                        backgroundColor: 'rgba(108, 117, 125, 0.2)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#6c757d',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#6c757d',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Realizados - Preventivo',
+                        data: realizedPreventiveMantenimientosLineData,
+                        borderColor: '#007bff', // Azul para preventivo realizado
+                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#007bff',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#007bff',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Realizados - Correctivo',
+                        data: realizedCorrectiveMantenimientosLineData,
+                        borderColor: '#dc3545', // Rojo para correctivo realizado
+                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#dc3545',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#dc3545',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Realizados - Otros', // For any other maintenance types
+                        data: realizedOtherMantenimientosLineData,
+                        borderColor: '#ffc107', // Naranja para otros tipos
+                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#ffc107',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#ffc107',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    title: {
+                        display: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Mes y Año',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Cantidad de Actividades',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+
+        // --- Line Chart for Comprobaciones ---
+        const comprobacionesLineCtx = document.getElementById('comprobacionesLineChart').getContext('2d');
+        new Chart(comprobacionesLineCtx, {
+            type: 'line',
+            data: {
+                labels: lineChartLabels,
+                datasets: [
+                    {
+                        label: 'Programadas',
+                        data: programmedComprobacionesLineData,
+                        borderColor: '#007bff', // Blue
+                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#007bff',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#007bff',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Realizadas',
+                        data: realizedComprobacionesLineData,
+                        borderColor: '#28a745', // Green
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        fill: false,
+                        tension: 0.3,
+                        pointBackgroundColor: '#28a745',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#28a745',
+                        pointHoverBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    title: {
+                        display: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Mes y Año',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Cantidad de Actividades',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{# Hidden divs to pass JSON data safely #}
+<div id="calibraciones_torta_labels_json" style="display:none;">{{ calibraciones_torta_labels_json }}</div>
+<div id="calibraciones_torta_data_json" style="display:none;">{{ calibraciones_torta_data_json }}</div>
+<div id="pie_chart_colors_cal_json" style="display:none;">{{ pie_chart_colors_cal_json }}</div>
+
+<div id="comprobaciones_torta_labels_json" style="display:none;">{{ comprobaciones_torta_labels_json }}</div>
+<div id="comprobaciones_torta_data_json" style="display:none;">{{ comprobaciones_torta_data_json }}</div>
+<div id="pie_chart_colors_comp_json" style="display:none;">{{ pie_chart_colors_comp_json }}</div>
+
+<div id="line_chart_labels_json" style="display:none;">{{ line_chart_labels_json }}</div>
+<div id="programmed_calibrations_line_data_json" style="display:none;">{{ programmed_calibrations_line_data_json }}</div>
+<div id="realized_calibrations_line_data_json" style="display:none;">{{ realized_calibrations_line_data_json }}</div>
+
+<div id="programmed_mantenimientos_line_data_json" style="display:none;">{{ programmed_mantenimientos_line_data_json }}</div>
+<div id="realized_preventive_mantenimientos_line_data_json" style="display:none;">{{ realized_preventive_mantenimientos_line_data_json }}</div>
+<div id="realized_corrective_mantenimientos_line_data_json" style="display:none;">{{ realized_corrective_mantenimientos_line_data_json }}</div>
+<div id="realized_other_mantenimientos_line_data_json" style="display:none;">{{ realized_other_mantenimientos_line_data_json }}</div>
+
+<div id="programmed_comprobaciones_line_data_json" style="display:none;">{{ programmed_comprobaciones_line_data_json }}</div>
+<div id="realized_comprobaciones_line_data_json" style="display:none;">{{ realized_comprobaciones_line_data_json }}</div>
+{% endblock %}

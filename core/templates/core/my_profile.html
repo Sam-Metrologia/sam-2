@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Perfil{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+    <div class="flex justify-end items-center mb-6 space-x-2"> {# Added space-x-2 for spacing buttons #}
+        <a href="{% url 'core:editar_usuario' pk=usuario.pk %}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+            <i class="fas fa-edit mr-2"></i> Editar Perfil
+        </a>
+        <a href="{% url 'core:password_change' %}" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+            <i class="fas fa-key mr-2"></i> Cambiar Contraseña
+        </a>
+    </div>
+
+    {# Mensajes de Django #}
+    {% if messages %}
+        <ul class="messages mb-4">
+            {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }} p-3 rounded-md mb-2"{% endif %}>
+                    {{ message }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+        <h2 class="text-xl font-semibold text-gray-700 mb-4">Información de tu Cuenta</h2>
+        <p><strong>Usuario:</strong> {{ usuario.username }}</p>
+        <p><strong>Nombre Completo:</strong> {{ usuario.get_full_name|default:"N/A" }}</p>
+        <p><strong>Email:</strong> {{ usuario.email|default:"N/A" }}</p>
+        <p><strong>Empresa:</strong> {{ usuario.empresa.nombre|default:"N/A" }}</p>
+        <p><strong>Es Staff:</strong> {% if usuario.is_staff %}Sí{% else %}No{% endif %}</p>
+        <p><strong>Es Superusuario:</strong> {% if usuario.is_superuser %}Sí{% else %}No{% endif %}</p>
+        <p><strong>Fecha de Creación:</strong> {{ usuario.date_joined|date:"d M Y H:i" }}</p>
+        <p><strong>Último Inicio de Sesión:</strong> {{ usuario.last_login|date:"d M Y H:i"|default:"N/A" }}</p>
+    </div>
+</div>
+{% endblock %}

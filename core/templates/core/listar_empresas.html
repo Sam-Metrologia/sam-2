@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="flex justify-between items-center mb-6">
+        <form method="GET" action="{% url 'core:listar_empresas' %}" class="flex space-x-2">
+            <input type="text" name="q" placeholder="Buscar empresa..." value="{{ query }}"
+                   class="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md shadow-md">
+                Buscar
+            </button>
+        </form>
+        <a href="{% url 'core:añadir_empresa' %}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md shadow-md">
+            Añadir Empresa
+        </a>
+    </div>
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <table class="min-w-full leading-normal">
+            <thead>
+                <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                    <th class="py-3 px-6 text-left">Nombre</th>
+                    <th class="py-3 px-6 text-left">NIT</th>
+                    <th class="py-3 px-6 text-left">Teléfono</th>
+                    <th class="py-3 px-6 text-left">Email</th>
+                    <th class="py-3 px-6 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="text-gray-600 text-sm font-light">
+                {% for empresa in empresas %}
+                <tr class="border-b border-gray-200 hover:bg-gray-100">
+                    <td class="py-3 px-6 text-left whitespace-nowrap">
+                        <a href="{% url 'core:detalle_empresa' empresa.pk %}" class="text-blue-600 hover:text-blue-800 hover:underline">
+                            {{ empresa.nombre }}
+                        </a>
+                    </td>
+                    <td class="py-3 px-6 text-left">{{ empresa.nit|default:"N/A" }}</td>
+                    <td class="py-3 px-6 text-left">{{ empresa.telefono|default:"N/A" }}</td>
+                    <td class="py-3 px-6 text-left">{{ empresa.email|default:"N/A" }}</td>
+                    <td class="py-3 px-6 text-center">
+                        <div class="flex item-center justify-center space-x-2">
+                            <a href="{% url 'core:editar_empresa' empresa.pk %}" class="w-8 h-8 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center text-blue-600" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{% url 'core:eliminar_empresa' empresa.pk %}" class="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-600" title="Eliminar">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="py-3 px-6 text-center">No hay empresas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Paginación #}
+    {% if empresas.has_other_pages %}
+    <div class="flex justify-center mt-6">
+        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+            {% if empresas.has_previous %}
+                <a href="?page={{ empresas.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <span class="sr-only">Anterior</span>
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            {% else %}
+                <span class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-gray-50 text-sm font-medium text-gray-500 cursor-not-allowed">
+                    <span class="sr-only">Anterior</span>
+                    <i class="fas fa-chevron-left"></i>
+                </span>
+            {% endif %}
+
+            {% for i in empresas.paginator.page_range %}
+                {% if empresas.number == i %}
+                    <span aria-current="page" class="relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-500 text-sm font-medium text-white">
+                        {{ i }}
+                    </span>
+                {% else %}
+                    <a href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        {{ i }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if empresas.has_next %}
+                <a href="?page={{ empresas.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <span class="sr-only">Siguiente</span>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            {% else %}
+                <span class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-gray-50 text-sm font-medium text-gray-500 cursor-not-allowed">
+                    <span class="sr-only">Siguiente</span>
+                    <i class="fas fa-chevron-right"></i>
+                </span>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

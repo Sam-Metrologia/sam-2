@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">{% if query %}Resultados para "{{ query }}"{% else %}{{ titulo_pagina }}{% endif %}</h1>
+
+    {# Información de formato de la empresa actual #}
+    {% if current_company_format_info %}
+    <div class="bg-blue-50 p-4 rounded-lg shadow-sm mb-6 text-blue-800 border border-blue-200">
+        <h2 class="text-xl font-semibold mb-2">Información de Formato de la Empresa: {{ current_company_format_info.nombre }}</h2>
+        <p><strong>Versión del Formato:</strong> {{ current_company_format_info.formato_version_empresa|default:"N/A" }}</p>
+        <p><strong>Fecha de Versión:</strong> {{ current_company_format_info.formato_fecha_version_empresa|date:"d/m/Y"|default:"N/A" }}</p>
+        <p><strong>Codificación del Formato:</strong> {{ current_company_format_info.formato_codificacion_empresa|default:"N/A" }}</p>
+    </div>
+    {% elif is_superuser and not selected_company_id %}/
+    {# Mensaje para superusuario cuando no hay empresa seleccionada #}
+    <div class="bg-yellow-50 p-4 rounded-lg shadow-sm mb-6 text-yellow-800 border border-yellow-200">
+        <p>Selecciona una empresa en el filtro superior para ver su información de formato.</p>
+    </div>
+    {% endif %}
+
+
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <form method="get" class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <label for="search-query" class="text-gray-700 font-bold">Buscar:</label>
+                <input type="text" name="q" id="search-query" placeholder="Código, nombre, marca..."
+                       class="form-input flex-grow" value="{{ request.GET.q }}">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label for="tipo_equipo" class="text-gray-700 font-bold">Tipo:</label>
+                <select name="tipo_equipo" id="tipo_equipo" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value, label in tipo_equipo_choices %}
+                        <option value="{{ value }}" {% if request.GET.tipo_equipo == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label for="estado" class="text-gray-700 font-bold">Estado:</label>
+                <select name="estado" id="estado" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value, label in estado_choices %}
+                        <option value="{{ value }}" {% if request.GET.estado == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Filtro de empresa para superusuarios #}
+            {% if is_superuser %}
+            <div class="flex items-center gap-2">
+                <label for="company-filter" class="text-gray-700 font-bold">Empresa:</label>
+                <select name="empresa_id" id="company-filter" class="form-select">
+                    <option value="">Todas</option>
+                    {% for empresa in empresas_disponibles %}
+                        <option value="{{ empresa.id }}" {% if selected_company_id == empresa.id|stringformat:"s" %}selected{% endif %}>
+                            {{ empresa.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                <i class="fas fa-filter mr-2"></i> Filtrar
+            </button>
+            <a href="{% url 'core:home' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                <i class="fas fa-redo mr-2"></i> Limpiar Filtros
+            </a>
+        </form>
+    </div>
+
+    <div class="mb-6 text-right flex justify-end space-x-2"> {# Added flex and space-x-2 for button grouping #}
+        {% if perms.core.add_equipo %} {# CAMBIO AQUÍ: Usar 'add_equipo' #}
+        <a href="{% url 'core:importar_equipos_excel' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+            <i class="fas fa-file-excel mr-2"></i> Importar Equipos
+        </a>
+        <a href="{% url 'core:añadir_equipo' %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+            <i class="fas fa-plus-circle mr-2"></i> Añadir Equipo
+        </a>
+        {% endif %}
+    </div>
+
+    {% if equipos %}
+    <div class="overflow-x-auto bg-white rounded-lg shadow-md">
+        <table class="min-w-full leading-normal">
+            <thead>
+                <tr>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tl-lg">
+                        Código Interno
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Nombre
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Empresa
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Tipo
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Marca
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Modelo
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Número de Serie
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Estado
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Próxima Calibración
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Próximo Mantenimiento
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tr-lg">
+                        Próxima Comprobación
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tr-lg">
+                        Acciones
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for equipo in equipos %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.codigo_interno }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.nombre }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.empresa.nombre }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.get_tipo_equipo_display }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.marca|default:"N/A" }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.modelo|default:"N/A" }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">{{ equipo.numero_serie|default:"N/A" }}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <span class="relative inline-block px-3 py-1 font-semibold leading-tight">
+                            <span aria-hidden="true" class="absolute inset-0 opacity-50 rounded-full
+                                {% if equipo.estado == 'Activo' %}bg-green-200{% elif equipo.estado == 'De Baja' %}bg-red-200{% else %}bg-yellow-200{% endif %}"></span>
+                            <span class="relative text-gray-900">{{ equipo.estado }}</span>
+                        </span>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm {{ equipo.proxima_calibracion_status }}">
+                        {{ equipo.proxima_calibracion|date:"d/m/Y"|default:"N/A" }}
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm {{ equipo.proximo_mantenimiento_status }}">
+                        {{ equipo.proximo_mantenimiento|date:"d/m/Y"|default:"N/A" }}
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm {{ equipo.proxima_comprobacion_status }}">
+                        {{ equipo.proxima_comprobacion|date:"d/m/Y"|default:"N/A" }}
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <div class="flex items-center space-x-2">
+                            <a href="{% url 'core:detalle_equipo' equipo.pk %}" title="Ver Detalle"
+                               class="text-blue-600 hover:text-blue-900 transition duration-300 ease-in-out">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'core:editar_equipo' equipo.pk %}" title="Editar"
+                               class="text-yellow-600 hover:text-yellow-900 transition duration-300 ease-in-out">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            {% if user.is_superuser %} {# Solo superusuarios pueden eliminar #}
+                            <a href="{% url 'core:eliminar_equipo' equipo.pk %}" title="Eliminar"
+                               class="text-red-600 hover:text-red-900 transition duration-300 ease-in-out">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                            {% endif %}
+                            {% if equipo.estado != 'De Baja' %}
+                            <a href="{% url 'core:dar_baja_equipo' equipo.pk %}" title="Dar de Baja"
+                               class="text-purple-600 hover:text-purple-900 transition duration-300 ease-in-out">
+                                <i class="fas fa-arrow-down"></i>
+                            </a>
+                            {% else %}
+                            <a href="{% url 'core:activar_equipo' equipo.pk %}" title="Activar Equipo"
+                               class="text-green-600 hover:text-green-900 transition duration-300 ease-in-out">
+                                <i class="fas fa-arrow-up"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Paginación #}
+    <div class="px-5 py-5 bg-white border-t flex flex-col xs:flex-row items-center xs:justify-between">
+        <span class="text-xs xs:text-sm text-gray-900">
+            Mostrando {{ equipos.start_index }} a {{ equipos.end_index }} de {{ equipos.paginator.count }} equipos
+        </span>
+        <div class="inline-flex mt-2 xs:mt-0">
+            {% if equipos.has_previous %}
+                <a href="?page={{ equipos.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_equipo %}&tipo_equipo={{ request.GET.tipo_equipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-l-lg transition duration-300 ease-in-out">
+                    Anterior
+                </a>
+            {% endif %}
+            
+            {% for i in equipos.paginator.page_range %}
+                {% if equipos.number == i %}
+                    <span class="bg-blue-800 text-white font-bold py-2 px-4 border-r border-gray-200">{{ i }}</span>
+                {% else %}
+                    <a href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_equipo %}&tipo_equipo={{ request.GET.tipo_equipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
+                       class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 border-r border-gray-200 transition duration-300 ease-in-out">
+                        {{ i }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if equipos.has_next %}
+                <a href="?page={{ equipos.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_equipo %}&tipo_equipo={{ request.GET.tipo_equipo }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r-lg transition duration-300 ease-in-out">
+                    Siguiente
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+        <p class="text-gray-600 text-lg">No se encontraron equipos que coincidan con los criterios de búsqueda o filtro.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
