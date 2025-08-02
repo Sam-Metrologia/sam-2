@@ -1,8 +1,13 @@
 #!/bin/bash
 
-# Exporta el PYTHONPATH para que Python pueda encontrar los módulos de tu proyecto.
-export PYTHONPATH=/opt/render/project/src/
+# Este script se ejecuta al iniciar la aplicación en Render
 
-# Inicia Gunicorn usando el módulo de Python.
-# Esto asegura que el comando 'gunicorn' se encuentre, sin importar la configuración del PATH.
-python -m gunicorn proyecto_c.wsgi:application --log-file -
+# Ejecuta las migraciones de la base de datos (opcional, pero recomendado)
+# Esto aplica cualquier cambio en el modelo de la base de datos
+python manage.py migrate
+
+# Recoge los archivos estáticos para la producción
+python manage.py collectstatic --no-input
+
+# Inicia la aplicación con Gunicorn, apuntando al archivo wsgi correcto
+gunicorn proyecto_c.wsgi 

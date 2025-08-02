@@ -31,13 +31,14 @@ if DEBUG:
     ALLOWED_HOSTS.append('localhost')
     ALLOWED_HOSTS.append('127.0.0.1')
 
-# --- INSERCIÓN IMPORTANTE: Configuración para CSRF en Render ---
+# --- CONFIGURACIÓN PARA CORREGIR EL ERROR CSRF EN RENDER ---
 # Django necesita confiar en el dominio de Render para aceptar el token CSRF.
 if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
 else:
+    # Para desarrollo local, confía en localhost
     CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
-# --- FIN DE LA INSERCIÓN IMPORTANTE ---
+# --- FIN DE LA CONFIGURACIÓN ---
 
 
 # Application definition
@@ -85,14 +86,27 @@ WSGI_APPLICATION = 'proyecto_c.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# Configuración de base de datos para PostgreSQL en Render
+# --- CONFIGURACIÓN CORREGIDA PARA LA BASE DE DATOS EN RENDER Y LOCAL ---
+# Obtenemos la URL de la base de datos de la variable de entorno
 DATABASE_URL = os.environ.get('DATABASE_URL')
-DATABASES = {
-    'default': dj_database_url.config(
-        default=DATABASE_URL,
-        conn_max_age=600 # Opcional: para reusar conexiones y evitar cuellos de botella
-    )
-}
+
+if DATABASE_URL:
+    # Si la variable existe, usamos la configuración de Render
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600
+        )
+    }
+else:
+    # Si no existe (estamos en desarrollo local), usamos SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+# --- FIN DE LA CONFIGURACIÓN CORREGIDA ---
 
 
 # Password validation
