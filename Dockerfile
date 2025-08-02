@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     shared-mime-info \
     python3-dev \
     build-essential \
+    libglib2.0-0 \
+    libpangoft2-1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Establece el directorio de trabajo dentro del contenedor.
@@ -34,4 +36,3 @@ RUN chmod +x start.sh
 # El comando principal para ejecutar la aplicación.
 # Usa CMD en lugar de ENTRYPOINT para que se pueda sobrescribir fácilmente.
 CMD ["./start.sh"]
-
