@@ -10,3 +10,5 @@ whitenoise==6.9.0
 python-dateutil
 openpyxl
 weasyprint
+django-storages
+boto3
