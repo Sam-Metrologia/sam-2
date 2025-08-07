@@ -49,7 +49,12 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for proveedor in proveedores %}
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ proveedor.nombre_empresa }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {# Enlace a la página de detalle del proveedor #}
+                            <a href="{% url 'core:detalle_proveedor' pk=proveedor.pk %}" class="text-blue-600 hover:text-blue-900">
+                                {{ proveedor.nombre_empresa }}
+                            </a>
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.get_tipo_servicio_display }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.nombre_contacto|default:"N/A" }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ proveedor.numero_contacto|default:"N/A" }}</td>
@@ -103,7 +108,7 @@
             const csrfInput = document.createElement('input');
             csrfInput.type = 'hidden';
             csrfInput.name = 'csrfmiddlewaretoken';
-            csrfInput.value = '{{ csrf_token }}';
+            csrfInput.value = '{{ csrf_token }}'; // Get CSRF token from Django context
             form.appendChild(csrfInput);
 
             document.body.appendChild(form);

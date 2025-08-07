@@ -38,6 +38,7 @@ urlpatterns = [
     path('equipos/<int:equipo_pk>/mantenimientos/añadir/', views.añadir_mantenimiento, name='añadir_mantenimiento'),
     path('equipos/<int:equipo_pk>/mantenimientos/<int:pk>/editar/', views.editar_mantenimiento, name='editar_mantenimiento'),
     path('equipos/<int:equipo_pk>/mantenimientos/<int:pk>/eliminar/', views.eliminar_mantenimiento, name='eliminar_mantenimiento'),
+    path('equipos/<int:equipo_pk>/mantenimientos/<int:pk>/', views.detalle_mantenimiento, name='detalle_mantenimiento'), # NUEVA URL PARA DETALLE DE MANTENIMIENTO
 
     # Comprobaciones
     path('equipos/<int:equipo_pk>/comprobaciones/añadir/', views.añadir_comprobacion, name='añadir_comprobacion'),
@@ -50,7 +51,7 @@ urlpatterns = [
     path('empresas/<int:pk>/editar/', views.editar_empresa, name='editar_empresa'),
     path('empresas/<int:pk>/eliminar/', views.eliminar_empresa, name='eliminar_empresa'),
     path('empresas/<int:pk>/', views.detalle_empresa, name='detalle_empresa'),
-    path('empresas/<int:empresa_pk>/añadir_usuario/', views.añadir_usuario_a_empresa, name='añadir_usuario_a_empresa'), # ¡NUEVA LÍNEA AÑADIDA!
+    path('empresas/<int:empresa_pk>/añadir_usuario/', views.añadir_usuario_a_empresa, name='añadir_usuario_a_empresa'),
 
     # Ubicaciones
     path('ubicaciones/', views.listar_ubicaciones, name='listar_ubicaciones'),
@@ -114,3 +115,4 @@ urlpatterns = [
     # URL para acceso denegado
     path('access_denied/', views.access_denied, name='access_denied'),
 ]
+

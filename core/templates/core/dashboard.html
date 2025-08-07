@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load math_filters %} {# ¡Esta línea es crucial para tus filtros! #}
 
 {% block extra_head %}
     <style>
@@ -53,6 +54,10 @@
             background-color: #e8f5e9; /* Light Green */
             border-color: #c8e6c9;
         }
+        .info-card.equipos-de-baja { {# Nuevo estilo para equipos de baja #}
+            background-color: #fce4ec; /* Light Pink */
+            border-color: #f8bbd0;
+        }
         .info-card.calibraciones-vencidas {
             background-color: #ffebee; /* Light Red */
             border-color: #ffcdd2;
@@ -65,7 +70,7 @@
             background-color: #ffebee; /* Light Red */
             border-color: #ffcdd2;
         }
-        .info-card.mantenimientos-proximas { {# CAMBIO AQUÍ: mantenimientos-proximos a mantenimientos-proximas #}
+        .info-card.mantenimientos-proximas {
             background-color: #fffde7; /* Light Yellow */
             border-color: #fff9c4;
         }
@@ -116,8 +121,29 @@
         .summary-table tr:last-child td {
             border-bottom: none;
         }
+        /* Estilos para la lista de mantenimientos correctivos */
+        .corrective-maintenance-list {
+            list-style: none;
+            padding: 0;
+            text-align: left;
+        }
+        .corrective-maintenance-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .corrective-maintenance-list li:last-child {
+            border-bottom: none;
+        }
+        .corrective-maintenance-list a {
+            color: #4299e1; /* text-blue-500 */
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .corrective-maintenance-list a:hover {
+            text-decoration: underline;
+        }
     </style>
-{% endblock %}
+{% endblock extra_head %}
 
 {% block content %}
 <div class="container mx-auto p-4">
@@ -161,6 +187,10 @@
             <h3>Equipos Activos</h3>
             <p>{{ equipos_activos }}</p>
         </div>
+        <div class="info-card equipos-de-baja"> {# Nuevo card para equipos de baja #}
+            <h3>Equipos de Baja</h3>
+            <p>{{ equipos_de_baja }}</p>
+        </div>
         {# Calibraciones Vencidas #}
         <div class="info-card calibraciones-vencidas {% if calibraciones_vencidas > 0 %}bg-red-100{% endif %}">
             <h3>Calibraciones Vencidas</h3>
@@ -183,9 +213,9 @@
             {% endif %}
         </div>
         {# Mantenimientos Próximos #}
-        <div class="info-card mantenimientos-proximas {% if mantenimientos_proximas > 0 %}bg-yellow-100{% endif %}"> {# CAMBIO AQUÍ: mantenimientos_proximos a mantenimientos_proximas #}
+        <div class="info-card mantenimientos-proximas {% if mantenimientos_proximas > 0 %}bg-yellow-100{% endif %}">
             <h3>Mantenimientos Próximos (30 días)</h3>
-            <p class="{% if mantenimientos_proximas > 0 %}text-yellow-700{% else %}text-gray-800{% endif %}">{{ mantenimientos_proximas }}</p> {# CAMBIO AQUÍ: mantenimientos_proximos a mantenimientos_proximas #}
+            <p class="{% if mantenimientos_proximas > 0 %}text-yellow-700{% else %}text-gray-800{% endif %}">{{ mantenimientos_proximas }}</p>
         </div>
         {# Comprobaciones Vencidas #}
         <div class="info-card comprobaciones-vencidas {% if comprobaciones_vencidas > 0 %}bg-red-100{% endif %}">
@@ -203,7 +233,7 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {# Gráfica de Torta para Calibraciones #}
+        {# Gráfica de Torta para Calibraciones - SE MANTIENE #}
         <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
             <div class="w-full lg:w-1/2 p-2">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Calibraciones (Año Actual)</h2>
@@ -247,7 +277,7 @@
             </div>
         </div>
 
-        {# Gráfica de Torta para Comprobaciones #}
+        {# Gráfica de Torta para Comprobaciones - SE MANTIENE #}
         <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
             <div class="w-full lg:w-1/2 p-2">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Comprobaciones (Año Actual)</h2>
@@ -293,7 +323,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 mb-8">
-        {# Gráfica de Línea para Calibraciones #}
+        {# Gráfica de Línea para Calibraciones - SE MANTIENE #}
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Calibraciones Programadas vs. Realizadas (Seguimiento)</h2>
             <div class="chart-container">
@@ -301,7 +331,7 @@
             </div>
         </div>
 
-        {# Gráfica de Línea para Mantenimientos #}
+        {# Gráfica de Línea para Mantenimientos - SE MANTIENE #}
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Mantenimientos Programados vs. Realizados (Seguimiento)</h2>
             <div class="chart-container">
@@ -309,7 +339,7 @@
             </div>
         </div>
 
-        {# Gráfica de Línea para Comprobaciones #}
+        {# Gráfica de Línea para Comprobaciones - SE MANTIENE #}
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Comprobaciones Programadas vs. Realizadas (Seguimiento)</h2>
             <div class="chart-container">
@@ -318,446 +348,34 @@
         </div>
     </div>
 
+    {# NUEVO CUADRO: Últimos Mantenimientos Correctivos - SE MANTIENE #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Últimos Mantenimientos Correctivos</h2>
+            {% if latest_corrective_maintenances %}
+                <ul class="corrective-maintenance-list">
+                    {% for maintenance in latest_corrective_maintenances %}
+                        <li>
+                            <a href="{% url 'core:detalle_mantenimiento' maintenance.equipo.pk maintenance.pk %}">
+                                Equipo: {{ maintenance.equipo.nombre }} ({{ maintenance.equipo.codigo_interno }}) - 
+                                Fecha: {{ maintenance.fecha_mantenimiento|date:"d/m/Y" }} - 
+                                Proveedor: {{ maintenance.nombre_proveedor|default:"N/A" }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-gray-600 text-center">No hay mantenimientos correctivos recientes.</p>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-<script>
-    // Register the datalabels plugin globally
-    Chart.register(ChartDataLabels);
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // Parse JSON data from Django context for Pie Charts
-        const calibracionesTortaLabels = JSON.parse(document.getElementById('calibraciones_torta_labels_json').innerHTML);
-        const calibracionesTortaData = JSON.parse(document.getElementById('calibraciones_torta_data_json').innerHTML);
-        const pieChartColorsCal = JSON.parse(document.getElementById('pie_chart_colors_cal_json').innerHTML);
-
-        const comprobacionesTortaLabels = JSON.parse(document.getElementById('comprobaciones_torta_labels_json').innerHTML);
-        const comprobacionesTortaData = JSON.parse(document.getElementById('comprobaciones_torta_data_json').innerHTML);
-        const pieChartColorsComp = JSON.parse(document.getElementById('pie_chart_colors_comp_json').innerHTML);
-
-        // Parse JSON data from Django context for Line Charts
-        const lineChartLabels = JSON.parse(document.getElementById('line_chart_labels_json').innerHTML);
-        const programmedCalibrationsLineData = JSON.parse(document.getElementById('programmed_calibrations_line_data_json').innerHTML);
-        const realizedCalibrationsLineData = JSON.parse(document.getElementById('realized_calibrations_line_data_json').innerHTML);
-        
-        const programmedMantenimientosLineData = JSON.parse(document.getElementById('programmed_mantenimientos_line_data_json').innerHTML);
-        const realizedPreventiveMantenimientosLineData = JSON.parse(document.getElementById('realized_preventive_mantenimientos_line_data_json').innerHTML);
-        const realizedCorrectiveMantenimientosLineData = JSON.parse(document.getElementById('realized_corrective_mantenimientos_line_data_json').innerHTML);
-        const realizedOtherMantenimientosLineData = JSON.parse(document.getElementById('realized_other_mantenimientos_line_data_json').innerHTML);
-
-        const programmedComprobacionesLineData = JSON.parse(document.getElementById('programmed_comprobaciones_line_data_json').innerHTML);
-        const realizedComprobacionesLineData = JSON.parse(document.getElementById('realized_comprobaciones_line_data_json').innerHTML);
-
-
-        // Helper to get total for percentage calculation in tooltips
-        const getTotal = (dataArray) => {
-            let sum = 0;
-            dataArray.forEach(value => {
-                sum += value;
-            });
-            return sum;
-        };
-
-        // --- Pie Chart for Calibraciones ---
-        const calibracionesPieCtx = document.getElementById('calibracionesPieChart').getContext('2d');
-        const totalCalibracionesTorta = getTotal(calibracionesTortaData);
-
-        new Chart(calibracionesPieCtx, {
-            type: 'doughnut', // Use doughnut for a modern look
-            data: {
-                labels: calibracionesTortaLabels,
-                datasets: [{
-                    data: calibracionesTortaData,
-                    backgroundColor: pieChartColorsCal,
-                    borderColor: '#ffffff', // White border between segments
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '70%', // Makes it a doughnut chart
-                plugins: {
-                    legend: {
-                        position: 'bottom', // Place legend at the bottom
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(tooltipItem) {
-                                const value = tooltipItem.parsed;
-                                const percentage = totalCalibracionesTorta > 0 ? ((value / totalCalibracionesTorta) * 100).toFixed(2) : 0;
-                                return `${tooltipItem.label}: ${value} (${percentage}%)`;
-                            }
-                        }
-                    },
-                    datalabels: { // Plugin for displaying percentages directly on segments
-                        color: '#fff',
-                        formatter: (value, context) => {
-                            const total = getTotal(context.dataset.data);
-                            const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
-                            return percentage + '%';
-                        },
-                        font: {
-                            weight: 'bold',
-                            size: 16
-                        },
-                        display: 'auto' // Ensure labels are displayed
-                    },
-                    title: {
-                        display: false, // Title is in H2 tag above
-                    }
-                }
-            }
-        });
-
-        // --- Pie Chart for Comprobaciones ---
-        const comprobacionesPieCtx = document.getElementById('comprobacionesPieChart').getContext('2d');
-        const totalComprobacionesTorta = getTotal(comprobacionesTortaData);
-
-        new Chart(comprobacionesPieCtx, {
-            type: 'doughnut',
-            data: {
-                labels: comprobacionesTortaLabels,
-                datasets: [{
-                    data: comprobacionesTortaData,
-                    backgroundColor: pieChartColorsComp,
-                    borderColor: '#ffffff',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '70%',
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(tooltipItem) {
-                                const value = tooltipItem.parsed;
-                                const percentage = totalComprobacionesTorta > 0 ? ((value / totalComprobacionesTorta) * 100).toFixed(2) : 0;
-                                return `${tooltipItem.label}: ${value} (${percentage}%)`;
-                            }
-                        }
-                    },
-                    datalabels: {
-                        color: '#fff',
-                        formatter: (value, context) => {
-                            const total = getTotal(context.dataset.data);
-                            const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
-                            return percentage + '%';
-                        },
-                        font: {
-                            weight: 'bold',
-                            size: 16
-                        },
-                        display: 'auto' // Ensure labels are displayed
-                    },
-                    title: {
-                        display: false,
-                    }
-                }
-            }
-        });
-
-        // --- Line Chart for Calibraciones ---
-        const calibracionesLineCtx = document.getElementById('calibracionesLineChart').getContext('2d');
-        new Chart(calibracionesLineCtx, {
-            type: 'line',
-            data: {
-                labels: lineChartLabels,
-                datasets: [
-                    {
-                        label: 'Programadas',
-                        data: programmedCalibrationsLineData,
-                        borderColor: '#007bff', // Blue
-                        backgroundColor: 'rgba(0, 123, 255, 0.2)', // Light blue fill
-                        fill: false, // No fill under the line
-                        tension: 0.3, // Smooth curves
-                        pointBackgroundColor: '#007bff',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#007bff',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    },
-                    {
-                        label: 'Realizadas',
-                        data: realizedCalibrationsLineData,
-                        borderColor: '#28a745', // Green
-                        backgroundColor: 'rgba(40, 167, 69, 0.2)', // Light green fill
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#28a745',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#28a745',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    title: {
-                        display: false,
-                    }
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes y Año',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            display: false // Hide vertical grid lines
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Cantidad de Actividades',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        ticks: {
-                            precision: 0 // Ensure integer ticks
-                        }
-                    }
-                }
-            }
-        });
-
-        // --- Line Chart for Mantenimientos (Desglosado por Tipo) ---
-        const mantenimientosLineCtx = document.getElementById('mantenimientosLineChart').getContext('2d');
-        new Chart(mantenimientosLineCtx, {
-            type: 'line',
-            data: {
-                labels: lineChartLabels,
-                datasets: [
-                    {
-                        label: 'Programados (Total)', // Programmed is general as per model
-                        data: programmedMantenimientosLineData,
-                        borderColor: '#6c757d', // Gris claro para programados totales
-                        backgroundColor: 'rgba(108, 117, 125, 0.2)',
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#6c757d',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#6c757d',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    },
-                    {
-                        label: 'Realizados - Preventivo',
-                        data: realizedPreventiveMantenimientosLineData,
-                        borderColor: '#007bff', // Azul para preventivo realizado
-                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#007bff',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#007bff',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    },
-                    {
-                        label: 'Realizados - Correctivo',
-                        data: realizedCorrectiveMantenimientosLineData,
-                        borderColor: '#dc3545', // Rojo para correctivo realizado
-                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#dc3545',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#dc3545',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    },
-                    {
-                        label: 'Realizados - Otros', // For any other maintenance types
-                        data: realizedOtherMantenimientosLineData,
-                        borderColor: '#ffc107', // Naranja para otros tipos
-                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#ffc107',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#ffc107',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    title: {
-                        display: false,
-                    }
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes y Año',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Cantidad de Actividades',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        ticks: {
-                            precision: 0
-                        }
-                    }
-                }
-            }
-        });
-
-        // --- Line Chart for Comprobaciones ---
-        const comprobacionesLineCtx = document.getElementById('comprobacionesLineChart').getContext('2d');
-        new Chart(comprobacionesLineCtx, {
-            type: 'line',
-            data: {
-                labels: lineChartLabels,
-                datasets: [
-                    {
-                        label: 'Programadas',
-                        data: programmedComprobacionesLineData,
-                        borderColor: '#007bff', // Blue
-                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#007bff',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#007bff',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    },
-                    {
-                        label: 'Realizadas',
-                        data: realizedComprobacionesLineData,
-                        borderColor: '#28a745', // Green
-                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
-                        fill: false,
-                        tension: 0.3,
-                        pointBackgroundColor: '#28a745',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#28a745',
-                        pointHoverBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 14
-                            }
-                        }
-                    },
-                    title: {
-                        display: false,
-                    }
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes y Año',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Cantidad de Actividades',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        ticks: {
-                            precision: 0
-                        }
-                    }
-                }
-            }
-        });
-    });
-</script>
 {# Hidden divs to pass JSON data safely #}
+{# Eliminados: estado_equipos_labels_json, estado_equipos_data_json, pie_chart_colors_equipos_json #}
+{# Eliminados: mantenimientos_torta_labels_json, mantenimientos_torta_data_json, pie_chart_colors_mant_json #}
+
 <div id="calibraciones_torta_labels_json" style="display:none;">{{ calibraciones_torta_labels_json }}</div>
 <div id="calibraciones_torta_data_json" style="display:none;">{{ calibraciones_torta_data_json }}</div>
 <div id="pie_chart_colors_cal_json" style="display:none;">{{ pie_chart_colors_cal_json }}</div>
@@ -774,7 +392,506 @@
 <div id="realized_preventive_mantenimientos_line_data_json" style="display:none;">{{ realized_preventive_mantenimientos_line_data_json }}</div>
 <div id="realized_corrective_mantenimientos_line_data_json" style="display:none;">{{ realized_corrective_mantenimientos_line_data_json }}</div>
 <div id="realized_other_mantenimientos_line_data_json" style="display:none;">{{ realized_other_mantenimientos_line_data_json }}</div>
+<div id="realized_predictive_mantenimientos_line_data_json" style="display:none;">{{ realized_predictive_mantenimientos_line_data_json }}</div>
+<div id="realized_inspection_mantenimientos_line_data_json" style="display:none;">{{ realized_inspection_mantenimientos_line_data_json }}</div>
 
 <div id="programmed_comprobaciones_line_data_json" style="display:none;">{{ programmed_comprobaciones_line_data_json }}</div>
 <div id="realized_comprobaciones_line_data_json" style="display:none;">{{ realized_comprobaciones_line_data_json }}</div>
-{% endblock %}
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<script>
+    // Register the datalabels plugin globally
+    Chart.register(ChartDataLabels);
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Helper function to parse JSON from hidden divs
+        function parseJsonFromHiddenDiv(id) {
+            const element = document.getElementById(id);
+            if (element && element.textContent) {
+                try {
+                    return JSON.parse(element.textContent);
+                } catch (e) {
+                    console.error("Error parsing JSON from", id, e);
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        // Helper to get total for percentage calculation in tooltips
+        const getTotal = (dataArray) => {
+            let sum = 0;
+            if (dataArray) { // Add a check for null/undefined dataArray
+                dataArray.forEach(value => {
+                    sum += value;
+                });
+            }
+            return sum;
+        };
+
+        // Parse JSON data from Django context for Pie Charts
+        const calibracionesTortaLabels = parseJsonFromHiddenDiv('calibraciones_torta_labels_json');
+        const calibracionesTortaData = parseJsonFromHiddenDiv('calibraciones_torta_data_json');
+        const pieChartColorsCal = parseJsonFromHiddenDiv('pie_chart_colors_cal_json');
+
+        const comprobacionesTortaLabels = parseJsonFromHiddenDiv('comprobaciones_torta_labels_json');
+        const comprobacionesTortaData = parseJsonFromHiddenDiv('comprobaciones_torta_data_json');
+        const pieChartColorsComp = parseJsonFromHiddenDiv('pie_chart_colors_comp_json');
+
+
+        // Parse JSON data from Django context for Line Charts
+        const lineChartLabels = parseJsonFromHiddenDiv('line_chart_labels_json');
+        const programmedCalibrationsLineData = parseJsonFromHiddenDiv('programmed_calibrations_line_data_json');
+        const realizedCalibrationsLineData = parseJsonFromHiddenDiv('realized_calibrations_line_data_json');
+        
+        const programmedMantenimientosLineData = parseJsonFromHiddenDiv('programmed_mantenimientos_line_data_json');
+        const realizedPreventiveMantenimientosLineData = parseJsonFromHiddenDiv('realized_preventive_mantenimientos_line_data_json');
+        const realizedCorrectiveMantenimientosLineData = parseJsonFromHiddenDiv('realized_corrective_mantenimientos_line_data_json');
+        const realizedOtherMantenimientosLineData = parseJsonFromHiddenDiv('realized_other_mantenimientos_line_data_json');
+        const realizedPredictiveMantenimientosLineData = parseJsonFromHiddenDiv('realized_predictive_mantenimientos_line_data_json');
+        const realizedInspectionMantenimientosLineData = parseJsonFromHiddenDiv('realized_inspection_mantenimientos_line_data_json');
+
+        const programmedComprobacionesLineData = parseJsonFromHiddenDiv('programmed_comprobaciones_line_data_json');
+        const realizedComprobacionesLineData = parseJsonFromHiddenDiv('realized_comprobaciones_line_data_json');
+
+
+        // --- Pie Chart for Calibraciones ---
+        if (calibracionesTortaLabels && calibracionesTortaData && pieChartColorsCal) {
+            const calibracionesPieCtx = document.getElementById('calibracionesPieChart').getContext('2d');
+            const totalCalibracionesTorta = getTotal(calibracionesTortaData);
+
+            new Chart(calibracionesPieCtx, {
+                type: 'doughnut', // Use doughnut for a modern look
+                data: {
+                    labels: calibracionesTortaLabels,
+                    datasets: [{
+                        data: calibracionesTortaData,
+                        backgroundColor: pieChartColorsCal,
+                        borderColor: '#ffffff', // White border between segments
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%', // Makes it a doughnut chart
+                    plugins: {
+                        legend: {
+                            position: 'bottom', // Place legend at the bottom
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    const value = tooltipItem.parsed;
+                                    const percentage = totalCalibracionesTorta > 0 ? ((value / totalCalibracionesTorta) * 100).toFixed(2) : 0;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        },
+                        datalabels: { // Plugin for displaying percentages directly on segments
+                            color: '#fff',
+                            formatter: (value, context) => {
+                                const total = getTotal(context.dataset.data);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+                                return percentage + '%';
+                            },
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            },
+                            display: 'auto' // Ensure labels are displayed
+                        },
+                        title: {
+                            display: false, // Title is in H2 tag above
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Pie Chart for Comprobaciones ---
+        if (comprobacionesTortaLabels && comprobacionesTortaData && pieChartColorsComp) {
+            const comprobacionesPieCtx = document.getElementById('comprobacionesPieChart').getContext('2d');
+            const totalComprobacionesTorta = getTotal(comprobacionesTortaData);
+
+            new Chart(comprobacionesPieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: comprobacionesTortaLabels,
+                    datasets: [{
+                        data: comprobacionesTortaData,
+                        backgroundColor: pieChartColorsComp,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    const value = tooltipItem.parsed;
+                                    const percentage = totalComprobacionesTorta > 0 ? ((value / totalComprobacionesTorta) * 100).toFixed(2) : 0;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            color: '#fff',
+                            formatter: (value, context) => {
+                                const total = getTotal(context.dataset.data);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+                                return percentage + '%';
+                            },
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            },
+                            display: 'auto' // Ensure labels are displayed
+                        },
+                        title: {
+                            display: false,
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Line Chart for Calibraciones ---
+        if (lineChartLabels && programmedCalibrationsLineData && realizedCalibrationsLineData) {
+            const calibracionesLineCtx = document.getElementById('calibracionesLineChart').getContext('2d');
+            new Chart(calibracionesLineCtx, {
+                type: 'line',
+                data: {
+                    labels: lineChartLabels,
+                    datasets: [
+                        {
+                            label: 'Programadas',
+                            data: programmedCalibrationsLineData,
+                            borderColor: '#007bff', // Blue
+                            backgroundColor: 'rgba(0, 123, 255, 0.2)', // Light blue fill
+                            fill: false, // No fill under the line
+                            tension: 0.3, // Smooth curves
+                            pointBackgroundColor: '#007bff',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#007bff',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            borderWidth: 2 // Grosor normal para programadas
+                        },
+                        {
+                            label: 'Realizadas',
+                            data: realizedCalibrationsLineData,
+                            borderColor: '#28a745', // Green
+                            backgroundColor: 'rgba(40, 167, 69, 0.2)', // Light green fill
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#28a745',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#28a745',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado para notoriedad
+                            pointHoverRadius: 9, // Aumentado para notoriedad
+                            borderWidth: 4 // Aumentado para notoriedad
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        title: {
+                            display: false,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Mes y Año',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Cantidad de Actividades',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                precision: 0 // Ensure integer ticks
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Line Chart for Mantenimientos (Desglosado por Tipo) ---
+        if (lineChartLabels && programmedMantenimientosLineData && realizedPreventiveMantenimientosLineData && realizedCorrectiveMantenimientosLineData && realizedOtherMantenimientosLineData && realizedPredictiveMantenimientosLineData && realizedInspectionMantenimientosLineData) {
+            const mantenimientosLineCtx = document.getElementById('mantenimientosLineChart').getContext('2d');
+            new Chart(mantenimientosLineCtx, {
+                type: 'line',
+                data: {
+                    labels: lineChartLabels,
+                    datasets: [
+                        {
+                            label: 'Programados (Total)', // Programmed is general as per model
+                            data: programmedMantenimientosLineData,
+                            borderColor: '#6c757d', // Gris claro para programados totales
+                            backgroundColor: 'rgba(108, 117, 125, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#6c757d',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#6c757d',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            borderWidth: 2 // Grosor normal para programados
+                        },
+                        {
+                            label: 'Realizados - Preventivo',
+                            data: realizedPreventiveMantenimientosLineData,
+                            borderColor: '#007bff', // Azul para preventivo realizado
+                            backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#007bff',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#007bff',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado
+                            pointHoverRadius: 9, // Aumentado
+                            borderWidth: 4 // Aumentado
+                        },
+                        {
+                            label: 'Realizados - Correctivo',
+                            data: realizedCorrectiveMantenimientosLineData,
+                            borderColor: '#dc3545', // Rojo para correctivo realizado
+                            backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#dc3545',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#dc3545',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado
+                            pointHoverRadius: 9, // Aumentado
+                            borderWidth: 4 // Aumentado
+                        },
+                        {
+                            label: 'Realizados - Predictivo',
+                            data: realizedPredictiveMantenimientosLineData,
+                            borderColor: '#800080', // Morado para predictivo
+                            backgroundColor: 'rgba(128, 0, 128, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#800080',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#800080',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado
+                            pointHoverRadius: 9, // Aumentado
+                            borderWidth: 4 // Aumentado
+                        },
+                        {
+                            label: 'Realizados - Inspección',
+                            data: realizedInspectionMantenimientosLineData,
+                            borderColor: '#008000', // Verde oscuro para inspección
+                            backgroundColor: 'rgba(0, 128, 0, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#008000',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#008000',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado
+                            pointHoverRadius: 9, // Aumentado
+                            borderWidth: 4 // Aumentado
+                        },
+                        {
+                            label: 'Realizados - Otros', // For any other maintenance types
+                            data: realizedOtherMantenimientosLineData,
+                            borderColor: '#ffc107', // Naranja para otros tipos
+                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#ffc107',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#ffc107',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado
+                            pointHoverRadius: 9, // Aumentado
+                            borderWidth: 4 // Aumentado
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        title: {
+                            display: false,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Mes y Año',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Cantidad de Actividades',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Line Chart for Comprobaciones ---
+        if (lineChartLabels && programmedComprobacionesLineData && realizedComprobacionesLineData) {
+            const comprobacionesLineCtx = document.getElementById('comprobacionesLineChart').getContext('2d');
+            new Chart(comprobacionesLineCtx, {
+                type: 'line',
+                data: {
+                    labels: lineChartLabels,
+                    datasets: [
+                        {
+                            label: 'Programadas',
+                            data: programmedComprobacionesLineData,
+                            borderColor: '#007bff', // Blue
+                            backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#007bff',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#007bff',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            borderWidth: 2 // Grosor normal para programadas
+                        },
+                        {
+                            label: 'Realizadas',
+                            data: realizedComprobacionesLineData,
+                            borderColor: '#28a745', // Green
+                            backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                            fill: false,
+                            tension: 0.3,
+                            pointBackgroundColor: '#28a745',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#28a745',
+                            pointHoverBorderColor: '#fff',
+                            pointRadius: 7, // Aumentado
+                            pointHoverRadius: 9, // Aumentado
+                            borderWidth: 4 // Aumentado
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        title: {
+                            display: false,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Mes y Año',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Cantidad de Actividades',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock content %}

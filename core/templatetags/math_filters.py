@@ -34,3 +34,11 @@ def abs_value(value):
         return abs(float(value))
     except (ValueError, TypeError):
         return 0.0 # Return 0.0 or handle as appropriate for your application
+
+@register.filter
+def custom_zip(list1, list2): # Renombrado el filtro a custom_zip
+    """
+    Zips two lists together.
+    Usage: {% for item1, item2 in list1|custom_zip:list2 %}
+    """
+    return zip(list1, list2) # Esto ahora llama a la función zip() incorporada de Python

@@ -1,3 +1,4 @@
+
 # core/forms.py
 
 from django import forms
@@ -309,6 +310,7 @@ class ProveedorForm(forms.ModelForm):
         # asegúrate de que el campo empresa sea visible y seleccionable.
         # Ya tiene la clase 'form-select w-full' por defecto en Meta.
         elif self.request and self.request.user.is_superuser: # No es necesario 'and not self.instance.pk' aquí, ya que el comportamiento por defecto es Select
+            self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select w-full'})
             self.fields['empresa'].required = True # Asegura que sea requerido para superusuarios al añadir/editar
 
     def clean_empresa(self):
@@ -439,17 +441,21 @@ class CalibracionForm(forms.ModelForm):
 
     class Meta:
         model = Calibracion
-        # Excluir 'equipo' y 'frecuencia_meses'
-        exclude = ('equipo',) # Eliminado 'frecuencia_meses'
+        # 'equipo' se asignará en la vista
+        fields = [
+            'fecha_calibracion', 'nombre_proveedor', 'resultado',
+            'numero_certificado', 'documento_calibracion',
+            'confirmacion_metrologica_pdf', 'intervalos_calibracion_pdf', # NUEVO CAMPO
+            'observaciones'
+        ]
         widgets = {
-            # 'fecha_calibracion' ahora se define explícitamente arriba
             'nombre_proveedor': forms.TextInput(attrs={'class': 'form-input'}),
-            'resultado': forms.Select(attrs={'class': 'form-select'}), 
+            'resultado': forms.Select(attrs={'class': 'form-select'}),
             'numero_certificado': forms.TextInput(attrs={'class': 'form-input'}),
             'documento_calibracion': ClearableFileInput(attrs={'class': 'form-input-file'}),
-            'confirmacion_metrologica_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}), 
+            'confirmacion_metrologica_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}),
+            'intervalos_calibracion_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}), # NUEVO WIDGET
             'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
-            # 'frecuencia_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0', 'step': '0.01'}), # Eliminado
         }
 
     def __init__(self, *args, **kwargs):
@@ -506,7 +512,7 @@ class ComprobacionForm(forms.ModelForm):
     fecha_comprobacion = forms.DateField(
         label="Fecha de Comprobación",
         widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-        input_formats=['%d/%m/%Y', '%d-%m/%Y', '%Y-%m-%d']
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
     )
 
     class Meta:
@@ -569,5 +575,3 @@ class ExcelUploadForm(forms.Form):
         help_text="Sube un archivo .xlsx con el listado de equipos.",
         widget=forms.FileInput(attrs={'class': 'form-input-file'})
     )
-
-

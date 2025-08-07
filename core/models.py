@@ -1,4 +1,5 @@
-# C:\Users\LENOVO\OneDrive\Escritorio\proyecto_c\core\models.py
+# core/models.py
+# Ajustado para la lógica de la primera programación de mantenimiento y comprobación
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -11,6 +12,7 @@ import os
 from django.utils.translation import gettext_lazy as _
 from dateutil.relativedelta import relativedelta # Mantener por si se necesita para otros cálculos, aunque no para este específico
 from django.conf import settings # ¡ASEGURARSE DE QUE ESTA LÍNEA ESTÉ PRESENTE!
+import calendar # Importar calendar para nombres de meses
 
 
 # Función para la ruta de subida de archivos
@@ -36,11 +38,12 @@ def get_upload_path(instance, filename):
 
     # Determinar subcarpeta específica para el tipo de documento
     if isinstance(instance, Calibracion):
-        # Para archivos de calibración, diferenciar entre certificado y confirmación
-        # Asume que el nombre del archivo contendrá 'confirmacion' para la confirmación metrológica
+        # Para archivos de calibración, diferenciar entre certificado, confirmación e intervalos
         if 'confirmacion' in filename.lower():
             subfolder = "calibraciones/confirmaciones/"
-        else: # Por defecto, si no es confirmación, es certificado
+        elif 'intervalos' in filename.lower(): # Nueva subcarpeta para intervalos
+            subfolder = "calibraciones/intervalos/"
+        else: # Por defecto, si no es confirmación o intervalos, es certificado
             subfolder = "calibraciones/certificados/"
     elif isinstance(instance, Mantenimiento):
         subfolder = "mantenimientos/"
@@ -381,16 +384,27 @@ class Equipo(models.Model):
             return
 
         base_date = self.fecha_ultimo_mantenimiento
-        if not base_date and self.fecha_adquisicion: # Si no hay último mantenimiento, usar fecha de adquisición
-            base_date = self.fecha_adquisicion
+        if not base_date: # Si no hay último mantenimiento registrado
+            # La primera programación se basa en la fecha de última calibración o adquisición
+            if self.fecha_ultima_calibracion:
+                base_date = self.fecha_ultima_calibracion
+            elif self.fecha_adquisicion:
+                base_date = self.fecha_adquisicion
+            
+            # Si tenemos una fecha base y una frecuencia, calculamos la primera fecha programada
+            if base_date and self.frecuencia_mantenimiento_meses is not None and self.frecuencia_mantenimiento_meses > 0:
+                total_days = int(round(self.frecuencia_mantenimiento_meses * decimal.Decimal('30.4375')))
+                self.proximo_mantenimiento = base_date + timedelta(days=total_days)
+            else:
+                self.proximo_mantenimiento = None
+        else: # Si ya hay un mantenimiento registrado, la próxima fecha se basa en el último
+            frequency = self.frecuencia_mantenimiento_meses
+            if base_date and frequency is not None and frequency > 0:
+                total_days = int(round(frequency * decimal.Decimal('30.4375')))
+                self.proximo_mantenimiento = base_date + timedelta(days=total_days)
+            else:
+                self.proximo_mantenimiento = None
 
-        frequency = self.frecuencia_mantenimiento_meses
-        
-        if base_date and frequency is not None and frequency > 0:
-            total_days = int(round(frequency * decimal.Decimal('30.4375')))
-            self.proximo_mantenimiento = base_date + timedelta(days=total_days)
-        else:
-            self.proximo_mantenimiento = None
 
     def calcular_proxima_comprobacion(self):
         # Si el equipo está de baja, no calcular próximas fechas
@@ -399,16 +413,26 @@ class Equipo(models.Model):
             return
 
         base_date = self.fecha_ultima_comprobacion
-        if not base_date and self.fecha_adquisicion: # Si no hay última comprobación, usar fecha de adquisición
-            base_date = self.fecha_adquisicion
+        if not base_date: # Si no hay última comprobación registrada
+            # La primera programación se basa en la fecha de última calibración o adquisición
+            if self.fecha_ultima_calibracion:
+                base_date = self.fecha_ultima_calibracion
+            elif self.fecha_adquisicion:
+                base_date = self.fecha_adquisicion
 
-        frequency = self.frecuencia_comprobacion_meses
-        
-        if base_date and frequency is not None and frequency > 0:
-            total_days = int(round(frequency * decimal.Decimal('30.4375')))
-            self.proxima_comprobacion = base_date + timedelta(days=total_days)
-        else:
-            self.proxima_comprobacion = None
+            # Si tenemos una fecha base y una frecuencia, calculamos la primera fecha programada
+            if base_date and self.frecuencia_comprobacion_meses is not None and self.frecuencia_comprobacion_meses > 0:
+                total_days = int(round(self.frecuencia_comprobacion_meses * decimal.Decimal('30.4375')))
+                self.proxima_comprobacion = base_date + timedelta(days=total_days)
+            else:
+                self.proxima_comprobacion = None
+        else: # Si ya hay una comprobación registrada, la próxima fecha se basa en la última
+            frequency = self.frecuencia_comprobacion_meses
+            if base_date and frequency is not None and frequency > 0:
+                total_days = int(round(frequency * decimal.Decimal('30.4375')))
+                self.proxima_comprobacion = base_date + timedelta(days=total_days)
+            else:
+                self.proxima_comprobacion = None
 
     def save(self, *args, **kwargs):
         # Recalcular las fechas próximas antes de guardar el Equipo
@@ -437,6 +461,7 @@ class Calibracion(models.Model):
     numero_certificado = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número de Certificado")
     documento_calibracion = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Certificado de Calibración (PDF)")
     confirmacion_metrologica_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Confirmación Metrológica (PDF)")
+    intervalos_calibracion_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Intervalos de Calibración (PDF)") # NUEVO CAMPO
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
     # Frecuencia eliminada de aquí
 
@@ -584,7 +609,6 @@ def update_equipo_calibracion_info(sender, instance, **kwargs):
 
     if latest_calibracion:
         equipo.fecha_ultima_calibracion = latest_calibracion.fecha_calibracion
-        # Ya NO actualizamos frecuencia_calibracion_meses desde aquí
     else:
         # Si no hay calibraciones, resetear los campos
         equipo.fecha_ultima_calibracion = None
@@ -593,12 +617,20 @@ def update_equipo_calibracion_info(sender, instance, **kwargs):
     # Solo recalcular si el equipo NO está de baja
     if equipo.estado != 'De Baja':
         equipo.calcular_proxima_calibracion()
+        # ¡IMPORTANTE! Recalcular mantenimiento y comprobacion aquí también
+        equipo.calcular_proximo_mantenimiento()
+        equipo.calcular_proxima_comprobacion()
     else:
         equipo.proxima_calibracion = None # Asegurar que se ponga a None si está de baja
+        equipo.proximo_mantenimiento = None # También establecer a None si el equipo está de baja
+        equipo.proxima_comprobacion = None # También establecer a None si el equipo está de baja
     
-    # Guardar el equipo, incluyendo proxima_calibracion en update_fields
+    # Guardar el equipo, incluyendo proxima_calibracion, proximo_mantenimiento y proxima_comprobacion en update_fields
     # Esto asegura que el valor calculado se persista en la DB
-    equipo.save(update_fields=['fecha_ultima_calibracion', 'proxima_calibracion'])
+    equipo.save(update_fields=[
+        'fecha_ultima_calibracion', 'proxima_calibracion',
+        'proximo_mantenimiento', 'proxima_comprobacion'
+    ])
 
 
 @receiver(post_delete, sender=Calibracion)
@@ -609,7 +641,6 @@ def update_equipo_calibracion_info_on_delete(sender, instance, **kwargs):
 
     if latest_calibracion:
         equipo.fecha_ultima_calibracion = latest_calibracion.fecha_calibracion
-        # Ya NO actualizamos frecuencia_calibracion_meses desde aquí
     else:
         # Si no quedan calibraciones, resetear los campos
         equipo.fecha_ultima_calibracion = None
@@ -618,10 +649,18 @@ def update_equipo_calibracion_info_on_delete(sender, instance, **kwargs):
     # Solo recalcular si el equipo NO está de baja
     if equipo.estado != 'De Baja':
         equipo.calcular_proxima_calibracion()
+        # ¡IMPORTANTE! Recalcular mantenimiento y comprobacion aquí también
+        equipo.calcular_proximo_mantenimiento()
+        equipo.calcular_proxima_comprobacion()
     else:
         equipo.proxima_calibracion = None # Asegurar que se ponga a None si está de baja
+        equipo.proximo_mantenimiento = None # También establecer a None si el equipo está de baja
+        equipo.proxima_comprobacion = None # También establecer a None si el equipo está de baja
     
-    equipo.save(update_fields=['fecha_ultima_calibracion', 'proxima_calibracion'])
+    equipo.save(update_fields=[
+        'fecha_ultima_calibracion', 'proxima_calibracion',
+        'proximo_mantenimiento', 'proxima_comprobacion'
+    ])
 
 
 @receiver(post_save, sender=Mantenimiento)
@@ -631,15 +670,13 @@ def update_equipo_mantenimiento_info(sender, instance, **kwargs):
 
     if latest_mantenimiento:
         equipo.fecha_ultimo_mantenimiento = latest_mantenimiento.fecha_mantenimiento
-        # Ya NO actualizamos frecuencia_mantenimiento_meses desde aquí
     else:
         equipo.fecha_ultimo_mantenimiento = None
     
-    # Solo recalcular si el equipo NO está de baja
     if equipo.estado != 'De Baja':
         equipo.calcular_proximo_mantenimiento() # Recalcular antes de guardar
     else:
-        equipo.proximo_mantenimiento = None # Asegurar que se ponga a None si está de baja
+        equipo.proximo_mantenimiento = None
 
     equipo.save(update_fields=['fecha_ultimo_mantenimiento', 'proximo_mantenimiento'])
 
@@ -650,15 +687,13 @@ def update_equipo_mantenimiento_info_on_delete(sender, instance, **kwargs):
 
     if latest_mantenimiento:
         equipo.fecha_ultimo_mantenimiento = latest_mantenimiento.fecha_mantenimiento
-        # Ya NO actualizamos frecuencia_mantenimiento_meses desde aquí
     else:
         equipo.fecha_ultimo_mantenimiento = None
     
-    # Solo recalcular si el equipo NO está de baja
     if equipo.estado != 'De Baja':
         equipo.calcular_proximo_mantenimiento() # Recalcular antes de guardar
     else:
-        equipo.proximo_mantenimiento = None # Asegurar que se ponga a None si está de baja
+        equipo.proximo_mantenimiento = None
 
     equipo.save(update_fields=['fecha_ultimo_mantenimiento', 'proximo_mantenimiento'])
 
@@ -670,15 +705,13 @@ def update_equipo_comprobacion_info(sender, instance, **kwargs):
 
     if latest_comprobacion:
         equipo.fecha_ultima_comprobacion = latest_comprobacion.fecha_comprobacion
-        # Ya NO actualizamos frecuencia_comprobacion_meses desde aquí
     else:
         equipo.fecha_ultima_comprobacion = None
     
-    # Solo recalcular si el equipo NO está de baja
     if equipo.estado != 'De Baja':
         equipo.calcular_proxima_comprobacion() # Recalcular antes de guardar
     else:
-        equipo.proxima_comprobacion = None # Asegurar que se ponga a None si está de baja
+        equipo.proxima_comprobacion = None
 
     equipo.save(update_fields=['fecha_ultima_comprobacion', 'proxima_comprobacion'])
 
@@ -692,13 +725,9 @@ def update_equipo_comprobacion_info_on_delete(sender, instance, **kwargs):
     else:
         equipo.fecha_ultima_comprobacion = None
     
-    # Solo recalcular si el equipo NO está de baja
     if equipo.estado != 'De Baja':
         equipo.calcular_proxima_comprobacion() # Recalcular antes de guardar
     else:
-        equipo.proxima_comprobacion = None # Asegurar que se ponga a None si está de baja
+        equipo.proxima_comprobacion = None
 
     equipo.save(update_fields=['fecha_ultima_comprobacion', 'proxima_comprobacion'])
-
-
-

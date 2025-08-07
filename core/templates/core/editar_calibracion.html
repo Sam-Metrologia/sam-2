@@ -29,6 +29,7 @@
                 <p class="form-input bg-gray-100 cursor-not-allowed">{{ equipo.codigo_interno }}</p>
             </div>
 
+            {# Iterar sobre los campos del formulario #}
             {% for field in form %}
                 <div class="mb-4">
                     <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">{{ field.label }}:</label>
@@ -39,6 +40,15 @@
                     {% for error in field.errors %}
                         <p class="text-red-500 text-xs italic">{{ error }}</p>
                     {% endfor %}
+
+                    {# Mostrar el archivo actual si existe y es un FileField #}
+                    {% if field.name == 'documento_calibracion' and field.value %}
+                        <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/certificados/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
+                    {% elif field.name == 'confirmacion_metrologica_pdf' and field.value %}
+                        <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/confirmaciones/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
+                    {% elif field.name == 'intervalos_calibracion_pdf' and field.value %} {# NUEVA LÓGICA PARA INTERVALOS PDF #}
+                        <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/intervalos/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
+                    {% endif %}
                 </div>
             {% endfor %}
 

@@ -25,89 +25,93 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                 <p class="text-gray-600 font-semibold">Nombre de la Empresa:</p>
-                <p class="text-gray-800">{{ proveedor.nombre_empresa }}</p>
-            </div>
-            <div>
-                <p class="text-gray-600 font-semibold">Empresa Cliente:</p>
-                <p class="text-gray-800">{{ proveedor.empresa.nombre|default:"N/A" }}</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.nombre_empresa }}</p>
             </div>
             <div>
                 <p class="text-gray-600 font-semibold">Tipo de Servicio:</p>
-                <p class="text-gray-800">{{ proveedor.get_tipo_servicio_display }}</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.get_tipo_servicio_display }}</p>
             </div>
+            {% if proveedor.empresa %}
+            <div>
+                <p class="text-gray-600 font-semibold">Empresa Cliente:</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.empresa.nombre }}</p>
+            </div>
+            {% endif %}
             <div>
                 <p class="text-gray-600 font-semibold">Nombre de Contacto:</p>
-                <p class="text-gray-800">{{ proveedor.nombre_contacto|default:"N/A" }}</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.nombre_contacto|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-gray-600 font-semibold">Número de Contacto:</p>
-                <p class="text-gray-800">{{ proveedor.numero_contacto|default:"N/A" }}</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.numero_contacto|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-gray-600 font-semibold">Correo Electrónico:</p>
-                <p class="text-gray-800">{{ proveedor.correo_electronico|default:"N/A" }}</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.correo_electronico|default:"N/A" }}</p>
             </div>
             <div>
                 <p class="text-gray-600 font-semibold">Página Web:</p>
-                <p class="text-gray-800">
+                <p class="text-gray-900 text-lg">
                     {% if proveedor.pagina_web %}
-                        <a href="{{ proveedor.pagina_web }}" target="_blank" class="text-blue-600 hover:underline">
-                            {{ proveedor.pagina_web }} <i class="fas fa-external-link-alt text-xs ml-1"></i>
-                        </a>
+                        <a href="{{ proveedor.pagina_web }}" target="_blank" class="text-blue-600 hover:underline">{{ proveedor.pagina_web }}</a>
                     {% else %}
                         N/A
                     {% endif %}
                 </p>
             </div>
+            <div class="md:col-span-2">
+                <p class="text-gray-600 font-semibold">Alcance (áreas o magnitudes):</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.alcance|default:"N/A" }}</p>
+            </div>
+            <div class="md:col-span-2">
+                <p class="text-gray-600 font-semibold">Servicio Prestado:</p>
+                <p class="text-gray-900 text-lg">{{ proveedor.servicio_prestado|default:"N/A" }}</p>
+            </div>
         </div>
 
-        <div class="mb-6">
-            <p class="text-gray-600 font-semibold">Alcance (áreas o magnitudes):</p>
-            <p class="text-gray-800 whitespace-pre-line">{{ proveedor.alcance|default:"N/A" }}</p>
-        </div>
-
-        <div class="mb-6">
-            <p class="text-gray-600 font-semibold">Servicio Prestado:</p>
-            <p class="text-gray-800 whitespace-pre-line">{{ proveedor.servicio_prestado|default:"N/A" }}</p>
-        </div>
-
-        <div class="flex flex-wrap gap-3 mt-6">
-            <a href="{% url 'core:editar_proveedor' proveedor.pk %}"
-               class="px-5 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition duration-300 ease-in-out">
+        <div class="flex flex-wrap justify-end gap-4 mt-6">
+            {% if perms.core.change_proveedor %}
+            <a href="{% url 'core:editar_proveedor' proveedor.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
                 <i class="fas fa-edit mr-2"></i> Editar Proveedor
             </a>
-            <button onclick="showDeleteModal('{% url 'core:eliminar_proveedor' proveedor.pk %}', '{{ proveedor.nombre_empresa }}')"
-                    class="px-5 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-300 ease-in-out">
+            {% endif %}
+            {% if perms.core.delete_proveedor %}
+            <button onclick="showDeleteModal('{% url 'core:eliminar_proveedor' proveedor.pk %}', '{{ proveedor.nombre_empresa }}')" 
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
                 <i class="fas fa-trash-alt mr-2"></i> Eliminar Proveedor
             </button>
-            <a href="{% url 'core:listar_proveedores' %}"
-               class="px-5 py-2 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300 ease-in-out">
+            {% endif %}
+            <a href="{% url 'core:listar_proveedores' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
                 <i class="fas fa-arrow-left mr-2"></i> Volver al Listado
             </a>
         </div>
     </div>
 </div>
 
-{# Modal de Confirmación de Eliminación (Reutilizable) #}
-<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-sm mx-auto p-0">
-        <div class="p-6">
-            <h3 class="text-lg leading-6 font-bold text-gray-900 mb-4">Confirmar Eliminación</h3>
-            <div class="mt-2">
+{# Modal de Confirmación de Eliminación #}
+<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Confirmar Eliminación</h3>
+            <div class="mt-2 px-7 py-3">
                 <p class="text-sm text-gray-500">
-                    ¿Estás seguro de que deseas eliminar <span id="objectToDeleteName" class="font-semibold text-gray-700"></span>? Esta acción no se puede deshacer.
+                    ¿Estás seguro de que deseas eliminar a <strong id="objectToDeleteName" class="font-bold text-gray-700"></strong>?
+                    Esta acción no se puede deshacer.
                 </p>
             </div>
-        </div>
-        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-lg">
-            <button type="button" id="confirmDeleteButton"
-                    class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition duration-300 ease-in-out">
-                Eliminar
-            </button>
-            <button type="button" id="cancelDeleteButton"
-                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm transition duration-300 ease-in-out">
-                Cancelar
-            </button>
+            <div class="items-center px-4 py-3">
+                <button type="button" id="confirmDeleteButton"
+                        class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition duration-300 ease-in-out">
+                    Eliminar
+                </button>
+                <button type="button" id="cancelDeleteButton" onclick="hideDeleteModal()"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm transition duration-300 ease-in-out">
+                    Cancelar
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -117,16 +121,28 @@
         const deleteModal = document.getElementById('deleteModal');
         const objectToDeleteName = document.getElementById('objectToDeleteName');
         const confirmDeleteButton = document.getElementById('confirmDeleteButton');
-        const cancelDeleteButton = document.getElementById('cancelDeleteButton');
 
         objectToDeleteName.textContent = objectName;
         confirmDeleteButton.onclick = function() {
-            window.location.href = deleteUrl;
-        };
-        cancelDeleteButton.onclick = function() {
-            deleteModal.classList.add('hidden');
+            // Create a form dynamically to send a POST request with CSRF token
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = deleteUrl;
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}'; // Get CSRF token from Django context
+            form.appendChild(csrfInput);
+
+            document.body.appendChild(form);
+            form.submit();
         };
         deleteModal.classList.remove('hidden');
+    }
+
+    function hideDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
     }
 </script>
 {% endblock %}

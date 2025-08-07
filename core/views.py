@@ -5,46 +5,45 @@ from django.contrib.auth.decorators import login_required, user_passes_test, per
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.db import models
-from datetime import date, timedelta, datetime # Importar datetime
-import calendar # Importar calendar para nombres de meses
+from datetime import date, timedelta, datetime
+import calendar
 import io
 import json
 import os
 import zipfile
 from collections import defaultdict
-import decimal # Mantener por ahora, si otros campos lo usan o se necesita para importación/exportación de otros numéricos
+import decimal
 
 # IMPORTACIONES ADICIONALES PARA LA IMPORTACIÓN DE EXCEL
 import openpyxl
-from django.db import transaction # Para asegurar la atomicidad de la creación
-from django.utils.dateparse import parse_date # Para parsear fechas
+from django.db import transaction
+from django.utils.dateparse import parse_date
 
-# IMPORTACIÓN FALTANTE: Agregada HttpResponse aquí
-from django.http import HttpResponse, JsonResponse, Http404, HttpResponseRedirect # Asegúrate de que HttpResponse esté aquí
+from django.http import HttpResponse, JsonResponse, Http404, HttpResponseRedirect
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
-from openpyxl.drawing.image import Image as ExcelImage # Import for images in Excel
+from openpyxl.drawing.image import Image as ExcelImage
 
-from dateutil.relativedelta import relativedelta # Importar relativedelta para cálculos de fechas
+from dateutil.relativedelta import relativedelta
 
 from django.conf import settings
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.utils import timezone # Importar timezone para obtener la fecha actual con zona horaria
-from django.utils.html import mark_safe # Importar mark_safe
+from django.utils import timezone
+from django.utils.html import mark_safe
 
 # Importar para PDF
-from django.template.loader import get_template # Asegúrate de que esta importación esté presente
-from weasyprint import HTML # <--- CAMBIO AQUÍ
+from django.template.loader import get_template
+from weasyprint import HTML
 
 # Importar los formularios de tu aplicación (asegúrate de que todos estos existan en .forms)
 from .forms import (
     CalibracionForm, MantenimientoForm, ComprobacionForm, EquipoForm,
     BajaEquipoForm, EmpresaForm, CustomUserCreationForm, CustomUserChangeForm,
     UbicacionForm, ProcedimientoForm, ProveedorCalibracionForm,
-    ProveedorMantenimientoForm, ProveedorComprobacionForm, ProveedorForm, # Importar el nuevo formulario ProveedorForm
-    AuthenticationForm, UserProfileForm, EmpresaFormatoForm, # Importar el nuevo formulario EmpresaFormatoForm
-    ExcelUploadForm # NUEVA IMPORTACIÓN: Para el formulario de subida de Excel
+    ProveedorMantenimientoForm, ProveedorComprobacionForm, ProveedorForm,
+    AuthenticationForm, UserProfileForm, EmpresaFormatoForm,
+    ExcelUploadForm
 )
 
 # Importar modelos
@@ -56,11 +55,11 @@ from .models import (
 
 # Importar para autenticación
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm # Importación CORRECTA desde Django
+from django.contrib.auth.forms import PasswordChangeForm
 
 # Importar para manejo de mensajes AJAX
-from django.views.decorators.csrf import csrf_exempt # Importar csrf_exempt
-from django.views.decorators.http import require_POST # Importar require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 
 # --- Vistas de Autenticación y Perfil ---
@@ -70,22 +69,22 @@ def user_login(request):
     Handles user login.
     """
     if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST) # Usar request como primer argumento
+        form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
-            user = authenticate(request, username=username, password=password) # Usar request como primer argumento
+            user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
                 messages.success(request, f'¡Bienvenido, {username}!')
-                return redirect('core:dashboard')  # Redirige al dashboard
+                return redirect('core:dashboard')
             else:
                 messages.error(request, 'Nombre de usuario o contraseña incorrectos.')
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario.')
     else:
         form = AuthenticationForm()
-    return render(request, 'registration/login.html', {'form': form}) # Asegúrate de que esta plantilla exista
+    return render(request, 'registration/login.html', {'form': form})
 
 @login_required
 def user_logout(request):
@@ -94,7 +93,36 @@ def user_logout(request):
     """
     logout(request)
     messages.info(request, 'Has cerrado sesión exitosamente.')
-    return redirect('core:login') # Redirige a la página de login
+    return redirect('core:login')
+
+@login_required
+def cambiar_password(request):
+    """
+    Handles changing the current user's password.
+    """
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)
+            messages.success(request, 'Tu contraseña ha sido actualizada exitosamente!')
+            return redirect('core:password_change_done')
+        else:
+            messages.error(request, 'Por favor corrige los errores a continuación.')
+    else:
+        form = PasswordChangeForm(request.user)
+    return render(request, 'registration/password_change_form.html', {
+        'form': form,
+        'titulo_pagina': 'Cambiar Contraseña'
+    })
+
+@login_required
+def password_change_done(request):
+    """
+    Renders the password change done page.
+    """
+    return render(request, 'core/password_change_done.html', {'titulo_pagina': 'Contraseña Cambiada'})
+
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -219,6 +247,16 @@ def dashboard(request):
     # --- Indicadores Clave ---
     total_equipos = equipos_queryset.count()
     equipos_activos = equipos_queryset.filter(estado='Activo').count()
+    # Equipos de baja (para el dashboard general, no filtrados por empresa aquí, pero se puede añadir)
+    equipos_de_baja = Equipo.objects.filter(estado='De Baja')
+    if not user.is_superuser and user.empresa:
+        equipos_de_baja = equipos_de_baja.filter(empresa=user.empresa)
+    elif not user.is_superuser and not user.empresa:
+        equipos_de_baja = Equipo.objects.none()
+    if selected_company_id and user.is_superuser: # Si superuser selecciona una empresa, filtrar también los de baja
+        equipos_de_baja = equipos_de_baja.filter(empresa_id=selected_company_id)
+    equipos_de_baja = equipos_de_baja.count()
+
 
     # Detección de actividades vencidas y próximas
     # Se basan directamente en los campos proxima_X del modelo Equipo
@@ -238,7 +276,7 @@ def dashboard(request):
         proximo_mantenimiento__lt=today
     ).count()
 
-    mantenimientos_proximas = equipos_queryset.filter( # Variable name is 'mantenimientos_proximos'
+    mantenimientos_proximas = equipos_queryset.filter(
         proximo_mantenimiento__isnull=False,
         proximo_mantenimiento__gte=today,
         proximo_mantenimiento__lte=today + timedelta(days=30)
@@ -268,6 +306,8 @@ def dashboard(request):
     realized_preventive_mantenimientos_line_data = [0] * 12
     realized_corrective_mantenimientos_line_data = [0] * 12
     realized_other_mantenimientos_line_data = [0] * 12
+    realized_predictive_mantenimientos_line_data = [0] * 12 # Nuevo tipo
+    realized_inspection_mantenimientos_line_data = [0] * 12 # Nuevo tipo
     realized_comprobaciones_line_data = [0] * 12
 
     # Calcular el primer mes del rango (6 meses antes del actual)
@@ -283,7 +323,7 @@ def dashboard(request):
     calibraciones_realizadas_period = Calibracion.objects.filter(
         equipo__in=equipos_queryset,
         fecha_calibracion__gte=start_date_range,
-        fecha_calibracion__lte=start_date_range + relativedelta(months=12, days=-1) # Hasta el final del rango de 12 meses
+        fecha_calibracion__lte=start_date_range + relativedelta(months=12, days=-1)
     )
     mantenimientos_realizados_period = Mantenimiento.objects.filter(
         equipo__in=equipos_queryset,
@@ -308,6 +348,10 @@ def dashboard(request):
                 realized_preventive_mantenimientos_line_data[month_index] += 1
             elif mant.tipo_mantenimiento == 'Correctivo':
                 realized_corrective_mantenimientos_line_data[month_index] += 1
+            elif mant.tipo_mantenimiento == 'Predictivo':
+                realized_predictive_mantenimientos_line_data[month_index] += 1
+            elif mant.tipo_mantenimiento == 'Inspección':
+                realized_inspection_mantenimientos_line_data[month_index] += 1
             else:
                 realized_other_mantenimientos_line_data[month_index] += 1
 
@@ -409,6 +453,15 @@ def dashboard(request):
     # Colores para las gráficas de torta
     pie_chart_colors_cal = ['#28a745', '#dc3545', '#007bff'] # Verde (Realizado), Rojo (No Cumplido), Azul (Pendiente/Programado)
     pie_chart_colors_comp = ['#28a745', '#dc3545', '#007bff'] # Mismos colores para comprobaciones
+    pie_chart_colors_equipos = ['#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6c757d'] # Activo, En Mantenimiento, De Baja, En Calibración, En Comprobación
+
+    # Estado de Equipos (Torta)
+    estado_equipos_counts = defaultdict(int)
+    for equipo in equipos_queryset.all(): # Incluir todos los estados, no solo activos
+        estado_equipos_counts[equipo.estado] += 1
+    
+    estado_equipos_labels = list(estado_equipos_counts.keys())
+    estado_equipos_data = list(estado_equipos_counts.values())
 
     # Calibraciones
     projected_calibraciones = get_projected_activities_for_year(equipos_queryset, 'calibracion', current_year, today)
@@ -466,6 +519,15 @@ def dashboard(request):
         comp_no_cumplido_anual_percent = (comp_no_cumplido_anual_display / comp_total_programmed_anual_display * 100)
         comp_pendiente_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
 
+    # Mantenimientos por Tipo (Torta)
+    mantenimientos_tipo_counts = defaultdict(int)
+    for mant in Mantenimiento.objects.filter(equipo__in=equipos_queryset).exclude(equipo__estado='De Baja'):
+        mantenimientos_tipo_counts[mant.tipo_mantenimiento] += 1
+    
+    mantenimientos_torta_labels = list(mantenimientos_tipo_counts.keys())
+    mantenimientos_torta_data = list(mantenimientos_tipo_counts.values())
+    pie_chart_colors_mant = ['#ffc107', '#dc3545', '#17a2b8', '#6c757d'] # Preventivo, Correctivo, Predictivo, Inspección
+
 
     # Obtener los códigos de equipos vencidos para mostrar en el dashboard
     # Excluir equipos "De Baja"
@@ -473,6 +535,20 @@ def dashboard(request):
     vencidos_mantenimiento_codigos = [e.codigo_interno for e in equipos_queryset.filter(proximo_mantenimiento__lt=today).exclude(estado='De Baja')]
     vencidos_comprobacion_codigos = [e.codigo_interno for e in equipos_queryset.filter(proxima_comprobacion__lt=today).exclude(estado='De Baja')]
 
+    # --- NUEVA LÓGICA PARA MANTENIMIENTOS CORRECTIVOS ---
+    # Obtener los 5 mantenimientos correctivos más recientes para la empresa del usuario
+    # o para todas las empresas si es superusuario y no hay filtro de empresa.
+    latest_corrective_maintenances_query = Mantenimiento.objects.filter(tipo_mantenimiento='Correctivo').order_by('-fecha_mantenimiento')
+    
+    if not user.is_superuser:
+        if user.empresa:
+            latest_corrective_maintenances_query = latest_corrective_maintenances_query.filter(equipo__empresa=user.empresa)
+        else:
+            latest_corrective_maintenances_query = Mantenimiento.objects.none()
+    elif selected_company_id:
+        latest_corrective_maintenances_query = latest_corrective_maintenances_query.filter(equipo__empresa_id=selected_company_id)
+
+    latest_corrective_maintenances = latest_corrective_maintenances_query[:5] # Limitar a los 5 más recientes
 
     # Convertir datos a JSON para pasarlos a JavaScript
     context = {
@@ -484,11 +560,12 @@ def dashboard(request):
 
         'total_equipos': total_equipos,
         'equipos_activos': equipos_activos,
-        
+        'equipos_de_baja': equipos_de_baja, # Añadido al contexto
+
         'calibraciones_vencidas': calibraciones_vencidas,
         'calibraciones_proximas': calibraciones_proximas,
         'mantenimientos_vencidos': mantenimientos_vencidos,
-        'mantenimientos_proximas': mantenimientos_proximas, # CORRECCIÓN AQUÍ: Cambiado a 'mantenimientos_proximos'
+        'mantenimientos_proximas': mantenimientos_proximas,
         'comprobaciones_vencidas': comprobaciones_vencidas,
         'comprobaciones_proximas': comprobaciones_proximas,
 
@@ -521,16 +598,27 @@ def dashboard(request):
         'realized_preventive_mantenimientos_line_data_json': mark_safe(json.dumps(realized_preventive_mantenimientos_line_data)),
         'realized_corrective_mantenimientos_line_data_json': mark_safe(json.dumps(realized_corrective_mantenimientos_line_data)),
         'realized_other_mantenimientos_line_data_json': mark_safe(json.dumps(realized_other_mantenimientos_line_data)),
+        'realized_predictive_mantenimientos_line_data_json': mark_safe(json.dumps(realized_predictive_mantenimientos_line_data)), # Nuevo
+        'realized_inspection_mantenimientos_line_data_json': mark_safe(json.dumps(realized_inspection_mantenimientos_line_data)), # Nuevo
         'programmed_comprobaciones_line_data_json': mark_safe(json.dumps(programmed_comprobaciones_line_data)),
         'realized_comprobaciones_line_data_json': mark_safe(json.dumps(realized_comprobaciones_line_data)),
         
         # Datos para gráficas de torta
+        'estado_equipos_labels_json': mark_safe(json.dumps(estado_equipos_labels)),
+        'estado_equipos_data_json': mark_safe(json.dumps(estado_equipos_data)),
+        'pie_chart_colors_equipos_json': mark_safe(json.dumps(pie_chart_colors_equipos)),
         'calibraciones_torta_labels_json': mark_safe(json.dumps(calibraciones_torta_labels)),
         'calibraciones_torta_data_json': mark_safe(json.dumps(calibraciones_torta_data)),
-        'pie_chart_colors_cal_json': mark_safe(json.dumps(pie_chart_colors_cal)), # Colores específicos para calibración
+        'pie_chart_colors_cal_json': mark_safe(json.dumps(pie_chart_colors_cal)),
         'comprobaciones_torta_labels_json': mark_safe(json.dumps(comprobaciones_torta_labels)),
         'comprobaciones_torta_data_json': mark_safe(json.dumps(comprobaciones_torta_data)),
-        'pie_chart_colors_comp_json': mark_safe(json.dumps(pie_chart_colors_comp)), # Colores específicos para comprobación
+        'pie_chart_colors_comp_json': mark_safe(json.dumps(pie_chart_colors_comp)),
+        'mantenimientos_torta_labels_json': mark_safe(json.dumps(mantenimientos_torta_labels)), # Nuevo
+        'mantenimientos_torta_data_json': mark_safe(json.dumps(mantenimientos_torta_data)), # Nuevo
+        'pie_chart_colors_mant_json': mark_safe(json.dumps(pie_chart_colors_mant)), # Nuevo
+
+        # Datos para el cuadro de mantenimientos correctivos
+        'latest_corrective_maintenances': latest_corrective_maintenances,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -773,22 +861,19 @@ def añadir_equipo(request):
         form = EquipoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             equipo = form.save(commit=False)
-            # La lógica de asignación de empresa para no-superusuarios se maneja en EquipoForm.clean_empresa
             equipo.save()
             messages.success(request, 'Equipo añadido exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        form = EquipoForm(request=request) # Pasar request al formulario
-        # La lógica para deshabilitar/ocultar el campo empresa se maneja en EquipoForm.__init__
+        form = EquipoForm(request=request)
     
-    # Se eliminó 'equipo': equipo del contexto, ya que no existe en el método GET ni en caso de formulario inválido
     return render(request, 'core/añadir_equipo.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Equipo'})
 
 
 @login_required
-@permission_required('core.add_equipo', raise_exception=True) # Solo usuarios con permiso para añadir equipos
+@permission_required('core.add_equipo', raise_exception=True)
 def importar_equipos_excel(request):
     """
     Handles importing equipment from an Excel file.
@@ -804,30 +889,26 @@ def importar_equipos_excel(request):
                 return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
 
             try:
-                # Cargar el libro de trabajo de Excel
                 workbook = openpyxl.load_workbook(excel_file)
                 sheet = workbook.active
                 
-                # Asumimos que la primera fila son los encabezados
                 headers = [cell.value for cell in sheet[1]]
                 
-                # Mapeo de encabezados de Excel a campos del modelo
-                # Puedes ajustar esto si los nombres de tus columnas en Excel son diferentes
                 column_mapping = {
                     'codigo_interno': 'codigo_interno',
                     'nombre': 'nombre',
-                    'empresa_nombre': 'empresa', # Se buscará por nombre
+                    'empresa_nombre': 'empresa',
                     'tipo_equipo': 'tipo_equipo',
                     'marca': 'marca',
                     'modelo': 'modelo',
                     'numero_serie': 'numero_serie',
-                    'ubicacion_nombre': 'ubicacion', # Se usará como texto libre
+                    'ubicacion_nombre': 'ubicacion',
                     'responsable': 'responsable',
                     'estado': 'estado',
                     'fecha_adquisicion': 'fecha_adquisicion',
                     'rango_medida': 'rango_medida',
                     'resolucion': 'resolucion',
-                    'error_maximo_permisible': 'error_maximo_permisible', # Ahora es CharField
+                    'error_maximo_permisible': 'error_maximo_permisible',
                     'observaciones': 'observaciones',
                     'version_formato': 'version_formato',
                     'fecha_version_formato': 'fecha_version_formato',
@@ -837,7 +918,6 @@ def importar_equipos_excel(request):
                     'frecuencia_comprobacion_meses': 'frecuencia_comprobacion_meses',
                 }
 
-                # Validar que los encabezados obligatorios existan
                 required_headers = ['codigo_interno', 'nombre', 'empresa_nombre', 'tipo_equipo', 'marca', 'modelo', 'numero_serie', 'ubicacion_nombre', 'responsable', 'estado', 'fecha_adquisicion']
                 if not all(h in headers for h in required_headers):
                     missing_headers = [h for h in required_headers if h not in headers]
@@ -847,7 +927,6 @@ def importar_equipos_excel(request):
                 created_count = 0
                 errors = []
                 
-                # Usar una transacción para asegurar que si algo falla, no se guarde nada.
                 with transaction.atomic():
                     for row_index, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
                         row_data = dict(zip(headers, row))
@@ -855,16 +934,13 @@ def importar_equipos_excel(request):
                         equipo_data = {}
                         row_errors = []
 
-                        # Mapear y validar datos de cada columna
                         for excel_col, model_field in column_mapping.items():
                             value = row_data.get(excel_col)
                             
-                            # Manejo de valores None o cadenas vacías para campos obligatorios
                             if excel_col in required_headers and (value is None or (isinstance(value, str) and value.strip() == '')):
                                 row_errors.append(f"'{excel_col}' es un campo obligatorio y está vacío.")
-                                continue # Pasa a la siguiente columna si es un error crítico
+                                continue
 
-                            # Si el campo es opcional y está vacío, establecerlo a None y continuar
                             if value is None or (isinstance(value, str) and value.strip() == ''):
                                 equipo_data[model_field] = None
                                 continue
@@ -872,40 +948,34 @@ def importar_equipos_excel(request):
                             if excel_col == 'empresa_nombre':
                                 try:
                                     empresa = Empresa.objects.get(nombre=value)
-                                    # Validar que el usuario tenga permiso para añadir a esta empresa
                                     if not request.user.is_superuser and request.user.empresa != empresa:
                                         row_errors.append(f"No tienes permiso para añadir equipos a la empresa '{value}'.")
                                     equipo_data['empresa'] = empresa
                                 except Empresa.DoesNotExist:
                                     row_errors.append(f"Empresa '{value}' no encontrada.")
-                            elif excel_col == 'ubicacion_nombre': # Ahora es un campo de texto libre
+                            elif excel_col == 'ubicacion_nombre':
                                 equipo_data['ubicacion'] = str(value).strip() if value is not None else ''
                             elif excel_col == 'tipo_equipo':
-                                # Obtener solo los valores de las opciones (el primer elemento de cada tupla)
                                 valid_choices = [choice[0] for choice in Equipo.TIPO_EQUIPO_CHOICES]
                                 if value not in valid_choices:
                                     row_errors.append(f"Tipo de equipo '{value}' no es válido. Opciones: {', '.join(valid_choices)}.")
                                 equipo_data[model_field] = value
                             elif excel_col == 'estado':
-                                # Obtener solo los valores de las opciones
                                 valid_choices = [choice[0] for choice in Equipo.ESTADO_CHOICES]
                                 if value not in valid_choices:
                                     row_errors.append(f"Estado '{value}' no es válido. Opciones: {', '.join(valid_choices)}.")
                                 equipo_data[model_field] = value
                             elif excel_col in ['fecha_adquisicion', 'fecha_version_formato']:
                                 parsed_date = None
-                                if isinstance(value, datetime): # Si openpyxl ya lo parseó a datetime
+                                if isinstance(value, datetime):
                                     parsed_date = value.date()
                                 else:
-                                    # Intentar parsear YYYY/MM/DD (como en tu plantilla de ejemplo)
                                     try:
                                         parsed_date = datetime.strptime(str(value), '%Y/%m/%d').date()
                                     except ValueError:
-                                        # Intentar parsear DD/MM/YYYY
                                         try:
                                             parsed_date = datetime.strptime(str(value), '%d/%m/%Y').date()
                                         except ValueError:
-                                            # Intentar parsear YYYY-MM-DD
                                             try:
                                                 parsed_date = datetime.strptime(str(value), '%Y-%m-%d').date()
                                             except ValueError:
@@ -915,17 +985,16 @@ def importar_equipos_excel(request):
                             elif excel_col in ['frecuencia_calibracion_meses', 'frecuencia_mantenimiento_meses', 'frecuencia_comprobacion_meses']:
                                 try:
                                     if value is not None and str(value).strip() != '':
-                                        equipo_data[model_field] = int(float(value)) # Convertir a float primero para manejar posibles decimales en Excel, luego a int
+                                        equipo_data[model_field] = decimal.Decimal(str(value)) # Guardar como Decimal
                                     else:
-                                        equipo_data[model_field] = None # Permitir que sea None si es opcional y vacío
-                                except (ValueError, TypeError):
+                                        equipo_data[model_field] = None
+                                except (ValueError, TypeError, decimal.InvalidOperation):
                                     row_errors.append(f"Valor numérico inválido para '{excel_col}': '{value}'.")
-                            elif excel_col == 'error_maximo_permisible': # Ahora es CharField, se guarda como texto
+                            elif excel_col == 'error_maximo_permisible':
                                 equipo_data[model_field] = str(value).strip() if value is not None else ''
                             else:
-                                equipo_data[model_field] = value # Para campos de texto simples
+                                equipo_data[model_field] = value
 
-                        # Validar unicidad de codigo_interno para la empresa (si ya se encontró la empresa)
                         if 'empresa' in equipo_data and 'codigo_interno' in equipo_data and not row_errors:
                             if Equipo.objects.filter(empresa=equipo_data['empresa'], codigo_interno=equipo_data['codigo_interno']).exists():
                                 row_errors.append(f"Ya existe un equipo con el código interno '{equipo_data['codigo_interno']}' para la empresa '{equipo_data['empresa'].nombre}'.")
@@ -933,28 +1002,24 @@ def importar_equipos_excel(request):
                         if row_errors:
                             errors.append(f"Fila {row_index}: {'; '.join(row_errors)}")
                         else:
-                            # Crear el objeto Equipo
                             try:
                                 Equipo.objects.create(**equipo_data)
                                 created_count += 1
                             except Exception as e:
                                 errors.append(f"Fila {row_index}: Error al crear el equipo - {e}")
-                                # Rollback explícito si ocurre un error inesperado
-                                raise # Re-lanzar para que la transacción se revierta
+                                raise
 
                 if errors:
                     messages.warning(request, f'Importación completada con {created_count} equipos creados y {len(errors)} errores.')
                     for err in errors:
-                        messages.error(request, err) # Mostrar cada error individualmente
-                    # Si hay errores, no redirigir, mostrar el formulario de nuevo con los mensajes
+                        messages.error(request, err)
                     return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
                 else:
                     messages.success(request, f'¡Importación exitosa! Se crearon {created_count} equipos.')
-                    return redirect('core:home') # Redirigir al listado de equipos
+                    return redirect('core:home')
             
             except Exception as e:
                 messages.error(request, f'Ocurrió un error inesperado al procesar el archivo: {e}')
-                # Esto atrapa errores como archivos corruptos o problemas de openpyxl
                 return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario de subida.')
@@ -977,7 +1042,6 @@ def detalle_equipo(request, pk):
         return redirect('core:home')
 
     calibraciones = equipo.calibraciones.all().order_by('-fecha_calibracion')
-    # Calcular proxima_actividad_para_este_registro para cada calibración
     for cal in calibraciones:
         if equipo.frecuencia_calibracion_meses and cal.fecha_calibracion:
             cal.proxima_actividad_para_este_registro = cal.fecha_calibracion + relativedelta(months=int(equipo.frecuencia_calibracion_meses))
@@ -985,7 +1049,6 @@ def detalle_equipo(request, pk):
             cal.proxima_actividad_para_este_registro = None
 
     mantenimientos = equipo.mantenimientos.all().order_by('-fecha_mantenimiento')
-    # Calcular proxima_actividad_para_este_registro para cada mantenimiento
     for mant in mantenimientos:
         if equipo.frecuencia_mantenimiento_meses and mant.fecha_mantenimiento:
             mant.proxima_actividad_para_este_registro = mant.fecha_mantenimiento + relativedelta(months=int(equipo.frecuencia_mantenimiento_meses))
@@ -993,7 +1056,6 @@ def detalle_equipo(request, pk):
             mant.proxima_actividad_para_este_registro = None
 
     comprobaciones = equipo.comprobaciones.all().order_by('-fecha_comprobacion')
-    # Calcular proxima_actividad_para_este_registro para cada comprobación
     for comp in comprobaciones:
         if equipo.frecuencia_comprobacion_meses and comp.fecha_comprobacion:
             comp.proxima_actividad_para_este_registro = comp.fecha_comprobacion + relativedelta(months=int(equipo.frecuencia_comprobacion_meses))
@@ -1032,21 +1094,19 @@ def editar_equipo(request, pk):
         form = EquipoForm(request.POST, request.FILES, instance=equipo, request=request)
         if form.is_valid():
             equipo = form.save(commit=False)
-            # La lógica de asignación de empresa para no-superusuarios se maneja en EquipoForm.clean_empresa
             equipo.save()
             messages.success(request, 'Equipo actualizado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        form = EquipoForm(instance=equipo, request=request) # Pasar request al formulario
-        # La lógica para deshabilitar/ocultar el campo empresa se maneja en EquipoForm.__init__
+        form = EquipoForm(instance=equipo, request=request)
 
     return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
 
 
 @login_required
-@permission_required('core.delete_equipo', raise_exception=True) # Este permiso NO se dará a los Gestores de Empresa
+@permission_required('core.delete_equipo', raise_exception=True)
 def eliminar_equipo(request, pk):
     """
     Handles deleting an equipment.
@@ -1219,6 +1279,26 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': mantenimiento, 'tipo': 'mantenimiento', 'titulo_pagina': f'Eliminar Mantenimiento de {equipo.nombre}'})
 
+@login_required
+@permission_required('core.view_mantenimiento', raise_exception=True)
+def detalle_mantenimiento(request, equipo_pk, pk):
+    """
+    Displays the details of a specific maintenance record.
+    """
+    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
+
+    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
+        messages.error(request, 'No tienes permiso para ver este mantenimiento.')
+        return redirect('core:detalle_equipo', pk=equipo.pk)
+
+    context = {
+        'equipo': equipo,
+        'mantenimiento': mantenimiento,
+        'titulo_pagina': f'Detalle de Mantenimiento: {equipo.nombre}',
+    }
+    return render(request, 'core/detalle_mantenimiento.html', context)
+
 
 # --- Vistas de Comprobaciones ---
 
@@ -1310,12 +1390,10 @@ def dar_baja_equipo(request, equipo_pk):
         messages.error(request, 'No tienes permiso para dar de baja este equipo.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
-    # **NUEVA LÓGICA: Verificar si ya existe un registro de baja para evitar IntegrityError**
     if BajaEquipo.objects.filter(equipo=equipo).exists():
         messages.warning(request, 'Este equipo ya tiene un registro de baja existente. Si desea activarlo, use la opción de activación.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
-    # La siguiente línea ya existía, pero la anterior es más robusta para el IntegrityError
     if equipo.estado == 'De Baja':
         messages.warning(request, 'Este equipo ya se encuentra dado de baja.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -1351,15 +1429,12 @@ def activar_equipo(request, equipo_pk):
 
     if request.method == 'POST':
         try:
-            # Delete the decommissioning record
-            # La señal post_delete en BajaEquipo se encarga de cambiar el estado del equipo a 'Activo'
             BajaEquipo.objects.filter(equipo=equipo).delete()
             messages.success(request, f'Equipo "{equipo.nombre}" activado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al activar el equipo: {e}')
             return redirect('core:detalle_equipo', pk=equipo.pk)
-    # Renderizar la plantilla de confirmación
     return render(request, 'core/confirmar_activacion.html', {'equipo': equipo, 'titulo_pagina': f'Activar Equipo: {equipo.nombre}'})
 
 
@@ -1466,7 +1541,7 @@ def detalle_empresa(request, pk):
     })
 
 @login_required
-@permission_required('core.change_empresa', raise_exception=True) # Permiso para cambiar empresa
+@permission_required('core.change_empresa', raise_exception=True)
 def añadir_usuario_a_empresa(request, empresa_pk):
     """
     Vista para añadir un usuario existente a una empresa específica.
@@ -1475,7 +1550,6 @@ def añadir_usuario_a_empresa(request, empresa_pk):
     empresa = get_object_or_404(Empresa, pk=empresa_pk)
     titulo_pagina = f"Añadir Usuario a {empresa.nombre}"
 
-    # Solo superusuarios o usuarios de la misma empresa pueden añadir usuarios a ella
     if not request.user.is_superuser and request.user.empresa != empresa:
         messages.error(request, 'No tienes permiso para añadir usuarios a esta empresa.')
         return redirect('core:detalle_empresa', pk=empresa.pk)
@@ -1485,7 +1559,6 @@ def añadir_usuario_a_empresa(request, empresa_pk):
         if user_id:
             try:
                 user_to_add = CustomUser.objects.get(pk=user_id)
-                # Verificar si el usuario ya está asociado a otra empresa
                 if user_to_add.empresa and user_to_add.empresa != empresa:
                     messages.warning(request, f"El usuario '{user_to_add.username}' ya está asociado a la empresa '{user_to_add.empresa.nombre}'. Se ha reasignado a '{empresa.nombre}'.")
                 
@@ -1500,10 +1573,6 @@ def añadir_usuario_a_empresa(request, empresa_pk):
         else:
             messages.error(request, "Por favor, selecciona un usuario.")
     
-    # Obtener todos los usuarios que no tienen empresa o que no son superusuarios
-    # y que no están ya asociados a esta empresa
-    # Esto evita que los superusuarios se asignen a una empresa específica
-    # y permite reasignar usuarios de otras empresas si es necesario.
     users_available = CustomUser.objects.filter(is_superuser=False).exclude(empresa=empresa)
 
     context = {
@@ -1828,7 +1897,6 @@ def listar_proveedores(request):
     if not request.user.is_superuser:
         proveedores_list = proveedores_list.filter(empresa=request.user.empresa)
 
-    # Apply text search filter
     if query:
         proveedores_list = proveedores_list.filter(
             Q(nombre_empresa__icontains=query) |
@@ -1838,8 +1906,6 @@ def listar_proveedores(request):
             Q(servicio_prestado__icontains=query)
         )
     
-    # Apply service type filter
-    # Asegurarse de que el filtro se aplique solo si tipo_servicio_filter no es None o cadena vacía
     if tipo_servicio_filter and tipo_servicio_filter != '': 
         proveedores_list = proveedores_list.filter(tipo_servicio=tipo_servicio_filter)
 
@@ -1859,7 +1925,7 @@ def listar_proveedores(request):
         'proveedores': proveedores,
         'query': query,
         'tipo_servicio_choices': tipo_servicio_choices,
-        'tipo_servicio_filter': tipo_servicio_filter, # Pass the selected filter back to the template
+        'tipo_servicio_filter': tipo_servicio_filter,
         'titulo_pagina': 'Listado de Proveedores',
     }
     return render(request, 'core/listar_proveedores.html', context)
@@ -1872,18 +1938,16 @@ def añadir_proveedor(request):
     Handles adding a new general provider.
     """
     if request.method == 'POST':
-        form = ProveedorForm(request.POST, request=request) # Pasar el request al formulario
+        form = ProveedorForm(request.POST, request=request)
         if form.is_valid():
             proveedor = form.save(commit=False)
-            # La lógica de asignación de empresa para no-superusuarios se maneja en ProveedorForm.clean_empresa
             proveedor.save()
             messages.success(request, 'Proveedor añadido exitosamente.')
             return redirect('core:listar_proveedores')
         else:
             messages.error(request, 'Hubo un error al añadir el proveedor. Por favor, revisa los datos.')
     else:
-        form = ProveedorForm(request=request) # Pasar el request al formulario
-        # La lógica para deshabilitar/ocultar el campo empresa se maneja en ProveedorForm.__init__
+        form = ProveedorForm(request=request)
 
     return render(request, 'core/añadir_proveedor.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Proveedor'})
 
@@ -1896,24 +1960,21 @@ def editar_proveedor(request, pk):
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
-    # Asegurar que el usuario solo puede editar proveedores de su empresa (si no es superusuario)
     if not request.user.is_superuser and proveedor.empresa != request.user.empresa:
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
 
     if request.method == 'POST':
-        form = ProveedorForm(request.POST, instance=proveedor, request=request) # Pasar el request al formulario
+        form = ProveedorForm(request.POST, instance=proveedor, request=request)
         if form.is_valid():
             proveedor = form.save(commit=False)
-            # La lógica de asignación de empresa para no-superusuarios se maneja en ProveedorForm.clean_empresa
             proveedor.save()
             messages.success(request, 'Proveedor actualizado exitosamente.')
             return redirect('core:listar_proveedores')
         else:
             messages.error(request, 'Hubo un error al actualizar el proveedor. Por favor, revisa los datos.')
     else:
-        form = ProveedorForm(instance=proveedor, request=request) # Pasar el request al formulario
-        # La lógica para deshabilitar/ocultar el campo empresa se maneja en ProveedorForm.__init__
+        form = ProveedorForm(instance=proveedor, request=request)
     return render(request, 'core/editar_proveedor.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor: {proveedor.nombre_empresa}'})
 
 
@@ -1925,7 +1986,6 @@ def eliminar_proveedor(request, pk):
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
-    # Asegurar que el usuario solo puede eliminar proveedores de su empresa (si no es superusuario)
     if not request.user.is_superuser and proveedor.empresa != request.user.empresa:
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -1942,14 +2002,13 @@ def eliminar_proveedor(request, pk):
 
 
 @login_required
-@permission_required('core.can_view_proveedor', raise_exception=True) # Reutilizamos el permiso de vista general
+@permission_required('core.can_view_proveedor', raise_exception=True)
 def detalle_proveedor(request, pk):
     """
     Displays the details of a specific general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
-    # Asegurar que el usuario solo puede ver proveedores de su empresa (si no es superusuario)
     if not request.user.is_superuser and proveedor.empresa != request.user.empresa:
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2003,19 +2062,17 @@ def añadir_usuario(request, empresa_pk=None):
     Handles adding a new custom user.
     """
     if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST, request=request) # Pasar request al formulario
+        form = CustomUserCreationForm(request.POST, request=request)
         if form.is_valid():
             user = form.save(commit=False)
-            # La lógica de asignación de empresa para no-superusuarios se maneja en CustomUserCreationForm.__init__
             user.save()
             messages.success(request, 'Usuario añadido exitosamente.')
             return redirect('core:listar_usuarios')
         else:
             messages.error(request, 'Hubo un error al añadir el usuario. Por favor, revisa los datos.')
     else:
-        form = CustomUserCreationForm(request=request) # Pasar request al formulario
-        # La lógica para deshabilitar/ocultar el campo empresa se maneja en CustomUserCreationForm.__init__
-        if empresa_pk: # Si se está añadiendo desde el detalle de una empresa (para superusuarios)
+        form = CustomUserCreationForm(request=request)
+        if empresa_pk:
             form.fields['empresa'].initial = get_object_or_404(Empresa, pk=empresa_pk)
 
     return render(request, 'core/añadir_usuario.html', {'form': form, 'empresa_pk': empresa_pk, 'titulo_pagina': 'Añadir Nuevo Usuario'})
@@ -2029,18 +2086,16 @@ def detalle_usuario(request, pk):
     """
     usuario = get_object_or_404(CustomUser, pk=pk)
 
-    # Si el usuario no es superusuario, solo puede ver su propio perfil
     if not request.user.is_superuser and request.user.pk != usuario.pk:
         messages.error(request, 'No tienes permiso para ver este perfil de usuario.')
-        return redirect('core:perfil_usuario') # Redirigir a su propio perfil
+        return redirect('core:perfil_usuario')
 
-    # Si es staff pero no superusuario, y el usuario a ver no es de su misma empresa
     if request.user.is_staff and not request.user.is_superuser and usuario.empresa != request.user.empresa:
         messages.error(request, 'No tienes permiso para ver usuarios de otras empresas.')
-        return redirect('core:listar_usuarios') # Redirigir al listado de usuarios de su empresa
+        return redirect('core:listar_usuarios')
 
     return render(request, 'core/detalle_usuario.html', {
-        'usuario_a_ver': usuario, # Renombrado para evitar conflicto con 'usuario' de request.user
+        'usuario_a_ver': usuario,
         'titulo_pagina': f'Detalle de Usuario: {usuario.username}',
     })
 
@@ -2053,34 +2108,26 @@ def editar_usuario(request, pk):
     """
     usuario_a_editar = get_object_or_404(CustomUser, pk=pk)
 
-    # Lógica de permisos para edición:
-    # 1. Superusuario puede editar a cualquiera.
-    # 2. Staff (no superusuario) solo puede editar usuarios de su misma empresa.
-    # 3. Un usuario normal (no staff, no superusuario) solo puede editar su propio perfil (ya cubierto por perfil_usuario).
     if not request.user.is_superuser:
-        if request.user.pk == usuario_a_editar.pk: # Si es su propio perfil, permitir edición (UserProfileForm)
-            return redirect('core:perfil_usuario') # Redirigir a la vista de perfil para edición
+        if request.user.pk == usuario_a_editar.pk:
+            return redirect('core:perfil_usuario')
         elif not request.user.is_staff or request.user.empresa != usuario_a_editar.empresa:
             messages.error(request, 'No tienes permiso para editar este usuario.')
-            return redirect('core:listar_usuarios') # Redirigir a listado o home
+            return redirect('core:listar_usuarios')
 
     if request.method == 'POST':
-        # Pasar el 'request' al formulario para la lógica de permisos dentro de __init__
-        form = CustomUserChangeForm(request.POST, instance=usuario_a_editar, request=request) 
+        form = CustomUserChangeForm(request.POST, instance=usuario_a_editar, request=request)
         if form.is_valid():
             user = form.save(commit=False)
-            # Asegurarse de que la empresa no se cambie si el usuario no es superusuario
             if not request.user.is_superuser:
-                user.empresa = usuario_a_editar.empresa # Mantener la empresa original
+                user.empresa = usuario_a_editar.empresa
             user.save()
             messages.success(request, f'Usuario "{user.username}" actualizado exitosamente.')
             return redirect('core:detalle_usuario', pk=usuario_a_editar.pk)
         else:
             messages.error(request, 'Hubo un error al actualizar el usuario. Por favor, revisa los datos.')
     else:
-        # Pasar el 'request' al formulario para la lógica de permisos dentro de __init__
-        form = CustomUserChangeForm(instance=usuario_a_editar, request=request) 
-        # La lógica para deshabilitar/ocultar el campo empresa se maneja en CustomUserChangeForm.__init__
+        form = CustomUserChangeForm(instance=usuario_a_editar, request=request)
 
     return render(request, 'core/editar_usuario.html', {'form': form, 'usuario_a_editar': usuario_a_editar, 'titulo_pagina': f'Editar Usuario: {usuario_a_editar.username}'})
 
@@ -2124,7 +2171,6 @@ def change_user_password(request, pk):
         messages.warning(request, "No puedes cambiar tu propia contraseña desde esta sección. Usa 'Mi Perfil' -> 'Cambiar contraseña'.")
         return redirect('core:detalle_usuario', pk=pk)
 
-    # Solo superusuarios pueden cambiar la contraseña de otros usuarios
     if not request.user.is_superuser:
         messages.error(request, 'No tienes permiso para cambiar la contraseña de otros usuarios.')
         return redirect('core:detalle_usuario', pk=pk)
@@ -2154,15 +2200,11 @@ def _generate_pdf_content(request, template_path, context):
     """
     Generates PDF content (bytes) from a template and context using WeasyPrint.
     """
-    # Importar get_template aquí para asegurar que siempre esté disponible
-    from django.template.loader import get_template 
+    from django.template.loader import get_template
 
     template = get_template(template_path)
     html_string = template.render(context)
     
-    # Usar WeasyPrint para generar el PDF
-    # WeasyPrint puede tomar una cadena HTML y URLs base para resolver rutas relativas
-    # Usamos request.build_absolute_uri('/') como base_url para que WeasyPrint resuelva las URLs de imágenes y documentos
     pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
     
     return pdf_file
@@ -2180,22 +2222,19 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     except BajaEquipo.DoesNotExist:
         pass
 
-    # Obtener URLs absolutas para imágenes y documentos, con manejo de None
-    # Usar 'logo_empresa' en lugar de 'logo'
     logo_empresa_url = request.build_absolute_uri(equipo.empresa.logo_empresa.url) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = request.build_absolute_uri(equipo.imagen_equipo.url) if equipo.imagen_equipo else None
     documento_baja_url = request.build_absolute_uri(baja_registro.documento_baja.url) if baja_registro and baja_registro.documento_baja else None
 
-    # NO se generan nuevos PDFs para estos, solo se usan las URLs si existen
     for cal in calibraciones:
         cal.documento_calibracion_url = request.build_absolute_uri(cal.documento_calibracion.url) if cal.documento_calibracion else None
         cal.confirmacion_metrologica_pdf_url = request.build_absolute_uri(cal.confirmacion_metrologica_pdf.url) if cal.confirmacion_metrologica_pdf else None
+        cal.intervalos_calibracion_pdf_url = request.build_absolute_uri(cal.intervalos_calibracion_pdf.url) if cal.intervalos_calibracion_pdf else None # NUEVO URL
     for mant in mantenimientos:
         mant.documento_mantenimiento_url = request.build_absolute_uri(mant.documento_mantenimiento.url) if mant.documento_mantenimiento else None
     for comp in comprobaciones:
         comp.documento_comprobacion_url = request.build_absolute_uri(comp.documento_comprobacion.url) if comp.documento_comprobacion else None
 
-    # Asegúrate de que los campos en el modelo Equipo sean correctos (e.g., archivo_compra, ficha_tecnica)
     archivo_compra_pdf_url = request.build_absolute_uri(equipo.archivo_compra_pdf.url) if equipo.archivo_compra_pdf else None
     ficha_tecnica_pdf_url = request.build_absolute_uri(equipo.ficha_tecnica_pdf.url) if equipo.ficha_tecnica_pdf else None
     manual_pdf_url = request.build_absolute_uri(equipo.manual_pdf.url) if equipo.manual_pdf else None
@@ -2225,14 +2264,12 @@ def _generate_equipment_activities_excel_content(equipo):
     """
     workbook = Workbook()
 
-    # Hoja de Calibraciones
     sheet_cal = workbook.active
     sheet_cal.title = "Calibraciones"
     headers_cal = ["Fecha Calibración", "Proveedor", "Resultado", "Número Certificado", "Observaciones"]
     sheet_cal.append(headers_cal)
     for cal in equipo.calibraciones.all().order_by('fecha_calibracion'):
-        # Asegúrate de que 'proveedor' es el campo correcto para el nombre del proveedor
-        proveedor_nombre = cal.nombre_proveedor if cal.nombre_proveedor else '' # Usar nombre_proveedor
+        proveedor_nombre = cal.nombre_proveedor if cal.nombre_proveedor else ''
         sheet_cal.append([
             cal.fecha_calibracion.strftime('%Y-%m-%d') if cal.fecha_calibracion else '',
             proveedor_nombre, 
@@ -2240,7 +2277,6 @@ def _generate_equipment_activities_excel_content(equipo):
             cal.numero_certificado,
             cal.observaciones
         ])
-    # Adjust column width
     for col in sheet_cal.columns:
         max_length = 0
         column = col[0].column_letter
@@ -2253,13 +2289,11 @@ def _generate_equipment_activities_excel_content(equipo):
         adjusted_width = (max_length + 2)
         sheet_cal.column_dimensions[column].width = adjusted_width
 
-    # Hoja de Mantenimientos
     sheet_mant = workbook.create_sheet("Mantenimientos")
     headers_mant = ["Fecha Mantenimiento", "Tipo", "Proveedor", "Responsable", "Costo", "Descripción"]
     sheet_mant.append(headers_mant)
     for mant in equipo.mantenimientos.all().order_by('fecha_mantenimiento'):
-        # Asegúrate de que 'proveedor' es el campo correcto para el nombre del proveedor
-        proveedor_nombre = mant.nombre_proveedor if mant.nombre_proveedor else '' # Usar nombre_proveedor
+        proveedor_nombre = mant.nombre_proveedor if mant.nombre_proveedor else ''
         sheet_mant.append([
             mant.fecha_mantenimiento.strftime('%Y-%m-%d') if mant.fecha_mantenimiento else '',
             mant.get_tipo_mantenimiento_display(),
@@ -2268,7 +2302,6 @@ def _generate_equipment_activities_excel_content(equipo):
             float(mant.costo) if mant.costo is not None else '',
             mant.descripcion
         ])
-    # Adjust column width
     for col in sheet_mant.columns:
         max_length = 0
         column = col[0].column_letter
@@ -2281,13 +2314,11 @@ def _generate_equipment_activities_excel_content(equipo):
         adjusted_width = (max_length + 2)
         sheet_mant.column_dimensions[column].width = adjusted_width
 
-    # Hoja de Comprobaciones
     sheet_comp = workbook.create_sheet("Comprobaciones")
     headers_comp = ["Fecha Comprobación", "Proveedor", "Responsable", "Resultado", "Observaciones"]
     sheet_comp.append(headers_comp)
     for comp in equipo.comprobaciones.all().order_by('fecha_comprobacion'):
-        # Asegúrate de que 'proveedor' es el campo correcto para el nombre del proveedor
-        proveedor_nombre = comp.nombre_proveedor if comp.nombre_proveedor else '' # Usar nombre_proveedor
+        proveedor_nombre = comp.nombre_proveedor if comp.nombre_proveedor else ''
         sheet_comp.append([
             comp.fecha_comprobacion.strftime('%Y-%m-%d') if comp.fecha_comprobacion else '',
             proveedor_nombre, 
@@ -2295,7 +2326,6 @@ def _generate_equipment_activities_excel_content(equipo):
             comp.resultado,
             comp.observaciones
         ])
-    # Adjust column width
     for col in sheet_comp.columns:
         max_length = 0
         column = col[0].column_letter
@@ -2322,13 +2352,11 @@ def _generate_equipment_general_info_excel_content(equipo):
     sheet = workbook.active
     sheet.title = "Información General"
 
-    # Headers for general information
     headers = [
         "Campo", "Valor"
     ]
     sheet.append(headers)
 
-    # Apply styling to headers
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
@@ -2343,9 +2371,8 @@ def _generate_equipment_general_info_excel_content(equipo):
         cell.fill = header_fill
         cell.alignment = header_alignment
         cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 30 # Adjust width for info
+        sheet.column_dimensions[cell.column_letter].width = 30
 
-    # General equipment information
     general_info = [
         ("Código Interno", equipo.codigo_interno),
         ("Nombre", equipo.nombre),
@@ -2354,13 +2381,13 @@ def _generate_equipment_general_info_excel_content(equipo):
         ("Marca", equipo.marca),
         ("Modelo", equipo.modelo),
         ("Número de Serie", equipo.numero_serie),
-        ("Ubicación", equipo.ubicacion), # Ahora es CharField
+        ("Ubicación", equipo.ubicacion),
         ("Responsable", equipo.responsable),
         ("Estado", equipo.estado),
         ("Fecha de Adquisición", equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else ''),
         ("Rango de Medida", equipo.rango_medida),
         ("Resolución", equipo.resolucion),
-        ("Error Máximo Permisible", equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else ''), # Ahora es CharField
+        ("Error Máximo Permisible", equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else ''),
         ("Fecha de Registro", equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else ''),
         ("Observaciones", equipo.observaciones),
         ("Versión Formato Equipo", equipo.version_formato),
@@ -2380,7 +2407,6 @@ def _generate_equipment_general_info_excel_content(equipo):
     for label, value in general_info:
         sheet.append([label, value])
 
-    # Adjust column width for content
     for col in sheet.columns:
         max_length = 0
         column = col[0].column_letter
@@ -2441,14 +2467,14 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.nombre,
             equipo.empresa.nombre if equipo.empresa else "N/A",
             equipo.get_tipo_equipo_display(),
-            equipo.ubicacion, # Ahora es CharField
+            equipo.ubicacion,
             equipo.responsable,
             equipo.marca,
             equipo.modelo,
             equipo.numero_serie,
             equipo.rango_medida,
             equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '', # Ahora es CharField
+            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
             equipo.estado,
             equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
             equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
@@ -2520,7 +2546,7 @@ def _generate_general_proveedor_list_excel_content(proveedores_queryset):
     for proveedor in proveedores_queryset:
         row_data = [
             proveedor.nombre_empresa,
-            proveedor.empresa.nombre if proveedor.empresa else "N/A", # Mostrar la empresa asociada
+            proveedor.empresa.nombre if proveedor.empresa else "N/A",
             proveedor.get_tipo_servicio_display(),
             proveedor.nombre_contacto,
             proveedor.numero_contacto,
@@ -2579,10 +2605,10 @@ def informes(request):
     # Filtrar solo equipos activos y no de baja
     equipos_activos_para_actividades = equipos_queryset.exclude(estado='De Baja')
 
-    scheduled_activities = [] # Se inicializa aquí para que no se duplique con las de abajo
+    scheduled_activities = []
 
     for equipo in equipos_activos_para_actividades.filter(proxima_calibracion__isnull=False).order_by('proxima_calibracion'):
-        if equipo.proxima_calibracion: # Double check for null
+        if equipo.proxima_calibracion:
             days_remaining = (equipo.proxima_calibracion - today).days
             estado_vencimiento = 'Vencida' if days_remaining < 0 else 'Próxima'
             scheduled_activities.append({
@@ -2593,9 +2619,8 @@ def informes(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    # Mantenimientos
     for equipo in equipos_activos_para_actividades.filter(proximo_mantenimiento__isnull=False).order_by('proximo_mantenimiento'):
-        if equipo.proximo_mantenimiento: # Double check for null
+        if equipo.proximo_mantenimiento:
             days_remaining = (equipo.proximo_mantenimiento - today).days
             estado_vencimiento = 'Vencida' if days_remaining < 0 else 'Próxima'
             scheduled_activities.append({
@@ -2606,9 +2631,8 @@ def informes(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    # Comprobaciones
     for equipo in equipos_activos_para_actividades.filter(proxima_comprobacion__isnull=False).order_by('proxima_comprobacion'):
-        if equipo.proxima_comprobacion: # Double check for null
+        if equipo.proxima_comprobacion:
             days_remaining = (equipo.proxima_comprobacion - today).days
             estado_vencimiento = 'Vencida' if days_remaining < 0 else 'Próxima'
             scheduled_activities.append({
@@ -2619,10 +2643,8 @@ def informes(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    # Ordenar todas las actividades por fecha programada
     scheduled_activities.sort(key=lambda x: x['fecha_programada'] if x['fecha_programada'] else date.max)
 
-    # Separar en listas para el contexto (si es necesario para la plantilla informes.html)
     calibraciones_proximas_30 = [act for act in scheduled_activities if act['tipo'] == 'Calibración' and act['estado_vencimiento'] == 'Próxima' and act['dias_restantes'] <= 30 and act['dias_restantes'] > 15]
     calibraciones_proximas_15 = [act for act in scheduled_activities if act['tipo'] == 'Calibración' and act['estado_vencimiento'] == 'Próxima' and act['dias_restantes'] <= 15 and act['dias_restantes'] >= 0]
     calibraciones_vencidas = [act for act in scheduled_activities if act['tipo'] == 'Calibración' and act['estado_vencimiento'] == 'Vencida']
@@ -2668,9 +2690,9 @@ def generar_informe_zip(request):
     ├── Equipos/
     │   ├── [Equipment Internal Code 1]/
     │   │   ├── Calibraciones/
-    │   │   │   ├── (Calibration PDFs)
-    │   │   │   └── Confirmaciones/ (NEW FOLDER)
-    │   │   │       └── (Confirmation PDFs)
+    │   │   │   ├── Certificados/ (Certificado de Calibración)
+    │   │   │   ├── Confirmaciones/ (Confirmación Metrológica)
+    │   │   │   └── Intervalos/ (Intervalos de Calibración - NUEVA CARPETA)
     │   │   ├── Comprobaciones/
     │   │   │   └── (Verification PDFs)
     │   │   ├── Mantenimientos/
@@ -2691,8 +2713,7 @@ def generar_informe_zip(request):
 
     empresa = get_object_or_404(Empresa, pk=selected_company_id)
     equipos_empresa = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
-    # Filtrar proveedores por la empresa seleccionada
-    proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa') 
+    proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -2706,83 +2727,165 @@ def generar_informe_zip(request):
 
         # 3. For each equipment, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
         for equipo in equipos_empresa:
-            # Sanitize equipment code for folder name
             safe_equipo_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_')
             equipo_folder = f"{empresa.nombre}/Equipos/{safe_equipo_codigo}"
 
-            # Add "Hoja de Vida" (generated in PDF)
             try:
                 hoja_vida_pdf_content = _generate_equipment_hoja_vida_pdf_content(request, equipo)
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content) # Name changed to match request
+                zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content)
             except Exception as e:
                 print(f"Error generating Hoja de Vida PDF for {equipo.codigo_interno}: {e}")
-                # Optional: add a text file indicating the error
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_PDF_ERROR.txt", f"Error generating Hoja de Vida PDF: {e}")
 
-            # Add "Hoja de Vida" (generated in Excel with general info) - NEW
             try:
                 hoja_vida_general_excel_content = _generate_equipment_general_info_excel_content(equipo)
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_Excel.xlsx", hoja_vida_general_excel_content) # Name changed to match request
+                zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_Excel.xlsx", hoja_vida_general_excel_content)
             except Exception as e:
                 print(f"Error generating Hoja de Vida General Excel for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_EXCEL_ERROR.txt", f"Error generating Hoja de Vida General Excel: {e}")
 
-            # Add "Hoja de Vida" (generated in Excel with activities history) - Existing
             try:
                 hoja_vida_activities_excel_content = _generate_equipment_activities_excel_content(equipo)
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_Excel.xlsx", hoja_vida_activities_excel_content) # Renamed for clarity
+                zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_Excel.xlsx", hoja_vida_activities_excel_content)
             except Exception as e:
                 print(f"Error generating Hoja de Vida Activities Excel for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Activities Excel: {e}")
 
 
-            # Add existing Calibration PDFs and Confirmation PDFs
+            # --- IMPORTANT NOTE FOR RENDER DEPLOYMENT ---
+            # The following section attempts to read files from the local filesystem using .path.
+            # On Render, files uploaded via Django's FileField are typically stored in a cloud storage
+            # service (like AWS S3, Google Cloud Storage, etc.) and not directly on the local filesystem
+            # of the ephemeral Render instance.
+            #
+            # To make this work, you MUST configure Django to use a cloud storage backend (e.g., django-storages
+            # with S3). If you have django-storages configured, you would access the file content
+            # using `file_field.open()` or `file_field.read()` which handles fetching from cloud storage.
+            #
+            # Example for cloud storage:
+            # from django.core.files.storage import default_storage
+            # if default_storage.exists(cal.documento_calibracion.name):
+            #     with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
+            #         zf.writestr(..., f.read())
+            #
+            # The current `os.path.exists` and `open(..., 'rb')` will only work if files are
+            # stored locally on the Render instance, which is generally not the case for user-uploaded
+            # media files in a production PaaS environment.
+            #
+            # If you haven't set up cloud storage, this part will likely fail silently or with errors
+            # in Render's logs because `os.path.exists` will return False or the path will be invalid.
+
+            # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
             calibraciones = Calibracion.objects.filter(equipo=equipo)
             for cal in calibraciones:
-                if cal.documento_calibracion and os.path.exists(cal.documento_calibracion.path):
-                    with open(cal.documento_calibracion.path, 'rb') as f:
-                        # Store calibration certificate in Calibraciones folder
-                        zf.writestr(f"{equipo_folder}/Calibraciones/{os.path.basename(cal.documento_calibracion.name)}", f.read())
-                if cal.confirmacion_metrologica_pdf and os.path.exists(cal.confirmacion_metrologica_pdf.path):
-                    with open(cal.confirmacion_metrologica_pdf.path, 'rb') as f:
-                        # Store confirmation PDF in a new Confirmaciones subfolder
-                        zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{os.path.basename(cal.confirmacion_metrologica_pdf.name)}", f.read())
+                # Certificado de Calibración
+                if cal.documento_calibracion:
+                    try:
+                        # Use default_storage if configured for cloud, otherwise os.path.exists
+                        if getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'storages.backends.s3boto3.S3Boto3Storage' or \
+                           getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'django.core.files.storage.FileSystemStorage': # Fallback for local
+                            if os.path.exists(cal.documento_calibracion.path):
+                                with open(cal.documento_calibracion.path, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{os.path.basename(cal.documento_calibracion.name)}", f.read())
+                        else: # Assume default_storage is configured for cloud storage
+                            from django.core.files.storage import default_storage
+                            if default_storage.exists(cal.documento_calibracion.name):
+                                with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{os.path.basename(cal.documento_calibracion.name)}", f.read())
+                    except Exception as e:
+                        print(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
+
+                # Confirmación Metrológica
+                if cal.confirmacion_metrologica_pdf:
+                    try:
+                        if getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'storages.backends.s3boto3.S3Boto3Storage' or \
+                           getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'django.core.files.storage.FileSystemStorage':
+                            if os.path.exists(cal.confirmacion_metrologica_pdf.path):
+                                with open(cal.confirmacion_metrologica_pdf.path, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{os.path.basename(cal.confirmacion_metrologica_pdf.name)}", f.read())
+                        else:
+                            from django.core.files.storage import default_storage
+                            if default_storage.exists(cal.confirmacion_metrologica_pdf.name):
+                                with default_storage.open(cal.confirmacion_metrologica_pdf.name, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{os.path.basename(cal.confirmacion_metrologica_pdf.name)}", f.read())
+                    except Exception as e:
+                        print(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
+
+                # Intervalos de Calibración (NUEVO)
+                if cal.intervalos_calibracion_pdf:
+                    try:
+                        if getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'storages.backends.s3boto3.S3Boto3Storage' or \
+                           getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'django.core.files.storage.FileSystemStorage':
+                            if os.path.exists(cal.intervalos_calibracion_pdf.path):
+                                with open(cal.intervalos_calibracion_pdf.path, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{os.path.basename(cal.intervalos_calibracion_pdf.name)}", f.read())
+                        else:
+                            from django.core.files.storage import default_storage
+                            if default_storage.exists(cal.intervalos_calibracion_pdf.name):
+                                with default_storage.open(cal.intervalos_calibracion_pdf.name, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{os.path.basename(cal.intervalos_calibracion_pdf.name)}", f.read())
+                    except Exception as e:
+                        print(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
 
             # Add existing Maintenance PDFs
             mantenimientos = Mantenimiento.objects.filter(equipo=equipo)
             for mant in mantenimientos:
-                if mant.documento_mantenimiento and os.path.exists(mant.documento_mantenimiento.path):
-                    with open(mant.documento_mantenimiento.path, 'rb') as f:
-                        zf.writestr(f"{equipo_folder}/Mantenimientos/{os.path.basename(mant.documento_mantenimiento.name)}", f.read())
+                if mant.documento_mantenimiento:
+                    try:
+                        if getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'storages.backends.s3boto3.S3Boto3Storage' or \
+                           getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'django.core.files.storage.FileSystemStorage':
+                            if os.path.exists(mant.documento_mantenimiento.path):
+                                with open(mant.documento_mantenimiento.path, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Mantenimientos/{os.path.basename(mant.documento_mantenimiento.name)}", f.read())
+                        else:
+                            from django.core.files.storage import default_storage
+                            if default_storage.exists(mant.documento_mantenimiento.name):
+                                with default_storage.open(mant.documento_mantenimiento.name, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Mantenimientos/{os.path.basename(mant.documento_mantenimiento.name)}", f.read())
+                    except Exception as e:
+                        print(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
 
             # Add existing Verification PDFs
             comprobaciones = Comprobacion.objects.filter(equipo=equipo)
             for comp in comprobaciones:
-                if comp.documento_comprobacion and os.path.exists(comp.documento_comprobacion.path):
-                    with open(comp.documento_comprobacion.path, 'rb') as f:
-                        zf.writestr(f"{equipo_folder}/Comprobaciones/{os.path.basename(comp.documento_comprobacion.name)}", f.read())
+                if comp.documento_comprobacion:
+                    try:
+                        if getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'storages.backends.s3boto3.S3Boto3Storage' or \
+                           getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'django.core.files.storage.FileSystemStorage':
+                            if os.path.exists(comp.documento_comprobacion.path):
+                                with open(comp.documento_comprobacion.path, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Comprobaciones/{os.path.basename(comp.documento_comprobacion.name)}", f.read())
+                        else:
+                            from django.core.files.storage import default_storage
+                            if default_storage.exists(comp.documento_comprobacion.name):
+                                with default_storage.open(comp.documento_comprobacion.name, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/Comprobaciones/{os.path.basename(comp.documento_comprobacion.name)}", f.read())
+                    except Exception as e:
+                        print(f"Error adding comprobacion document {comp.documento_comprobacion.name} to zip: {e}")
             
             # Add other equipment documents (if they exist and are PDF)
-            # NOTE: Ensure field names in the Equipo model are correct.
-            # Names here (archivo_compra_pdf, ficha_tecnica_pdf, manual_pdf, otros_documentos_pdf)
-            # seem to be what you were using with xhtml2pdf. If in your model they are simply
-            # archivo_compra, ficha_tecnica, etc., adjust them here.
-            if equipo.archivo_compra_pdf and os.path.exists(equipo.archivo_compra_pdf.path):
-                if equipo.archivo_compra_pdf.name.lower().endswith('.pdf'):
-                    with open(equipo.archivo_compra_pdf.path, 'rb') as f:
-                        zf.writestr(f"{equipo_folder}/{os.path.basename(equipo.archivo_compra_pdf.name)}", f.read())
-            if equipo.ficha_tecnica_pdf and os.path.exists(equipo.ficha_tecnica_pdf.path):
-                if equipo.ficha_tecnica_pdf.name.lower().endswith('.pdf'):
-                    with open(equipo.ficha_tecnica_pdf.path, 'rb') as f:
-                        zf.writestr(f"{equipo_folder}/{os.path.basename(equipo.ficha_tecnica_pdf.name)}", f.read())
-            if equipo.manual_pdf and os.path.exists(equipo.manual_pdf.path):
-                if equipo.manual_pdf.name.lower().endswith('.pdf'):
-                    with open(equipo.manual_pdf.path, 'rb') as f:
-                        zf.writestr(f"{equipo_folder}/{os.path.basename(equipo.manual_pdf.name)}", f.read())
-            if equipo.otros_documentos_pdf and os.path.exists(equipo.otros_documentos_pdf.path):
-                if equipo.otros_documentos_pdf.name.lower().endswith('.pdf'):
-                    with open(equipo.otros_documentos_pdf.path, 'rb') as f:
-                        zf.writestr(f"{equipo_folder}/{os.path.basename(equipo.otros_documentos_pdf.name)}", f.read())
+            # This part also assumes local file system access or default_storage configuration
+            equipment_docs = [
+                equipo.archivo_compra_pdf,
+                equipo.ficha_tecnica_pdf,
+                equipo.manual_pdf,
+                equipo.otros_documentos_pdf
+            ]
+            for doc_field in equipment_docs:
+                if doc_field:
+                    try:
+                        if getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'storages.backends.s3boto3.S3Boto3Storage' or \
+                           getattr(settings, 'DEFAULT_FILE_STORAGE', None) == 'django.core.files.storage.FileSystemStorage':
+                            if os.path.exists(doc_field.path) and doc_field.name.lower().endswith('.pdf'):
+                                with open(doc_field.path, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/{os.path.basename(doc_field.name)}", f.read())
+                        else:
+                            from django.core.files.storage import default_storage
+                            if default_storage.exists(doc_field.name) and doc_field.name.lower().endswith('.pdf'):
+                                with default_storage.open(doc_field.name, 'rb') as f:
+                                    zf.writestr(f"{equipo_folder}/{os.path.basename(doc_field.name)}", f.read())
+                    except Exception as e:
+                        print(f"Error adding equipment document {doc_field.name} to zip: {e}")
 
 
     zip_buffer.seek(0)
@@ -2792,30 +2895,23 @@ def generar_informe_zip(request):
 
 
 @login_required
-# Eliminado: @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def informe_vencimientos_pdf(request):
     """
     Generates a PDF report of upcoming and overdue activities.
     """
     today = timezone.localdate()
-    # Equipos con próximas calibraciones/mantenimientos/comprobaciones en los próximos 30 días
-    # o que ya han vencido.
     upcoming_threshold = today + timedelta(days=30)
 
-    # Obtener todas las actividades programadas
     scheduled_activities = []
 
-    # Filtrar equipos por empresa del usuario si no es superusuario
     equipos_base_query = Equipo.objects.all()
     if not request.user.is_superuser and request.user.empresa:
         equipos_base_query = equipos_base_query.filter(empresa=request.user.empresa)
     elif not request.user.is_superuser and not request.user.empresa:
-        equipos_base_query = Equipo.objects.none() # Usuario normal sin empresa no ve equipos
+        equipos_base_query = Equipo.objects.none()
 
-    # Excluir equipos "De Baja" de los informes de vencimiento
     equipos_base_query = equipos_base_query.exclude(estado='De Baja')
 
-    # Calibraciones
     calibraciones_query = equipos_base_query.filter(
         proxima_calibracion__isnull=False
     ).order_by('proxima_calibracion')
@@ -2832,7 +2928,6 @@ def informe_vencimientos_pdf(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    # Mantenimientos
     mantenimientos_query = equipos_base_query.filter(
         proximo_mantenimiento__isnull=False
     ).order_by('proximo_mantenimiento')
@@ -2849,7 +2944,6 @@ def informe_vencimientos_pdf(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    # Comprobaciones
     comprobaciones_query = equipos_base_query.filter(
         proxima_comprobacion__isnull=False
     ).order_by('proxima_comprobacion')
@@ -2861,12 +2955,11 @@ def informe_vencimientos_pdf(request):
             scheduled_activities.append({
                 'tipo': 'Comprobación',
                 'equipo': equipo,
-                'fecha_programada': equipo.proxima_comprobacion, # Corrected: 'proprobacion' to 'proxima_comprobacion'
+                'fecha_programada': equipo.proxima_comprobacion,
                 'dias_restantes': days_remaining,
                 'estado_vencimiento': estado_vencimiento
             })
 
-    # Ordenar todas las actividades por fecha programada
     scheduled_activities.sort(key=lambda x: x['fecha_programada'] if x['fecha_programada'] else date.max)
 
     context = {
@@ -2880,8 +2973,7 @@ def informe_vencimientos_pdf(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="informe_vencimientos.pdf"'
 
-    # Usar WeasyPrint para generar el PDF
-    pdf_file = _generate_pdf_content(request, template_path, context) # Reutilizar la función auxiliar
+    pdf_file = _generate_pdf_content(request, template_path, context)
     response.write(pdf_file)
     return response
 
@@ -2899,7 +2991,6 @@ def programmed_activities_list(request):
     elif not request.user.is_superuser and not request.user.empresa:
         equipos_base_query = Equipo.objects.none()
 
-    # Excluir equipos "De Baja" de la lista de actividades programadas
     equipos_base_query = equipos_base_query.exclude(estado='De Baja')
 
     calibraciones_query = equipos_base_query.filter(
@@ -2945,7 +3036,7 @@ def programmed_activities_list(request):
             scheduled_activities.append({
                 'tipo': 'Comprobación',
                 'equipo': equipo,
-                'fecha_programada': equipo.proxima_comprobacion, # Corrected: 'proprobacion' to 'proxima_comprobacion'
+                'fecha_programada': equipo.proxima_comprobacion,
                 'dias_restantes': days_remaining,
                 'estado_vencimiento': estado_vencimiento
             })
@@ -2965,7 +3056,7 @@ def programmed_activities_list(request):
 
 
 @login_required
-@permission_required('core.can_export_reports', raise_exception=True) # Protegido por el nuevo permiso
+@permission_required('core.can_export_reports', raise_exception=True)
 def exportar_equipos_excel(request):
     """
     Exports a general list of equipment to an Excel file.
@@ -2976,7 +3067,6 @@ def exportar_equipos_excel(request):
     elif not request.user.is_superuser and not request.user.empresa:
         equipos = Equipo.objects.none()
 
-    # Reuse the helper function to generate Excel content
     excel_content = _generate_general_equipment_list_excel_content(equipos)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -2985,15 +3075,11 @@ def exportar_equipos_excel(request):
     return response
 
 @login_required
-# Eliminado: @permission_required('core.can_export_reports', raise_exception=True) # Protegido por el nuevo permiso
 def generar_hoja_vida_pdf(request, pk):
     """
     Generates the "Hoja de Vida" (Life Sheet) PDF for a specific equipment.
     """
     equipo = get_object_or_404(Equipo, pk=pk)
-    # La lógica de permisos ahora es:
-    # Superusuario: puede generar la hoja de vida de cualquier equipo.
-    # Usuario normal/staff: puede generar la hoja de vida de equipos de su propia empresa.
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para generar la hoja de vida de este equipo.')
         return redirect('core:home')
@@ -3004,12 +3090,11 @@ def generar_hoja_vida_pdf(request, pk):
         response['Content-Disposition'] = f'attachment; filename="hoja_vida_{equipo.codigo_interno}.pdf"'
         return response
     except Exception as e:
-        # The specific exception error will be shown here
         return HttpResponse(f'Tuvimos algunos errores al generar el PDF: <pre>{e}</pre>')
 
 
 @require_POST
-@csrf_exempt # Usar csrf_exempt para esta vista simple de AJAX. En un entorno de producción real, se preferiría un manejo de CSRF más robusto para APIs.
+@csrf_exempt
 def add_message(request):
     """
     Adds a Django message via an AJAX POST request.
@@ -3018,7 +3103,7 @@ def add_message(request):
     try:
         data = json.loads(request.body)
         message_text = data.get('message', 'Mensaje genérico.')
-        message_tags = data.get('tags', 'info') # Default to 'info'
+        message_tags = data.get('tags', 'info')
 
         if message_tags == 'success':
             messages.success(request, message_text)
@@ -3042,6 +3127,3 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
-
-
-

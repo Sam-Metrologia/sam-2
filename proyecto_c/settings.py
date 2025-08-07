@@ -19,17 +19,26 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'un_valor_por_defecto_muy_largo_y_alea
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG (LEE DESDE VARIABLE DE ENTORNO)
 # En Render, DEBUG_VALUE debe ser 'False'
+# Para desarrollo local, si RENDER_EXTERNAL_HOSTNAME no está presente, forzamos DEBUG a True
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+
+# Si no estamos en Render, asumimos que es desarrollo local y forzamos DEBUG a True
+# De lo contrario, leemos de la variable de entorno (para Render)
 DEBUG = os.environ.get('DEBUG_VALUE', 'False') == 'True'
+if not RENDER_EXTERNAL_HOSTNAME:
+    DEBUG = True # Forzar DEBUG a True en desarrollo local si no hay hostname de Render
 
 ALLOWED_HOSTS = [] # Inicializa como lista vacía
-RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME') # Obtiene el hostname de Render
+
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME) # Añade el hostname de Render
 
-# Para desarrollo local, si necesitas acceder por localhost
+# Para desarrollo local, si DEBUG es True, permite localhost y 127.0.0.1
 if DEBUG:
     ALLOWED_HOSTS.append('localhost')
     ALLOWED_HOSTS.append('127.0.0.1')
+    # Puedes añadir tu IP local si necesitas acceder desde otros dispositivos en tu red
+    # ALLOWED_HOSTS.append('tu_ip_local') # Ejemplo: '192.168.1.100'
 
 # --- CONFIGURACIÓN PARA CORREGIR EL ERROR CSRF EN RENDER ---
 # Django necesita confiar en el dominio de Render para aceptar el token CSRF.
@@ -171,4 +180,3 @@ MESSAGE_TAGS = {
 
 # ¡MUY IMPORTANTE! Le dice a Django que use nuestro modelo CustomUser
 AUTH_USER_MODEL = 'core.CustomUser'
-# Prueba de modificacion setting
