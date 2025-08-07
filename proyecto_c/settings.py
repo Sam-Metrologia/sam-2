@@ -5,6 +5,9 @@ from pathlib import Path
 from django.contrib.messages import constants as messages
 import dj_database_url # Añadido para la configuración de la base de datos
 
+# Importamos la configuración para AWS S3
+from storages.backends.s3boto3 import S3Boto3Storage
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -59,6 +62,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core', # ¡MUY IMPORTANTE! Añade tu aplicación 'core' aquí
+    'storages', # <--- ¡IMPORTANTE! Añade la app de storages
 ]
 
 MIDDLEWARE = [
@@ -153,8 +157,36 @@ STATIC_ROOT = BASE_DIR / 'staticfiles' # Directorio para archivos estáticos rec
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files (user uploaded files)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media' # Directorio para archivos subidos por los usuarios
+# NOTA: Comentamos la configuración local de Media para usar la de AWS S3
+# MEDIA_URL = '/media/'
+# MEDIA_ROOT = BASE_DIR / 'media' # Directorio para archivos subidos por los usuarios
+
+# ==============================================================================
+# CONFIGURACIÓN DE ARCHIVOS DE MEDIA (AWS S3)
+# ==============================================================================
+# Esta configuración permite a Django guardar y servir archivos de media
+# (como PDFs, imágenes, etc.) en un servicio de almacenamiento en la nube,
+# lo cual es necesario en entornos de producción como Render.
+
+# Lee las credenciales de AWS desde variables de entorno
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
+
+# Si las credenciales de AWS existen, configuramos S3
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    AWS_DEFAULT_ACL = None
+    AWS_S3_FILE_OVERWRITE = False
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+else:
+    # Si no hay credenciales, usamos la configuración local (para desarrollo)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+# ==============================================================================
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
