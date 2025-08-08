@@ -141,12 +141,14 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 # =============================================================================
-# CONFIGURACIÓN DE AWS S3 (PARA PRODUCCIÓN)
+# CONFIGURACIÓN DE AWS S3 (PARA PRODUCCIÓN) Y ARCHIVOS DE MEDIOS
 # =============================================================================
+
+# Si las variables de entorno de AWS están presentes, usa S3 para archivos de medios.
 if os.environ.get('AWS_ACCESS_KEY_ID'):
-    # Añadimos la clase de almacenamiento para media files
+    # Establece el motor de almacenamiento de archivos por defecto
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    
+
     # Configuramos los parámetros del bucket
     AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
     AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
@@ -156,7 +158,7 @@ if os.environ.get('AWS_ACCESS_KEY_ID'):
     # Esto garantiza que las URL se construyan correctamente
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
-    
+
     # Usa SSL para las peticiones a S3
     AWS_S3_USE_SSL = True
 
@@ -178,7 +180,7 @@ else:
     print("WARNING: AWS S3 environment variables not found. Using local media storage.")
 
 
-# ==============================================================================
+# =============================================================================
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -196,3 +198,4 @@ MESSAGE_TAGS = {
 
 # Configuración del modelo de usuario
 AUTH_USER_MODEL = 'core.CustomUser'
+
