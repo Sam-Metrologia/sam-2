@@ -21,7 +21,7 @@ from django.utils.dateparse import parse_date
 
 from django.http import HttpResponse, JsonResponse, Http404, HttpResponseRedirect
 
-from openpyxl import Workbook
+from openpypyxl import Workbook
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.drawing.image import Image as ExcelImage
 
@@ -61,6 +61,9 @@ from django.contrib.auth.forms import PasswordChangeForm # Asegúrate de que est
 # Importar para manejo de mensajes AJAX
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+
+# Importar para default_storage
+from django.core.files.storage import default_storage # <-- Asegúrate de tener esta importación
 
 
 # --- Vistas de Autenticación y Perfil ---
@@ -1070,23 +1073,31 @@ def detalle_equipo(request, pk):
         except BajaEquipo.DoesNotExist:
             pass
 
-    logo_empresa_url = request.build_absolute_uri(equipo.empresa.logo_empresa.url) if equipo.empresa and equipo.empresa.logo_empresa else None
-    imagen_equipo_url = request.build_absolute_uri(equipo.imagen_equipo.url) if equipo.imagen_equipo else None
-    documento_baja_url = request.build_absolute_uri(baja_registro.documento_baja.url) if baja_registro and baja_registro.documento_baja else None
+    # Utilizar default_storage para acceder a las URLs de los archivos
+    # Helper para obtener URL segura desde default_storage
+    def get_file_url(file_field):
+        if file_field and default_storage.exists(file_field.name):
+            return request.build_absolute_uri(file_field.url)
+        return None
+
+    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa else None
+    imagen_equipo_url = get_file_url(equipo.imagen_equipo)
+    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro else None
 
     for cal in calibraciones:
-        cal.documento_calibracion_url = request.build_absolute_uri(cal.documento_calibracion.url) if cal.documento_calibracion else None
-        cal.confirmacion_metrologica_pdf_url = request.build_absolute_uri(cal.confirmacion_metrologica_pdf.url) if cal.confirmacion_metrologica_pdf else None
-        cal.intervalos_calibracion_pdf_url = request.build_absolute_uri(cal.intervalos_calibracion_pdf.url) if cal.intervalos_calibracion_pdf else None # NUEVO URL
-    for mant in mantenimientos:
-        mant.documento_mantenimiento_url = request.build_absolute_uri(mant.documento_mantenimiento.url) if mant.documento_mantenimiento else None
-    for comp in comprobaciones:
-        comp.documento_comprobacion_url = request.build_absolute_uri(comp.documento_comprobacion.url) if comp.documento_comprobacion else None
+        cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
+        cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
+        cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
 
-    archivo_compra_pdf_url = request.build_absolute_uri(equipo.archivo_compra_pdf.url) if equipo.archivo_compra_pdf else None
-    ficha_tecnica_pdf_url = request.build_absolute_uri(equipo.ficha_tecnica_pdf.url) if equipo.ficha_tecnica_pdf else None
-    manual_pdf_url = request.build_absolute_uri(equipo.manual_pdf.url) if equipo.manual_pdf else None
-    otros_documentos_pdf_url = request.build_absolute_uri(equipo.otros_documentos_pdf.url) if equipo.otros_documentos_pdf else None
+    for mant in mantenimientos:
+        mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
+    for comp in comprobaciones:
+        comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
+
+    archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
+    ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
+    manual_pdf_url = get_file_url(equipo.manual_pdf)
+    otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
 
 
     return render(request, 'core/detalle_equipo.html', {
@@ -1234,41 +1245,29 @@ def eliminar_calibracion(request, equipo_pk, pk):
 # --- Vistas de Mantenimientos ---
 
 @login_required
-@permission_required('core.add_comprobacion', raise_exception=True)
-def añadir_comprobacion(request, equipo_pk):
+@permission_required('core.add_mantenimiento', raise_exception=True)
+def añadir_mantenimiento(request, equipo_pk):
     """
-    Handles adding a new verification record for an equipment.
+    Handles adding a new maintenance record for an equipment.
     """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para añadir comprobaciones a este equipo.')
+        messages.error(request, 'No tienes permiso para añadir mantenimientos a este equipo.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        form = ComprobacionForm(request.POST, request.FILES)
+        form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
-            try: # Añade un bloque try-except aquí para capturar errores de S3
-                comprobacion = form.save(commit=False)
-                comprobacion.equipo = equipo
-                comprobacion.save() # Aquí es donde se intenta guardar el archivo en S3
-                
-                # --- LÍNEA DE DEPURACIÓN CLAVE ---
-                print(f"DEBUG: Archivo guardado para la comprobación ID: {comprobacion.id}, nombre de archivo: {comprobacion.documento_comprobacion.name if comprobacion.documento_comprobacion else 'N/A'}")
-                # ---------------------------------
-
-                messages.success(request, 'Comprobación añadida exitosamente.')
-                return redirect('core:detalle_equipo', pk=equipo.pk)
-            except Exception as e:
-                # Si ocurre un error durante el guardado (incluyendo problemas de S3)
-                print(f"ERROR al guardar comprobación o archivo en S3: {e}")
-                messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
-                # Re-renderiza el formulario con los datos POST para que el usuario pueda ver los errores
-                return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
+            mantenimiento = form.save(commit=False)
+            mantenimiento.equipo = equipo
+            mantenimiento.save()
+            messages.success(request, 'Mantenimiento añadido exitosamente.')
+            return redirect('core:detalle_equipo', pk=equipo.pk)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        form = ComprobacionForm()
-    return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
+        form = MantenimientoForm()
+    return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
 
 @login_required
 @permission_required('core.change_mantenimiento', raise_exception=True)
@@ -2274,12 +2273,14 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         pass
 
     # Utilizar default_storage para acceder a las URLs de los archivos
-    from django.core.files.storage import default_storage
-
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
-        if file_field and default_storage.exists(file_field.name):
-            return request.build_absolute_uri(file_field.url)
+        # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
+        if file_field and file_field.name:
+            # Verifica si el archivo existe en el almacenamiento configurado
+            # default_storage.exists() es la forma correcta de verificar si el archivo está en S3 o localmente
+            if default_storage.exists(file_field.name):
+                return request.build_absolute_uri(file_field.url)
         return None
 
     logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa else None
@@ -2300,6 +2301,7 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
     manual_pdf_url = get_file_url(equipo.manual_pdf)
     otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
+
 
     context = {
         'equipo': equipo,
@@ -2813,43 +2815,17 @@ def generar_informe_zip(request):
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Activities Excel: {e}")
 
 
-            # --- IMPORTANT NOTE FOR RENDER DEPLOYMENT ---
-            # The following section attempts to read files from the local filesystem using .path.
-            # On Render, files uploaded via Django's FileField are typically stored in a cloud storage
-            # service (like AWS S3, Google Cloud Storage, etc.) and not directly on the local filesystem
-            # of the ephemeral Render instance.
-            #
-            # To make this work, you MUST configure Django to use a cloud storage backend (e.g., django-storages
-            # with S3). If you have django-storages configured, you would access the file content
-            # using `file_field.open()` or `file_field.read()` which handles fetching from cloud storage.
-            #
-            # Example for cloud storage:
-            # from django.core.files.storage import default_storage
-            # if default_storage.exists(cal.documento_calibracion.name):
-            #     with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
-            #         zf.writestr(..., f.read())
-            #
-            # The current `os.path.exists` and `open(..., 'rb')` will only work if files are
-            # stored locally on the Render instance, which is generally not the case for user-uploaded
-            # media files in a production PaaS environment.
-            #
-            # If you haven't set up cloud storage, this part will likely fail silently or with errors
-            # in Render's logs because `os.path.exists` will return False or the path will be invalid.
-
             # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
             calibraciones = Calibracion.objects.filter(equipo=equipo)
-            from django.core.files.storage import default_storage # Asegurarse de que esté importado
-
             for cal in calibraciones:
                 # Certificado de Calibración
                 if cal.documento_calibracion:
                     try:
-                        # Usar default_storage para leer desde S3
-                        if default_storage.exists(cal.documento_calibracion.name):
+                        if default_storage.exists(cal.documento_calibracion.name): # Usar default_storage para verificar existencia
                             with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{os.path.basename(cal.documento_calibracion.name)}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en S3 (certificado): {cal.documento_calibracion.name}")
+                            print(f"DEBUG: Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
                     except Exception as e:
                         print(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
 
@@ -2860,7 +2836,7 @@ def generar_informe_zip(request):
                             with default_storage.open(cal.confirmacion_metrologica_pdf.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{os.path.basename(cal.confirmacion_metrologica_pdf.name)}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en S3 (confirmación): {cal.confirmacion_metrologica_pdf.name}")
+                            print(f"DEBUG: Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}")
                     except Exception as e:
                         print(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
 
@@ -2871,7 +2847,7 @@ def generar_informe_zip(request):
                             with default_storage.open(cal.intervalos_calibracion_pdf.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{os.path.basename(cal.intervalos_calibracion_pdf.name)}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en S3 (intervalos): {cal.intervalos_calibracion_pdf.name}")
+                            print(f"DEBUG: Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}")
                     except Exception as e:
                         print(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
 
@@ -2884,7 +2860,7 @@ def generar_informe_zip(request):
                             with default_storage.open(mant.documento_mantenimiento.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Mantenimientos/{os.path.basename(mant.documento_mantenimiento.name)}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en S3 (mantenimiento): {mant.documento_mantenimiento.name}")
+                            print(f"DEBUG: Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}")
                     except Exception as e:
                         print(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
 
@@ -2897,7 +2873,7 @@ def generar_informe_zip(request):
                             with default_storage.open(comp.documento_comprobacion.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Comprobaciones/{os.path.basename(comp.documento_comprobacion.name)}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en S3 (comprobación): {comp.documento_comprobacion.name}")
+                            print(f"DEBUG: Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}")
                     except Exception as e:
                         print(f"Error adding comprobacion document {comp.documento_comprobacion.name} to zip: {e}")
             
@@ -2915,7 +2891,7 @@ def generar_informe_zip(request):
                             with default_storage.open(doc_field.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/{os.path.basename(doc_field.name)}", f.read())
                         else:
-                             print(f"DEBUG: Archivo no encontrado en S3 (doc. equipo): {doc_field.name}")
+                             print(f"DEBUG: Archivo no encontrado en storage (doc. equipo): {doc_field.name}")
                     except Exception as e:
                         print(f"Error adding equipment document {doc_field.name} to zip: {e}")
 
