@@ -12,3 +12,5 @@ openpyxl
 weasyprint
 django-storages
 boto3
+django-crispy-forms
+crispy-bootstrap5
