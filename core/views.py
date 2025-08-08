@@ -21,7 +21,7 @@ from django.utils.dateparse import parse_date
 
 from django.http import HttpResponse, JsonResponse, Http404, HttpResponseRedirect
 
-from openpypyxl import Workbook
+from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.drawing.image import Image as ExcelImage
 
