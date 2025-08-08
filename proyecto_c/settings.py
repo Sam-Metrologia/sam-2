@@ -8,12 +8,13 @@ import dj_database_url
 from storages.backends.s3boto3 import S3Boto3Storage
 
 # ==============================================================================
-# CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AÑADIDO PARA DEPURACIÓN)
-# Esto nos dará información detallada sobre la comunicación con S3.
+# CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AJUSTADO PARA DEPURACIÓN MÁS VERBOSA)
+# Cambiamos el nivel de log a DEBUG para obtener la máxima información posible.
 # ==============================================================================
 import logging
-logging.getLogger('botocore').setLevel(logging.INFO)
-logging.getLogger('s3transfer').setLevel(logging.INFO)
+# Para obtener logs detallados de la comunicación con AWS
+logging.getLogger('botocore').setLevel(logging.DEBUG)
+logging.getLogger('s3transfer').setLevel(logging.DEBUG)
 # ==============================================================================
 
 
@@ -138,17 +139,28 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
 
-# IMPORTANTE: Asegura que el dominio personalizado para S3 esté bien formado
-AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+# Verifica que las variables de entorno para S3 existan antes de usarlas
+if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME:
+    # IMPORTANTE: Asegura que el dominio personalizado para S3 esté bien formado
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    # Usa S3 para los archivos de media
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    
+    # **RECOMENDADO AÑADIR/AJUSTAR:**
+    # No añade el parámetro de autenticación como una cadena de consulta, para URLs más limpias
+    AWS_QUERYSTRING_AUTH = False 
+    AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
+    AWS_DEFAULT_ACL = 'public-read' # Asegura que los archivos subidos sean públicamente legibles
+    AWS_S3_FILE_OVERWRITE = False # Mantiene la configuración actual para no sobrescribir archivos con el mismo nombre
+    AWS_LOCATION = 'media' # Subirá todos los archivos a una subcarpeta 'media' en el bucket
+else:
+    # Si las variables de entorno de S3 no están, usa la configuración local
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+    print("WARNING: AWS S3 environment variables not found. Using local media storage.")
 
-# **RECOMENDADO AÑADIR/AJUSTAR:**
-AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
-AWS_DEFAULT_ACL = 'public-read' # Asegura que los archivos subidos sean públicamente legibles
-AWS_S3_FILE_OVERWRITE = False # Mantiene la configuración actual para no sobrescribir archivos con el mismo nombre
-
-# Usa S3 para los archivos de media
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 
 # ==============================================================================
 
