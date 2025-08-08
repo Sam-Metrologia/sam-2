@@ -15,3 +15,4 @@ boto3
 django-crispy-forms
 crispy-bootstrap5
 django-filter
+django-cleanup
