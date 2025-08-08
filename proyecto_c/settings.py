@@ -139,15 +139,16 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
 
+
 # Verifica que las variables de entorno para S3 existan antes de usarlas
-if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME:
+if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+    # Configuración de S3 si las variables de entorno existen
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    
     # IMPORTANTE: Asegura que el dominio personalizado para S3 esté bien formado
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
-    
-    # Usa S3 para los archivos de media
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
-    
+
     # **RECOMENDADO AÑADIR/AJUSTAR:**
     # No añade el parámetro de autenticación como una cadena de consulta, para URLs más limpias
     AWS_QUERYSTRING_AUTH = False 
@@ -155,6 +156,7 @@ if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME:
     AWS_DEFAULT_ACL = 'public-read' # Asegura que los archivos subidos sean públicamente legibles
     AWS_S3_FILE_OVERWRITE = False # Mantiene la configuración actual para no sobrescribir archivos con el mismo nombre
     AWS_LOCATION = 'media' # Subirá todos los archivos a una subcarpeta 'media' en el bucket
+    AWS_ACL_ENABLE = True # Habilita la ACL
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
@@ -179,4 +181,4 @@ MESSAGE_TAGS = {
     messages.ERROR: 'alert-error',
 }
 
-AUTH_USER_MODEL = 'core.CustomUser'
+AUTH_USER_MODEL = 'core.CustomUser'r'
