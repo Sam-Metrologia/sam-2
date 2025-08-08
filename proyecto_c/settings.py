@@ -9,7 +9,6 @@ from storages.backends.s3boto3 import S3Boto3Storage
 
 # ==============================================================================
 # CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AJUSTADO PARA DEPURACIÓN MÁS VERBOSA)
-# Cambiamos el nivel de log a DEBUG para obtener la máxima información posible.
 # ==============================================================================
 import logging
 # Para obtener logs detallados de la comunicación con AWS
@@ -152,6 +151,12 @@ if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME and AWS_ACCESS_KEY_ID and AWS_
     # Agrega esta línea para asegurar que boto3 esté configurado y usa SSL
     AWS_S3_USE_SSL = True
 
+    # **LÍNEAS AÑADIDAS/AJUSTADAS**
+    # Asegura que cada archivo subido tenga permiso de lectura pública
+    AWS_DEFAULT_ACL = 'public-read' 
+    # Habilita el control de ACL (Access Control List)
+    AWS_ACL_ENABLE = True 
+
     # No añade el parámetro de autenticación como una cadena de consulta, para URLs más limpias
     AWS_QUERYSTRING_AUTH = False 
     AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
@@ -184,4 +189,3 @@ MESSAGE_TAGS = {
 }
 
 AUTH_USER_MODEL = 'core.CustomUser'
-
