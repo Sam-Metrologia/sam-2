@@ -1234,29 +1234,41 @@ def eliminar_calibracion(request, equipo_pk, pk):
 # --- Vistas de Mantenimientos ---
 
 @login_required
-@permission_required('core.add_mantenimiento', raise_exception=True)
-def añadir_mantenimiento(request, equipo_pk):
+@permission_required('core.add_comprobacion', raise_exception=True)
+def añadir_comprobacion(request, equipo_pk):
     """
-    Handles adding a new maintenance record for an equipment.
+    Handles adding a new verification record for an equipment.
     """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para añadir mantenimientos a este equipo.')
+        messages.error(request, 'No tienes permiso para añadir comprobaciones a este equipo.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        form = MantenimientoForm(request.POST, request.FILES)
+        form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
-            mantenimiento = form.save(commit=False)
-            mantenimiento.equipo = equipo
-            mantenimiento.save()
-            messages.success(request, 'Mantenimiento añadido exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try: # Añade un bloque try-except aquí para capturar errores de S3
+                comprobacion = form.save(commit=False)
+                comprobacion.equipo = equipo
+                comprobacion.save() # Aquí es donde se intenta guardar el archivo en S3
+                
+                # --- LÍNEA DE DEPURACIÓN CLAVE ---
+                print(f"DEBUG: Archivo guardado para la comprobación ID: {comprobacion.id}, nombre de archivo: {comprobacion.documento_comprobacion.name if comprobacion.documento_comprobacion else 'N/A'}")
+                # ---------------------------------
+
+                messages.success(request, 'Comprobación añadida exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                # Si ocurre un error durante el guardado (incluyendo problemas de S3)
+                print(f"ERROR al guardar comprobación o archivo en S3: {e}")
+                messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
+                # Re-renderiza el formulario con los datos POST para que el usuario pueda ver los errores
+                return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        form = MantenimientoForm()
-    return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
+        form = ComprobacionForm()
+    return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
 
 @login_required
 @permission_required('core.change_mantenimiento', raise_exception=True)
