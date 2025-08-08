@@ -4,14 +4,12 @@ import os
 from pathlib import Path
 from django.contrib.messages import constants as messages
 import dj_database_url
-# Importa S3Boto3Storage de django-storages para la configuración de S3
 from storages.backends.s3boto3 import S3Boto3Storage
 
 # ==============================================================================
 # CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AJUSTADO PARA DEPURACIÓN MÁS VERBOSA)
 # ==============================================================================
 import logging
-# Para obtener logs detallados de la comunicación con AWS
 logging.getLogger('botocore').setLevel(logging.DEBUG)
 logging.getLogger('s3transfer').setLevel(logging.DEBUG)
 # ==============================================================================
@@ -33,18 +31,9 @@ ALLOWED_HOSTS = []
 
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-
-if DEBUG:
-    ALLOWED_HOSTS.append('localhost')
-    ALLOWED_HOSTS.append('127.0.0.1')
-
-if RENDER_EXTERNAL_HOSTNAME:
-    CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
-else:
-    CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
-
-
+    
 # Application definition
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -52,9 +41,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'storages', # Añade 'storages' para la integración con S3
+    'crispy_forms',
+    'crispy_bootstrap5',
+    'django_filters',
     'core',
+    'storages',
+    'weasyprint',
+    'django_cleanup.apps.CleanupConfig',
 ]
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
+CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -72,7 +69,7 @@ ROOT_URLCONF = 'proyecto_c.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -80,6 +77,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.company_data',
+                'core.context_processors.unread_messages_count',
             ],
         },
     },
@@ -87,86 +86,88 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'proyecto_c.wsgi.application'
 
-# Database
-DATABASE_URL = os.environ.get('DATABASE_URL')
 
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600
-        )
+# Database
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
+if not DEBUG and os.environ.get('DATABASE_URL'):
+    DATABASES['default'] = dj_database_url.config(conn_max_age=600)
 
 
 # Password validation
+# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
+
 AUTH_PASSWORD_VALIDATORS = [
-    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
 ]
 
+
 # Internationalization
+# https://docs.djangoproject.com/en/4.2/topics/i18n/
+
 LANGUAGE_CODE = 'es-es'
+
 TIME_ZONE = 'America/Bogota'
+
 USE_I18N = True
+
 USE_TZ = True
 
 
-# ==============================================================================
-# CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS Y DE MEDIA (WHITENOISE & AWS S3)
-# ==============================================================================
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-# Configuración de archivos estáticos (CSS, JS, etc.) para producción con Whitenoise
+# Configuración para archivos estáticos
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
-
-# Configuración de archivos de media (subidos por usuarios) con AWS S3
-# Lee las credenciales de AWS desde variables de entorno
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
-
-
-# Verifica que las variables de entorno para S3 existan antes de usarlas
-if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
-    # Configuración de S3 si las variables de entorno existen
+# =============================================================================
+# CONFIGURACIÓN DE AWS S3 (PARA PRODUCCIÓN)
+# =============================================================================
+if os.environ.get('AWS_ACCESS_KEY_ID'):
+    # Añadimos la clase de almacenamiento para media files
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
-    # IMPORTANTE: Asegura que el dominio personalizado para S3 esté bien formado
+    # Configuramos los parámetros del bucket
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    
+    # Esto garantiza que las URL se construyan correctamente
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     
-    # Agrega esta línea para asegurar que boto3 esté configurado y usa SSL
+    # Usa SSL para las peticiones a S3
     AWS_S3_USE_SSL = True
-
-    # **LÍNEAS AÑADIDAS/AJUSTADAS**
-    # Asegura que cada archivo subido tenga permiso de lectura pública
-    AWS_DEFAULT_ACL = 'public-read' 
-    # Habilita el control de ACL (Access Control List)
-    AWS_ACL_ENABLE = True 
-
-    # Añade esta linea para asegurarte que el ACL se aplique a los archivos subidos.
-    # Esta es la parte que faltaba para que el public-read se aplique correctamente.
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400', 'ACL': 'public-read'}
-
 
     # No añade el parámetro de autenticación como una cadena de consulta, para URLs más limpias
     AWS_QUERYSTRING_AUTH = False 
     AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
     AWS_LOCATION = 'media' # Subirá todos los archivos a una subcarpeta 'media' en el bucket
     
+    # Habilita el control de ACL para asegurar la lectura pública del objeto
+    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'public-read'}
+
     # Asegúrate de que los archivos nuevos no sobrescriban los viejos con el mismo nombre.
     AWS_S3_FILE_OVERWRITE = False
 else:
@@ -186,11 +187,12 @@ LOGIN_URL = 'core:login'
 LOGOUT_REDIRECT_URL = 'core:login'
 
 MESSAGE_TAGS = {
-    messages.DEBUG: 'alert-info',
+    messages.DEBUG: 'alert-secondary',
     messages.INFO: 'alert-info',
     messages.SUCCESS: 'alert-success',
     messages.WARNING: 'alert-warning',
-    messages.ERROR: 'alert-error',
+    messages.ERROR: 'alert-danger',
 }
 
+# Configuración del modelo de usuario
 AUTH_USER_MODEL = 'core.CustomUser'
