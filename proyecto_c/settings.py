@@ -181,4 +181,4 @@ MESSAGE_TAGS = {
     messages.ERROR: 'alert-error',
 }
 
-AUTH_USER_MODEL = 'core.CustomUser'r'
+AUTH_USER_MODEL = 'core.CustomUser'
