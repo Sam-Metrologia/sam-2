@@ -148,15 +148,17 @@ if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME and AWS_ACCESS_KEY_ID and AWS_
     # IMPORTANTE: Asegura que el dominio personalizado para S3 esté bien formado
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    
+    # Agrega esta línea para asegurar que boto3 esté configurado y usa SSL
+    AWS_S3_USE_SSL = True
 
-    # **RECOMENDADO AÑADIR/AJUSTAR:**
     # No añade el parámetro de autenticación como una cadena de consulta, para URLs más limpias
     AWS_QUERYSTRING_AUTH = False 
     AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
-    AWS_DEFAULT_ACL = 'public-read' # Asegura que los archivos subidos sean públicamente legibles
-    AWS_S3_FILE_OVERWRITE = False # Mantiene la configuración actual para no sobrescribir archivos con el mismo nombre
     AWS_LOCATION = 'media' # Subirá todos los archivos a una subcarpeta 'media' en el bucket
-    AWS_ACL_ENABLE = True # Habilita la ACL
+    
+    # Asegúrate de que los archivos nuevos no sobrescriban los viejos con el mismo nombre.
+    AWS_S3_FILE_OVERWRITE = False
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
@@ -182,3 +184,4 @@ MESSAGE_TAGS = {
 }
 
 AUTH_USER_MODEL = 'core.CustomUser'
+
