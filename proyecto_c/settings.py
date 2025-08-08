@@ -4,9 +4,18 @@ import os
 from pathlib import Path
 from django.contrib.messages import constants as messages
 import dj_database_url
-
 # Importa S3Boto3Storage de django-storages para la configuración de S3
 from storages.backends.s3boto3 import S3Boto3Storage
+
+# ==============================================================================
+# CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AÑADIDO PARA DEPURACIÓN)
+# Esto nos dará información detallada sobre la comunicación con S3.
+# ==============================================================================
+import logging
+logging.getLogger('botocore').setLevel(logging.INFO)
+logging.getLogger('s3transfer').setLevel(logging.INFO)
+# ==============================================================================
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
