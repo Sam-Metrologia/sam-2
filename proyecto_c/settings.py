@@ -34,16 +34,6 @@ ALLOWED_HOSTS = []
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
-if DEBUG:
-    ALLOWED_HOSTS.append('localhost')
-    ALLOWED_HOSTS.append('127.0.0.1')
-
-if RENDER_EXTERNAL_HOSTNAME:
-    CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
-else:
-    CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
-
-
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,9 +42,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'storages', # Añade 'storages' para la integración con S3
+    # Aplicaciones de terceros
+    'storages',
+    'crispy_forms',
+    'crispy_bootstrap5',
+    'weasyprint',
+    # Mis aplicaciones
     'core',
 ]
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
+CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -87,87 +85,73 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'proyecto_c.wsgi.application'
 
-# Database
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600
-        )
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+DATABASES = {
+    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
+}
 
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
-    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
 ]
 
-# Internationalization
-LANGUAGE_CODE = 'es-es'
+LANGUAGE_CODE = 'es-co'
+
 TIME_ZONE = 'America/Bogota'
+
 USE_I18N = True
+
 USE_TZ = True
 
 
-# ==============================================================================
-# CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS Y DE MEDIA (WHITENOISE & AWS S3)
-# ==============================================================================
-
-# Configuración de archivos estáticos (CSS, JS, etc.) para producción con Whitenoise
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_DIRS = [
+    BASE_DIR / 'core/static',
+]
 
+# =============================================================================
+# CONFIGURACIÓN DE ALMACENAMIENTO DE ARCHIVOS EN AWS S3
+# =============================================================================
 
-# Configuración de archivos de media (subidos por usuarios) con AWS S3
-# Lee las credenciales de AWS desde variables de entorno
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME')
-
-
-# Verifica que las variables de entorno para S3 existan antes de usarlas
-if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
-    # Configuración de S3 si las variables de entorno existen
+# Verifica si las variables de entorno de S3 están configuradas
+if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
+    # LÍNEA CORREGIDA/AJUSTADA
+    # Define la clase de almacenamiento para usar S3
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
-    # IMPORTANTE: Asegura que el dominio personalizado para S3 esté bien formado
+    # Obtiene las credenciales de AWS desde las variables de entorno
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     
-    # Agrega esta línea para asegurar que boto3 esté configurado y usa SSL
+    # Asegura que boto3 esté configurado y usa SSL
     AWS_S3_USE_SSL = True
 
-    # **LÍNEAS AÑADIDAS/AJUSTADAS**
-    # Asegura que cada archivo subido tenga permiso de lectura pública
-    AWS_DEFAULT_ACL = 'public-read' 
-    # Habilita el control de ACL (Access Control List)
-    AWS_ACL_ENABLE = True 
-
-    # Añade esta linea para asegurarte que el ACL se aplique a los archivos subidos.
-    # Esta es la parte que faltaba para que el public-read se aplique correctamente.
+    # Esta línea es crucial y es la que faltaba.
+    # Establece el ACL a 'public-read' para todos los archivos subidos.
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400', 'ACL': 'public-read'}
-
-
-    # No añade el parámetro de autenticación como una cadena de consulta, para URLs más limpias
-    AWS_QUERYSTRING_AUTH = False 
-    AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
-    AWS_LOCATION = 'media' # Subirá todos los archivos a una subcarpeta 'media' en el bucket
     
-    # Asegúrate de que los archivos nuevos no sobrescriban los viejos con el mismo nombre.
+    # No añade el parámetro de autenticación como una cadena de consulta.
+    AWS_QUERYSTRING_AUTH = False 
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_LOCATION = 'media'
+    
+    # Asegúrate de que los archivos nuevos no sobrescriban los viejos.
     AWS_S3_FILE_OVERWRITE = False
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
@@ -177,8 +161,6 @@ else:
     print("WARNING: AWS S3 environment variables not found. Using local media storage.")
 
 
-# ==============================================================================
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_REDIRECT_URL = 'core:dashboard'
@@ -186,11 +168,9 @@ LOGIN_URL = 'core:login'
 LOGOUT_REDIRECT_URL = 'core:login'
 
 MESSAGE_TAGS = {
-    messages.DEBUG: 'alert-info',
+    messages.DEBUG: 'alert-secondary',
     messages.INFO: 'alert-info',
     messages.SUCCESS: 'alert-success',
     messages.WARNING: 'alert-warning',
-    messages.ERROR: 'alert-error',
+    messages.ERROR: 'alert-danger',
 }
-
-AUTH_USER_MODEL = 'core.CustomUser'
