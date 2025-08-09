@@ -145,7 +145,7 @@ STATICFILES_DIRS = [
 ]
 
 # =============================================================================
-# CONFIGURACIÓN DE ALMACENAMIENTO DE ARCHIVOS EN AWS S3
+# CONFIGURACIÓN DE ALMACENAMIENTO DE ARCHIVOS EN AWS S3 (AJUSTADA)
 # =============================================================================
 
 # Verifica si las variables de entorno de S3 están configuradas
@@ -164,9 +164,9 @@ if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
     # Asegura que boto3 esté configurado y usa SSL
     AWS_S3_USE_SSL = True
 
-    # Esta línea es crucial. Establece el ACL a 'public-read' para todos los archivos subidos.
-    # Esto permite que los archivos sean accesibles públicamente por URL.
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400', 'ACL': 'public-read'}
+    # IMPORTANTE: Eliminada la línea 'ACL': 'public-read'
+    # Ahora el control de acceso se manejará exclusivamente con políticas de bucket.
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'} # Solo CacheControl
     
     # No añade el parámetro de autenticación como una cadena de consulta.
     # Esto es importante para URLs limpias y accesibles directamente.
@@ -203,4 +203,3 @@ MESSAGE_TAGS = {
 # ==============================================================================
 AUTH_USER_MODEL = 'core.CustomUser'
 # ==============================================================================
-
