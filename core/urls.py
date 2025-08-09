@@ -65,30 +65,32 @@ urlpatterns = [
     path('procedimientos/<int:pk>/editar/', views.editar_procedimiento, name='editar_procedimiento'),
     path('procedimientos/<int:pk>/eliminar/', views.eliminar_procedimiento, name='eliminar_procedimiento'),
 
-    # Proveedores (General)
+    # Proveedores (General) - ¡Mantener solo estas rutas para proveedores!
     path('proveedores/', views.listar_proveedores, name='listar_proveedores'),
     path('proveedores/añadir/', views.añadir_proveedor, name='añadir_proveedor'),
     path('proveedores/<int:pk>/editar/', views.editar_proveedor, name='editar_proveedor'),
     path('proveedores/<int:pk>/eliminar/', views.eliminar_proveedor, name='eliminar_proveedor'),
     path('proveedores/<int:pk>/', views.detalle_proveedor, name='detalle_proveedor'),
 
-    # Proveedores de Calibración
-    path('proveedores_calibracion/', views.listar_proveedores_calibracion, name='listar_proveedores_calibracion'),
-    path('proveedores_calibracion/añadir/', views.añadir_proveedor_calibracion, name='añadir_proveedor_calibracion'),
-    path('proveedores_calibracion/<int:pk>/editar/', views.editar_proveedor_calibracion, name='editar_proveedor_calibracion'),
-    path('proveedores_calibracion/<int:pk>/eliminar/', views.eliminar_proveedor_calibracion, name='eliminar_proveedor_calibracion'),
+    # NOTA: Las siguientes rutas de proveedores específicos fueron eliminadas de views.py y forms.py
+    # y ahora se eliminan de urls.py para evitar ImportError.
+    # # Proveedores de Calibración
+    # path('proveedores_calibracion/', views.listar_proveedores_calibracion, name='listar_proveedores_calibracion'),
+    # path('proveedores_calibracion/añadir/', views.añadir_proveedor_calibracion, name='añadir_proveedor_calibracion'),
+    # path('proveedores_calibracion/<int:pk>/editar/', views.editar_proveedor_calibracion, name='editar_proveedor_calibracion'),
+    # path('proveedores_calibracion/<int:pk>/eliminar/', views.eliminar_proveedor_calibracion, name='eliminar_proveedor_calibracion'),
 
-    # Proveedores de Mantenimiento
-    path('proveedores_mantenimiento/', views.listar_proveedores_mantenimiento, name='listar_proveedores_mantenimiento'),
-    path('proveedores_mantenimiento/añadir/', views.añadir_proveedor_mantenimiento, name='añadir_proveedor_mantenimiento'),
-    path('proveedores_mantenimiento/<int:pk>/editar/', views.editar_proveedor_mantenimiento, name='editar_proveedor_mantenimiento'),
-    path('proveedores_mantenimiento/<int:pk>/eliminar/', views.eliminar_proveedor_mantenimiento, name='eliminar_proveedor_mantenimiento'),
+    # # Proveedores de Mantenimiento
+    # path('proveedores_mantenimiento/', views.listar_proveedores_mantenimiento, name='listar_proveedores_mantenimiento'),
+    # path('proveedores_mantenimiento/añadir/', views.añadir_proveedor_mantenimiento, name='añadir_proveedor_mantenimiento'),
+    # path('proveedores_mantenimiento/<int:pk>/editar/', views.editar_proveedor_mantenimiento, name='editar_proveedor_mantenimiento'),
+    # path('proveedores_mantenimiento/<int:pk>/eliminar/', views.eliminar_proveedor_mantenimiento, name='eliminar_proveedor_mantenimiento'),
 
-    # Proveedores de Comprobación
-    path('proveedores_comprobacion/', views.listar_proveedores_comprobacion, name='listar_proveedores_comprobacion'),
-    path('proveedores_comprobacion/añadir/', views.añadir_proveedor_comprobacion, name='añadir_proveedor_comprobacion'),
-    path('proveedores_comprobacion/<int:pk>/editar/', views.editar_proveedor_comprobacion, name='editar_proveedor_comprobacion'),
-    path('proveedores_comprobacion/<int:pk>/eliminar/', views.eliminar_proveedor_comprobacion, name='eliminar_proveedor_comprobacion'),
+    # # Proveedores de Comprobación
+    # path('proveedores_comprobacion/', views.listar_proveedores_comprobacion, name='listar_proveedores_comprobacion'),
+    # path('proveedores_comprobacion/añadir/', views.añadir_proveedor_comprobacion, name='añadir_proveedor_comprobacion'),
+    # path('proveedores_comprobacion/<int:pk>/editar/', views.editar_proveedor_comprobacion, name='editar_proveedor_comprobacion'),
+    # path('proveedores_comprobacion/<int:pk>/eliminar/', views.eliminar_proveedor_comprobacion, name='eliminar_proveedor_comprobacion'),
 
     # Usuarios
     path('usuarios/', views.listar_usuarios, name='listar_usuarios'),
@@ -115,4 +117,3 @@ urlpatterns = [
     # URL para acceso denegado
     path('access_denied/', views.access_denied, name='access_denied'),
 ]
-

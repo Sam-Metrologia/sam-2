@@ -5,8 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _ # Importar para las traducciones de fieldsets
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
-    BajaEquipo, Ubicacion, Procedimiento, ProveedorCalibracion,
-    ProveedorMantenimiento, ProveedorComprobacion, Proveedor # Importar el nuevo modelo Proveedor
+    BajaEquipo, Ubicacion, Procedimiento, Proveedor # Solo importar el modelo Proveedor general
 )
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
@@ -116,7 +115,7 @@ class EquipoAdmin(admin.ModelAdmin):
 # Admin para Calibracion
 @admin.register(Calibracion)
 class CalibracionAdmin(admin.ModelAdmin):
-    list_display = ['equipo', 'fecha_calibracion', 'nombre_proveedor', 'resultado', 'numero_certificado'] # Eliminado 'frecuencia_meses'
+    list_display = ['equipo', 'fecha_calibracion', 'nombre_proveedor', 'resultado', 'numero_certificado']
     list_filter = ['fecha_calibracion', 'resultado', 'equipo__empresa'] 
     search_fields = ['equipo__nombre', 'equipo__codigo_interno', 'nombre_proveedor', 'numero_certificado', 'observaciones'] 
     raw_id_fields = ['equipo']
@@ -124,17 +123,17 @@ class CalibracionAdmin(admin.ModelAdmin):
     ordering = ['-fecha_calibracion']
     fieldsets = (
         (None, {
-            'fields': ('equipo', 'fecha_calibracion', 'nombre_proveedor', 'resultado', 'numero_certificado', 'observaciones') # Eliminado 'frecuencia_meses'
+            'fields': ('equipo', 'fecha_calibracion', 'nombre_proveedor', 'resultado', 'numero_certificado', 'observaciones')
         }),
         ('Documentos', {
-            'fields': ('documento_calibracion', 'confirmacion_metrologica_pdf') 
+            'fields': ('documento_calibracion', 'confirmacion_metrologica_pdf', 'intervalos_calibracion_pdf') # Añadido intervalos_calibracion_pdf
         }),
     )
 
 # Admin para Mantenimiento
 @admin.register(Mantenimiento)
 class MantenimientoAdmin(admin.ModelAdmin):
-    list_display = ['equipo', 'fecha_mantenimiento', 'tipo_mantenimiento', 'nombre_proveedor', 'responsable'] # Eliminado 'frecuencia_meses'
+    list_display = ['equipo', 'fecha_mantenimiento', 'tipo_mantenimiento', 'nombre_proveedor', 'responsable']
     list_filter = ['tipo_mantenimiento', 'fecha_mantenimiento', 'equipo__empresa']
     search_fields = ['equipo__nombre', 'equipo__codigo_interno', 'nombre_proveedor', 'responsable', 'descripcion']
     raw_id_fields = ['equipo']
@@ -142,7 +141,7 @@ class MantenimientoAdmin(admin.ModelAdmin):
     ordering = ['-fecha_mantenimiento']
     fieldsets = (
         (None, {
-            'fields': ('equipo', 'fecha_mantenimiento', 'tipo_mantenimiento', 'nombre_proveedor', 'responsable', 'costo', 'descripcion') # Eliminado 'frecuencia_meses'
+            'fields': ('equipo', 'fecha_mantenimiento', 'tipo_mantenimiento', 'nombre_proveedor', 'responsable', 'costo', 'descripcion')
         }),
         ('Documentos', {
             'fields': ('documento_mantenimiento',)
@@ -152,7 +151,7 @@ class MantenimientoAdmin(admin.ModelAdmin):
 # Admin para Comprobacion
 @admin.register(Comprobacion)
 class ComprobacionAdmin(admin.ModelAdmin):
-    list_display = ['equipo', 'fecha_comprobacion', 'nombre_proveedor', 'responsable', 'resultado'] # Eliminado 'frecuencia_meses'
+    list_display = ['equipo', 'fecha_comprobacion', 'nombre_proveedor', 'responsable', 'resultado']
     list_filter = ['resultado', 'fecha_comprobacion', 'equipo__empresa']
     search_fields = ['equipo__nombre', 'equipo__codigo_interno', 'nombre_proveedor', 'responsable', 'observaciones']
     raw_id_fields = ['equipo']
@@ -160,7 +159,7 @@ class ComprobacionAdmin(admin.ModelAdmin):
     ordering = ['-fecha_comprobacion']
     fieldsets = (
         (None, {
-            'fields': ('equipo', 'fecha_comprobacion', 'nombre_proveedor', 'responsable', 'resultado', 'observaciones') # Eliminado 'frecuencia_meses'
+            'fields': ('equipo', 'fecha_comprobacion', 'nombre_proveedor', 'responsable', 'resultado', 'observaciones')
         }),
         ('Documentos', {
             'fields': ('documento_comprobacion',)
@@ -194,33 +193,17 @@ class ProcedimientoAdmin(admin.ModelAdmin):
     date_hierarchy = 'fecha_emision'
     ordering = ['nombre']
 
-# Admin para Proveedores existentes (se mantienen)
-@admin.register(ProveedorCalibracion)
-class ProveedorCalibracionAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'contacto', 'telefono', 'email']
-    search_fields = ['nombre', 'contacto', 'email']
-
-@admin.register(ProveedorMantenimiento)
-class ProveedorMantenimientoAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'contacto', 'telefono', 'email']
-    search_fields = ['nombre', 'contacto', 'email']
-
-@admin.register(ProveedorComprobacion)
-class ProveedorComprobacionAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'contacto', 'telefono', 'email']
-    search_fields = ['nombre', 'contacto', 'email']
-
-# NUEVO ADMIN: Proveedor General
+# NUEVO ADMIN: Proveedor General (los ProveedorCalibracion, Mantenimiento, Comprobacion ya no son necesarios)
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
-    list_display = ['nombre_empresa', 'empresa', 'tipo_servicio', 'nombre_contacto', 'numero_contacto', 'correo_electronico'] # Añadido 'empresa'
-    list_filter = ['tipo_servicio', 'empresa'] # Añadido 'empresa' a los filtros
-    search_fields = ['nombre_empresa', 'nombre_contacto', 'correo_electronico', 'alcance', 'servicio_prestado', 'empresa__nombre'] # Añadido búsqueda por empresa
+    list_display = ['nombre_empresa', 'empresa', 'tipo_servicio', 'nombre_contacto', 'numero_contacto', 'correo_electronico']
+    list_filter = ['tipo_servicio', 'empresa']
+    search_fields = ['nombre_empresa', 'nombre_contacto', 'correo_electronico', 'alcance', 'servicio_prestado', 'empresa__nombre']
     ordering = ['nombre_empresa']
-    raw_id_fields = ['empresa'] # Permite seleccionar empresa por ID en el admin
+    raw_id_fields = ['empresa']
     fieldsets = (
         (None, {
-            'fields': ('empresa', 'tipo_servicio', 'nombre_empresa', 'nombre_contacto', 'numero_contacto', 'correo_electronico', 'pagina_web') # Añadido 'empresa'
+            'fields': ('empresa', 'tipo_servicio', 'nombre_empresa', 'nombre_contacto', 'numero_contacto', 'correo_electronico', 'pagina_web')
         }),
         ('Detalles del Servicio', {
             'fields': ('alcance', 'servicio_prestado')

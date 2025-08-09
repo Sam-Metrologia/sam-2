@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 from django.contrib.messages import constants as messages
-import dj_database_url
+import dj_database_url # Importado para configurar la base de datos
 # Importa S3Boto3Storage de django-storages para la configuración de S3
 from storages.backends.s3boto3 import S3Boto3Storage
 
@@ -25,6 +25,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'un_valor_por_defecto_muy_largo_y_alea
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 
+# DEBUG se activa si no hay RENDER_EXTERNAL_HOSTNAME, o si DEBUG_VALUE es 'True'
 DEBUG = os.environ.get('DEBUG_VALUE', 'False') == 'True'
 if not RENDER_EXTERNAL_HOSTNAME:
     DEBUG = True
@@ -33,6 +34,11 @@ ALLOWED_HOSTS = []
 
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Si DEBUG es True, añade los hosts locales permitidos
+if DEBUG:
+    ALLOWED_HOSTS.append('localhost')
+    ALLOWED_HOSTS.append('127.0.0.1')
 
 # Application definition
 INSTALLED_APPS = [
@@ -85,9 +91,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'proyecto_c.wsgi.application'
 
+# ==============================================================================
+# CONFIGURACIÓN DE BASE DE DATOS (AJUSTADA)
+# ==============================================================================
 DATABASES = {
-    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
+
+# Configuración de base de datos para producción (Render)
+# Si la variable de entorno DATABASE_URL está presente, úsala para PostgreSQL.
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    # Para PostgreSQL en Render, asegurar conexiones SSL
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+    }
+# ==============================================================================
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -127,7 +150,6 @@ STATICFILES_DIRS = [
 
 # Verifica si las variables de entorno de S3 están configuradas
 if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
-    # LÍNEA CORREGIDA/AJUSTADA
     # Define la clase de almacenamiento para usar S3
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
@@ -135,29 +157,30 @@ if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
     AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1') # Default region
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/' # Ruta para acceder a los archivos desde la web
     
     # Asegura que boto3 esté configurado y usa SSL
     AWS_S3_USE_SSL = True
 
-    # Esta línea es crucial y es la que faltaba.
-    # Establece el ACL a 'public-read' para todos los archivos subidos.
+    # Esta línea es crucial. Establece el ACL a 'public-read' para todos los archivos subidos.
+    # Esto permite que los archivos sean accesibles públicamente por URL.
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400', 'ACL': 'public-read'}
     
     # No añade el parámetro de autenticación como una cadena de consulta.
+    # Esto es importante para URLs limpias y accesibles directamente.
     AWS_QUERYSTRING_AUTH = False 
-    AWS_S3_SIGNATURE_VERSION = 's3v4'
-    AWS_LOCATION = 'media'
+    AWS_S3_SIGNATURE_VERSION = 's3v4' # Especifica la versión de firma S3 (generalmente s3v4)
+    AWS_LOCATION = 'media' # Prefijo de la carpeta dentro de tu bucket S3 para los archivos media
     
-    # Asegúrate de que los archivos nuevos no sobrescriban los viejos.
+    # Asegúrate de que los archivos nuevos no sobrescriban los viejos con el mismo nombre.
     AWS_S3_FILE_OVERWRITE = False
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
+    MEDIA_ROOT = BASE_DIR / 'media' # Carpeta local donde se guardarán los archivos
     print("WARNING: AWS S3 environment variables not found. Using local media storage.")
 
 
@@ -174,3 +197,10 @@ MESSAGE_TAGS = {
     messages.WARNING: 'alert-warning',
     messages.ERROR: 'alert-danger',
 }
+
+# ==============================================================================
+# CONFIGURACIÓN DE USUARIO PERSONALIZADO (Asegúrate de que esta línea esté presente)
+# ==============================================================================
+AUTH_USER_MODEL = 'core.CustomUser'
+# ==============================================================================
+

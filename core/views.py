@@ -38,19 +38,17 @@ from weasyprint import HTML
 
 # Importar los formularios de tu aplicación (asegúrate de que todos estos existan en .forms)
 from .forms import (
+    AuthenticationForm, # Asegúrate de que este formulario esté definido en forms.py
     CalibracionForm, MantenimientoForm, ComprobacionForm, EquipoForm,
-    BajaEquipoForm, EmpresaForm, CustomUserCreationForm, CustomUserChangeForm,
-    UbicacionForm, ProcedimientoForm, ProveedorCalibracionForm,
-    ProveedorMantenimientoForm, ProveedorComprobacionForm, ProveedorForm,
-    AuthenticationForm, UserProfileForm, EmpresaFormatoForm,
-    ExcelUploadForm
+    BajaEquipoForm, UbicacionForm, ProcedimientoForm, ProveedorForm,
+    ExcelUploadForm,
+    CustomUserCreationForm, CustomUserChangeForm, UserProfileForm, EmpresaForm, EmpresaFormatoForm, # Nuevos formularios importados
 )
 
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
-    CustomUser, Ubicacion, Procedimiento, ProveedorCalibracion,
-    ProveedorMantenimiento, ProveedorComprobacion, Proveedor
+    CustomUser, Ubicacion, Procedimiento, Proveedor
 )
 
 # Importar para autenticación
@@ -99,6 +97,7 @@ def user_logout(request):
     messages.info(request, 'Has cerrado sesión exitosamente.')
     return redirect('core:login')
 
+# Vista para cambiar la contraseña del usuario actual (no la dupliques si ya existe una similar)
 @login_required
 def cambiar_password(request):
     """
@@ -148,16 +147,15 @@ def get_projected_activities_for_year(equipment_queryset, activity_type, current
             fecha_calibracion__year=current_year
         ).values_list('equipo_id', 'fecha_calibracion')
         freq_attr = 'frecuencia_calibracion_meses'
-        last_date_attr = 'fecha_ultima_calibracion'
+        # No se necesita last_date_attr aquí, ya que la lógica de proyección ya está definida
     elif activity_type == 'comprobacion':
         realized_activities_for_year = Comprobacion.objects.filter(
             equipo__in=equipment_queryset,
             fecha_comprobacion__year=current_year
         ).values_list('equipo_id', 'fecha_comprobacion')
         freq_attr = 'frecuencia_comprobacion_meses'
-        last_date_attr = 'fecha_ultima_comprobacion'
     else:
-        return [] # Should not happen with current usage
+        return [] # Should not happen with current usage (solo calibracion y comprobacion para esta función)
 
     # Create a set of (equipo_id, year, month) for realized activities for quick lookup
     realized_set = set()
@@ -174,23 +172,16 @@ def get_projected_activities_for_year(equipment_queryset, activity_type, current
         plan_start_date = equipo.fecha_adquisicion if equipo.fecha_adquisicion else (equipo.fecha_registro.date() if equipo.fecha_registro else date(current_year, 1, 1))
 
         # Calculate the first projected date within the current year
-        # We need to find the earliest 'plan_start_date' that is relevant for the current year.
-        # If plan_start_date is in the past, calculate how many frequencies have passed
-        # to get to a date roughly at the beginning of the current year.
-        
-        # Calculate difference in months from plan_start_date to beginning of current_year
         diff_months = (current_year - plan_start_date.year) * 12 + (1 - plan_start_date.month)
         
-        # Calculate how many full frequency intervals have passed
         num_intervals = 0
         if freq_months > 0:
-            num_intervals = max(0, (diff_months + freq_months - 1) // freq_months) # Ceiling division
+            num_intervals = max(0, (diff_months + freq_months - 1) // freq_months)
 
-        current_projection_date = plan_start_date + relativedelta(months=num_intervals * freq_months)
+        current_projection_date = plan_start_date + relativedelta(months=int(num_intervals * freq_months)) # Asegurar que freq_months es int para relativedelta
 
         # Now, project activities within the current year
-        # Loop for a reasonable number of iterations to cover all possibilities within a year plus some buffer
-        for _ in range(int(12 / freq_months) + 2 if freq_months > 0 else 12): 
+        for _ in range(int(12 / freq_months) + 2 if freq_months > 0 else 0): # Pequeño ajuste en el rango para asegurar la cobertura
             if current_projection_date.year == current_year:
                 is_realized = (equipo.id, current_projection_date.year, current_projection_date.month) in realized_set
 
@@ -211,7 +202,7 @@ def get_projected_activities_for_year(equipment_queryset, activity_type, current
                 break # Stop projecting if we've gone past the current year
 
             try:
-                current_projection_date += relativedelta(months=int(freq_months))
+                current_projection_date += relativedelta(months=int(freq_months)) # Asegurar que freq_months es int para relativedelta
             except OverflowError:
                 break
     return projected_activities
@@ -491,9 +482,15 @@ def dashboard(request):
             cal_pendiente_anual_display
         ]
         
-        cal_realized_anual_percent = (cal_realized_anual_display / cal_total_programmed_anual_display * 100)
-        cal_no_cumplido_anual_percent = (cal_no_cumplido_anual_display / cal_total_programmed_anual_display * 100)
-        cal_pendiente_anual_percent = (cal_pendiente_anual_display / cal_total_programmed_anual_display * 100)
+        # Asegurarse de que el denominador no sea cero antes de calcular el porcentaje
+        if cal_total_programmed_anual_display > 0:
+            cal_realized_anual_percent = (cal_realized_anual_display / cal_total_programmed_anual_display * 100)
+            cal_no_cumplido_anual_percent = (cal_no_cumplido_anual_display / cal_total_programmed_anual_display * 100)
+            cal_pendiente_anual_percent = (cal_pendiente_anual_display / cal_total_programmed_anual_display * 100)
+        else:
+            cal_realized_anual_percent = 0
+            cal_no_cumplido_anual_percent = 0
+            cal_pendiente_anual_percent = 0
 
 
     # Comprobaciones (similar logic)
@@ -519,9 +516,15 @@ def dashboard(request):
             comp_pendiente_anual_display
         ]
         
-        comp_realized_anual_percent = (comp_realized_anual_display / comp_total_programmed_anual_display * 100)
-        comp_no_cumplido_anual_percent = (comp_no_cumplido_anual_display / comp_total_programmed_anual_display * 100)
-        comp_pendiente_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
+        # Asegurarse de que el denominador no sea cero antes de calcular el porcentaje
+        if comp_total_programmed_anual_display > 0:
+            comp_realized_anual_percent = (comp_realized_anual_display / comp_total_programmed_anual_display * 100)
+            comp_no_cumplido_anual_percent = (comp_no_cumplido_anual_display / comp_total_programmed_anual_display * 100)
+            comp_pendiente_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
+        else:
+            comp_realized_anual_percent = 0
+            comp_no_cumplido_anual_percent = 0
+            comp_pendiente_anual_percent = 0
 
     # Mantenimientos por Tipo (Torta)
     mantenimientos_tipo_counts = defaultdict(int)
@@ -650,30 +653,32 @@ def perfil_usuario(request):
         form = UserProfileForm(instance=request.user)
     return render(request, 'core/my_profile.html', {'form': form, 'usuario': request.user, 'titulo_pagina': 'Mi Perfil'})
 
-@login_required
-def cambiar_password(request):
-    """
-    Handles changing the current user's password.
-    """
-    if request.method == 'POST':
-        form = PasswordChangeForm(request.user, request.POST)
-        if form.is_valid():
-            user = form.save()
-            update_session_auth_hash(request, user)
-            messages.success(request, 'Tu contraseña ha sido actualizada exitosamente.')
-            return redirect('core:password_change_done')
-        else:
-            messages.error(request, 'Por favor corrige los errores a continuación.')
-    else:
-        form = PasswordChangeForm(request.user)
-    return render(request, 'registration/password_change_form.html', {'form': form, 'titulo_pagina': 'Cambiar Contraseña'})
+# Eliminar esta función si ya existe 'cambiar_password' en otro lugar y se usa consistentemente
+# @login_required
+# def cambiar_password(request):
+#     """
+#     Handles changing the current user's password.
+#     """
+#     if request.method == 'POST':
+#         form = PasswordChangeForm(request.user, request.POST)
+#         if form.is_valid():
+#             user = form.save()
+#             update_session_auth_hash(request, user)
+#             messages.success(request, 'Tu contraseña ha sido actualizada exitosamente.')
+#             return redirect('core:password_change_done')
+#         else:
+#             messages.error(request, 'Por favor corrige los errores a continuación.')
+#     else:
+#         form = PasswordChangeForm(request.user)
+#     return render(request, 'registration/password_change_form.html', {'form': form, 'titulo_pagina': 'Cambiar Contraseña'})
 
-@login_required
-def password_change_done(request):
-    """
-    Renders the password change done page.
-    """
-    return render(request, 'core/password_change_done.html', {'titulo_pagina': 'Contraseña Cambiada'})
+# Eliminar esta función si ya existe 'password_change_done' en otro lugar y se usa consistentemente
+# @login_required
+# def password_change_done(request):
+#     """
+#     Renders the password change done page.
+#     """
+#     return render(request, 'core/password_change_done.html', {'titulo_pagina': 'Contraseña Cambiada'})
 
 
 # --- Vistas de Equipos ---
@@ -1011,19 +1016,20 @@ def importar_equipos_excel(request):
                                 created_count += 1
                             except Exception as e:
                                 errors.append(f"Fila {row_index}: Error al crear el equipo - {e}")
-                                raise
+                                raise # Re-lanza la excepción para que transaction.atomic() haga rollback
 
                 if errors:
                     messages.warning(request, f'Importación completada con {created_count} equipos creados y {len(errors)} errores.')
                     for err in errors:
                         messages.error(request, err)
+                    # No redirect aquí para que el usuario pueda ver los mensajes de error
                     return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
                 else:
                     messages.success(request, f'¡Importación exitosa! Se crearon {created_count} equipos.')
                     return redirect('core:home')
             
-            except Exception as e:
-                messages.error(request, f'Ocurrió un error inesperado al procesar el archivo: {e}')
+            except Exception as e: # Este catch capturará la excepción relanzada si hay un error atómico
+                messages.error(request, f'Ocurrió un error inesperado al procesar el archivo o la transacción: {e}')
                 return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario de subida.')
@@ -1067,17 +1073,17 @@ def detalle_equipo(request, pk):
             comp.proxima_actividad_para_este_registro = None
 
     baja_registro = None
-    if equipo.estado == 'De Baja':
-        try:
-            baja_registro = BajaEquipo.objects.get(equipo=equipo)
-        except BajaEquipo.DoesNotExist:
-            pass
+    try:
+        baja_registro = equipo.baja_registro
+    except BajaEquipo.DoesNotExist:
+        pass
 
     # Utilizar default_storage para acceder a las URLs de los archivos
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
-        if file_field and default_storage.exists(file_field.name):
-            return request.build_absolute_uri(file_field.url)
+        if file_field and file_field.name:
+            if default_storage.exists(file_field.name):
+                return request.build_absolute_uri(file_field.url)
         return None
 
     logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa else None
@@ -1182,11 +1188,23 @@ def añadir_calibracion(request, equipo_pk):
     if request.method == 'POST':
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
-            calibracion = form.save(commit=False)
-            calibracion.equipo = equipo
-            calibracion.save()
-            messages.success(request, 'Calibración añadida exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try: # Añade un bloque try-except aquí para capturar errores de S3
+                calibracion = form.save(commit=False)
+                calibracion.equipo = equipo
+                calibracion.save() # Aquí es donde se intenta guardar el archivo en S3
+                
+                # --- LÍNEA DE DEPURACIÓN CLAVE ---
+                print(f"DEBUG: Archivo guardado para la calibración ID: {calibracion.id}, nombre de archivo: {calibracion.documento_calibracion.name if calibracion.documento_calibracion else 'N/A'}")
+                # ---------------------------------
+
+                messages.success(request, 'Calibración añadida exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                # Si ocurre un error durante el guardado (incluyendo problemas de S3)
+                print(f"ERROR al guardar calibración o archivo en S3: {e}")
+                messages.error(request, f'Hubo un error al guardar la calibración: {e}')
+                # Re-renderiza el formulario con los datos POST para que el usuario pueda ver los errores
+                return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
@@ -1479,6 +1497,7 @@ def activar_equipo(request, equipo_pk):
 
     if request.method == 'POST':
         try:
+            # La señal post_delete en models.py se encargará de cambiar el estado del equipo a 'Activo'
             BajaEquipo.objects.filter(equipo=equipo).delete()
             messages.success(request, f'Equipo "{equipo.nombre}" activado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -1753,185 +1772,9 @@ def eliminar_procedimiento(request, pk):
         return redirect('core:listar_procedimientos')
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': procedimiento, 'tipo': 'procedimiento', 'titulo_pagina': f'Eliminar Procedimiento: {procedimiento.nombre}'})
 
-# --- Vistas de Proveedores de Calibración (EXISTENTES) ---
-@login_required
-@permission_required('core.can_view_proveedorcalibracion', raise_exception=True)
-def listar_proveedores_calibracion(request):
-    """
-    Lists all calibration providers.
-    """
-    proveedores = ProveedorCalibracion.objects.all()
-    return render(request, 'core/listar_proveedores_calibracion.html', {'proveedores': proveedores, 'titulo_pagina': 'Listado de Proveedores de Calibración'})
-
-@login_required
-@permission_required('core.can_add_proveedorcalibracion', raise_exception=True)
-def añadir_proveedor_calibracion(request):
-    """
-    Handles adding a new calibration provider.
-    """
-    if request.method == 'POST':
-        form = ProveedorCalibracionForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Proveedor de Calibración añadido exitosamente.')
-            return redirect('core:listar_proveedores_calibracion')
-        else:
-            messages.error(request, 'Hubo un error al añadir el proveedor. Por favor, revisa los datos.')
-    else:
-        form = ProveedorCalibracionForm()
-    return render(request, 'core/añadir_proveedor_calibracion.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Proveedor de Calibración'})
-
-@login_required
-@permission_required('core.can_change_proveedorcalibracion', raise_exception=True)
-def editar_proveedor_calibracion(request, pk):
-    """
-    Handles editing an existing calibration provider.
-    """
-    proveedor = get_object_or_404(ProveedorCalibracion, pk=pk)
-    if request.method == 'POST':
-        form = ProveedorCalibracionForm(request.POST, instance=proveedor)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Proveedor de Calibración actualizado exitosamente.')
-            return redirect('core:listar_proveedores_calibracion')
-        else:
-            messages.error(request, 'Hubo un error al actualizar el proveedor. Por favor, revisa los datos.')
-    else:
-        form = ProveedorCalibracionForm(instance=proveedor)
-    return render(request, 'core/editar_proveedor_calibracion.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor de Calibración: {proveedor.nombre}'})
-
-@login_required
-@permission_required('core.can_delete_proveedorcalibracion', raise_exception=True)
-def eliminar_proveedor_calibracion(request, pk):
-    """
-    Handles deleting a calibration provider.
-    """
-    proveedor = get_object_or_404(ProveedorCalibracion, pk=pk)
-    if request.method == 'POST':
-        proveedor.delete()
-        messages.success(request, 'Proveedor de Calibración eliminado exitosamente.')
-        return redirect('core:listar_proveedores_calibracion')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': proveedor, 'tipo': 'proveedor de calibración', 'titulo_pagina': f'Eliminar Proveedor de Calibración: {proveedor.nombre}'})
-
-@login_required
-@permission_required('core.can_view_proveedormantenimiento', raise_exception=True)
-def listar_proveedores_mantenimiento(request):
-    """
-    Lists all maintenance providers.
-    """
-    proveedores = ProveedorMantenimiento.objects.all()
-    return render(request, 'core/listar_proveedores_mantenimiento.html', {'proveedores': proveedores, 'titulo_pagina': 'Listado de Proveedores de Mantenimiento'})
-
-@login_required
-@permission_required('core.can_add_proveedormantenimiento', raise_exception=True)
-def añadir_proveedor_mantenimiento(request):
-    """
-    Handles adding a new maintenance provider.
-    """
-    if request.method == 'POST':
-        form = ProveedorMantenimientoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Proveedor de Mantenimiento añadido exitosamente.')
-            return redirect('core:listar_proveedores_mantenimiento')
-        else:
-            messages.error(request, 'Hubo un error al añadir el proveedor. Por favor, revisa los datos.')
-    else:
-        form = ProveedorMantenimientoForm()
-    return render(request, 'core/añadir_proveedor_mantenimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Proveedor de Mantenimiento'})
-
-@login_required
-@permission_required('core.can_change_proveedormantenimiento', raise_exception=True)
-def editar_proveedor_mantenimiento(request, pk):
-    """
-    Handles editing an existing maintenance provider.
-    """
-    proveedor = get_object_or_404(ProveedorMantenimiento, pk=pk)
-    if request.method == 'POST':
-        form = ProveedorMantenimientoForm(request.POST, instance=proveedor)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Proveedor de Mantenimiento actualizado exitosamente.')
-            return redirect('core:listar_proveedores_mantenimiento')
-        else:
-            messages.error(request, 'Hubo un error al actualizar el proveedor. Por favor, revisa los datos.')
-    else:
-        form = ProveedorMantenimientoForm(instance=proveedor)
-    return render(request, 'core/editar_proveedor_mantenimiento.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor de Mantenimiento: {proveedor.nombre}'})
-
-@login_required
-@permission_required('core.can_delete_proveedormantenimiento', raise_exception=True)
-def eliminar_proveedor_mantenimiento(request, pk):
-    """
-    Handles deleting a maintenance provider.
-    """
-    proveedor = get_object_or_404(ProveedorMantenimiento, pk=pk)
-    if request.method == 'POST':
-        proveedor.delete()
-        messages.success(request, 'Proveedor de Mantenimiento eliminado exitosamente.')
-        return redirect('core:listar_proveedores_mantenimiento')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': proveedor, 'tipo': 'proveedor de mantenimiento', 'titulo_pagina': f'Eliminar Proveedor de Mantenimiento: {proveedor.nombre}'})
-
-@login_required
-@permission_required('core.can_view_proveedorcomprobacion', raise_exception=True)
-def listar_proveedores_comprobacion(request):
-    """
-    Lists all verification providers.
-    """
-    proveedores = ProveedorComprobacion.objects.all()
-    return render(request, 'core/listar_proveedores_comprobacion.html', {'proveedores': proveedores, 'titulo_pagina': 'Listado de Proveedores de Comprobación'})
-
-@login_required
-@permission_required('core.can_add_proveedorcomprobacion', raise_exception=True)
-def añadir_proveedor_comprobacion(request):
-    """
-    Handles adding a new verification provider.
-    """
-    if request.method == 'POST':
-        form = ProveedorComprobacionForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Proveedor de Comprobación añadido exitosamente.')
-            return redirect('core:listar_proveedores_comprobacion')
-        else:
-            messages.error(request, 'Hubo un error al añadir el proveedor. Por favor, revisa los datos.')
-    else:
-        form = ProveedorComprobacionForm()
-    return render(request, 'core/añadir_proveedor_comprobacion.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Proveedor de Comprobación'})
-
-@login_required
-@permission_required('core.can_change_proveedorcomprobacion', raise_exception=True)
-def editar_proveedor_comprobacion(request, pk):
-    """
-    Handles editing an existing verification provider.
-    """
-    proveedor = get_object_or_404(ProveedorComprobacion, pk=pk)
-    if request.method == 'POST':
-        form = ProveedorComprobacionForm(request.POST, instance=proveedor)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Proveedor de Comprobación actualizado exitosamente.')
-            return redirect('core:listar_proveedores_comprobacion')
-        else:
-            messages.error(request, 'Hubo un error al actualizar el proveedor. Por favor, revisa los datos.')
-    else:
-        form = ProveedorComprobacionForm(instance=proveedor)
-    return render(request, 'core/editar_proveedor_comprobacion.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor de Comprobación: {proveedor.nombre}'})
-
-@login_required
-@permission_required('core.can_delete_proveedorcomprobacion', raise_exception=True)
-def eliminar_proveedor_comprobacion(request, pk):
-    """
-    Handles deleting a verification provider.
-    """
-    proveedor = get_object_or_404(ProveedorComprobacion, pk=pk)
-    if request.method == 'POST':
-        proveedor.delete()
-        messages.success(request, 'Proveedor de Comprobación eliminado exitosamente.')
-        return redirect('core:listar_proveedores_comprobacion')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': proveedor, 'tipo': 'proveedor de comprobación', 'titulo_pagina': f'Eliminar Proveedor de Comprobación: {proveedor.nombre}'})
-
-# --- NUEVAS VISTAS PARA EL MODELO PROVEEDOR GENERAL ---
+# --- Vistas de Proveedores (GENERAL) ---
+# Se eliminan las vistas específicas de ProveedorCalibracion, ProveedorMantenimiento, ProveedorComprobacion
+# en favor del modelo Proveedor general.
 
 @login_required
 @permission_required('core.can_view_proveedor', raise_exception=True)
@@ -2170,7 +2013,7 @@ def editar_usuario(request, pk):
         if form.is_valid():
             user = form.save(commit=False)
             if not request.user.is_superuser:
-                user.empresa = usuario_a_editar.empresa
+                user.empresa = usuario_a_editar.empresa # Asegurar que la empresa no se cambie si no es superuser
             user.save()
             messages.success(request, f'Usuario "{user.username}" actualizado exitosamente.')
             return redirect('core:detalle_usuario', pk=usuario_a_editar.pk)
@@ -2908,7 +2751,7 @@ def informe_vencimientos_pdf(request):
     Generates a PDF report of upcoming and overdue activities.
     """
     today = timezone.localdate()
-    upcoming_threshold = today + timedelta(days=30)
+    # upcoming_threshold = today + timedelta(days=30) # Esta variable no se usa directamente en este método.
 
     scheduled_activities = []
 
@@ -3098,7 +2941,9 @@ def generar_hoja_vida_pdf(request, pk):
         response['Content-Disposition'] = f'attachment; filename="hoja_vida_{equipo.codigo_interno}.pdf"'
         return response
     except Exception as e:
-        return HttpResponse(f'Tuvimos algunos errores al generar el PDF: <pre>{e}</pre>')
+        # Aquí puedes añadir un mensaje de depuración más específico para el usuario
+        messages.error(request, f'Tuvimos algunos errores al generar el PDF: {e}. Revisa los logs para más detalles.')
+        return redirect('core:detalle_equipo', pk=equipo.pk) # Redirige al detalle del equipo o a una página de error
 
 
 @require_POST
@@ -3135,3 +2980,4 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
+
