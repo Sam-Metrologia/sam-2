@@ -519,8 +519,7 @@ def dashboard(request):
         # Asegurarse de que el denominador no sea cero antes de calcular el porcentaje
         if comp_total_programmed_anual_display > 0:
             comp_realized_anual_percent = (comp_realized_anual_display / comp_total_programmed_anual_display * 100)
-            comp_no_cumplido_anual_percent = (comp_no_cumplido_anual_display / comp_total_programmed_anual_display * 100)
-            comp_pendiente_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
+            comp_no_cumplido_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
         else:
             comp_realized_anual_percent = 0
             comp_no_cumplido_anual_percent = 0
@@ -2595,17 +2594,18 @@ def generar_informe_zip(request):
     [Company Name]/
     ├── Equipos/
     │   ├── [Equipment Internal Code 1]/
+    │   │   ├── Hoja_de_vida.pdf
+    │   │   ├── Baja/ (Documento de Baja del Equipo - NUEVA CARPETA)
     │   │   ├── Calibraciones/
     │   │   │   ├── Certificados/ (Certificado de Calibración)
     │   │   │   ├── Confirmaciones/ (Confirmación Metrológica)
-    │   │   │   └── Intervalos/ (Intervalos de Calibración - NUEVA CARPETA)
+    │   │   │   └── Intervalos/ (Intervalos de Calibración)
     │   │   ├── Comprobaciones/
     │   │   │   └── (Verification PDFs)
     │   │   ├── Mantenimientos/
     │   │   │   └── (Maintenance PDFs)
-    │   │   ├── Hoja_de_vida_PDF.pdf
-    │   │   ├── Hoja_de_vida_General_Excel.xlsx (NEW: General Info)
-    │   │   └── Hoja_de_vida_Actividades_Excel.xlsx (Existing: Activities History)
+    │   │   ├── Hoja_de_vida_General_Excel.xlsx
+    │   │   └── Hoja_de_vida_Actividades_Excel.xlsx
     │   └── [Equipment Internal Code 2]/
     │       └── ...
     ├── Listado_de_equipos.xlsx
@@ -2656,6 +2656,27 @@ def generar_informe_zip(request):
             except Exception as e:
                 print(f"Error generating Hoja de Vida Activities Excel for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Activities Excel: {e}")
+
+            # --- NUEVA LÓGICA: Añadir Documento de Baja si existe ---
+            try:
+                # Intenta obtener el registro de baja para el equipo
+                baja_registro = BajaEquipo.objects.get(equipo=equipo)
+                if baja_registro.documento_baja and default_storage.exists(baja_registro.documento_baja.name):
+                    # Define la ruta dentro del ZIP para el documento de baja
+                    baja_folder = f"{equipo_folder}/Baja"
+                    # Abre el archivo del almacenamiento (S3 o local) y añádelo al ZIP
+                    with default_storage.open(baja_registro.documento_baja.name, 'rb') as f:
+                        file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
+                        zf.writestr(f"{baja_folder}/{file_name_in_zip}", f.read())
+                    print(f"DEBUG: Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
+                else:
+                    print(f"DEBUG: No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
+            except BajaEquipo.DoesNotExist:
+                print(f"DEBUG: Equipo {equipo.codigo_interno} no tiene registro de baja.")
+            except Exception as e:
+                print(f"Error adding decommission document for {equipo.codigo_interno} to zip: {e}")
+                zf.writestr(f"{equipo_folder}/Baja/Documento_Baja_ERROR.txt", f"Error adding decommission document: {e}")
+            # --- FIN NUEVA LÓGICA ---
 
 
             # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
@@ -2980,4 +3001,3 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
-
