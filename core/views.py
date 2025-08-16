@@ -20,6 +20,8 @@ from django.db import transaction
 from django.utils.dateparse import parse_date
 
 from django.http import HttpResponse, JsonResponse, Http404, HttpResponseRedirect
+from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
@@ -38,11 +40,11 @@ from weasyprint import HTML
 
 # Importar los formularios de tu aplicación (asegúrate de que todos estos existan en .forms)
 from .forms import (
-    AuthenticationForm, # Asegúrate de que este formulario esté definido en forms.py
+    AuthenticationForm,
     CalibracionForm, MantenimientoForm, ComprobacionForm, EquipoForm,
     BajaEquipoForm, UbicacionForm, ProcedimientoForm, ProveedorForm,
     ExcelUploadForm,
-    CustomUserCreationForm, CustomUserChangeForm, UserProfileForm, EmpresaForm, EmpresaFormatoForm, # Nuevos formularios importados
+    CustomUserCreationForm, CustomUserChangeForm, UserProfileForm, EmpresaForm, EmpresaFormatoForm,
 )
 
 # Importar modelos
@@ -51,25 +53,650 @@ from .models import (
     CustomUser, Ubicacion, Procedimiento, Proveedor
 )
 
-# Importar para autenticación
+# Importar para autenticación y grupos
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.models import Group # Importar el modelo Group
 
-from django.contrib.auth.forms import PasswordChangeForm # Asegúrate de que esta importación esté presente
-
-# Importar para manejo de mensajes AJAX
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-
-# Importar para default_storage
-from django.core.files.storage import default_storage # <-- Asegúrate de tener esta importación
+# Importar para default_storage (manejo de archivos S3/local)
+from django.core.files.storage import default_storage
 
 
-# --- Vistas de Autenticación y Perfil ---
+# =============================================================================
+# Funciones de utilidad (helpers)
+# =============================================================================
+
+def es_miembro_empresa(user, empresa_id):
+    """Verifica si el usuario pertenece a la empresa especificada."""
+    return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
+
+# --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
+def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
+    """
+    Generates a list of projected activities for the current year for a given activity type.
+    Each projected activity will have a 'date' and 'status' (realized, overdue, pending).
+    This function is primarily for the annual summary (pie charts).
+    Applies to Calibracion and Comprobacion.
+    """
+    projected_activities = []
+    
+    # Filtrar equipos para excluir los que están "De Baja" o "Inactivo" de las proyecciones
+    equipment_queryset = equipment_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+
+    # Fetch all realized activities for the current year for quick lookup
+    realized_activities_for_year = []
+    if activity_type == 'calibracion':
+        realized_activities_for_year = Calibracion.objects.filter(
+            equipo__in=equipment_queryset,
+            fecha_calibracion__year=current_year
+        ).values_list('equipo_id', 'fecha_calibracion')
+        freq_attr = 'frecuencia_calibracion_meses'
+    elif activity_type == 'comprobacion':
+        realized_activities_for_year = Comprobacion.objects.filter(
+            equipo__in=equipment_queryset,
+            fecha_comprobacion__year=current_year
+        ).values_list('equipo_id', 'fecha_comprobacion')
+        freq_attr = 'frecuencia_comprobacion_meses'
+    else:
+        return []
+
+    # Create a set of (equipo_id, year, month) for realized activities for quick lookup
+    realized_set = set()
+    for eq_id, date_obj in realized_activities_for_year:
+        realized_set.add((eq_id, date_obj.year, date_obj.month))
+
+    for equipo in equipment_queryset:
+        freq_months = getattr(equipo, freq_attr)
+
+        if freq_months is None or freq_months <= 0:
+            continue
+
+        # Determine the effective start date for planning this activity type for this equipment
+        plan_start_date = equipo.fecha_adquisicion if equipo.fecha_adquisicion else \
+                          (equipo.fecha_registro.date() if equipo.fecha_registro else date(current_year, 1, 1))
+
+        # Calculate the first projected date *relevant to the current year* based on the frequency
+        delta_years = current_year - plan_start_date.year
+        delta_months = (delta_years * 12) + (1 - plan_start_date.month)
+
+        num_intervals_to_reach_year = 0
+        if freq_months > 0:
+            num_intervals_to_reach_year = max(0, (delta_months + freq_months - 1) // freq_months)
+        
+        current_projection_date = plan_start_date + relativedelta(months=int(num_intervals_to_reach_year * freq_months))
+
+
+        # Now, project activities for the entire current year
+        for _ in range(int(12 / freq_months) + 2 if freq_months > 0 else 0): # Project slightly beyond 12 months to catch edge cases
+            if current_projection_date.year == current_year:
+                # Check if this specific projected activity (for this equipment, in this year and month) was realized
+                is_realized = (equipo.id, current_projection_date.year, current_projection_date.month) in realized_set
+
+                status = ''
+                if is_realized:
+                    status = 'Realizado'
+                elif current_projection_date < today:
+                    status = 'No Cumplido' # Overdue and not realized
+                else:
+                    status = 'Pendiente/Programado' # Future and not realized
+
+                projected_activities.append({
+                    'equipo_id': equipo.id,
+                    'date': current_projection_date,
+                    'status': status
+                })
+            elif current_projection_date.year > current_year:
+                break # Stop projecting if we've gone past the current year
+
+            try:
+                current_projection_date += relativedelta(months=int(freq_months))
+            except OverflowError: # Prevent extremely large dates causing errors
+                break
+    return projected_activities
+
+def get_projected_maintenance_compliance_for_year(equipment_queryset, current_year, today):
+    """
+    Generates a list of projected maintenance activities for the current year,
+    categorized by compliance status (realized, overdue, pending).
+    This specifically targets 'Preventivo' and 'Predictivo' maintenance as they are typically scheduled.
+    """
+    projected_activities = []
+    
+    # Filtrar equipos para excluir los que están "De Baja" o "Inactivo" de las proyecciones
+    equipment_queryset = equipment_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+
+    # Fetch all realized *scheduled* maintenance activities for the current year for quick lookup
+    # Only consider 'Preventivo' and 'Predictivo' as scheduled
+    realized_scheduled_maintenance_for_year = Mantenimiento.objects.filter(
+        equipo__in=equipment_queryset,
+        fecha_mantenimiento__year=current_year,
+        tipo_mantenimiento__in=['Preventivo', 'Predictivo']
+    ).values_list('equipo_id', 'fecha_mantenimiento')
+    
+    realized_set = set()
+    for eq_id, date_obj in realized_scheduled_maintenance_for_year:
+        realized_set.add((eq_id, date_obj.year, date_obj.month))
+
+    for equipo in equipment_queryset:
+        freq_months = equipo.frecuencia_mantenimiento_meses
+
+        if freq_months is None or freq_months <= 0:
+            continue
+
+        # Determine the effective start date for planning this activity type for this equipment
+        plan_start_date = equipo.fecha_adquisicion if equipo.fecha_adquisicion else \
+                          (equipo.fecha_registro.date() if equipo.fecha_registro else date(current_year, 1, 1))
+
+        # Calculate the first projected date *relevant to the current year* based on the frequency
+        delta_years = current_year - plan_start_date.year
+        delta_months = (delta_years * 12) + (1 - plan_start_date.month)
+
+        num_intervals_to_reach_year = 0
+        if freq_months > 0:
+            num_intervals_to_reach_year = max(0, (delta_months + freq_months - 1) // freq_months)
+        
+        current_projection_date = plan_start_date + relativedelta(months=int(num_intervals_to_reach_year * freq_months))
+
+        # Now, project activities for the entire current year
+        for _ in range(int(12 / freq_months) + 2 if freq_months > 0 else 0):
+            if current_projection_date.year == current_year:
+                is_realized = (equipo.id, current_projection_date.year, current_projection_date.month) in realized_set
+
+                status = ''
+                if is_realized:
+                    status = 'Realizado'
+                elif current_projection_date < today:
+                    status = 'No Cumplido' # Overdue and not realized
+                else:
+                    status = 'Pendiente/Programado' # Future and not realized
+
+                projected_activities.append({
+                    'equipo_id': equipo.id,
+                    'date': current_projection_date,
+                    'status': status
+                })
+            elif current_projection_date.year > current_year:
+                break
+            try:
+                current_projection_date += relativedelta(months=int(freq_months))
+            except OverflowError:
+                break
+    return projected_activities
+
+
+# --- Funciones Auxiliares para Generación de PDF (se mantienen para Hoja de Vida y Listado General) ---
+
+def _generate_pdf_content(request, template_path, context):
+    """
+    Generates PDF content (bytes) from a template and context using WeasyPrint.
+    """
+    from django.template.loader import get_template
+
+    template = get_template(template_path)
+    html_string = template.render(context)
+    
+    # base_url es crucial para que WeasyPrint resuelva rutas de CSS e imágenes
+    # Si las imágenes están en S3, request.build_absolute_uri('/') generará URLs HTTPS completas.
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
+    
+    return pdf_file
+
+def _generate_equipment_hoja_vida_pdf_content(request, equipo):
+    """
+    Generates the PDF content for an equipment's "Hoja de Vida".
+    """
+    calibraciones = equipo.calibraciones.all().order_by('-fecha_calibracion')
+    mantenimientos = equipo.mantenimientos.all().order_by('-fecha_mantenimiento')
+    comprobaciones = equipo.comprobaciones.all().order_by('-fecha_comprobacion')
+    baja_registro = None
+    try:
+        baja_registro = equipo.baja_registro
+    except BajaEquipo.DoesNotExist:
+        pass
+
+    # Utilizar default_storage para acceder a las URLs de los archivos
+    # Helper para obtener URL segura desde default_storage
+    def get_file_url(file_field):
+        # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
+        if file_field and file_field.name:
+            try:
+                if default_storage.exists(file_field.name):
+                    return request.build_absolute_uri(file_field.url)
+            except Exception as e:
+                print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
+        return None
+
+    # Obtener URLs de los archivos para pasarlos al contexto
+    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+    imagen_equipo_url = get_file_url(equipo.imagen_equipo)
+    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
+
+    for cal in calibraciones:
+        cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
+        cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
+        cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
+
+    for mant in mantenimientos:
+        mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
+    for comp in comprobaciones:
+        comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
+
+    archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
+    ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
+    manual_pdf_url = get_file_url(equipo.manual_pdf)
+    otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
+
+
+    context = {
+        'equipo': equipo,
+        'calibraciones': calibraciones,
+        'mantenimientos': mantenimientos,
+        'comprobaciones': comprobaciones,
+        'baja_registro': baja_registro,
+        'logo_empresa_url': logo_empresa_url,
+        'imagen_equipo_url': imagen_equipo_url,
+        'documento_baja_url': documento_baja_url,
+        'archivo_compra_pdf_url': archivo_compra_pdf_url,
+        'ficha_tecnica_pdf_url': ficha_tecnica_pdf_url,
+        'manual_pdf_url': manual_pdf_url,
+        'otros_documentos_pdf_url': otros_documentos_pdf_url,
+        'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
+    }
+    return _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
+
+
+# --- Funciones Auxiliares para Generación de Excel ---
+
+def _generate_general_equipment_list_excel_content(equipos_queryset):
+    """
+    Generates an Excel file with the general list of equipment.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Listado de Equipos"
+
+    headers = [
+        "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
+        "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
+        "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
+        "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
+        "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
+        "Próxima Comprobación", "Frecuencia Comprobación (meses)"
+    ]
+    sheet.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    header_border = Border(left=Side(style='thin'),
+                           right=Side(style='thin'),
+                           top=Side(style='thin'),
+                           bottom=Side(style='thin'))
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = header_border
+        sheet.column_dimensions[cell.column_letter].width = 25
+
+    for equipo in equipos_queryset:
+        row_data = [
+            equipo.codigo_interno,
+            equipo.nombre,
+            equipo.empresa.nombre if equipo.empresa else "N/A",
+            equipo.get_tipo_equipo_display(),
+            equipo.marca,
+            equipo.modelo,
+            equipo.numero_serie,
+            equipo.ubicacion,
+            equipo.responsable,
+            equipo.estado,
+            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+            equipo.rango_medida,
+            equipo.resolucion,
+            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+            equipo.observaciones,
+            equipo.version_formato,
+            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+            equipo.codificacion_formato,
+            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
+            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento else '',
+            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion else '',
+            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+        ]
+        sheet.append(row_data)
+
+    for col in sheet.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+
+def _generate_equipment_general_info_excel_content(equipo):
+    """
+    Generates an Excel file with general information of a specific equipment.
+    This is similar to _generate_general_equipment_list_excel_content but for a single equipment.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Información General"
+
+    headers = [
+        "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
+        "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
+        "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
+        "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
+        "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
+        "Próxima Comprobación", "Frecuencia Comprobación (meses)"
+    ]
+    sheet.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    header_border = Border(left=Side(style='thin'),
+                           right=Side(style='thin'),
+                           top=Side(style='thin'),
+                           bottom=Side(style='thin'))
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = header_border
+        sheet.column_dimensions[cell.column_letter].width = 25
+
+    row_data = [
+        equipo.codigo_interno,
+        equipo.nombre,
+        equipo.empresa.nombre if equipo.empresa else "N/A",
+        equipo.get_tipo_equipo_display(),
+        equipo.marca,
+        equipo.modelo,
+        equipo.numero_serie,
+        equipo.ubicacion,
+        equipo.responsable,
+        equipo.estado,
+        equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+        equipo.rango_medida,
+        equipo.resolucion,
+        equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+        equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+        equipo.observaciones,
+        equipo.version_formato,
+        equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+        equipo.codificacion_formato,
+        equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+        equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+        float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+        equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
+        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento else '',
+        float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+        equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion else '',
+        float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+    ]
+    sheet.append(row_data)
+
+    for col in sheet.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+
+def _generate_equipment_activities_excel_content(equipo):
+    """
+    Generates an Excel file with the activities (calibrations, maintenances, verifications) of a specific equipment.
+    """
+    workbook = Workbook()
+
+    sheet_cal = workbook.active
+    sheet_cal.title = "Calibraciones"
+    headers_cal = ["Fecha Calibración", "Proveedor", "Resultado", "Número Certificado", "Observaciones"]
+    sheet_cal.append(headers_cal)
+    for cal in equipo.calibraciones.all().order_by('fecha_calibracion'):
+        proveedor_nombre = cal.nombre_proveedor if cal.nombre_proveedor else ''
+        sheet_cal.append([
+            cal.fecha_calibracion.strftime('%Y-%m-%d') if cal.fecha_calibracion else '',
+            proveedor_nombre, 
+            cal.resultado,
+            cal.numero_certificado,
+            cal.observaciones
+        ])
+    for col in sheet_cal.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet_cal.column_dimensions[column].width = adjusted_width
+
+    sheet_mant = workbook.create_sheet("Mantenimientos")
+    headers_mant = ["Fecha Mantenimiento", "Tipo", "Proveedor", "Responsable", "Costo", "Descripción"]
+    sheet_mant.append(headers_mant)
+    for mant in equipo.mantenimientos.all().order_by('fecha_mantenimiento'):
+        proveedor_nombre = mant.nombre_proveedor if mant.nombre_proveedor else ''
+        sheet_mant.append([
+            mant.fecha_mantenimiento.strftime('%Y-%m-%d') if mant.fecha_mantenimiento else '',
+            mant.get_tipo_mantenimiento_display(),
+            proveedor_nombre, 
+            mant.responsable,
+            float(mant.costo) if mant.costo is not None else '',
+            mant.descripcion
+        ])
+    for col in sheet_mant.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet_mant.column_dimensions[column].width = adjusted_width
+
+    sheet_comp = workbook.create_sheet("Comprobaciones")
+    headers_comp = ["Fecha Comprobación", "Proveedor", "Responsable", "Resultado", "Observaciones"]
+    sheet_comp.append(headers_comp)
+    for comp in equipo.comprobaciones.all().order_by('fecha_comprobacion'):
+        proveedor_nombre = comp.nombre_proveedor if comp.nombre_proveedor else ''
+        sheet_comp.append([
+            comp.fecha_comprobacion.strftime('%Y-%m-%d') if comp.fecha_comprobacion else '',
+            proveedor_nombre, 
+            comp.responsable,
+            comp.resultado,
+            comp.observaciones
+        ])
+    for col in sheet_comp.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet_comp.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+
+def _generate_general_proveedor_list_excel_content(proveedores_queryset):
+    """
+    Generates an Excel file with the general list of providers.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Listado de Proveedores"
+
+    headers = [
+        "Nombre de la Empresa Proveedora", "Empresa Cliente", "Tipo de Servicio", "Nombre de Contacto",
+        "Número de Contacto", "Correo Electrónico", "Página Web",
+        "Alcance", "Servicio Prestado"
+    ]
+    sheet.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    header_border = Border(left=Side(style='thin'),
+                           right=Side(style='thin'),
+                           top=Side(style='thin'),
+                           bottom=Side(style='thin'))
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = header_border
+        sheet.column_dimensions[cell.column_letter].width = 25
+
+    for proveedor in proveedores_queryset:
+        row_data = [
+            proveedor.nombre_empresa,
+            proveedor.empresa.nombre if proveedor.empresa else "N/A",
+            proveedor.get_tipo_servicio_display(),
+            proveedor.nombre_contacto,
+            proveedor.numero_contacto,
+            proveedor.correo_electronico,
+            proveedor.pagina_web,
+            proveedor.alcance,
+            proveedor.servicio_prestado,
+        ]
+        sheet.append(row_data)
+
+    for col in sheet.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+def _generate_procedimiento_info_excel_content(procedimientos_queryset):
+    """
+    Generates an Excel file with the general list of procedures.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Listado de Procedimientos"
+
+    headers = [
+        "Nombre", "Código", "Versión", "Fecha de Emisión", "Empresa", "Observaciones", "Documento PDF"
+    ]
+    sheet.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    header_border = Border(left=Side(style='thin'),
+                           right=Side(style='thin'),
+                           top=Side(style='thin'),
+                           bottom=Side(style='thin'))
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = header_border
+        sheet.column_dimensions[cell.column_letter].width = 25
+
+    for proc in procedimientos_queryset:
+        row_data = [
+            proc.nombre,
+            proc.codigo,
+            proc.version,
+            proc.fecha_emision.strftime('%Y-%m-%d') if proc.fecha_emision else '',
+            proc.empresa.nombre if proc.empresa else "N/A",
+            proc.observaciones,
+            proc.documento_pdf.url if proc.documento_pdf else 'N/A',
+        ]
+        sheet.append(row_data)
+
+    for col in sheet.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+
+# =============================================================================
+# Vistas de Autenticación y Perfil de Usuario
+# =============================================================================
 
 def user_login(request):
-    """
-    Handles user login.
-    """
+    """Vista para el inicio de sesión de usuarios."""
+    if request.user.is_authenticated:
+        return redirect('core:dashboard') # Redirigir al dashboard si ya está logueado
+
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
@@ -90,19 +717,14 @@ def user_login(request):
 
 @login_required
 def user_logout(request):
-    """
-    Logs out the current user.
-    """
+    """Vista para cerrar sesión de usuarios."""
     logout(request)
     messages.info(request, 'Has cerrado sesión exitosamente.')
     return redirect('core:login')
 
-# Vista para cambiar la contraseña del usuario actual (no la dupliques si ya existe una similar)
 @login_required
 def cambiar_password(request):
-    """
-    Handles changing the current user's password.
-    """
+    """Vista para que el usuario cambie su propia contraseña."""
     if request.method == 'POST':
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
@@ -121,92 +743,29 @@ def cambiar_password(request):
 
 @login_required
 def password_change_done(request):
-    """
-    Renders the password change done page.
-    """
+    """Vista de confirmación de cambio de contraseña."""
     return render(request, 'core/password_change_done.html', {'titulo_pagina': 'Contraseña Cambiada'})
 
-
-# --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
-def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
+@login_required
+def perfil_usuario(request):
     """
-    Generates a list of projected activities for the current year for a given activity type.
-    Each projected activity will have a 'date' and 'status' (realized, overdue, pending).
-    This function is primarily for the annual summary (pie charts).
+    Handles user profile viewing and editing.
     """
-    projected_activities = []
-    
-    # Filtrar equipos para excluir los que están "De Baja"
-    equipment_queryset = equipment_queryset.exclude(estado='De Baja')
-
-    # Fetch all realized activities for the current year for quick lookup
-    realized_activities_for_year = []
-    if activity_type == 'calibracion':
-        realized_activities_for_year = Calibracion.objects.filter(
-            equipo__in=equipment_queryset,
-            fecha_calibracion__year=current_year
-        ).values_list('equipo_id', 'fecha_calibracion')
-        freq_attr = 'frecuencia_calibracion_meses'
-        # No se necesita last_date_attr aquí, ya que la lógica de proyección ya está definida
-    elif activity_type == 'comprobacion':
-        realized_activities_for_year = Comprobacion.objects.filter(
-            equipo__in=equipment_queryset,
-            fecha_comprobacion__year=current_year
-        ).values_list('equipo_id', 'fecha_comprobacion')
-        freq_attr = 'frecuencia_comprobacion_meses'
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Tu perfil ha sido actualizado exitosamente.')
+            return redirect('core:perfil_usuario')
+        else:
+            messages.error(request, 'Error al actualizar tu perfil. Por favor, revisa los campos.')
     else:
-        return [] # Should not happen with current usage (solo calibracion y comprobacion para esta función)
+        form = UserProfileForm(instance=request.user)
+    return render(request, 'core/my_profile.html', {'form': form, 'usuario': request.user, 'titulo_pagina': 'Mi Perfil'})
 
-    # Create a set of (equipo_id, year, month) for realized activities for quick lookup
-    realized_set = set()
-    for eq_id, date_obj in realized_activities_for_year:
-        realized_set.add((eq_id, date_obj.year, date_obj.month))
-
-    for equipo in equipment_queryset:
-        freq_months = getattr(equipo, freq_attr)
-
-        # Ensure freq_months is a positive number before proceeding
-        if freq_months is None or freq_months <= 0:
-            continue # Skip this equipment if frequency is not valid for projection
-
-        plan_start_date = equipo.fecha_adquisicion if equipo.fecha_adquisicion else (equipo.fecha_registro.date() if equipo.fecha_registro else date(current_year, 1, 1))
-
-        # Calculate the first projected date within the current year
-        diff_months = (current_year - plan_start_date.year) * 12 + (1 - plan_start_date.month)
-        
-        num_intervals = 0
-        if freq_months > 0:
-            num_intervals = max(0, (diff_months + freq_months - 1) // freq_months)
-
-        current_projection_date = plan_start_date + relativedelta(months=int(num_intervals * freq_months)) # Asegurar que freq_months es int para relativedelta
-
-        # Now, project activities within the current year
-        for _ in range(int(12 / freq_months) + 2 if freq_months > 0 else 0): # Pequeño ajuste en el rango para asegurar la cobertura
-            if current_projection_date.year == current_year:
-                is_realized = (equipo.id, current_projection_date.year, current_projection_date.month) in realized_set
-
-                status = ''
-                if is_realized:
-                    status = 'Realizado'
-                elif current_projection_date < today:
-                    status = 'No Cumplido' # Overdue and not realized
-                else:
-                    status = 'Pendiente/Programado' # Future and not realized
-
-                projected_activities.append({
-                    'equipo_id': equipo.id,
-                    'date': current_projection_date,
-                    'status': status
-                })
-            elif current_projection_date.year > current_year:
-                break # Stop projecting if we've gone past the current year
-
-            try:
-                current_projection_date += relativedelta(months=int(freq_months)) # Asegurar que freq_months es int para relativedelta
-            except OverflowError:
-                break
-    return projected_activities
-
+# =============================================================================
+# Vistas de Dashboard y Estadísticas
+# =============================================================================
 
 @login_required
 def dashboard(request):
@@ -237,59 +796,56 @@ def dashboard(request):
         equipos_queryset = equipos_queryset.filter(empresa_id=selected_company_id)
 
     # Excluir equipos "De Baja" de los cálculos del dashboard
-    equipos_queryset = equipos_queryset.exclude(estado='De Baja')
+    equipos_para_dashboard = equipos_queryset.exclude(estado='De Baja')
 
     # --- Indicadores Clave ---
     total_equipos = equipos_queryset.count()
     equipos_activos = equipos_queryset.filter(estado='Activo').count()
-    # Equipos de baja (para el dashboard general, no filtrados por empresa aquí, pero se puede añadir)
-    equipos_de_baja = Equipo.objects.filter(estado='De Baja')
-    if not user.is_superuser and user.empresa:
-        equipos_de_baja = equipos_de_baja.filter(empresa=user.empresa)
-    elif not user.is_superuser and not user.empresa:
-        equipos_de_baja = Equipo.objects.none()
-    if selected_company_id and user.is_superuser: # Si superuser selecciona una empresa, filtrar también los de baja
-        equipos_de_baja = equipos_de_baja.filter(empresa_id=selected_company_id)
-    equipos_de_baja = equipos_de_baja.count()
-
+    equipos_inactivos = equipos_queryset.filter(estado='Inactivo').count()
+    equipos_de_baja = equipos_queryset.filter(estado='De Baja').count()
 
     # Detección de actividades vencidas y próximas
-    # Se basan directamente en los campos proxima_X del modelo Equipo
-    calibraciones_vencidas = equipos_queryset.filter(
+    # Se basan directamente en los campos proxima_X del modelo Equipo, excluyendo Inactivos y De Baja
+    calibraciones_vencidas = equipos_para_dashboard.filter(
         proxima_calibracion__isnull=False,
         proxima_calibracion__lt=today
     ).count()
 
-    calibraciones_proximas = equipos_queryset.filter(
+    calibraciones_proximas = equipos_para_dashboard.filter(
         proxima_calibracion__isnull=False,
         proxima_calibracion__gte=today,
         proxima_calibracion__lte=today + timedelta(days=30)
     ).count()
 
-    mantenimientos_vencidos = equipos_queryset.filter(
+    mantenimientos_vencidos = equipos_para_dashboard.filter(
         proximo_mantenimiento__isnull=False,
         proximo_mantenimiento__lt=today
     ).count()
 
-    mantenimientos_proximas = equipos_queryset.filter(
+    mantenimientos_proximas = equipos_para_dashboard.filter(
         proximo_mantenimiento__isnull=False,
         proximo_mantenimiento__gte=today,
         proximo_mantenimiento__lte=today + timedelta(days=30)
     ).count()
 
-    comprobaciones_vencidas = equipos_queryset.filter(
+    comprobaciones_vencidas = equipos_para_dashboard.filter(
         proxima_comprobacion__isnull=False,
         proxima_comprobacion__lt=today
     ).count()
 
-    comprobaciones_proximas = equipos_queryset.filter(
+    comprobaciones_proximas = equipos_para_dashboard.filter(
         proxima_comprobacion__isnull=False,
         proxima_comprobacion__gte=today,
         proxima_comprobacion__lte=today + timedelta(days=30)
     ).count()
 
+    # Obtener los códigos de equipos vencidos para mostrar en el dashboard
+    vencidos_calibracion_codigos = [e.codigo_interno for e in equipos_para_dashboard.filter(proxima_calibracion__lt=today)]
+    vencidos_mantenimiento_codigos = [e.codigo_interno for e in equipos_para_dashboard.filter(proximo_mantenimiento__lt=today)]
+    vencidos_comprobacion_codigos = [e.codigo_interno for e in equipos_para_dashboard.filter(proxima_comprobacion__lt=today)]
+
+
     # --- Datos para Gráficas de Línea (Programadas vs Realizadas por Mes) ---
-    # Rango de 6 meses antes y 6 meses después del mes actual
     line_chart_labels = []
     
     # Initialize programmed data arrays
@@ -301,8 +857,8 @@ def dashboard(request):
     realized_preventive_mantenimientos_line_data = [0] * 12
     realized_corrective_mantenimientos_line_data = [0] * 12
     realized_other_mantenimientos_line_data = [0] * 12
-    realized_predictive_mantenimientos_line_data = [0] * 12 # Nuevo tipo
-    realized_inspection_mantenimientos_line_data = [0] * 12 # Nuevo tipo
+    realized_predictive_mantenimientos_line_data = [0] * 12
+    realized_inspection_mantenimientos_line_data = [0] * 12
     realized_comprobaciones_line_data = [0] * 12
 
     # Calcular el primer mes del rango (6 meses antes del actual)
@@ -314,19 +870,19 @@ def dashboard(request):
         target_date = start_date_range + relativedelta(months=i)
         line_chart_labels.append(f"{calendar.month_abbr[target_date.month]}. {target_date.year}")
 
-    # Datos "Realizadas" (basado en registros de actividad)
+    # Datos "Realizadas" (basado en registros de actividad) - Solo para equipos que no estén de baja
     calibraciones_realizadas_period = Calibracion.objects.filter(
-        equipo__in=equipos_queryset,
+        equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_calibracion__gte=start_date_range,
         fecha_calibracion__lte=start_date_range + relativedelta(months=12, days=-1)
     )
     mantenimientos_realizados_period = Mantenimiento.objects.filter(
-        equipo__in=equipos_queryset,
+        equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_mantenimiento__gte=start_date_range,
         fecha_mantenimiento__lte=start_date_range + relativedelta(months=12, days=-1)
     )
     comprobaciones_realizadas_period = Comprobacion.objects.filter(
-        equipo__in=equipos_queryset,
+        equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_comprobacion__gte=start_date_range,
         fecha_comprobacion__lte=start_date_range + relativedelta(months=12, days=-1)
     )
@@ -356,9 +912,9 @@ def dashboard(request):
             realized_comprobaciones_line_data[month_index] += 1
 
     # Datos "Programadas" (basado en un plan fijo anual desde la fecha de adquisición/registro)
-    for equipo in equipos_queryset: # equipos_queryset ya excluye "De Baja"
+    # Usar equipos_para_dashboard para la programación
+    for equipo in equipos_para_dashboard:
         # Determinar la fecha de inicio del plan para este equipo (fecha de adquisición o registro)
-        # Asegurarse de que plan_start_date sea un objeto date
         plan_start_date = equipo.fecha_adquisicion if equipo.fecha_adquisicion else \
                           (equipo.fecha_registro.date() if equipo.fecha_registro else date(current_year, 1, 1))
 
@@ -366,25 +922,19 @@ def dashboard(request):
         if equipo.frecuencia_calibracion_meses is not None and equipo.frecuencia_calibracion_meses > 0:
             freq = int(equipo.frecuencia_calibracion_meses)
             
-            # Calcular la diferencia en meses desde plan_start_date hasta el inicio del rango de la gráfica
             diff_months = (start_date_range.year - plan_start_date.year) * 12 + (start_date_range.month - plan_start_date.month)
-            
-            # Calcular cuántos intervalos de frecuencia han pasado para llegar al inicio del rango
             num_intervals = 0
-            if freq > 0: # Evitar división por cero
-                num_intervals = max(0, (diff_months + freq - 1) // freq) # Ceiling division para asegurar que empezamos en o antes del rango
+            if freq > 0:
+                num_intervals = max(0, (diff_months + freq - 1) // freq)
 
             current_plan_date = plan_start_date + relativedelta(months=num_intervals * freq)
             
-            # Contar las actividades planificadas dentro del rango de 12 meses de la gráfica
-            # Iterar solo por los 12 meses del rango de la gráfica más un pequeño buffer
-            for _ in range(12 + freq): # Un buffer para asegurar que cubrimos todos los puntos
+            for _ in range(12 + freq): # Iterar lo suficiente para cubrir el rango de 12 meses
                 if start_date_range <= current_plan_date < start_date_range + relativedelta(months=12):
                     month_index = ((current_plan_date.year - start_date_range.year) * 12 + current_plan_date.month - start_date_range.month)
                     if 0 <= month_index < 12:
                         programmed_calibrations_line_data[month_index] += 1
                 
-                # Si la fecha del plan ya superó el final de nuestro rango de 12 meses + buffer, podemos parar
                 if current_plan_date >= start_date_range + relativedelta(months=12 + freq):
                     break
                 
@@ -448,15 +998,16 @@ def dashboard(request):
     # Colores para las gráficas de torta
     pie_chart_colors_cal = ['#28a745', '#dc3545', '#007bff'] # Verde (Realizado), Rojo (No Cumplido), Azul (Pendiente/Programado)
     pie_chart_colors_comp = ['#28a745', '#dc3545', '#007bff'] # Mismos colores para comprobaciones
-    pie_chart_colors_equipos = ['#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6c757d'] # Activo, En Mantenimiento, De Baja, En Calibración, En Comprobación
+    pie_chart_colors_equipos = ['#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6c757d', '#8672cb'] # Activo, En Mantenimiento, De Baja, En Calibración, En Comprobación, Inactivo (usar solo los relevantes)
 
-    # Estado de Equipos (Torta)
+    # Estado de Equipos (Torta) - Usar el queryset general (incluye De Baja, Inactivo)
     estado_equipos_counts = defaultdict(int)
-    for equipo in equipos_queryset.all(): # Incluir todos los estados, no solo activos
+    for equipo in equipos_queryset.all():
         estado_equipos_counts[equipo.estado] += 1
     
     estado_equipos_labels = list(estado_equipos_counts.keys())
     estado_equipos_data = list(estado_equipos_counts.values())
+
 
     # Calibraciones
     projected_calibraciones = get_projected_activities_for_year(equipos_queryset, 'calibracion', current_year, today)
@@ -470,7 +1021,7 @@ def dashboard(request):
     if cal_total_programmed_anual_display == 0:
         calibraciones_torta_labels = ['Sin Actividades']
         calibraciones_torta_data = [1] # A small value to render the chart
-        pie_chart_colors_cal = ['#cccccc']
+        pie_chart_colors_cal_display = ['#cccccc'] # Grey for no activities
         cal_realized_anual_percent = 0
         cal_no_cumplido_anual_percent = 0
         cal_pendiente_anual_percent = 0
@@ -481,6 +1032,7 @@ def dashboard(request):
             cal_no_cumplido_anual_display,
             cal_pendiente_anual_display
         ]
+        pie_chart_colors_cal_display = pie_chart_colors_cal # Use predefined colors
         
         # Asegurarse de que el denominador no sea cero antes de calcular el porcentaje
         if cal_total_programmed_anual_display > 0:
@@ -504,7 +1056,7 @@ def dashboard(request):
     if comp_total_programmed_anual_display == 0:
         comprobaciones_torta_labels = ['Sin Actividades']
         comprobaciones_torta_data = [1]
-        pie_chart_colors_comp = ['#cccccc']
+        pie_chart_colors_comp_display = ['#cccccc']
         comp_realized_anual_percent = 0
         comp_no_cumplido_anual_percent = 0
         comp_pendiente_anual_percent = 0
@@ -515,35 +1067,65 @@ def dashboard(request):
             comp_no_cumplido_anual_display,
             comp_pendiente_anual_display
         ]
+        pie_chart_colors_comp_display = pie_chart_colors_comp
         
         # Asegurarse de que el denominador no sea cero antes de calcular el porcentaje
         if comp_total_programmed_anual_display > 0:
             comp_realized_anual_percent = (comp_realized_anual_display / comp_total_programmed_anual_display * 100)
-            comp_no_cumplido_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
+            comp_no_cumplido_anual_percent = (comp_no_cumplido_anual_display / comp_total_programmed_anual_display * 100)
+            comp_pendiente_anual_percent = (comp_pendiente_anual_display / comp_total_programmed_anual_display * 100)
         else:
             comp_realized_anual_percent = 0
             comp_no_cumplido_anual_percent = 0
             comp_pendiente_anual_percent = 0
 
-    # Mantenimientos por Tipo (Torta)
+    # NUEVA LÓGICA: Mantenimientos por Cumplimiento (Torta)
+    projected_mantenimientos = get_projected_maintenance_compliance_for_year(equipos_queryset, current_year, today)
+    
+    mant_total_programmed_anual_display = len(projected_mantenimientos)
+    mant_realized_anual_display = sum(1 for act in projected_mantenimientos if act['status'] == 'Realizado')
+    mant_no_cumplido_anual_display = sum(1 for act in projected_mantenimientos if act['status'] == 'No Cumplido')
+    mant_pendiente_anual_display = sum(1 for act in projected_mantenimientos if act['status'] == 'Pendiente/Programado')
+
+    if mant_total_programmed_anual_display == 0:
+        mantenimientos_cumplimiento_torta_labels = ['Sin Actividades Programadas']
+        mantenimientos_cumplimiento_torta_data = [1]
+        pie_chart_colors_mant_compliance_display = ['#cccccc']
+        mant_realized_anual_percent = 0
+        mant_no_cumplido_anual_percent = 0
+        mant_pendiente_anual_percent = 0
+    else:
+        mantenimientos_cumplimiento_torta_labels = ['Realizado', 'No Cumplido', 'Pendiente/Programado']
+        mantenimientos_cumplimiento_torta_data = [
+            mant_realized_anual_display,
+            mant_no_cumplido_anual_display,
+            mant_pendiente_anual_display
+        ]
+        # Colores específicos para cumplimiento de mantenimiento (similar a calibración/comprobación)
+        pie_chart_colors_mant_compliance_display = ['#28a745', '#dc3545', '#007bff'] 
+        
+        if mant_total_programmed_anual_display > 0:
+            mant_realized_anual_percent = (mant_realized_anual_display / mant_total_programmed_anual_display * 100)
+            mant_no_cumplido_anual_percent = (mant_no_cumplido_anual_display / mant_total_programmed_anual_display * 100)
+            mant_pendiente_anual_percent = (mant_pendiente_anual_display / mant_total_programmed_anual_display * 100)
+        else:
+            mant_realized_anual_percent = 0
+            mant_no_cumplido_anual_percent = 0
+            mant_pendiente_anual_percent = 0
+
+
+    # Mantenimientos por Tipo (Torta) - Esta ya existía y es para todos los mantenimientos realizados
     mantenimientos_tipo_counts = defaultdict(int)
-    for mant in Mantenimiento.objects.filter(equipo__in=equipos_queryset).exclude(equipo__estado='De Baja'):
+    # Excluir equipos de baja o inactivos de este conteo también
+    for mant in Mantenimiento.objects.filter(equipo__in=equipos_para_dashboard):
         mantenimientos_tipo_counts[mant.tipo_mantenimiento] += 1
     
-    mantenimientos_torta_labels = list(mantenimientos_tipo_counts.keys())
-    mantenimientos_torta_data = list(mantenimientos_tipo_counts.values())
-    pie_chart_colors_mant = ['#ffc107', '#dc3545', '#17a2b8', '#6c757d'] # Preventivo, Correctivo, Predictivo, Inspección
+    mantenimientos_tipo_labels = list(mantenimientos_tipo_counts.keys())
+    mantenimientos_tipo_data = list(mantenimientos_tipo_counts.values())
+    pie_chart_colors_mant_types = ['#ffc107', '#dc3545', '#17a2b8', '#6c757d', '#8672cb'] # Preventivo, Correctivo, Predictivo, Inspección, Otro
 
-
-    # Obtener los códigos de equipos vencidos para mostrar en el dashboard
-    # Excluir equipos "De Baja"
-    vencidos_calibracion_codigos = [e.codigo_interno for e in equipos_queryset.filter(proxima_calibracion__lt=today).exclude(estado='De Baja')]
-    vencidos_mantenimiento_codigos = [e.codigo_interno for e in equipos_queryset.filter(proximo_mantenimiento__lt=today).exclude(estado='De Baja')]
-    vencidos_comprobacion_codigos = [e.codigo_interno for e in equipos_queryset.filter(proxima_comprobacion__lt=today).exclude(estado='De Baja')]
 
     # --- NUEVA LÓGICA PARA MANTENIMIENTOS CORRECTIVOS ---
-    # Obtener los 5 mantenimientos correctivos más recientes para la empresa del usuario
-    # o para todas las empresas si es superusuario y no hay filtro de empresa.
     latest_corrective_maintenances_query = Mantenimiento.objects.filter(tipo_mantenimiento='Correctivo').order_by('-fecha_mantenimiento')
     
     if not user.is_superuser:
@@ -566,7 +1148,8 @@ def dashboard(request):
 
         'total_equipos': total_equipos,
         'equipos_activos': equipos_activos,
-        'equipos_de_baja': equipos_de_baja, # Añadido al contexto
+        'equipos_inactivos': equipos_inactivos,
+        'equipos_de_baja': equipos_de_baja,
 
         'calibraciones_vencidas': calibraciones_vencidas,
         'calibraciones_proximas': calibraciones_proximas,
@@ -596,6 +1179,16 @@ def dashboard(request):
         'comp_no_cumplido_anual_percent': round(comp_no_cumplido_anual_percent),
         'comp_pendiente_anual_percent': round(comp_pendiente_anual_percent),
 
+        # NUEVOS DATOS PARA CUMPLIMIENTO DE MANTENIMIENTO
+        'mant_total_programmed_anual': mant_total_programmed_anual_display,
+        'mant_realized_anual': mant_realized_anual_display,
+        'mant_no_cumplido_anual': mant_no_cumplido_anual_display,
+        'mant_pendiente_anual': mant_pendiente_anual_display,
+        'mant_realized_anual_percent': round(mant_realized_anual_percent),
+        'mant_no_cumplido_anual_percent': round(mant_no_cumplido_anual_percent),
+        'mant_pendiente_anual_percent': round(mant_pendiente_anual_percent),
+
+
         # Datos para gráficas de línea
         'line_chart_labels_json': mark_safe(json.dumps(line_chart_labels)),
         'programmed_calibrations_line_data_json': mark_safe(json.dumps(programmed_calibrations_line_data)),
@@ -604,8 +1197,8 @@ def dashboard(request):
         'realized_preventive_mantenimientos_line_data_json': mark_safe(json.dumps(realized_preventive_mantenimientos_line_data)),
         'realized_corrective_mantenimientos_line_data_json': mark_safe(json.dumps(realized_corrective_mantenimientos_line_data)),
         'realized_other_mantenimientos_line_data_json': mark_safe(json.dumps(realized_other_mantenimientos_line_data)),
-        'realized_predictive_mantenimientos_line_data_json': mark_safe(json.dumps(realized_predictive_mantenimientos_line_data)), # Nuevo
-        'realized_inspection_mantenimientos_line_data_json': mark_safe(json.dumps(realized_inspection_mantenimientos_line_data)), # Nuevo
+        'realized_predictive_mantenimientos_line_data_json': mark_safe(json.dumps(realized_predictive_mantenimientos_line_data)),
+        'realized_inspection_mantenimientos_line_data_json': mark_safe(json.dumps(realized_inspection_mantenimientos_line_data)),
         'programmed_comprobaciones_line_data_json': mark_safe(json.dumps(programmed_comprobaciones_line_data)),
         'realized_comprobaciones_line_data_json': mark_safe(json.dumps(realized_comprobaciones_line_data)),
         
@@ -615,18 +1208,26 @@ def dashboard(request):
         'pie_chart_colors_equipos_json': mark_safe(json.dumps(pie_chart_colors_equipos)),
         'calibraciones_torta_labels_json': mark_safe(json.dumps(calibraciones_torta_labels)),
         'calibraciones_torta_data_json': mark_safe(json.dumps(calibraciones_torta_data)),
-        'pie_chart_colors_cal_json': mark_safe(json.dumps(pie_chart_colors_cal)),
+        'pie_chart_colors_cal_json': mark_safe(json.dumps(pie_chart_colors_cal_display)), # Usar la variable con el sufijo _display
         'comprobaciones_torta_labels_json': mark_safe(json.dumps(comprobaciones_torta_labels)),
         'comprobaciones_torta_data_json': mark_safe(json.dumps(comprobaciones_torta_data)),
-        'pie_chart_colors_comp_json': mark_safe(json.dumps(pie_chart_colors_comp)),
-        'mantenimientos_torta_labels_json': mark_safe(json.dumps(mantenimientos_torta_labels)), # Nuevo
-        'mantenimientos_torta_data_json': mark_safe(json.dumps(mantenimientos_torta_data)), # Nuevo
-        'pie_chart_colors_mant_json': mark_safe(json.dumps(pie_chart_colors_mant)), # Nuevo
+        'pie_chart_colors_comp_json': mark_safe(json.dumps(pie_chart_colors_comp_display)), # Usar la variable con el sufijo _display
+        
+        # NUEVOS DATOS JSON PARA CUMPLIMIENTO DE MANTENIMIENTO
+        'mantenimientos_cumplimiento_torta_labels_json': mark_safe(json.dumps(mantenimientos_cumplimiento_torta_labels)),
+        'mantenimientos_cumplimiento_torta_data_json': mark_safe(json.dumps(mantenimientos_cumplimiento_torta_data)),
+        'pie_chart_colors_mant_compliance_json': mark_safe(json.dumps(pie_chart_colors_mant_compliance_display)),
+
+        # EXISTENTE: Datos para mantenimientos por tipo
+        'mantenimientos_tipo_labels_json': mark_safe(json.dumps(mantenimientos_tipo_labels)),
+        'mantenimientos_tipo_data_json': mark_safe(json.dumps(mantenimientos_tipo_data)),
+        'pie_chart_colors_mant_types_json': mark_safe(json.dumps(pie_chart_colors_mant_types)),
 
         # Datos para el cuadro de mantenimientos correctivos
         'latest_corrective_maintenances': latest_corrective_maintenances,
     }
     return render(request, 'core/dashboard.html', context)
+
 
 @login_required
 def contact_us(request):
@@ -634,51 +1235,6 @@ def contact_us(request):
     Renders the contact us page.
     """
     return render(request, 'core/contact_us.html')
-
-@login_required
-def perfil_usuario(request):
-    """
-    Handles user profile viewing and editing.
-    """
-    if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Tu perfil ha sido actualizado exitosamente.')
-            return redirect('core:perfil_usuario')
-        else:
-            messages.error(request, 'Error al actualizar tu perfil. Por favor, revisa los campos.')
-    else:
-        form = UserProfileForm(instance=request.user)
-    return render(request, 'core/my_profile.html', {'form': form, 'usuario': request.user, 'titulo_pagina': 'Mi Perfil'})
-
-# Eliminar esta función si ya existe 'cambiar_password' en otro lugar y se usa consistentemente
-# @login_required
-# def cambiar_password(request):
-#     """
-#     Handles changing the current user's password.
-#     """
-#     if request.method == 'POST':
-#         form = PasswordChangeForm(request.user, request.POST)
-#         if form.is_valid():
-#             user = form.save()
-#             update_session_auth_hash(request, user)
-#             messages.success(request, 'Tu contraseña ha sido actualizada exitosamente.')
-#             return redirect('core:password_change_done')
-#         else:
-#             messages.error(request, 'Por favor corrige los errores a continuación.')
-#     else:
-#         form = PasswordChangeForm(request.user)
-#     return render(request, 'registration/password_change_form.html', {'form': form, 'titulo_pagina': 'Cambiar Contraseña'})
-
-# Eliminar esta función si ya existe 'password_change_done' en otro lugar y se usa consistentemente
-# @login_required
-# def password_change_done(request):
-#     """
-#     Renders the password change done page.
-#     """
-#     return render(request, 'core/password_change_done.html', {'titulo_pagina': 'Contraseña Cambiada'})
-
 
 # --- Vistas de Equipos ---
 
@@ -688,12 +1244,12 @@ def home(request):
     """
     Lists all equipment, with filtering and pagination.
     """
+    user = request.user
     query = request.GET.get('q')
     tipo_equipo_filter = request.GET.get('tipo_equipo')
     estado_filter = request.GET.get('estado')
     
     # --- INICIO: Lógica para el filtro de empresa para superusuarios y obtener info de formato ---
-    user = request.user
     selected_company_id = request.GET.get('empresa_id')
     empresas_disponibles = Empresa.objects.all().order_by('nombre')
 
@@ -724,7 +1280,6 @@ def home(request):
                 equipos_list = Equipo.objects.none()
         # If superuser and no company selected, current_company_format_info remains None,
         # meaning no specific company format info will be displayed at the top.
-    # --- FIN: Lógica para el filtro de empresa para superusuarios y obtener info de formato ---
 
 
     today = timezone.localdate() # Obtener la fecha actual con la zona horaria configurada
@@ -745,14 +1300,19 @@ def home(request):
     if tipo_equipo_filter:
         equipos_list = equipos_list.filter(tipo_equipo=tipo_equipo_filter)
 
-    # Filtrar por estado
+    # Filtro por estado
     if estado_filter:
         equipos_list = equipos_list.filter(estado=estado_filter)
+    else:
+        # Por defecto, no mostrar "De Baja" a menos que se filtre explícitamente por él
+        if not user.is_superuser or (user.is_superuser and not selected_company_id):
+            equipos_list = equipos_list.exclude(estado='De Baja')
 
     # Añadir lógica para el estado de las fechas de próxima actividad
     for equipo in equipos_list:
         # Calibración
-        if equipo.proxima_calibracion and equipo.estado != 'De Baja': # No proyectar si está de baja
+        # Excluir De Baja e Inactivo para la proyección de estado visual
+        if equipo.proxima_calibracion and equipo.estado not in ['De Baja', 'Inactivo']:
             days_remaining = (equipo.proxima_calibracion - today).days
             if days_remaining < 0:
                 equipo.proxima_calibracion_status = 'text-red-600 font-bold' # Vencido
@@ -763,10 +1323,10 @@ def home(request):
             else:
                 equipo.proxima_calibracion_status = 'text-gray-900' # Más de 30 días o futuro lejano (negro)
         else:
-            equipo.proxima_calibracion_status = 'text-gray-500' # N/A o sin fecha o de baja
+            equipo.proxima_calibracion_status = 'text-gray-500' # N/A o sin fecha o de baja o inactivo
 
         # Comprobación
-        if equipo.proxima_comprobacion and equipo.estado != 'De Baja': # No proyectar si está de baja
+        if equipo.proxima_comprobacion and equipo.estado not in ['De Baja', 'Inactivo']:
             days_remaining = (equipo.proxima_comprobacion - today).days
             if days_remaining < 0:
                 equipo.proxima_comprobacion_status = 'text-red-600 font-bold' # Vencido
@@ -777,10 +1337,10 @@ def home(request):
             else:
                 equipo.proxima_comprobacion_status = 'text-gray-900' # Más de 30 días o futuro lejano (negro)
         else:
-            equipo.proxima_comprobacion_status = 'text-gray-500' # N/A o sin fecha o de baja
+            equipo.proxima_comprobacion_status = 'text-gray-500' # N/A o sin fecha o de baja o inactivo
 
         # Mantenimiento
-        if equipo.proximo_mantenimiento and equipo.estado != 'De Baja': # No proyectar si está de baja
+        if equipo.proximo_mantenimiento and equipo.estado not in ['De Baja', 'Inactivo']:
             days_remaining = (equipo.proximo_mantenimiento - today).days
             if days_remaining < 0:
                 equipo.proximo_mantenimiento_status = 'text-red-600 font-bold' # Vencido
@@ -791,7 +1351,7 @@ def home(request):
             else:
                 equipo.proximo_mantenimiento_status = 'text-gray-900' # Más de 30 días o futuro lejano (negro)
         else:
-            equipo.proximo_mantenimiento_status = 'text-gray-500' # N/A o sin fecha o de baja
+            equipo.proximo_mantenimiento_status = 'text-gray-500' # N/A o sin fecha o de baja o inactivo
 
 
     paginator = Paginator(equipos_list, 10)
@@ -815,49 +1375,88 @@ def home(request):
         'is_superuser': user.is_superuser, # Pasar is_superuser al contexto
         'empresas_disponibles': empresas_disponibles, # Pasar empresas_disponibles al contexto
         'selected_company_id': selected_company_id, # Pasar selected_company_id al contexto
-        'current_company_format_info': current_company_format_info, # NUEVO: Información de formato de la empresa actual
+        'current_company_format_info': current_company_format_info, # Información de formato de la empresa actual
     }
     return render(request, 'core/home.html', context)
 
 @login_required
+@require_POST # Esta vista es solo para peticiones POST de AJAX
+@csrf_exempt
 def update_empresa_formato(request):
     """
-    Updates the format information for a company via AJAX.
+    Updates the format information for a company via an AJAX POST request.
+    This view is intended for dynamic updates from the dashboard or similar.
     """
-    if request.method == 'POST':
-        # Determine which company to update
-        company_to_update = None
-        if request.user.is_superuser:
-            # Superuser can update any company if 'empresa_id' is provided
-            empresa_id = request.POST.get('empresa_id')
-            if empresa_id:
-                try:
-                    company_to_update = Empresa.objects.get(pk=empresa_id)
-                except Empresa.DoesNotExist:
-                    return JsonResponse({'status': 'error', 'message': 'Empresa no encontrada.'}, status=404)
-            else:
-                return JsonResponse({'status': 'error', 'message': 'ID de empresa requerido para superusuario.'}, status=400)
-        elif request.user.empresa:
-            # Regular user can only update their own company
-            company_to_update = request.user.empresa
+    # This view remains a POST-only endpoint for AJAX.
+    # The new editar_empresa_formato view will handle the GET/POST for a dedicated page.
+    # ... (existing code for this view remains unchanged as it's for AJAX) ...
+    # Determine which company to update
+    company_to_update = None
+    if request.user.is_superuser:
+        # Superuser can update any company if 'empresa_id' is provided
+        empresa_id = request.POST.get('empresa_id')
+        if empresa_id:
+            try:
+                company_to_update = Empresa.objects.get(pk=empresa_id)
+            except Empresa.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'Empresa no encontrada.'}, status=404)
         else:
-            return JsonResponse({'status': 'error', 'message': 'Usuario no asociado a ninguna empresa.'}, status=403)
+            return JsonResponse({'status': 'error', 'message': 'ID de empresa requerido para superusuario.'}, status=400)
+    elif request.user.empresa:
+        # Regular user can only update their own company
+        company_to_update = request.user.empresa
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Usuario no asociado a ninguna empresa.'}, status=403)
 
-        form = EmpresaFormatoForm(request.POST, instance=company_to_update)
+    form = EmpresaFormatoForm(request.POST, instance=company_to_update)
+    if form.is_valid():
+        form.save()
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Información de formato actualizada.',
+            'version': company_to_update.formato_version_empresa,
+            'fecha_version': company_to_update.formato_fecha_version_empresa.strftime('%d/%m/%Y') if company_to_update.formato_fecha_version_empresa else 'N/A',
+            'codificacion': company_to_update.formato_codificacion_empresa,
+        })
+    else:
+        errors = form.errors.as_json()
+        return JsonResponse({'status': 'error', 'message': 'Errores de validación.', 'errors': errors}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido.'}, status=405)
+
+
+# NUEVA VISTA: Para editar la información de formato de una empresa (GET y POST)
+@login_required
+@require_http_methods(["GET", "POST"])
+def editar_empresa_formato(request, pk):
+    """
+    Handles editing the format information for a specific company (dedicated page).
+    Superusers can edit any company. Regular users can only edit their own company.
+    """
+    empresa = get_object_or_404(Empresa, pk=pk)
+
+    # Permiso: Superusuario o usuario asociado a la empresa
+    if not request.user.is_superuser and request.user.empresa != empresa:
+        messages.error(request, 'No tienes permiso para editar la información de formato de esta empresa.')
+        return redirect('core:dashboard') # O a la lista de empresas si aplica
+
+    if request.method == 'POST':
+        form = EmpresaFormatoForm(request.POST, instance=empresa)
         if form.is_valid():
             form.save()
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Información de formato actualizada.',
-                'version': company_to_update.formato_version_empresa,
-                'fecha_version': company_to_update.formato_fecha_version_empresa.strftime('%d/%m/%Y') if company_to_update.formato_fecha_version_empresa else 'N/A',
-                'codificacion': company_to_update.formato_codificacion_empresa,
-            })
+            messages.success(request, f'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
+            return redirect('core:detalle_empresa', pk=empresa.pk) # O a listar_empresas si prefieres
         else:
-            # Return form errors as JSON
-            errors = form.errors.as_json()
-            return JsonResponse({'status': 'error', 'message': 'Errores de validación.', 'errors': errors}, status=400)
-    return JsonResponse({'status': 'error', 'message': 'Método no permitido.'}, status=405)
+            messages.error(request, 'Hubo un error al actualizar el formato. Por favor, revisa los datos.')
+    else:
+        form = EmpresaFormatoForm(instance=empresa)
+
+    context = {
+        'form': form,
+        'empresa': empresa,
+        'titulo_pagina': f'Editar Formato de Empresa: {empresa.nombre}',
+    }
+    return render(request, 'core/editar_empresa_formato.html', context)
+
 
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
@@ -1029,6 +1628,7 @@ def importar_equipos_excel(request):
             
             except Exception as e: # Este catch capturará la excepción relanzada si hay un error atómico
                 messages.error(request, f'Ocurrió un error inesperado al procesar el archivo o la transacción: {e}')
+                print(f"DEBUG: Error en importar_equipos_excel: {e}") # Para depuración
                 return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario de subida.')
@@ -1085,9 +1685,9 @@ def detalle_equipo(request, pk):
                 return request.build_absolute_uri(file_field.url)
         return None
 
-    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa else None
+    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = get_file_url(equipo.imagen_equipo)
-    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro else None
+    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
     for cal in calibraciones:
         cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
@@ -1164,11 +1764,14 @@ def eliminar_equipo(request, pk):
         try:
             equipo_nombre = equipo.nombre
             equipo.delete()
-            messages.success(request, 'Equipo eliminado exitosamente.')
-            return redirect('core:home')
+            messages.success(request, f'Equipo "{equipo_nombre}" eliminado exitosamente.')
+            # Redirige a la página principal después de eliminar para evitar NoReverseMatch
+            return redirect('core:home') 
         except Exception as e:
             messages.error(request, f'Error al eliminar el equipo: {e}')
-            return redirect('core:home')
+            print(f"DEBUG: Error al eliminar equipo {equipo.pk}: {e}") # Para depuración
+            # Si hay un error, redirige a home, ya que detalle_equipo podría no ser válido
+            return redirect('core:home') 
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': equipo, 'tipo': 'equipo', 'titulo_pagina': f'Eliminar Equipo: {equipo.nombre}'})
 
 # --- Vistas de Calibraciones ---
@@ -1187,22 +1790,16 @@ def añadir_calibracion(request, equipo_pk):
     if request.method == 'POST':
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
-            try: # Añade un bloque try-except aquí para capturar errores de S3
+            try:
                 calibracion = form.save(commit=False)
                 calibracion.equipo = equipo
-                calibracion.save() # Aquí es donde se intenta guardar el archivo en S3
+                calibracion.save()
                 
-                # --- LÍNEA DE DEPURACIÓN CLAVE ---
-                print(f"DEBUG: Archivo guardado para la calibración ID: {calibracion.id}, nombre de archivo: {calibracion.documento_calibracion.name if calibracion.documento_calibracion else 'N/A'}")
-                # ---------------------------------
-
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                # Si ocurre un error durante el guardado (incluyendo problemas de S3)
                 print(f"ERROR al guardar calibración o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
-                # Re-renderiza el formulario con los datos POST para que el usuario pueda ver los errores
                 return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
@@ -1226,9 +1823,14 @@ def editar_calibracion(request, equipo_pk, pk):
     if request.method == 'POST':
         form = CalibracionForm(request.POST, request.FILES, instance=calibracion)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Calibración actualizada exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                form.save()
+                messages.success(request, 'Calibración actualizada exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                print(f"ERROR al actualizar calibración o archivo en S3: {e}")
+                messages.error(request, f'Hubo un error al actualizar la calibración: {e}')
+                return render(request, 'core/editar_calibracion.html', {'form': form, 'equipo': equipo, 'calibracion': calibracion, 'titulo_pagina': f'Editar Calibración para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
@@ -1255,6 +1857,7 @@ def eliminar_calibracion(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al eliminar la calibración: {e}')
+            print(f"DEBUG: Error al eliminar calibración {calibracion.pk}: {e}") # Para depuración
             return redirect('core:detalle_equipo', pk=equipo.pk)
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': calibracion, 'tipo': 'calibración', 'titulo_pagina': f'Eliminar Calibración de {equipo.nombre}'})
 
@@ -1275,11 +1878,16 @@ def añadir_mantenimiento(request, equipo_pk):
     if request.method == 'POST':
         form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
-            mantenimiento = form.save(commit=False)
-            mantenimiento.equipo = equipo
-            mantenimiento.save()
-            messages.success(request, 'Mantenimiento añadido exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                mantenimiento = form.save(commit=False)
+                mantenimiento.equipo = equipo
+                mantenimiento.save()
+                messages.success(request, 'Mantenimiento añadido exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                print(f"ERROR al guardar mantenimiento o archivo en S3: {e}")
+                messages.error(request, f'Hubo un error al guardar el mantenimiento: {e}')
+                return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
@@ -1302,9 +1910,14 @@ def editar_mantenimiento(request, equipo_pk, pk):
     if request.method == 'POST':
         form = MantenimientoForm(request.POST, request.FILES, instance=mantenimiento)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Mantenimiento actualizado exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                form.save()
+                messages.success(request, 'Mantenimiento actualizado exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                print(f"ERROR al actualizar mantenimiento o archivo en S3: {e}")
+                messages.error(request, f'Hubo un error al actualizar el mantenimiento: {e}')
+                return render(request, 'core/editar_mantenimiento.html', {'form': form, 'equipo': equipo, 'mantenimiento': mantenimiento, 'titulo_pagina': f'Editar Mantenimiento para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
@@ -1331,6 +1944,7 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al eliminar el mantenimiento: {e}')
+            print(f"DEBUG: Error al eliminar mantenimiento {mantenimiento.pk}: {e}") # Para depuración
             return redirect('core:detalle_equipo', pk=equipo.pk)
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': mantenimiento, 'tipo': 'mantenimiento', 'titulo_pagina': f'Eliminar Mantenimiento de {equipo.nombre}'})
 
@@ -1371,22 +1985,16 @@ def añadir_comprobacion(request, equipo_pk):
     if request.method == 'POST':
         form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
-            try: # Añade un bloque try-except aquí para capturar errores de S3
+            try:
                 comprobacion = form.save(commit=False)
                 comprobacion.equipo = equipo
-                comprobacion.save() # Aquí es donde se intenta guardar el archivo en S3
+                comprobacion.save()
                 
-                # --- LÍNEA DE DEPURACIÓN CLAVE ---
-                print(f"DEBUG: Archivo guardado para la comprobación ID: {comprobacion.id}, nombre de archivo: {comprobacion.documento_comprobacion.name if comprobacion.documento_comprobacion else 'N/A'}")
-                # ---------------------------------
-
                 messages.success(request, 'Comprobación añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                # Si ocurre un error durante el guardado (incluyendo problemas de S3)
                 print(f"ERROR al guardar comprobación o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
-                # Re-renderiza el formulario con los datos POST para que el usuario pueda ver los errores
                 return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
@@ -1410,9 +2018,14 @@ def editar_comprobacion(request, equipo_pk, pk):
     if request.method == 'POST':
         form = ComprobacionForm(request.POST, request.FILES, instance=comprobacion)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Comprobación actualizada exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                form.save()
+                messages.success(request, 'Comprobación actualizada exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                print(f"ERROR al actualizar comprobación o archivo en S3: {e}")
+                messages.error(request, f'Hubo un error al actualizar la comprobación: {e}')
+                return render(request, 'core/editar_comprobacion.html', {'form': form, 'equipo': equipo, 'comprobacion': comprobacion, 'titulo_pagina': f'Editar Comprobación para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
@@ -1439,17 +2052,20 @@ def eliminar_comprobacion(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al eliminar la comprobación: {e}')
+            print(f"DEBUG: Error al eliminar comprobación {comprobacion.pk}: {e}") # Para depuración
             return redirect('core:detalle_equipo', pk=equipo.pk)
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': comprobacion, 'tipo': 'comprobación', 'titulo_pagina': f'Eliminar Comprobación de {equipo.nombre}'})
 
 
-# --- Vistas de Baja de Equipo ---
+# --- Vistas de Baja de Equipo y Nueva Inactivación ---
 
 @login_required
 @permission_required('core.add_bajaequipo', raise_exception=True)
+@require_http_methods(["GET", "POST"]) # Asegúrate de permitir GET para la página de confirmación
 def dar_baja_equipo(request, equipo_pk):
     """
-    Handles marking an equipment as decommissioned.
+    Permite dar de baja un equipo de forma permanente (cambia estado a 'De Baja').
+    Si el equipo ya está 'De Baja', muestra un mensaje.
     """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
 
@@ -1457,53 +2073,122 @@ def dar_baja_equipo(request, equipo_pk):
         messages.error(request, 'No tienes permiso para dar de baja este equipo.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
-    if BajaEquipo.objects.filter(equipo=equipo).exists():
-        messages.warning(request, 'Este equipo ya tiene un registro de baja existente. Si desea activarlo, use la opción de activación.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
-
     if equipo.estado == 'De Baja':
-        messages.warning(request, 'Este equipo ya se encuentra dado de baja.')
+        messages.warning(request, f'El equipo "{equipo.nombre}" ya está dado de baja.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
-
+    
     if request.method == 'POST':
         form = BajaEquipoForm(request.POST, request.FILES)
         if form.is_valid():
-            baja_registro = form.save(commit=False)
-            baja_registro.equipo = equipo
-            baja_registro.dado_de_baja_por = request.user
-            baja_registro.save()
-            messages.success(request, f'Equipo "{equipo.nombre}" dado de baja exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                baja_registro = form.save(commit=False)
+                baja_registro.equipo = equipo
+                baja_registro.dado_de_baja_por = request.user
+                baja_registro.save() # El signal post_save ya se encarga de cambiar el estado del equipo
+                
+                messages.success(request, f'Equipo "{equipo.nombre}" dado de baja exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
+                print(f"DEBUG: Error al dar de baja equipo {equipo.pk}: {e}") # Para depuración
+                return render(request, 'core/dar_baja_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario de baja.')
     else:
         form = BajaEquipoForm()
-    return render(request, 'core/dar_baja_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'})
+    
+    return render(request, 'core/dar_baja_equipo.html', {
+        'form': form,
+        'equipo': equipo,
+        'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'
+    })
+
 
 @login_required
-def activar_equipo(request, equipo_pk):
+@permission_required('core.change_equipo', raise_exception=True)
+@require_http_methods(["GET", "POST"])
+def inactivar_equipo(request, equipo_pk):
     """
-    Activates a decommissioned equipment.
+    Inactiva un equipo (cambia su estado a 'Inactivo').
+    Esto es para una pausa temporal, no una baja definitiva.
     """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
+
+    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
+        messages.error(request, 'No tienes permiso para inactivar este equipo.')
+        return redirect('core:detalle_equipo', pk=equipo_pk)
+
+    if equipo.estado == 'Inactivo':
+        messages.info(request, f'El equipo "{equipo.nombre}" ya está inactivo.')
+        return redirect('core:detalle_equipo', pk=equipo_pk)
+    elif equipo.estado == 'De Baja':
+        messages.error(request, f'El equipo "{equipo.nombre}" ha sido dado de baja de forma permanente y no puede ser inactivado.')
+        return redirect('core:detalle_equipo', pk=equipo_pk)
+    
+    if request.method == 'POST':
+        equipo.estado = 'Inactivo'
+        # Poner a None las próximas fechas al inactivar
+        equipo.proxima_calibracion = None
+        equipo.proximo_mantenimiento = None
+        equipo.proxima_comprobacion = None
+        equipo.save(update_fields=['estado', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion'])
+        messages.success(request, f'Equipo "{equipo.nombre}" inactivado exitosamente.')
+        return redirect('core:detalle_equipo', pk=equipo_pk)
+    
+    # Mostrar página de confirmación si es GET
+    return render(request, 'core/confirmar_inactivacion.html', {
+        'equipo': equipo,
+        'titulo_pagina': f'Inactivar Equipo: {equipo.nombre}'
+    })
+
+
+@login_required
+@permission_required('core.change_equipo', raise_exception=True)
+@require_http_methods(["GET", "POST"])
+def activar_equipo(request, equipo_pk):
+    """
+    Activa un equipo (cambia su estado de 'Inactivo' o 'De Baja' a 'Activo').
+    Si estaba 'De Baja', elimina el registro de BajaEquipo asociado.
+    """
+    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para activar este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+        return redirect('core:detalle_equipo', pk=equipo_pk)
 
-    if equipo.estado != 'De Baja':
-        messages.warning(request, 'Este equipo no se encuentra de baja.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+    if equipo.estado == 'Activo':
+        messages.info(request, f'El equipo "{equipo.nombre}" ya está activo.')
+        return redirect('core:detalle_equipo', pk=equipo_pk)
 
     if request.method == 'POST':
-        try:
-            # La señal post_delete en models.py se encargará de cambiar el estado del equipo a 'Activo'
-            BajaEquipo.objects.filter(equipo=equipo).delete()
+        if equipo.estado == 'De Baja':
+            try:
+                baja_registro = BajaEquipo.objects.get(equipo=equipo)
+                baja_registro.delete() # Esto activará el equipo a través de la señal post_delete
+                messages.success(request, f'Equipo "{equipo.nombre}" activado exitosamente y registro de baja eliminado.')
+            except BajaEquipo.DoesNotExist:
+                equipo.estado = 'Activo'
+                equipo.save(update_fields=['estado'])
+                messages.warning(request, f'Equipo "{equipo.nombre}" activado. No se encontró registro de baja asociado.')
+            except Exception as e:
+                messages.error(request, f'Error al activar el equipo y eliminar el registro de baja: {e}')
+                print(f"DEBUG: Error al activar equipo {equipo.pk} (De Baja): {e}")
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+        
+        elif equipo.estado == 'Inactivo':
+            equipo.estado = 'Activo'
+            equipo.calcular_proxima_calibracion()
+            equipo.calcular_proximo_mantenimiento()
+            equipo.calcular_proxima_comprobacion()
+            equipo.save()
             messages.success(request, f'Equipo "{equipo.nombre}" activado exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
-        except Exception as e:
-            messages.error(request, f'Error al activar el equipo: {e}')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
-    return render(request, 'core/confirmar_activacion.html', {'equipo': equipo, 'titulo_pagina': f'Activar Equipo: {equipo.nombre}'})
+            
+        return redirect('core:detalle_equipo', pk=equipo.pk)
+    
+    return render(request, 'core/confirmar_activacion.html', {
+        'equipo': equipo,
+        'titulo_pagina': f'Activar Equipo: {equipo.nombre}'
+    })
 
 
 # --- Vistas de Empresas ---
@@ -1516,6 +2201,9 @@ def listar_empresas(request):
     """
     query = request.GET.get('q')
     empresas_list = Empresa.objects.all()
+
+    if not request.user.is_superuser:
+        empresas_list = empresas_list.filter(pk=request.user.empresa.pk) # Un usuario normal solo ve su propia empresa
 
     if query:
         empresas_list = empresas_list.filter(
@@ -1556,6 +2244,30 @@ def añadir_empresa(request):
     return render(request, 'core/añadir_empresa.html', {'formulario': formulario, 'titulo_pagina': 'Añadir Nueva Empresa'})
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser or u.empresa.pk == pk, login_url='/core/access_denied/') # Restringe a superusuario o propia empresa
+def detalle_empresa(request, pk):
+    """
+    Displays the details of a specific company and its associated equipment.
+    """
+    empresa = get_object_or_404(Empresa, pk=pk)
+
+    # Permission check: superusers can see any company; regular users can only see their own.
+    if not request.user.is_superuser and request.user.empresa != empresa:
+        messages.error(request, 'No tienes permiso para ver los detalles de esta empresa.')
+        return redirect('core:listar_empresas') # Redirect to list if not permitted
+
+    # Obtener los equipos asociados a esta empresa
+    equipos_asociados = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
+
+    context = {
+        'empresa': empresa,
+        'equipos_asociados': equipos_asociados,
+        'titulo_pagina': f'Detalle de Empresa: {empresa.nombre}'
+    }
+    return render(request, 'core/detalle_empresa.html', context)
+
+
+@login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def editar_empresa(request, pk):
     """
@@ -1588,25 +2300,10 @@ def eliminar_empresa(request, pk):
             return redirect('core:listar_empresas')
         except Exception as e:
             messages.error(request, f'Error al eliminar la empresa: {e}')
+            print(f"DEBUG: Error al eliminar empresa {empresa.pk}: {e}")
             return redirect('core:listar_empresas')
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': empresa, 'tipo': 'empresa', 'titulo_pagina': f'Eliminar Empresa: {empresa.nombre}'})
 
-
-@login_required
-@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
-def detalle_empresa(request, pk):
-    """
-    Displays the details of a specific company (superuser only).
-    """
-    empresa = get_object_or_404(Empresa, pk=pk)
-    usuarios_empresa = CustomUser.objects.filter(empresa=empresa)
-    equipos_empresa = Equipo.objects.filter(empresa=empresa)
-    return render(request, 'core/detalle_empresa.html', {
-        'empresa': empresa,
-        'usuarios_empresa': usuarios_empresa,
-        'equipos_empresa': equipos_empresa,
-        'titulo_pagina': f'Detalle de Empresa: {empresa.nombre}',
-    })
 
 @login_required
 @permission_required('core.change_empresa', raise_exception=True)
@@ -1638,6 +2335,7 @@ def añadir_usuario_a_empresa(request, empresa_pk):
                 messages.error(request, "El usuario seleccionado no existe.")
             except Exception as e:
                 messages.error(request, f"Error al añadir usuario: {e}")
+                print(f"DEBUG: Error en añadir_usuario_a_empresa: {e}")
         else:
             messages.error(request, "Por favor, selecciona un usuario.")
     
@@ -1653,7 +2351,7 @@ def añadir_usuario_a_empresa(request, empresa_pk):
 
 # --- Vistas de Ubicación ---
 @login_required
-@permission_required('core.can_view_ubicacion', raise_exception=True)
+@permission_required('core.view_ubicacion', raise_exception=True)
 def listar_ubicaciones(request):
     """
     Lists all locations.
@@ -1662,7 +2360,7 @@ def listar_ubicaciones(request):
     return render(request, 'core/listar_ubicaciones.html', {'ubicaciones': ubicaciones, 'titulo_pagina': 'Listado de Ubicaciones'})
 
 @login_required
-@permission_required('core.can_add_ubicacion', raise_exception=True)
+@permission_required('core.add_ubicacion', raise_exception=True)
 def añadir_ubicacion(request):
     """
     Handles adding a new location.
@@ -1680,7 +2378,7 @@ def añadir_ubicacion(request):
     return render(request, 'core/añadir_ubicacion.html', {'form': form, 'titulo_pagina': 'Añadir Nueva Ubicación'})
 
 @login_required
-@permission_required('core.can_change_ubicacion', raise_exception=True)
+@permission_required('core.change_ubicacion', raise_exception=True)
 def editar_ubicacion(request, pk):
     """
     Handles editing an existing location.
@@ -1699,84 +2397,177 @@ def editar_ubicacion(request, pk):
     return render(request, 'core/editar_ubicacion.html', {'form': form, 'ubicacion': ubicacion, 'titulo_pagina': f'Editar Ubicación: {ubicacion.nombre}'})
 
 @login_required
-@permission_required('core.can_delete_ubicacion', raise_exception=True)
+@permission_required('core.delete_ubicacion', raise_exception=True)
 def eliminar_ubicacion(request, pk):
     """
     Handles deleting a location.
     """
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
     if request.method == 'POST':
-        ubicacion.delete()
-        messages.success(request, 'Ubicación eliminada exitosamente.')
-        return redirect('core:listar_ubicaciones')
+        try:
+            ubicacion.delete()
+            messages.success(request, 'Ubicación eliminada exitosamente.')
+            return redirect('core:listar_ubicaciones')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar la ubicación: {e}')
+            print(f"DEBUG: Error al eliminar ubicación {ubicacion.pk}: {e}")
+            return redirect('core:listar_ubicaciones')
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': ubicacion, 'tipo': 'ubicación', 'titulo_pagina': f'Eliminar Ubicación: {ubicacion.nombre}'})
+
 
 # --- Vistas de Procedimiento ---
 @login_required
-@permission_required('core.can_view_procedimiento', raise_exception=True)
+@permission_required('core.view_procedimiento', raise_exception=True)
 def listar_procedimientos(request):
     """
-    Lists all procedures.
+    Lists all procedures, filtered by user's company or selected company for superusers.
+    Also passes company format info.
     """
-    procedimientos = Procedimiento.objects.all()
-    return render(request, 'core/listar_procedimientos.html', {'procedimientos': procedimientos, 'titulo_pagina': 'Listado de Procedimientos'})
+    user = request.user
+    selected_company_id = request.GET.get('empresa_id') # Para superusuarios
+
+    # Query inicial de todos los procedimientos
+    procedimientos_list = Procedimiento.objects.all().order_by('codigo')
+
+    current_company_format_info = None
+
+    if not user.is_superuser:
+        if user.empresa:
+            procedimientos_list = procedimientos_list.filter(empresa=user.empresa)
+            current_company_format_info = user.empresa
+            selected_company_id = str(user.empresa.id) # Asegura que el filtro muestre la empresa del usuario
+        else:
+            procedimientos_list = Procedimiento.objects.none() # Usuario sin empresa no ve procedimientos
+            messages.info(request, "No tienes una empresa asociada. Contacta al administrador para asignar una.")
+    else: # Es superusuario
+        if selected_company_id:
+            try:
+                current_company_format_info = Empresa.objects.get(pk=selected_company_id)
+                procedimientos_list = procedimientos_list.filter(empresa_id=selected_company_id)
+            except Empresa.DoesNotExist:
+                messages.error(request, 'La empresa seleccionada no existe.')
+                procedimientos_list = Procedimiento.objects.none()
+        # Si superusuario y no selected_company_id, current_company_format_info queda None,
+        # lo que significa que no se mostrará información de formato de empresa específica.
+        # En este caso, el superusuario ve TODOS los procedimientos de TODAS las empresas.
+
+    # Lógica de paginación
+    paginator = Paginator(procedimientos_list, 10)
+    page_number = request.GET.get('page')
+    try:
+        procedimientos = paginator.page(page_number)
+    except PageNotAnInteger:
+        procedimientos = paginator.page(1)
+    except EmptyPage:
+        procedimientos = paginator.page(paginator.num_pages)
+
+    # Lista de empresas disponibles para el filtro (solo si es superusuario)
+    empresas_disponibles = Empresa.objects.all().order_by('nombre') if user.is_superuser else Empresa.objects.none()
+
+
+    context = {
+        'procedimientos': procedimientos,
+        'titulo_pagina': 'Listado de Procedimientos',
+        'current_company_format_info': current_company_format_info,
+        'is_superuser': user.is_superuser,
+        'empresas_disponibles': empresas_disponibles,
+        'selected_company_id': selected_company_id,
+    }
+    return render(request, 'core/listar_procedimientos.html', context)
+
 
 @login_required
-@permission_required('core.can_add_procedimiento', raise_exception=True)
+@permission_required('core.add_procedimiento', raise_exception=True)
+@require_http_methods(["GET", "POST"])
 def añadir_procedimiento(request):
     """
     Handles adding a new procedure.
     """
     if request.method == 'POST':
-        form = ProcedimientoForm(request.POST, request.FILES)
+        form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Procedimiento añadido exitosamente.')
-            return redirect('core:listar_procedimientos')
+            try:
+                procedimiento = form.save(commit=False)
+                # Si el usuario no es superusuario, asigna automáticamente su empresa
+                if not request.user.is_superuser:
+                    procedimiento.empresa = request.user.empresa
+                procedimiento.save()
+                messages.success(request, 'Procedimiento añadido exitosamente.')
+                return redirect('core:listar_procedimientos')
+            except Exception as e:
+                messages.error(request, f'Hubo un error al añadir el procedimiento: {e}. Revisa el log para más detalles.')
+                print(f"DEBUG: Error al añadir procedimiento: {e}")
+                return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
         else:
-            messages.error(request, 'Hubo un error al añadir el procedimiento. Por favor, revisa los datos.')
+            messages.error(request, 'Por favor, corrige los errores en el formulario.')
     else:
-        form = ProcedimientoForm()
+        form = ProcedimientoForm(request=request) # Pasa el request al formulario para la lógica de empresa
     return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
 
+
 @login_required
-@permission_required('core.can_change_procedimiento', raise_exception=True)
+@permission_required('core.change_procedimiento', raise_exception=True)
+@require_http_methods(["GET", "POST"])
 def editar_procedimiento(request, pk):
     """
     Handles editing an existing procedure.
     """
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
+
+    # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
+    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+        messages.error(request, 'No tienes permiso para editar este procedimiento.')
+        return redirect('core:listar_procedimientos')
+
     if request.method == 'POST':
-        form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento)
+        form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Procedimiento actualizado exitosamente.')
-            return redirect('core:listar_procedimientos')
+            try:
+                # La lógica de empresa ya se maneja en el formulario, solo guardar
+                form.save()
+                messages.success(request, 'Procedimiento actualizado exitosamente.')
+                return redirect('core:listar_procedimientos')
+            except Exception as e:
+                messages.error(request, f'Hubo un error al actualizar el procedimiento: {e}. Revisa el log para más detalles.')
+                print(f"DEBUG: Error al actualizar procedimiento: {e}")
+                return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
         else:
-            messages.error(request, 'Hubo un error al actualizar el procedimiento. Por favor, revisa los datos.')
+            messages.error(request, 'Por favor, corrige los errores en el formulario.')
     else:
-        form = ProcedimientoForm(instance=procedimiento)
+        form = ProcedimientoForm(instance=procedimiento, request=request)
     return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
 
 @login_required
-@permission_required('core.can_delete_procedimiento', raise_exception=True)
+@permission_required('core.delete_procedimiento', raise_exception=True)
+@require_http_methods(["GET", "POST"])
 def eliminar_procedimiento(request, pk):
     """
     Handles deleting a procedure.
     """
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
-    if request.method == 'POST':
-        procedimiento.delete()
-        messages.success(request, 'Procedimiento eliminado exitosamente.')
+
+    # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
+    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+        messages.error(request, 'No tienes permiso para eliminar este procedimiento.')
         return redirect('core:listar_procedimientos')
+
+    if request.method == 'POST':
+        try:
+            nombre_proc = procedimiento.nombre
+            procedimiento.delete()
+            messages.success(request, f'Procedimiento "{nombre_proc}" eliminado exitosamente.')
+            return redirect('core:listar_procedimientos')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar el procedimiento: {e}. Revisa el log para más detalles.')
+            print(f"DEBUG: Error al eliminar procedimiento {procedimiento.pk}: {e}")
+            return redirect('core:listar_procedimientos')
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': procedimiento, 'tipo': 'procedimiento', 'titulo_pagina': f'Eliminar Procedimiento: {procedimiento.nombre}'})
 
+
 # --- Vistas de Proveedores (GENERAL) ---
-# Se eliminan las vistas específicas de ProveedorCalibracion, ProveedorMantenimiento, ProveedorComprobacion
-# en favor del modelo Proveedor general.
 
 @login_required
-@permission_required('core.can_view_proveedor', raise_exception=True)
+@permission_required('core.view_proveedor', raise_exception=True)
 def listar_proveedores(request):
     """
     Lists all general providers, with filtering and pagination.
@@ -1824,7 +2615,7 @@ def listar_proveedores(request):
 
 
 @login_required
-@permission_required('core.can_add_proveedor', raise_exception=True)
+@permission_required('core.add_proveedor', raise_exception=True)
 def añadir_proveedor(request):
     """
     Handles adding a new general provider.
@@ -1845,7 +2636,7 @@ def añadir_proveedor(request):
 
 
 @login_required
-@permission_required('core.can_change_proveedor', raise_exception=True)
+@permission_required('core.change_proveedor', raise_exception=True)
 def editar_proveedor(request, pk):
     """
     Handles editing an existing general provider.
@@ -1871,7 +2662,7 @@ def editar_proveedor(request, pk):
 
 
 @login_required
-@permission_required('core.can_delete_proveedor', raise_exception=True)
+@permission_required('core.delete_proveedor', raise_exception=True)
 def eliminar_proveedor(request, pk):
     """
     Handles deleting a general provider.
@@ -1889,12 +2680,13 @@ def eliminar_proveedor(request, pk):
             return redirect('core:listar_proveedores')
         except Exception as e:
             messages.error(request, f'Error al eliminar el proveedor: {e}')
+            print(f"DEBUG: Error al eliminar proveedor {proveedor.pk}: {e}")
             return redirect('core:listar_proveedores')
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': proveedor, 'tipo': 'proveedor', 'titulo_pagina': f'Eliminar Proveedor: {proveedor.nombre_empresa}'})
 
 
 @login_required
-@permission_required('core.can_view_proveedor', raise_exception=True)
+@permission_required('core.view_proveedor', raise_exception=True)
 def detalle_proveedor(request, pk):
     """
     Displays the details of a specific general provider.
@@ -1951,13 +2743,14 @@ def listar_usuarios(request):
 @user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/')
 def añadir_usuario(request, empresa_pk=None):
     """
-    Handles adding a new custom user.
+    Handles adding a new custom user and assigning groups.
     """
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST, request=request)
         if form.is_valid():
             user = form.save(commit=False)
             user.save()
+            form.save_m2m()
             messages.success(request, 'Usuario añadido exitosamente.')
             return redirect('core:listar_usuarios')
         else:
@@ -1996,12 +2789,13 @@ def detalle_usuario(request, pk):
 @user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/')
 def editar_usuario(request, pk):
     """
-    Handles editing an existing custom user.
+    Handles editing an existing custom user and updating groups.
     """
     usuario_a_editar = get_object_or_404(CustomUser, pk=pk)
 
     if not request.user.is_superuser:
         if request.user.pk == usuario_a_editar.pk:
+            messages.info(request, "Estás editando tu propio perfil. Para cambiar la contraseña, usa la opción específica en tu perfil.")
             return redirect('core:perfil_usuario')
         elif not request.user.is_staff or request.user.empresa != usuario_a_editar.empresa:
             messages.error(request, 'No tienes permiso para editar este usuario.')
@@ -2012,8 +2806,9 @@ def editar_usuario(request, pk):
         if form.is_valid():
             user = form.save(commit=False)
             if not request.user.is_superuser:
-                user.empresa = usuario_a_editar.empresa # Asegurar que la empresa no se cambie si no es superuser
+                user.empresa = usuario_a_editar.empresa 
             user.save()
+            form.save_m2m()
             messages.success(request, f'Usuario "{user.username}" actualizado exitosamente.')
             return redirect('core:detalle_usuario', pk=usuario_a_editar.pk)
         else:
@@ -2047,6 +2842,7 @@ def eliminar_usuario(request, pk):
             return redirect('core:listar_usuarios')
         except Exception as e:
             messages.error(request, f'Error al eliminar el usuario: {e}')
+            print(f"DEBUG: Error al eliminar usuario {usuario.pk}: {e}")
             return redirect('core:detalle_usuario', pk=usuario.pk)
     return render(request, 'core/confirmar_eliminacion.html', {'objeto': usuario, 'tipo': 'usuario', 'titulo_pagina': f'Eliminar Usuario: {usuario.username}'})
 
@@ -2086,400 +2882,6 @@ def change_user_password(request, pk):
     return render(request, 'core/change_user_password.html', context)
 
 
-# --- Funciones Auxiliares para Generación de PDF (se mantienen para Hoja de Vida y Listado General) ---
-
-def _generate_pdf_content(request, template_path, context):
-    """
-    Generates PDF content (bytes) from a template and context using WeasyPrint.
-    """
-    from django.template.loader import get_template
-
-    template = get_template(template_path)
-    html_string = template.render(context)
-    
-    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
-    
-    return pdf_file
-
-def _generate_equipment_hoja_vida_pdf_content(request, equipo):
-    """
-    Generates the PDF content for an equipment's "Hoja de Vida".
-    """
-    calibraciones = equipo.calibraciones.all().order_by('-fecha_calibracion')
-    mantenimientos = equipo.mantenimientos.all().order_by('-fecha_mantenimiento')
-    comprobaciones = equipo.comprobaciones.all().order_by('-fecha_comprobacion')
-    baja_registro = None
-    try:
-        baja_registro = equipo.baja_registro
-    except BajaEquipo.DoesNotExist:
-        pass
-
-    # Utilizar default_storage para acceder a las URLs de los archivos
-    # Helper para obtener URL segura desde default_storage
-    def get_file_url(file_field):
-        # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
-        if file_field and file_field.name:
-            # Verifica si el archivo existe en el almacenamiento configurado
-            # default_storage.exists() es la forma correcta de verificar si el archivo está en S3 o localmente
-            if default_storage.exists(file_field.name):
-                return request.build_absolute_uri(file_field.url)
-        return None
-
-    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa else None
-    imagen_equipo_url = get_file_url(equipo.imagen_equipo)
-    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro else None
-
-    for cal in calibraciones:
-        cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
-        cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
-        cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
-
-    for mant in mantenimientos:
-        mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
-    for comp in comprobaciones:
-        comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
-
-    archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
-    ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
-    manual_pdf_url = get_file_url(equipo.manual_pdf)
-    otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
-
-
-    context = {
-        'equipo': equipo,
-        'calibraciones': calibraciones,
-        'mantenimientos': mantenimientos,
-        'comprobaciones': comprobaciones,
-        'baja_registro': baja_registro,
-        'logo_empresa_url': logo_empresa_url,
-        'imagen_equipo_url': imagen_equipo_url,
-        'documento_baja_url': documento_baja_url,
-        'archivo_compra_pdf_url': archivo_compra_pdf_url,
-        'ficha_tecnica_pdf_url': ficha_tecnica_pdf_url,
-        'manual_pdf_url': manual_pdf_url,
-        'otros_documentos_pdf_url': otros_documentos_pdf_url,
-        'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
-    }
-    return _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
-
-
-def _generate_equipment_activities_excel_content(equipo):
-    """
-    Generates an Excel file with the activities (calibrations, maintenances, verifications) of a specific equipment.
-    """
-    workbook = Workbook()
-
-    sheet_cal = workbook.active
-    sheet_cal.title = "Calibraciones"
-    headers_cal = ["Fecha Calibración", "Proveedor", "Resultado", "Número Certificado", "Observaciones"]
-    sheet_cal.append(headers_cal)
-    for cal in equipo.calibraciones.all().order_by('fecha_calibracion'):
-        proveedor_nombre = cal.nombre_proveedor if cal.nombre_proveedor else ''
-        sheet_cal.append([
-            cal.fecha_calibracion.strftime('%Y-%m-%d') if cal.fecha_calibracion else '',
-            proveedor_nombre, 
-            cal.resultado,
-            cal.numero_certificado,
-            cal.observaciones
-        ])
-    for col in sheet_cal.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet_cal.column_dimensions[column].width = adjusted_width
-
-    sheet_mant = workbook.create_sheet("Mantenimientos")
-    headers_mant = ["Fecha Mantenimiento", "Tipo", "Proveedor", "Responsable", "Costo", "Descripción"]
-    sheet_mant.append(headers_mant)
-    for mant in equipo.mantenimientos.all().order_by('fecha_mantenimiento'):
-        proveedor_nombre = mant.nombre_proveedor if mant.nombre_proveedor else ''
-        sheet_mant.append([
-            mant.fecha_mantenimiento.strftime('%Y-%m-%d') if mant.fecha_mantenimiento else '',
-            mant.get_tipo_mantenimiento_display(),
-            proveedor_nombre, 
-            mant.responsable,
-            float(mant.costo) if mant.costo is not None else '',
-            mant.descripcion
-        ])
-    for col in sheet_mant.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet_mant.column_dimensions[column].width = adjusted_width
-
-    sheet_comp = workbook.create_sheet("Comprobaciones")
-    headers_comp = ["Fecha Comprobación", "Proveedor", "Responsable", "Resultado", "Observaciones"]
-    sheet_comp.append(headers_comp)
-    for comp in equipo.comprobaciones.all().order_by('fecha_comprobacion'):
-        proveedor_nombre = comp.nombre_proveedor if comp.nombre_proveedor else ''
-        sheet_comp.append([
-            comp.fecha_comprobacion.strftime('%Y-%m-%d') if comp.fecha_comprobacion else '',
-            proveedor_nombre, 
-            comp.responsable,
-            comp.resultado,
-            comp.observaciones
-        ])
-    for col in sheet_comp.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet_comp.column_dimensions[column].width = adjusted_width
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
-def _generate_equipment_general_info_excel_content(equipo):
-    """
-    Generates an Excel file with the general information of a specific equipment.
-    """
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Información General"
-
-    headers = [
-        "Campo", "Valor"
-    ]
-    sheet.append(headers)
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    header_alignment = Alignment(horizontal="center", vertical="center")
-    header_border = Border(left=Side(style='thin'),
-                           right=Side(style='thin'),
-                           top=Side(style='thin'),
-                           bottom=Side(style='thin'))
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 30
-
-    general_info = [
-        ("Código Interno", equipo.codigo_interno),
-        ("Nombre", equipo.nombre),
-        ("Empresa", equipo.empresa.nombre if equipo.empresa else "N/A"),
-        ("Tipo de Equipo", equipo.get_tipo_equipo_display()),
-        ("Marca", equipo.marca),
-        ("Modelo", equipo.modelo),
-        ("Número de Serie", equipo.numero_serie),
-        ("Ubicación", equipo.ubicacion),
-        ("Responsable", equipo.responsable),
-        ("Estado", equipo.estado),
-        ("Fecha de Adquisición", equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else ''),
-        ("Rango de Medida", equipo.rango_medida),
-        ("Resolución", equipo.resolucion),
-        ("Error Máximo Permisible", equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else ''),
-        ("Fecha de Registro", equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else ''),
-        ("Observaciones", equipo.observaciones),
-        ("Versión Formato Equipo", equipo.version_formato),
-        ("Fecha Versión Formato Equipo", equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else ''),
-        ("Codificación Formato Equipo", equipo.codificacion_formato),
-        ("Fecha Última Calibración", equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else ''),
-        ("Próxima Calibración", equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else ''),
-        ("Frecuencia Calibración (meses)", float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else ''),
-        ("Fecha Último Mantenimiento", equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else ''),
-        ("Próximo Mantenimiento", equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento else ''),
-        ("Frecuencia Mantenimiento (meses)", float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else ''),
-        ("Fecha Última Comprobación", equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else ''),
-        ("Próxima Comprobación", equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion else ''),
-        ("Frecuencia Comprobación (meses)", float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else ''),
-    ]
-
-    for label, value in general_info:
-        sheet.append([label, value])
-
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
-def _generate_general_equipment_list_excel_content(equipos_queryset):
-    """
-    Generates an Excel file with the general list of equipment.
-    """
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Listado de Equipos"
-
-    headers = [
-        "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Ubicación",
-        "Responsable", "Marca", "Modelo", "Número de Serie", "Rango de Medida",
-        "Resolución", "Error Máximo Permisible", "Estado", "Fecha de Adquisición", "Fecha de Registro",
-        "Observaciones",
-        "Versión Formato Equipo", "Fecha Versión Formato Equipo", "Codificación Formato Equipo",
-        "Fecha Última Calibración", "Próxima Calibración", "Frecuencia Calibración (meses)",
-        "Fecha Último Mantenimiento", "Próximo Mantenimiento", "Frecuencia Mantenimiento (meses)",
-        "Fecha Última Comprobación", "Próxima Comprobación", "Frecuencia Comprobación (meses)"
-    ]
-    sheet.append(headers)
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    header_alignment = Alignment(horizontal="center", vertical="center")
-    header_border = Border(left=Side(style='thin'),
-                           right=Side(style='thin'),
-                           top=Side(style='thin'),
-                           bottom=Side(style='thin'))
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 20
-
-    for equipo in equipos_queryset:
-        row_data = [
-            equipo.codigo_interno,
-            equipo.nombre,
-            equipo.empresa.nombre if equipo.empresa else "N/A",
-            equipo.get_tipo_equipo_display(),
-            equipo.ubicacion,
-            equipo.responsable,
-            equipo.marca,
-            equipo.modelo,
-            equipo.numero_serie,
-            equipo.rango_medida,
-            equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-            equipo.estado,
-            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
-            equipo.observaciones,
-            equipo.version_formato,
-            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-            equipo.codificacion_formato,
-            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento else '',
-            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion else '',
-            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-        ]
-        sheet.append(row_data)
-
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
-def _generate_general_proveedor_list_excel_content(proveedores_queryset):
-    """
-    Generates an Excel file with the general list of providers.
-    """
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Listado de Proveedores"
-
-    headers = [
-        "Nombre de la Empresa Proveedora", "Empresa Cliente", "Tipo de Servicio", "Nombre de Contacto",
-        "Número de Contacto", "Correo Electrónico", "Página Web",
-        "Alcance", "Servicio Prestado"
-    ]
-    sheet.append(headers)
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    header_alignment = Alignment(horizontal="center", vertical="center")
-    header_border = Border(left=Side(style='thin'),
-                           right=Side(style='thin'),
-                           top=Side(style='thin'),
-                           bottom=Side(style='thin'))
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 25
-
-    for proveedor in proveedores_queryset:
-        row_data = [
-            proveedor.nombre_empresa,
-            proveedor.empresa.nombre if proveedor.empresa else "N/A",
-            proveedor.get_tipo_servicio_display(),
-            proveedor.nombre_contacto,
-            proveedor.numero_contacto,
-            proveedor.correo_electronico,
-            proveedor.pagina_web,
-            proveedor.alcance,
-            proveedor.servicio_prestado,
-        ]
-        sheet.append(row_data)
-
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
 # --- Vistas de Informes ---
 
 @login_required
@@ -2507,8 +2909,8 @@ def informes(request):
         equipos_queryset = equipos_queryset.filter(empresa_id=selected_company_id)
 
     # --- Actividades a Realizar (Listados Detallados) ---
-    # Filtrar solo equipos activos y no de baja
-    equipos_activos_para_actividades = equipos_queryset.exclude(estado='De Baja')
+    # Filtrar solo equipos activos y no de baja o inactivos
+    equipos_activos_para_actividades = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
 
     scheduled_activities = []
 
@@ -2589,17 +2991,17 @@ def informes(request):
 @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def generar_informe_zip(request):
     """
-    Generates a ZIP file containing equipment reports and associated documents.
+    Generates a ZIP file containing equipment reports and associated documents, including procedures.
     The ZIP structure includes:
     [Company Name]/
     ├── Equipos/
     │   ├── [Equipment Internal Code 1]/
     │   │   ├── Hoja_de_vida.pdf
-    │   │   ├── Baja/ (Documento de Baja del Equipo - NUEVA CARPETA)
+    │   │   ├── Baja/ (Documento de Baja del Equipo)
     │   │   ├── Calibraciones/
-    │   │   │   ├── Certificados/ (Certificado de Calibración)
-    │   │   │   ├── Confirmaciones/ (Confirmación Metrológica)
-    │   │   │   └── Intervalos/ (Intervalos de Calibración)
+    │   │   │   ├── Certificados/
+    │   │   │   ├── Confirmaciones/
+    │   │   │   └── Intervalos/
     │   │   ├── Comprobaciones/
     │   │   │   └── (Verification PDFs)
     │   │   ├── Mantenimientos/
@@ -2608,8 +3010,12 @@ def generar_informe_zip(request):
     │   │   └── Hoja_de_vida_Actividades_Excel.xlsx
     │   └── [Equipment Internal Code 2]/
     │       └── ...
+    ├── Procedimientos/
+    │   ├── [Procedure Code 1].pdf
+    │   └── [Procedure Code 2].pdf
     ├── Listado_de_equipos.xlsx
-    └── Listado_de_proveedores.xlsx
+    ├── Listado_de_proveedores.xlsx
+    └── Listado_de_procedimientos.xlsx
     """
     selected_company_id = request.GET.get('empresa_id')
     
@@ -2620,6 +3026,7 @@ def generar_informe_zip(request):
     empresa = get_object_or_404(Empresa, pk=selected_company_id)
     equipos_empresa = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
     proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
+    procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo') # Filtrar procedimientos por empresa
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -2631,9 +3038,15 @@ def generar_informe_zip(request):
         excel_buffer_general_proveedores = _generate_general_proveedor_list_excel_content(proveedores_empresa)
         zf.writestr(f"{empresa.nombre}/Listado_de_Proveedores.xlsx", excel_buffer_general_proveedores)
 
-        # 3. For each equipment, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
+        # 3. Add Listado_de_procedimientos.xlsx (NEW)
+        excel_buffer_procedimientos = _generate_procedimiento_info_excel_content(procedimientos_empresa)
+        zf.writestr(f"{empresa.nombre}/Listado_de_procedimientos.xlsx", excel_buffer_procedimientos)
+
+
+        # 4. For each equipment, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
         for equipo in equipos_empresa:
-            safe_equipo_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_')
+            # Asegura que el código interno no contenga caracteres que puedan causar problemas en nombres de archivo/ruta
+            safe_equipo_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(':', '_')
             equipo_folder = f"{empresa.nombre}/Equipos/{safe_equipo_codigo}"
 
             try:
@@ -2655,37 +3068,30 @@ def generar_informe_zip(request):
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_Excel.xlsx", hoja_vida_activities_excel_content)
             except Exception as e:
                 print(f"Error generating Hoja de Vida Activities Excel for {equipo.codigo_interno}: {e}")
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Activities Excel: {e}")
+                zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Actividades Excel: {e}")
 
-            # --- NUEVA LÓGICA: Añadir Documento de Baja si existe ---
+            # --- Añadir Documento de Baja si existe ---
             try:
-                # Intenta obtener el registro de baja para el equipo
-                baja_registro = BajaEquipo.objects.get(equipo=equipo)
-                if baja_registro.documento_baja and default_storage.exists(baja_registro.documento_baja.name):
-                    # Define la ruta dentro del ZIP para el documento de baja
+                baja_registro = BajaEquipo.objects.filter(equipo=equipo).first()
+                if baja_registro and baja_registro.documento_baja and default_storage.exists(baja_registro.documento_baja.name):
                     baja_folder = f"{equipo_folder}/Baja"
-                    # Abre el archivo del almacenamiento (S3 o local) y añádelo al ZIP
                     with default_storage.open(baja_registro.documento_baja.name, 'rb') as f:
                         file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
                         zf.writestr(f"{baja_folder}/{file_name_in_zip}", f.read())
                     print(f"DEBUG: Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
                 else:
                     print(f"DEBUG: No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
-            except BajaEquipo.DoesNotExist:
-                print(f"DEBUG: Equipo {equipo.codigo_interno} no tiene registro de baja.")
             except Exception as e:
                 print(f"Error adding decommission document for {equipo.codigo_interno} to zip: {e}")
                 zf.writestr(f"{equipo_folder}/Baja/Documento_Baja_ERROR.txt", f"Error adding decommission document: {e}")
-            # --- FIN NUEVA LÓGICA ---
 
 
             # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
             calibraciones = Calibracion.objects.filter(equipo=equipo)
             for cal in calibraciones:
-                # Certificado de Calibración
                 if cal.documento_calibracion:
                     try:
-                        if default_storage.exists(cal.documento_calibracion.name): # Usar default_storage para verificar existencia
+                        if default_storage.exists(cal.documento_calibracion.name):
                             with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{os.path.basename(cal.documento_calibracion.name)}", f.read())
                         else:
@@ -2693,7 +3099,6 @@ def generar_informe_zip(request):
                     except Exception as e:
                         print(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
 
-                # Confirmación Metrológica
                 if cal.confirmacion_metrologica_pdf:
                     try:
                         if default_storage.exists(cal.confirmacion_metrologica_pdf.name):
@@ -2704,7 +3109,6 @@ def generar_informe_zip(request):
                     except Exception as e:
                         print(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
 
-                # Intervalos de Calibración (NUEVO)
                 if cal.intervalos_calibracion_pdf:
                     try:
                         if default_storage.exists(cal.intervalos_calibracion_pdf.name):
@@ -2759,6 +3163,25 @@ def generar_informe_zip(request):
                     except Exception as e:
                         print(f"Error adding equipment document {doc_field.name} to zip: {e}")
 
+        # Add existing Procedure PDFs (NEW)
+        for proc in procedimientos_empresa:
+            if proc.documento_pdf:
+                try:
+                    if default_storage.exists(proc.documento_pdf.name):
+                        safe_proc_code = proc.codigo.replace('/', '_').replace('\\', '_').replace(':', '_')
+                        proc_folder = f"{empresa.nombre}/Procedimientos"
+                        with default_storage.open(proc.documento_pdf.name, 'rb') as f:
+                            file_name_in_zip = os.path.basename(proc.documento_pdf.name)
+                            # Usar código del procedimiento como prefijo para el nombre del archivo en el zip
+                            zip_path = f"{proc_folder}/{safe_proc_code}_{file_name_in_zip}"
+                            zf.writestr(zip_path, f.read())
+                        print(f"DEBUG: Documento de procedimiento '{file_name_in_zip}' añadido para procedimiento {proc.codigo}")
+                    else:
+                        print(f"DEBUG: Archivo de procedimiento no encontrado en storage: {proc.documento_pdf.name}")
+                except Exception as e:
+                    print(f"Error adding procedure document {proc.documento_pdf.name} to zip: {e}")
+                    zf.writestr(f"{empresa.nombre}/Procedimientos/Documento_Procedimiento_{proc.codigo}_ERROR.txt", f"Error adding procedure document: {e}")
+
 
     zip_buffer.seek(0)
     response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
@@ -2767,14 +3190,12 @@ def generar_informe_zip(request):
 
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def informe_vencimientos_pdf(request):
     """
     Generates a PDF report of upcoming and overdue activities.
     """
     today = timezone.localdate()
-    # upcoming_threshold = today + timedelta(days=30) # Esta variable no se usa directamente en este método.
-
-    scheduled_activities = []
 
     equipos_base_query = Equipo.objects.all()
     if not request.user.is_superuser and request.user.empresa:
@@ -2782,12 +3203,14 @@ def informe_vencimientos_pdf(request):
     elif not request.user.is_superuser and not request.user.empresa:
         equipos_base_query = Equipo.objects.none()
 
-    equipos_base_query = equipos_base_query.exclude(estado='De Baja')
+    # Excluir equipos "De Baja" y "Inactivo" para este informe
+    equipos_base_query = equipos_base_query.exclude(estado__in=['De Baja', 'Inactivo'])
 
     calibraciones_query = equipos_base_query.filter(
         proxima_calibracion__isnull=False
     ).order_by('proxima_calibracion')
 
+    scheduled_activities = []
     for equipo in calibraciones_query:
         if equipo.proxima_calibracion:
             days_remaining = (equipo.proxima_calibracion - today).days
@@ -2842,12 +3265,16 @@ def informe_vencimientos_pdf(request):
 
     template_path = 'core/informe_vencimientos_pdf.html'
     
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="informe_vencimientos.pdf"'
+    try:
+        pdf_file = _generate_pdf_content(request, template_path, context)
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="informe_vencimientos.pdf"'
+        return response
+    except Exception as e:
+        messages.error(request, f'Tuvimos algunos errores al generar el PDF de vencimientos: {e}. Revisa los logs para más detalles.')
+        print(f"DEBUG: Error al generar informe_vencimientos_pdf: {e}")
+        return redirect('core:informes')
 
-    pdf_file = _generate_pdf_content(request, template_path, context)
-    response.write(pdf_file)
-    return response
 
 @login_required
 def programmed_activities_list(request):
@@ -2863,7 +3290,8 @@ def programmed_activities_list(request):
     elif not request.user.is_superuser and not request.user.empresa:
         equipos_base_query = Equipo.objects.none()
 
-    equipos_base_query = equipos_base_query.exclude(estado='De Baja')
+    # Excluir equipos "De Baja" y "Inactivo" para esta lista
+    equipos_base_query = equipos_base_query.exclude(estado__in=['De Baja', 'Inactivo'])
 
     calibraciones_query = equipos_base_query.filter(
         proxima_calibracion__isnull=False
@@ -2962,9 +3390,9 @@ def generar_hoja_vida_pdf(request, pk):
         response['Content-Disposition'] = f'attachment; filename="hoja_vida_{equipo.codigo_interno}.pdf"'
         return response
     except Exception as e:
-        # Aquí puedes añadir un mensaje de depuración más específico para el usuario
         messages.error(request, f'Tuvimos algunos errores al generar el PDF: {e}. Revisa los logs para más detalles.')
-        return redirect('core:detalle_equipo', pk=equipo.pk) # Redirige al detalle del equipo o a una página de error
+        print(f"DEBUG: Error al generar hoja_vida_pdf para equipo {equipo.pk}: {e}")
+        return redirect('core:detalle_equipo', pk=equipo.pk)
 
 
 @require_POST

@@ -71,8 +71,8 @@
     </div>
 
     <div class="bg-gray-50 p-4 rounded-md shadow-sm mt-6">
-        <h2 class="text-xl font-semibold text-gray-700 mb-4">Equipos de la Empresa ({{ equipos_empresa.count }})</h2>
-        {% if equipos_empresa %}
+        <h2 class="text-xl font-semibold text-gray-700 mb-4">Equipos de la Empresa ({{ equipos_asociados.count }})</h2>
+        {% if equipos_asociados %}
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white border border-gray-200 rounded-md">
                     <thead>
@@ -87,7 +87,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for equipo in equipos_empresa %}
+                        {% for equipo in equipos_asociados %}
                         <tr class="hover:bg-gray-50">
                             <td class="py-2 px-4 border-b">{{ equipo.codigo_interno }}</td>
                             <td class="py-2 px-4 border-b">{{ equipo.nombre }}</td>

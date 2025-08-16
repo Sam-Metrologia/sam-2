@@ -32,9 +32,12 @@
             font-family: 'Inter', sans-serif;
             background-color: var(--color-background-light);
             color: var(--color-text-dark);
+            margin: 0;
+            padding: 0;
+            display: flex; /* Habilitar flexbox en el body */
+            min-height: 100vh; /* Asegura que el body ocupe al menos el 100% del viewport */
         }
 
-        /* Sidebar */
         .sidebar {
             width: 250px;
             background-color: var(--color-background-dark);
@@ -47,6 +50,8 @@
             z-index: 1000;
             box-shadow: 2px 0 10px rgba(0,0,0,0.15); /* Sombra más pronunciada */
             overflow-y: auto; /* Permite scroll si el contenido es largo */
+            display: flex;
+            flex-direction: column;
         }
         .sidebar.hidden {
             transform: translateX(-100%);
@@ -68,6 +73,7 @@
             list-style: none;
             padding: 0;
             margin: 0;
+            flex-grow: 1; /* Permite que la lista de navegación se estire */
         }
         .sidebar ul li a {
             display: flex;
@@ -108,7 +114,7 @@
             width: calc(100% - 250px); /* Default width for desktop */
             min-height: 100vh; /* Asegura que el contenido principal ocupe toda la altura */
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Contenido principal como columna flex */
         }
         .main-content.expanded {
             margin-left: 0;
@@ -258,6 +264,9 @@
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
+            body {
+                flex-direction: column; /* En móvil, el body es una columna */
+            }
             .sidebar {
                 transform: translateX(-100%);
                 position: fixed; /* Asegura que no se desplace con el contenido */
@@ -279,7 +288,7 @@
     </style>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="flex">
+<body> {# Body como contenedor flex con altura mínima #}
     <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
         <div class="sidebar-header">
@@ -287,31 +296,43 @@
         </div>
         <nav>
             <ul>
-                <li><a href="{% url 'core:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <li><a href="{% url 'core:dashboard' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a></li>
-                <li><a href="{% url 'core:home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <li><a href="{% url 'core:home' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'home' %}active{% endif %}">
                     <i class="fas fa-boxes"></i> Equipos
                 </a></li>
                 {# Nuevo elemento de menú para Proveedores #}
-                <li><a href="{% url 'core:listar_proveedores' %}" class="{% if request.resolver_match.url_name == 'listar_proveedores' %}active{% endif %}">
+                <li><a href="{% url 'core:listar_proveedores' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'listar_proveedores' %}active{% endif %}">
                     <i class="fas fa-address-book"></i> Proveedores
                 </a></li>
+                {# NUEVO ELEMENTO DE MENÚ PARA PROCEDIMIENTOS #}
+                <li><a href="{% url 'core:listar_procedimientos' %}" class="{% if request.resolver_match and 'procedimiento' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-file-alt"></i> Procedimientos
+                </a></li>
                 {% if user.is_superuser %}
-                <li><a href="{% url 'core:listar_empresas' %}" class="{% if request.resolver_match.url_name == 'listar_empresas' %}active{% endif %}">
+                <li><a href="{% url 'core:listar_empresas' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'listar_empresas' %}active{% endif %}">
                     <i class="fas fa-building"></i> Empresas
                 </a></li>
                 {% endif %}
                 {% if user.is_staff or user.is_superuser %}
-                <li><a href="{% url 'core:listar_usuarios' %}" class="{% if 'usuario' in request.resolver_match.url_name %}active{% endif %}">
+                <li><a href="{% url 'core:listar_usuarios' %}" class="{% if request.resolver_match and 'usuario' in request.resolver_match.url_name %}active{% endif %}">
                     <i class="fas fa-users"></i> Usuarios
                 </a></li>
                 {% endif %}
-                <li><a href="{% url 'core:informes' %}" class="{% if request.resolver_match.url_name == 'informes' %}active{% endif %}">
+                <li><a href="{% url 'core:informes' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'informes' %}active{% endif %}">
                     <i class="fas fa-chart-line"></i> Informes
                 </a></li>
             </ul>
         </nav>
+        <div class="mt-auto pb-4"> {# Añadido mt-auto para empujar los enlaces de perfil/logout al final #}
+            <a href="{% url 'core:perfil_usuario' %}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition duration-200 ease-in-out mx-2">
+                <i class="fas fa-user-circle mr-3"></i> Mi Perfil
+            </a>
+            <a href="{% url 'core:logout' %}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-red-700 hover:text-white rounded-md transition duration-200 ease-in-out mt-2 mx-2">
+                <i class="fas fa-sign-out-alt mr-3"></i> Cerrar Sesión
+            </a>
+        </div>
     </aside>
 
     <!-- Main Content -->
@@ -342,7 +363,7 @@
 
         <footer class="main-footer">
             <p>&copy; {% now "Y" %} SAM. Todos los derechos reservados.</p>
-            <p>Desarrollado por <a href="#" target="_blank">SAM METROLOGIA S.A.S</a></p> {# CAMBIO REALIZADO AQUÍ #}
+            <p>Desarrollado por <a href="https://www.google.com" target="_blank">SAM METROLOGIA S.A.S</a></p>
         </footer>
     </div>
 
@@ -423,3 +444,4 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+

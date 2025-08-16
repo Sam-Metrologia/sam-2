@@ -1,82 +1,24 @@
 {% extends 'base.html' %}
-{% load static %}
+
+{% block title %}Activar Equipo{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4">
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+<div class="container mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Activar Equipo: {{ equipo.nombre }}</h1>
 
-    {% if messages %}
-        <div class="mb-4">
-            {% for message in messages %}
-                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+    <p class="text-lg text-gray-700 mb-6">¿Estás seguro de que deseas cambiar el estado del equipo "{{ equipo.nombre }}" (Código Interno: {{ equipo.codigo_interno }}) a <span class="font-bold text-green-600">Activo</span>?</p>
+    <p class="text-gray-600 mb-8">Esto permitirá que el equipo sea nuevamente considerado en los cálculos de actividades programadas y reportes.</p>
 
-    <div class="bg-white p-6 rounded-lg shadow-md">
-        <p class="text-gray-700 text-lg mb-4">¿Estás seguro de que deseas eliminar el siguiente {{ tipo }}?</p>
-        <p class="text-xl font-semibold text-red-600 mb-6">
-            {% if tipo == 'usuario' %}
-                {{ objeto.username }}
-            {% else %}
-                {{ objeto.nombre }}
-            {% endif %}
-        </p>
-
-        <form method="post" action="">
-            {% csrf_token %}
-            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
-                <i class="fas fa-trash-alt mr-2"></i> Confirmar Eliminación
+    <form method="post">
+        {% csrf_token %}
+        <div class="flex items-center justify-start space-x-4">
+            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                <i class="fas fa-check-circle mr-2"></i> Confirmar Activación
             </button>
-            {# El botón de cancelar redirige a la lista de usuarios o empresas según el tipo de objeto #}
-            {% if tipo == 'usuario' %}
-                <a href="{% url 'core:listar_usuarios' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'empresa' %}
-                <a href="{% url 'core:listar_empresas' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'equipo' %}
-                <a href="{% url 'core:home' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'calibracion' %}
-                <a href="{% url 'core:detalle_equipo' pk=objeto.equipo.pk %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'mantenimiento' %}
-                <a href="{% url 'core:detalle_equipo' pk=objeto.equipo.pk %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'comprobacion' %}
-                <a href="{% url 'core:detalle_equipo' pk=objeto.equipo.pk %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'ubicacion' %}
-                <a href="{% url 'core:listar_ubicaciones' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'procedimiento' %}
-                <a href="{% url 'core:listar_procedimientos' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'proveedor_calibracion' %}
-                <a href="{% url 'core:listar_proveedores_calibracion' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'proveedor_mantenimiento' %}
-                <a href="{% url 'core:listar_proveedores_mantenimiento' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% elif tipo == 'proveedor_comprobacion' %}
-                <a href="{% url 'core:listar_proveedores_comprobacion' %}" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-md ml-2 transition duration-300 ease-in-out">
-                    <i class="fas fa-times mr-2"></i> Cancelar
-                </a>
-            {% endif %}
-        </form>
-    </div>
+            <a href="{% url 'core:detalle_equipo' pk=equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                <i class="fas fa-times-circle mr-2"></i> Cancelar
+            </a>
+        </div>
+    </form>
 </div>
 {% endblock %}

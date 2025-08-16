@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Listado de Proveedores{% endblock %}
-{% block header_title %}Listado de Proveedores{% endblock %}
+{% block title %}Listado de Procedimientos{% endblock %}
+{% block header_title %}Listado de Procedimientos{% endblock %}
 
 {% block content %}
 <div class="container mx-auto p-4 flex-grow"> {# flex-grow para que ocupe el espacio disponible #}
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">Listado de Proveedores</h1>
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Listado de Procedimientos</h1>
 
     {# Mensajes de Django #}
     {% if messages %}
@@ -22,30 +22,19 @@
     {# Mensaje para superusuario cuando no hay empresa seleccionada en el filtro #}
     {% if is_superuser and not selected_company_id %}
     <div class="bg-yellow-50 p-4 rounded-lg shadow-sm mb-6 text-yellow-800 border border-yellow-200">
-        <p class="font-semibold">Como Superusuario, puedes seleccionar una empresa para ver sus proveedores asociados.</p>
+        <p class="font-semibold">Como Superusuario, puedes seleccionar una empresa para ver sus procedimientos asociados.</p>
         <p>Utiliza el filtro de empresa a continuación.</p>
     </div>
     {% endif %}
 
-    {# Filtros para Proveedores (adaptados de home.html) #}
+    {# Filtros para Procedimientos (adaptados de home.html) #}
     <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <form method="get" action="{% url 'core:listar_proveedores' %}" class="flex flex-wrap items-center justify-between gap-4">
-            {# Campo de búsqueda: para nombre o código de proveedor #}
+        <form method="get" action="{% url 'core:listar_procedimientos' %}" class="flex flex-wrap items-center justify-between gap-4">
+            {# Campo de búsqueda: para nombre o código de procedimiento #}
             <div class="flex items-center gap-2">
                 <label for="search-query" class="text-gray-700 font-bold">Buscar:</label>
-                <input type="text" name="q" id="search-query" placeholder="Nombre, contacto, email..."
+                <input type="text" name="q" id="search-query" placeholder="Nombre o código..."
                        class="form-input flex-grow" value="{{ request.GET.q|default:'' }}">
-            </div>
-
-            {# Selector de Tipo de Servicio #}
-            <div class="flex items-center gap-2">
-                <label for="tipo_servicio" class="text-gray-700 font-bold">Tipo Servicio:</label>
-                <select name="tipo_servicio" id="tipo_servicio" class="form-select">
-                    <option value="">Todos</option>
-                    {% for value, label in tipo_servicio_choices %}
-                        <option value="{{ value }}" {% if request.GET.tipo_servicio == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
             </div>
 
             {# Selector de Empresa (solo para superusuarios) #}
@@ -68,41 +57,38 @@
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
                     <i class="fas fa-filter mr-2"></i> Filtrar
                 </button>
-                <a href="{% url 'core:listar_proveedores' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                <a href="{% url 'core:listar_procedimientos' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
                     <i class="fas fa-redo mr-2"></i> Limpiar Filtros
                 </a>
             </div>
         </form>
     </div>
 
-    {# Botón Añadir Proveedor (similar a Añadir Equipo) #}
+    {# Botón Añadir Procedimiento (similar a Añadir Equipo) #}
     <div class="mb-6 text-right flex justify-end space-x-2">
-        {% if perms.core.add_proveedor %} {# Asegúrate de tener el permiso correcto para el modelo de Proveedor #}
-        <a href="{% url 'core:añadir_proveedor' %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
-            <i class="fas fa-plus-circle mr-2"></i> Añadir Proveedor
+        {% if perms.core.add_procedimiento %} {# Asegúrate de tener el permiso correcto para el modelo de Procedimiento #}
+        <a href="{% url 'core:añadir_procedimiento' %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+            <i class="fas fa-plus-circle mr-2"></i> Añadir Procedimiento
         </a>
         {% endif %}
     </div>
 
-    {% if proveedores %}
+    {% if procedimientos %}
     <div class="overflow-x-auto bg-white rounded-lg shadow-md">
         <table class="min-w-full leading-normal">
             <thead>
                 <tr>
                     <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tl-lg">
-                        Nombre de la Empresa
+                        Nombre
                     </th>
                     <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Tipo de Servicio
+                        Código
                     </th>
                     <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Contacto
+                        Versión
                     </th>
                     <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Teléfono
-                    </th>
-                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Email
+                        Fecha de Emisión
                     </th>
                     <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Empresa
@@ -113,42 +99,41 @@
                 </tr>
             </thead>
             <tbody>
-                {% for proveedor in proveedores %}
+                {% for procedimiento in procedimientos %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">
-                            <a href="{% url 'core:detalle_proveedor' pk=proveedor.pk %}" class="text-blue-600 hover:text-blue-900">
-                                {{ proveedor.nombre_empresa }}
-                            </a>
-                        </p>
+                        <p class="text-gray-900 whitespace-no-wrap">{{ procedimiento.nombre }}</p>
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">{{ proveedor.get_tipo_servicio_display }}</p>
+                        <p class="text-gray-900 whitespace-no-wrap">{{ procedimiento.codigo }}</p>
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">{{ proveedor.nombre_contacto|default:"N/A" }}</p>
+                        <p class="text-gray-900 whitespace-no-wrap">{{ procedimiento.version|default:"N/A" }}</p>
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">{{ proveedor.numero_contacto|default:"N/A" }}</p>
+                        <p class="text-gray-900 whitespace-no-wrap">{{ procedimiento.fecha_emision|date:"d/m/Y"|default:"N/A" }}</p>
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">{{ proveedor.correo_electronico|default:"N/A" }}</p>
-                    </td>
-                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">{{ proveedor.empresa.nombre|default:"N/A" }}</p>
+                        <p class="text-gray-900 whitespace-no-wrap">{{ procedimiento.empresa.nombre|default:"N/A" }}</p>
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                         <div class="flex items-center space-x-2">
-                            <a href="{% url 'core:editar_proveedor' pk=proveedor.pk %}" title="Editar"
+                            <a href="{% url 'core:editar_procedimiento' pk=procedimiento.pk %}" title="Editar"
                                class="text-yellow-600 hover:text-yellow-900 transition duration-300 ease-in-out">
                                 <i class="fas fa-edit"></i>
                             </a>
                             <button type="button" 
-                                    onclick="showDeleteModal('{% url 'core:eliminar_proveedor' pk=proveedor.pk %}', 'el proveedor &quot;{{ proveedor.nombre_empresa }}&quot;')" 
+                                    onclick="showDeleteModal('{% url 'core:eliminar_procedimiento' pk=procedimiento.pk %}', 'el procedimiento &quot;{{ procedimiento.nombre }}&quot;')" 
                                     title="Eliminar"
                                     class="text-red-600 hover:text-red-900 transition duration-300 ease-in-out">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
+                            {% if procedimiento.documento_pdf %}
+                                <a href="{{ procedimiento.documento_pdf.url }}" target="_blank" title="Ver PDF"
+                                   class="text-purple-600 hover:text-purple-900 transition duration-300 ease-in-out">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -157,32 +142,32 @@
         </table>
     </div>
 
-    {# Paginación (copiada de home.html y ajustada para proveedores) #}
+    {# Paginación (copiada de home.html y ajustada para procedimientos) #}
     <div class="px-5 py-5 bg-white border-t flex flex-col xs:flex-row items-center xs:justify-between">
         <span class="text-xs xs:text-sm text-gray-900">
-            Mostrando {{ proveedores.start_index }} a {{ proveedores.end_index }} de {{ proveedores.paginator.count }} proveedores
+            Mostrando {{ procedimientos.start_index }} a {{ procedimientos.end_index }} de {{ procedimientos.paginator.count }} procedimientos
         </span>
         <div class="inline-flex mt-2 xs:mt-0">
-            {% if proveedores.has_previous %}
-                <a href="?page={{ proveedores.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_servicio %}&tipo_servicio={{ request.GET.tipo_servicio }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
+            {% if procedimientos.has_previous %}
+                <a href="?page={{ procedimientos.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-l-lg transition duration-300 ease-in-out">
                     Anterior
                 </a>
             {% endif %}
             
-            {% for i in proveedores.paginator.page_range %}
-                {% if proveedores.number == i %}
+            {% for i in procedimientos.paginator.page_range %}
+                {% if procedimientos.number == i %}
                     <span class="bg-blue-800 text-white font-bold py-2 px-4 border-r border-gray-200">{{ i }}</span>
                 {% else %}
-                    <a href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_servicio %}&tipo_servicio={{ request.GET.tipo_servicio }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
+                    <a href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 border-r border-gray-200 transition duration-300 ease-in-out">
                         {{ i }}
                     </a>
                 {% endif %}
             {% endfor %}
 
-            {% if proveedores.has_next %}
-                <a href="?page={{ proveedores.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_servicio %}&tipo_servicio={{ request.GET.tipo_servicio }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
+            {% if procedimientos.has_next %}
+                <a href="?page={{ procedimientos.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.empresa_id %}&empresa_id={{ request.GET.empresa_id }}{% endif %}"
                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r-lg transition duration-300 ease-in-out">
                     Siguiente
                 </a>
@@ -191,7 +176,7 @@
     </div>
     {% else %}
         <div class="bg-white p-6 rounded-lg shadow-md text-center">
-            <p class="text-gray-600 text-lg">No se encontraron proveedores registrados en el sistema para esta empresa o no se encontraron resultados.</p>
+            <p class="text-gray-600 text-lg">No hay procedimientos registrados en el sistema para esta empresa o no se encontraron resultados.</p>
         </div>
     {% endif %}
 

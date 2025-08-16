@@ -2,21 +2,44 @@
 {% load static %}
 
 {% block content %}
-<div class="container mx-auto p-4">
+<div class="container mx-auto p-4 flex-grow"> {# flex-grow para que ocupe el espacio disponible #}
     <h1 class="text-3xl font-bold text-gray-800 mb-6">{% if query %}Resultados para "{{ query }}"{% else %}{{ titulo_pagina }}{% endif %}</h1>
 
-    {# Información de formato de la empresa actual #}
+    {# Sección de Información de la Empresa y Logo #}
     {% if current_company_format_info %}
-    <div class="bg-blue-50 p-4 rounded-lg shadow-sm mb-6 text-blue-800 border border-blue-200">
-        <h2 class="text-xl font-semibold mb-2">Información de Formato de la Empresa: {{ current_company_format_info.nombre }}</h2>
-        <p><strong>Versión del Formato:</strong> {{ current_company_format_info.formato_version_empresa|default:"N/A" }}</p>
-        <p><strong>Fecha de Versión:</strong> {{ current_company_format_info.formato_fecha_version_empresa|date:"d/m/Y"|default:"N/A" }}</p>
-        <p><strong>Codificación del Formato:</strong> {{ current_company_format_info.formato_codificacion_empresa|default:"N/A" }}</p>
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6 flex flex-col md:flex-row items-center justify-between gap-4 border border-gray-200">
+        <div class="flex items-center gap-4">
+            {% if current_company_format_info.logo_empresa %}
+                <img src="{{ current_company_format_info.logo_empresa.url }}" alt="Logo de {{ current_company_format_info.nombre }}" class="h-20 w-auto object-contain rounded-md shadow-sm">
+            {% else %}
+                <div class="h-20 w-20 flex items-center justify-center bg-gray-200 text-gray-500 rounded-md text-sm font-semibold">
+                                    </div>
+            {% endif %}
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-800">{{ current_company_format_info.nombre }}</h2>
+                <p class="text-gray-600">NIT: {{ current_company_format_info.nit|default:"N/A" }}</p>
+                <p class="text-gray-600">Dirección: {{ current_company_format_info.direccion|default:"N/A" }}</p>
+            </div>
+        </div>
+        <div class="text-sm text-gray-700 md:text-right mt-4 md:mt-0">
+            <p><strong>Versión del Formato:</strong> {{ current_company_format_info.formato_version_empresa|default:"N/A" }}</p>
+            <p><strong>Fecha de Versión:</strong> {{ current_company_format_info.formato_fecha_version_empresa|date:"d/m/Y"|default:"N/A" }}</p>
+            <p><strong>Codificación del Formato:</strong> {{ current_company_format_info.formato_codificacion_empresa|default:"N/A" }}</p>
+            {# Botón para editar la información de formato de la empresa #}
+            {% if request.user.is_superuser or request.user.empresa == current_company_format_info %}
+            <div class="mt-4">
+                <a href="{% url 'core:editar_empresa_formato' pk=current_company_format_info.pk %}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                    <i class="fas fa-edit mr-2"></i> Editar Formato
+                </a>
+            </div>
+            {% endif %}
+        </div>
     </div>
-    {% elif is_superuser and not selected_company_id %}/
+    {% elif is_superuser and not selected_company_id %}
     {# Mensaje para superusuario cuando no hay empresa seleccionada #}
     <div class="bg-yellow-50 p-4 rounded-lg shadow-sm mb-6 text-yellow-800 border border-yellow-200">
-        <p>Selecciona una empresa en el filtro superior para ver su información de formato.</p>
+        <p class="font-semibold">Como Superusuario, puedes seleccionar una empresa para ver sus equipos asociados y su información de formato.</p>
+        <p>Utiliza el filtro de empresa a continuación.</p>
     </div>
     {% endif %}
 
@@ -84,7 +107,7 @@
     </div>
 
     <div class="mb-6 text-right flex justify-end space-x-2"> {# Added flex and space-x-2 for button grouping #}
-        {% if perms.core.add_equipo %} {# CAMBIO AQUÍ: Usar 'add_equipo' #}
+        {% if perms.core.add_equipo %}
         <a href="{% url 'core:importar_equipos_excel' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
             <i class="fas fa-file-excel mr-2"></i> Importar Equipos
         </a>
@@ -164,7 +187,7 @@
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                         <span class="relative inline-block px-3 py-1 font-semibold leading-tight">
                             <span aria-hidden="true" class="absolute inset-0 opacity-50 rounded-full
-                                {% if equipo.estado == 'Activo' %}bg-green-200{% elif equipo.estado == 'De Baja' %}bg-red-200{% else %}bg-yellow-200{% endif %}"></span>
+                                {% if equipo.estado == 'Activo' %}bg-green-200{% elif equipo.estado == 'De Baja' %}bg-red-200{% elif equipo.estado == 'Inactivo' %}bg-yellow-200{% endif %}"></span>
                             <span class="relative text-gray-900">{{ equipo.estado }}</span>
                         </span>
                     </td>
@@ -187,22 +210,37 @@
                                class="text-yellow-600 hover:text-yellow-900 transition duration-300 ease-in-out">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            {% if user.is_superuser %} {# Solo superusuarios pueden eliminar #}
-                            <a href="{% url 'core:eliminar_equipo' equipo.pk %}" title="Eliminar"
-                               class="text-red-600 hover:text-red-900 transition duration-300 ease-in-out">
+                            {# Eliminar Equipo: Usa el modal para confirmar antes de enviar la solicitud POST #}
+                            {% if perms.core.delete_equipo %}
+                            <button type="button" 
+                                    onclick="showDeleteModal('{% url 'core:eliminar_equipo' equipo.pk %}', 'el equipo &quot;{{ equipo.nombre }}&quot; ({{ equipo.codigo_interno }})')" 
+                                    title="Eliminar"
+                                    class="text-red-600 hover:text-red-900 transition duration-300 ease-in-out">
                                 <i class="fas fa-trash-alt"></i>
-                            </a>
+                            </button>
                             {% endif %}
-                            {% if equipo.estado != 'De Baja' %}
-                            <a href="{% url 'core:dar_baja_equipo' equipo.pk %}" title="Dar de Baja"
-                               class="text-purple-600 hover:text-purple-900 transition duration-300 ease-in-out">
-                                <i class="fas fa-arrow-down"></i>
-                            </a>
-                            {% else %}
-                            <a href="{% url 'core:activar_equipo' equipo.pk %}" title="Activar Equipo"
-                               class="text-green-600 hover:text-green-900 transition duration-300 ease-in-out">
-                                <i class="fas fa-arrow-up"></i>
-                            </a>
+                            
+                            {# Lógica para botones de estado #}
+                            {% if equipo.estado == 'Activo' %}
+                                <a href="{% url 'core:inactivar_equipo' equipo.pk %}" title="Inactivar Equipo"
+                                class="text-yellow-500 hover:text-yellow-700 transition duration-300 ease-in-out">
+                                    <i class="fas fa-pause-circle"></i>
+                                </a>
+                                <a href="{% url 'core:dar_baja_equipo' equipo.pk %}" title="Dar de Baja"
+                                class="text-red-600 hover:text-red-800 transition duration-300 ease-in-out">
+                                    <i class="fas fa-minus-circle"></i>
+                                </a>
+                            {% elif equipo.estado == 'Inactivo' or equipo.estado == 'De Baja' %}
+                                <a href="{% url 'core:activar_equipo' equipo.pk %}" title="Activar Equipo"
+                                class="text-green-600 hover:text-green-800 transition duration-300 ease-in-out">
+                                    <i class="fas fa-check-circle"></i>
+                                </a>
+                                {% if equipo.estado == 'Inactivo' %}
+                                <a href="{% url 'core:dar_baja_equipo' equipo.pk %}" title="Dar de Baja"
+                                class="text-red-600 hover:text-red-800 transition duration-300 ease-in-out">
+                                    <i class="fas fa-minus-circle"></i>
+                                </a>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </td>
@@ -250,5 +288,43 @@
     </div>
     {% endif %}
 
+    {# Modal de Confirmación de Eliminación #}
+    <div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar Eliminación</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">
+                        ¿Estás seguro de que quieres eliminar <strong id="entityName" class="font-semibold text-gray-700"></strong>?
+                        Esta acción no se puede deshacer.
+                    </p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <form id="deleteForm" method="post" action="">
+                        {% csrf_token %}
+                        <button type="submit" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Eliminar
+                        </button>
+                        <button type="button" onclick="hideDeleteModal()" class="mt-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
+                            Cancelar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    function showDeleteModal(deleteUrl, entityName) {
+        document.getElementById('entityName').innerText = entityName;
+        document.getElementById('deleteForm').action = deleteUrl;
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+
+    function hideDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+    }
+</script>
 {% endblock %}

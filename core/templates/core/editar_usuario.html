@@ -16,24 +16,61 @@
             </div>
         {% endif %}
 
-        {% for field in form %}
-            <div class="mb-4">
-                <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
-                    {{ field.label }}
-                    {% if field.field.required %}
-                        <span class="text-red-500">*</span>
-                    {% endif %}
-                </label>
-                {{ field.as_widget }}
-                
-                {% if field.help_text %}
-                    <p class="text-gray-600 text-xs italic mt-1">{{ field.help_text }}</p>
+        {# Renderizar todos los campos del formulario excepto 'groups' y 'user_permissions' #}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for field in form %}
+                {% if field.name != 'groups' and field.name != 'user_permissions' %}
+                    <div class="mb-4">
+                        <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ field.label }}
+                            {% if field.field.required %}
+                                <span class="text-red-500">*</span>
+                            {% endif %}
+                        </label>
+                        {{ field.as_widget }}
+                        
+                        {% if field.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
                 {% endif %}
-                {% for error in field.errors %}
-                    <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+            {% endfor %}
+        </div>
+
+        {# Renderizar el campo 'groups' por separado #}
+        {% if form.groups %}
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.groups.label }}</label>
+                <div class="space-y-2">
+                    {{ form.groups }}
+                </div>
+                {% if form.groups.help_text %}
+                    <p class="text-gray-600 text-xs italic mt-1">{{ form.groups.help_text }}</p>
+                {% endif %}
+                {% for error in form.groups.errors %}
+                    <p class="text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
             </div>
-        {% endfor %}
+        {% endif %}
+
+        {# Renderizar el campo 'user_permissions' por separado (normalmente solo visible para superusuarios) #}
+        {% if form.user_permissions %}
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.user_permissions.label }}</label>
+                <div class="space-y-2">
+                    {{ form.user_permissions }}
+                </div>
+                {% if form.user_permissions.help_text %}
+                    <p class="text-gray-600 text-xs italic mt-1">{{ form.user_permissions.help_text }}</p>
+                {% endif %}
+                {% for error in form.user_permissions.errors %}
+                    <p class="text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
 
         <div class="flex items-center justify-end space-x-4">
             <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">

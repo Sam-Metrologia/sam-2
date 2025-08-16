@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load math_filters %} {# ¡Esta línea es crucial para tus filtros! #}
+{% load math_filters %} {# Esta línea es crucial para tus filtros! #}
 
 {% block extra_head %}
     <style>
@@ -54,7 +54,11 @@
             background-color: #e8f5e9; /* Light Green */
             border-color: #c8e6c9;
         }
-        .info-card.equipos-de-baja { {# Nuevo estilo para equipos de baja #}
+        .info-card.equipos-inactivos { {# NUEVO estilo para equipos inactivos #}
+            background-color: #fff8e1; /* Light Orange */
+            border-color: #ffecb3;
+        }
+        .info-card.equipos-de-baja { 
             background-color: #fce4ec; /* Light Pink */
             border-color: #f8bbd0;
         }
@@ -187,7 +191,11 @@
             <h3>Equipos Activos</h3>
             <p>{{ equipos_activos }}</p>
         </div>
-        <div class="info-card equipos-de-baja"> {# Nuevo card para equipos de baja #}
+        <div class="info-card equipos-inactivos"> {# NUEVO card para equipos inactivos #}
+            <h3>Equipos Inactivos</h3>
+            <p>{{ equipos_inactivos }}</p>
+        </div>
+        <div class="info-card equipos-de-baja">
             <h3>Equipos de Baja</h3>
             <p>{{ equipos_de_baja }}</p>
         </div>
@@ -233,7 +241,7 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {# Gráfica de Torta para Calibraciones - SE MANTIENE #}
+        {# Gráfica de Torta para Calibraciones #}
         <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
             <div class="w-full lg:w-1/2 p-2">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Calibraciones (Año Actual)</h2>
@@ -277,7 +285,51 @@
             </div>
         </div>
 
-        {# Gráfica de Torta para Comprobaciones - SE MANTIENE #}
+        {# NUEVA Gráfica de Torta para Mantenimientos - Cumplimiento #}
+        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
+            <div class="w-full lg:w-1/2 p-2">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Mantenimientos (Año Actual)</h2>
+                <div class="chart-container">
+                    <canvas id="mantenimientosCumplimientoPieChart"></canvas>
+                </div>
+            </div>
+            <div class="w-full lg:w-1/2 p-2">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Resumen Mantenimientos (Año Actual)</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Estado</th>
+                            <th>Cantidad</th>
+                            <th>Porcentaje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Total Programados</td>
+                            <td>{{ mant_total_programmed_anual }}</td>
+                            <td>100%</td>
+                        </tr>
+                        <tr>
+                            <td>Realizados</td>
+                            <td>{{ mant_realized_anual }}</td>
+                            <td>{{ mant_realized_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>No Cumplidos (Vencidos)</td>
+                            <td>{{ mant_no_cumplido_anual }}</td>
+                            <td>{{ mant_no_cumplido_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                        <tr>
+                            <td>Pendientes/Programados (Futuro)</td>
+                            <td>{{ mant_pendiente_anual }}</td>
+                            <td>{{ mant_pendiente_anual_percent|floatformat:"0" }}%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Gráfica de Torta para Comprobaciones #}
         <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
             <div class="w-full lg:w-1/2 p-2">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Comprobaciones (Año Actual)</h2>
@@ -323,7 +375,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 mb-8">
-        {# Gráfica de Línea para Calibraciones - SE MANTIENE #}
+        {# Gráfica de Línea para Calibraciones #}
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Calibraciones Programadas vs. Realizadas (Seguimiento)</h2>
             <div class="chart-container">
@@ -331,7 +383,7 @@
             </div>
         </div>
 
-        {# Gráfica de Línea para Mantenimientos - SE MANTIENE #}
+        {# Gráfica de Línea para Mantenimientos #}
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Mantenimientos Programados vs. Realizados (Seguimiento)</h2>
             <div class="chart-container">
@@ -339,7 +391,7 @@
             </div>
         </div>
 
-        {# Gráfica de Línea para Comprobaciones - SE MANTIENE #}
+        {# Gráfica de Línea para Comprobaciones #}
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Comprobaciones Programadas vs. Realizadas (Seguimiento)</h2>
             <div class="chart-container">
@@ -348,7 +400,7 @@
         </div>
     </div>
 
-    {# NUEVO CUADRO: Últimos Mantenimientos Correctivos - SE MANTIENE #}
+    {# Últimos Mantenimientos Correctivos #}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div class="bg-white shadow-lg rounded-lg p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Últimos Mantenimientos Correctivos</h2>
@@ -356,7 +408,7 @@
                 <ul class="corrective-maintenance-list">
                     {% for maintenance in latest_corrective_maintenances %}
                         <li>
-                            <a href="{% url 'core:detalle_mantenimiento' maintenance.equipo.pk maintenance.pk %}">
+                            <a href="{% url 'core:detalle_mantenimiento' maintenance.equipo.pk maintenance.pk %}" class="text-blue-500 hover:underline">
                                 Equipo: {{ maintenance.equipo.nombre }} ({{ maintenance.equipo.codigo_interno }}) - 
                                 Fecha: {{ maintenance.fecha_mantenimiento|date:"d/m/Y" }} - 
                                 Proveedor: {{ maintenance.nombre_proveedor|default:"N/A" }}
@@ -368,17 +420,35 @@
                 <p class="text-gray-600 text-center">No hay mantenimientos correctivos recientes.</p>
             {% endif %}
         </div>
+
+        {# EXISTING: Gráfica de Torta para Mantenimientos por Tipo #}
+        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Mantenimientos por Tipo (Año Actual)</h2>
+            <div class="chart-container">
+                <canvas id="mantenimientosTipoPieChart"></canvas>
+            </div>
+            {# No hay tabla de resumen para esta gráfica en este layout, solo el gráfico #}
+        </div>
+
     </div>
 
 </div>
 
 {# Hidden divs to pass JSON data safely #}
-{# Eliminados: estado_equipos_labels_json, estado_equipos_data_json, pie_chart_colors_equipos_json #}
-{# Eliminados: mantenimientos_torta_labels_json, mantenimientos_torta_data_json, pie_chart_colors_mant_json #}
-
 <div id="calibraciones_torta_labels_json" style="display:none;">{{ calibraciones_torta_labels_json }}</div>
 <div id="calibraciones_torta_data_json" style="display:none;">{{ calibraciones_torta_data_json }}</div>
 <div id="pie_chart_colors_cal_json" style="display:none;">{{ pie_chart_colors_cal_json }}</div>
+
+{# NUEVOS DIVS para el gráfico de torta de Mantenimientos (Cumplimiento) #}
+<div id="mantenimientos_cumplimiento_torta_labels_json" style="display:none;">{{ mantenimientos_cumplimiento_torta_labels_json }}</div>
+<div id="mantenimientos_cumplimiento_torta_data_json" style="display:none;">{{ mantenimientos_cumplimiento_torta_data_json }}</div>
+<div id="pie_chart_colors_mant_compliance_json" style="display:none;">{{ pie_chart_colors_mant_compliance_json }}</div>
+
+{# EXISTENTE: Divs para el gráfico de torta de Mantenimientos (por Tipo) #}
+<div id="mantenimientos_tipo_labels_json" style="display:none;">{{ mantenimientos_tipo_labels_json }}</div>
+<div id="mantenimientos_tipo_data_json" style="display:none;">{{ mantenimientos_tipo_data_json }}</div>
+<div id="pie_chart_colors_mant_types_json" style="display:none;">{{ pie_chart_colors_mant_types_json }}</div>
+
 
 <div id="comprobaciones_torta_labels_json" style="display:none;">{{ comprobaciones_torta_labels_json }}</div>
 <div id="comprobaciones_torta_data_json" style="display:none;">{{ comprobaciones_torta_data_json }}</div>
@@ -435,6 +505,17 @@
         const calibracionesTortaLabels = parseJsonFromHiddenDiv('calibraciones_torta_labels_json');
         const calibracionesTortaData = parseJsonFromHiddenDiv('calibraciones_torta_data_json');
         const pieChartColorsCal = parseJsonFromHiddenDiv('pie_chart_colors_cal_json');
+
+        // NUEVAS VARIABLES para el gráfico de torta de Mantenimientos (Cumplimiento)
+        const mantenimientosCumplimientoTortaLabels = parseJsonFromHiddenDiv('mantenimientos_cumplimiento_torta_labels_json');
+        const mantenimientosCumplimientoTortaData = parseJsonFromHiddenDiv('mantenimientos_cumplimiento_torta_data_json');
+        const pieChartColorsMantCompliance = parseJsonFromHiddenDiv('pie_chart_colors_mant_compliance_json');
+
+        // EXISTENTE: Variables para el gráfico de torta de Mantenimientos (por Tipo)
+        const mantenimientosTipoLabels = parseJsonFromHiddenDiv('mantenimientos_tipo_labels_json');
+        const mantenimientosTipoData = parseJsonFromHiddenDiv('mantenimientos_tipo_data_json');
+        const pieChartColorsMantTypes = parseJsonFromHiddenDiv('pie_chart_colors_mant_types_json');
+
 
         const comprobacionesTortaLabels = parseJsonFromHiddenDiv('comprobaciones_torta_labels_json');
         const comprobacionesTortaData = parseJsonFromHiddenDiv('comprobaciones_torta_data_json');
@@ -515,6 +596,126 @@
                 }
             });
         }
+
+        // --- NUEVA Pie Chart for Mantenimientos (Cumplimiento) ---
+        if (mantenimientosCumplimientoTortaLabels && mantenimientosCumplimientoTortaData && pieChartColorsMantCompliance) {
+            const mantenimientosCumplimientoPieCtx = document.getElementById('mantenimientosCumplimientoPieChart').getContext('2d');
+            const totalMantenimientosTorta = getTotal(mantenimientosCumplimientoTortaData);
+
+            new Chart(mantenimientosCumplimientoPieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: mantenimientosCumplimientoTortaLabels,
+                    datasets: [{
+                        data: mantenimientosCumplimientoTortaData,
+                        backgroundColor: pieChartColorsMantCompliance,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    const value = tooltipItem.parsed;
+                                    const percentage = totalMantenimientosTorta > 0 ? ((value / totalMantenimientosTorta) * 100).toFixed(2) : 0;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            color: '#fff',
+                            formatter: (value, context) => {
+                                const total = getTotal(context.dataset.data);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+                                return percentage + '%';
+                            },
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            },
+                            display: 'auto'
+                        },
+                        title: {
+                            display: false,
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- EXISTING Pie Chart for Mantenimientos (por Tipo) ---
+        // Este gráfico es el que ya existía y muestra el desglose por tipo (Preventivo, Correctivo, etc.)
+        if (mantenimientosTipoLabels && mantenimientosTipoData && pieChartColorsMantTypes) {
+            const mantenimientosTipoPieCtx = document.getElementById('mantenimientosTipoPieChart').getContext('2d');
+            const totalMantenimientosTipo = getTotal(mantenimientosTipoData);
+
+            new Chart(mantenimientosTipoPieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: mantenimientosTipoLabels,
+                    datasets: [{
+                        data: mantenimientosTipoData,
+                        backgroundColor: pieChartColorsMantTypes,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    const value = tooltipItem.parsed;
+                                    const percentage = totalMantenimientosTipo > 0 ? ((value / totalMantenimientosTipo) * 100).toFixed(2) : 0;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            color: '#fff',
+                            formatter: (value, context) => {
+                                const total = getTotal(context.dataset.data);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+                                return percentage + '%';
+                            },
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            },
+                            display: 'auto'
+                        },
+                        title: {
+                            display: false,
+                        }
+                    }
+                }
+            });
+        }
+
 
         // --- Pie Chart for Comprobaciones ---
         if (comprobacionesTortaLabels && comprobacionesTortaData && pieChartColorsComp) {
