@@ -4,16 +4,13 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AuthenticationForm as DjangoAuthenticationForm, PasswordChangeForm 
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
-    BajaEquipo, Ubicacion, Procedimiento, Proveedor # Importar solo el modelo Proveedor general
+    BajaEquipo, Ubicacion, Procedimiento, Proveedor 
 )
-# Asegúrate de que ProveedorCalibracion, ProveedorMantenimiento, ProveedorComprobacion
-# no están siendo importados si ya no existen como modelos separados,
-# o si ya no se usan sus formularios. Asumo que Proveedor es el único general.
 
-from django.forms.widgets import DateInput, FileInput, ClearableFileInput, TextInput # Importar TextInput
+from django.forms.widgets import DateInput, FileInput, ClearableFileInput, TextInput 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from datetime import datetime # Importar datetime para el parseo de fechas
+from datetime import datetime 
 import os
 
 # Formulario de Autenticación personalizado para usar CustomUser
@@ -24,115 +21,122 @@ class AuthenticationForm(DjangoAuthenticationForm):
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = CustomUser
-        fields = UserCreationForm.Meta.fields + ('email', 'first_name', 'last_name', 'empresa', 'is_staff', 'is_superuser',) # Asegúrate de incluir is_staff y is_superuser
+        # Incluir explícitamente 'groups' y 'user_permissions' para asegurar su presencia
+        fields = UserCreationForm.Meta.fields + ('email', 'first_name', 'last_name', 'empresa', 'is_staff', 'is_superuser', 'groups', 'user_permissions',)
         widgets = {
             'empresa': forms.Select(attrs={'class': 'form-select'}),
             'email': forms.EmailInput(attrs={'class': 'form-input'}),
             'first_name': forms.TextInput(attrs={'class': 'form-input'}),
             'last_name': forms.TextInput(attrs={'class': 'form-input'}),
-            'is_staff': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
-            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
-            # Añadir widgets para los campos de contraseña que UserCreationForm ya maneja
-            # Estos son los nombres de campo por defecto para las contraseñas en UserCreationForm
-            'password': forms.PasswordInput(attrs={'class': 'form-input'}),
-            'password2': forms.PasswordInput(attrs={'class': 'form-input'}), 
+            'is_staff': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
+            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
+            'groups': forms.SelectMultiple(attrs={'class': 'form-multiselect'}), # Widget para la selección de grupos
+            'user_permissions': forms.SelectMultiple(attrs={'class': 'form-multiselect'}), # Widget para permisos
         }
     
     def __init__(self, *args, **kwargs):
-        # Extraer 'request' antes de llamar a super().__init__
         request = kwargs.pop('request', None) 
         super().__init__(*args, **kwargs)
-        # Si el usuario no es superusuario, no puede elegir empresa ni ser staff/superuser
+        
+        # Filtrar el queryset de empresa y deshabilitar campos para usuarios no superusuarios
         if request and not request.user.is_superuser:
-            # Filtra el queryset de empresa para mostrar solo la empresa del usuario
             self.fields['empresa'].queryset = Empresa.objects.filter(pk=request.user.empresa.pk)
-            self.fields['empresa'].empty_label = None # No permitir opción vacía
+            self.fields['empresa'].empty_label = None 
             self.fields['empresa'].initial = request.user.empresa
-            self.fields['empresa'].widget.attrs['disabled'] = 'disabled' # Deshabilitar el campo en la UI
+            self.fields['empresa'].widget.attrs['disabled'] = 'disabled' 
             self.fields['is_staff'].widget.attrs['disabled'] = 'disabled'
             self.fields['is_superuser'].widget.attrs['disabled'] = 'disabled'
-        
-        # Si el usuario es superusuario, el campo empresa debe ser seleccionable
+            # Los campos 'groups' y 'user_permissions' deben ser deshabilitados también para no superusuarios
+            self.fields['groups'].widget.attrs['disabled'] = 'disabled'
+            self.fields['user_permissions'].widget.attrs['disabled'] = 'disabled'
         elif request and request.user.is_superuser:
-            self.fields['empresa'].queryset = Empresa.objects.all() # Todos los objetos de empresa
+            self.fields['empresa'].queryset = Empresa.objects.all() 
+        
+        # Aplicar clases de Tailwind CSS a todos los campos visibles por defecto
+        # Se excluyen is_staff, is_superuser, groups, user_permissions de esta aplicación genérica
+        # porque ya tienen widgets específicos o son manejados por el template.
+        for field_name, field in self.fields.items():
+            if field_name not in ['is_staff', 'is_superuser', 'groups', 'user_permissions']: 
+                if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput, forms.PasswordInput)):
+                    field.widget.attrs.update({'class': 'form-input'})
+                elif isinstance(field.widget, ClearableFileInput):
+                    field.widget.attrs.update({'class': 'form-input-file'})
 
 
 # Formulario para CustomUser (Cambio/Edición)
 class CustomUserChangeForm(UserChangeForm):
-    class Meta:
+    class Meta(UserChangeForm.Meta):
         model = CustomUser
+        # Incluir explícitamente 'groups' y 'user_permissions'
         fields = ('username', 'email', 'first_name', 'last_name', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions', 'empresa',)
         widgets = {
             'empresa': forms.Select(attrs={'class': 'form-select'}),
             'email': forms.EmailInput(attrs={'class': 'form-input'}),
             'first_name': forms.TextInput(attrs={'class': 'form-input'}),
             'last_name': forms.TextInput(attrs={'class': 'form-input'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
-            'is_staff': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
-            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
+            'is_staff': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
+            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'groups': forms.SelectMultiple(attrs={'class': 'form-multiselect'}),
             'user_permissions': forms.SelectMultiple(attrs={'class': 'form-multiselect'}),
         }
     
     def __init__(self, *args, **kwargs):
-        # EXTRAER 'request' ANTES DE LLAMAR A super().__init__
         request = kwargs.pop('request', None) 
         super().__init__(*args, **kwargs)
         
         # Si el usuario que edita NO es superusuario, restringir ciertos campos
         if request and not request.user.is_superuser:
-            # No puede cambiar la empresa del usuario editado
             self.fields['empresa'].widget.attrs['disabled'] = 'disabled'
-            # No puede cambiar permisos de staff/superuser
             self.fields['is_staff'].widget.attrs['disabled'] = 'disabled'
             self.fields['is_superuser'].widget.attrs['disabled'] = 'disabled'
             self.fields['groups'].widget.attrs['disabled'] = 'disabled'
             self.fields['user_permissions'].widget.attrs['disabled'] = 'disabled'
-            # No puede cambiar el estado activo de otros usuarios (excepto su propia cuenta)
             if self.instance != request.user: 
                 self.fields['is_active'].widget.attrs['disabled'] = 'disabled'
-        
-        # NO eliminar el campo 'password' aquí. UserChangeForm lo maneja internamente.
+
+        # Aplicar clases de Tailwind CSS a los campos restantes
+        for field_name, field in self.fields.items():
+            if field_name not in ['is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions']: # Excluir checkboxes y campos selectmultiple
+                if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput)):
+                    field.widget.attrs.update({'class': 'form-input'})
+                elif isinstance(field.widget, ClearableFileInput):
+                    field.widget.attrs.update({'class': 'form-input-file'})
 
 
 # Formulario para el perfil de usuario (solo para que el usuario edite su propio perfil)
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['first_name', 'last_name', 'email', 'empresa', 'username'] # Añadido 'username' para que se muestre
+        fields = ['first_name', 'last_name', 'email', 'empresa', 'username'] 
         widgets = {
-            # Deshabilitar el campo 'empresa' para que los usuarios normales no puedan cambiarla
             'empresa': forms.Select(attrs={'disabled': 'disabled'}),
-            'username': forms.TextInput(attrs={'readonly': 'readonly'}), # Hacer el username de solo lectura
+            'username': forms.TextInput(attrs={'readonly': 'readonly'}), 
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and not self.instance.is_superuser:
-            # Si el usuario no es superusuario, el campo 'empresa' es de solo lectura.
-            # No lo hacemos 'disabled' para que el valor se envíe en el POST.
             self.fields['empresa'].widget.attrs['readonly'] = True
             self.fields['empresa'].help_text = "Tu empresa no puede ser cambiada desde aquí."
-            self.fields['empresa'].required = False # No es requerido si es de solo lectura y el valor ya existe
+            self.fields['empresa'].required = False 
         
-        # Asegurarse de que el username sea de solo lectura
         self.fields['username'].widget.attrs['readonly'] = True
         self.fields['username'].help_text = "El nombre de usuario no puede ser cambiado."
+        
+        # Aplicar clases de Tailwind a los campos restantes
+        for field_name, field in self.fields.items():
+            if field_name not in ['empresa', 'username']: # Excluir los que ya tienen attrs
+                 if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput)):
+                    field.widget.attrs.update({'class': 'form-input'})
+                 elif isinstance(field.widget, ClearableFileInput):
+                    field.widget.attrs.update({'class': 'form-input-file'})
 
-    # Sobrescribir el método clean_empresa para manejar el campo empresa si está readonly
     def clean_empresa(self):
-        # Si el campo empresa es de solo lectura (para usuarios no superusuario),
-        # el valor del formulario puede ser None o incorrecto si no se envía.
-        # En ese caso, recuperamos el valor original del instance.
-        # La verificación de superusuario se hace sobre self.request.user, no sobre self.instance
-        # Nota: self.request no está disponible por defecto en ModelForms.
-        # Si necesitas acceso al request, deberías pasarlo al formulario en la vista.
-        # Por ahora, asumo que este clean_empresa es para el admin o un contexto donde el request no es crítico aquí.
-        # Por seguridad, si el campo está deshabilitado/readonly, se toma el valor de la instancia.
-        # Si el usuario es superusuario, se toma el valor del cleaned_data.
-        if self.instance and hasattr(self, 'request') and not self.request.user.is_superuser:
+        # Esta lógica asegura que la empresa no se cambie si el campo está en solo lectura
+        if self.instance and self.instance.empresa and self.fields['empresa'].widget.attrs.get('readonly'):
             return self.instance.empresa
-        return self.cleaned_data['empresa']
+        return self.cleaned_data.get('empresa')
 
 
 # Formularios de Empresa
@@ -146,8 +150,17 @@ class EmpresaForm(forms.ModelForm):
             'direccion': forms.TextInput(attrs={'class': 'form-input'}),
             'telefono': forms.TextInput(attrs={'class': 'form-input'}),
             'email': forms.EmailInput(attrs={'class': 'form-input'}),
+            'pais': forms.TextInput(attrs={'class': 'form-input'}),
+            'ciudad': forms.TextInput(attrs={'class': 'form-input'}),
             'logo_empresa': ClearableFileInput(attrs={'class': 'form-input-file'}),
+            'formato_version_empresa': forms.TextInput(attrs={'class': 'form-input'}),
+            'formato_fecha_version_empresa': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
+            'formato_codificacion_empresa': forms.TextInput(attrs={'class': 'form-input'}),
         }
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        return cleaned_data
 
 # NUEVO Formulario para la información de formato de la Empresa
 class EmpresaFormatoForm(forms.ModelForm):
@@ -201,9 +214,30 @@ class UbicacionForm(forms.ModelForm):
         model = Ubicacion
         fields = '__all__'
         widgets = {
+            'empresa': forms.Select(attrs={'class': 'form-select'}),
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'request' in kwargs:
+            request_user = kwargs.pop('request').user
+            if not request_user.is_superuser and request_user.empresa:
+                self.fields['empresa'].queryset = Empresa.objects.filter(pk=request_user.empresa.pk)
+                self.fields['empresa'].initial = request_user.empresa.pk
+                self.fields['empresa'].widget.attrs['disabled'] = 'disabled'
+            elif request_user.is_superuser:
+                self.fields['empresa'].queryset = Empresa.objects.all()
+            else:
+                self.fields['empresa'].queryset = Empresa.objects.none()
+        
+        for field_name, field in self.fields.items():
+            if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput)):
+                field.widget.attrs.update({'class': 'form-input'})
+            elif isinstance(field.widget, ClearableFileInput):
+                field.widget.attrs.update({'class': 'form-input-file'})
+
 
 # Formularios de Procedimiento
 class ProcedimientoForm(forms.ModelForm):
@@ -216,41 +250,40 @@ class ProcedimientoForm(forms.ModelForm):
     
     class Meta:
         model = Procedimiento
-        fields = '__all__' # Incluir todos los campos, incluyendo 'empresa'
+        fields = '__all__' 
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),
             'codigo': forms.TextInput(attrs={'class': 'form-input'}),
             'version': forms.TextInput(attrs={'class': 'form-input'}),
-            'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}), # Añadir widget para observaciones
+            'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}), 
             'documento_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}),
-            'empresa': forms.Select(attrs={'class': 'form-select w-full'}), # Widget para el campo empresa
+            'empresa': forms.Select(attrs={'class': 'form-select w-full'}), 
         }
     
     def __init__(self, *args, **kwargs):
-        self.request = kwargs.pop('request', None) # Captura el request para lógica de permisos
+        self.request = kwargs.pop('request', None) 
         super().__init__(*args, **kwargs)
 
-        # Lógica para el campo 'empresa' según el tipo de usuario
         if self.request and not self.request.user.is_superuser:
-            # Si no es superusuario, el campo empresa debe ser oculto
-            # y su valor pre-establecido a la empresa del usuario.
             self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk: # Solo para nuevas instancias
+            if not self.instance.pk: 
                 self.fields['empresa'].initial = self.request.user.empresa
-            else: # Para edición, asegurar que no se pueda cambiar la empresa del procedimiento existente
+            else: 
                 self.fields['empresa'].initial = self.instance.empresa
-            self.fields['empresa'].required = False # No es requerido si es oculto y pre-establecido
+            self.fields['empresa'].required = False 
         elif self.request and self.request.user.is_superuser:
-            # Si es superusuario, el campo empresa debe ser visible y seleccionable.
-            # Por defecto ya es un Select, pero forzamos el queryset a todas las empresas
             self.fields['empresa'].queryset = Empresa.objects.all()
-            self.fields['empresa'].required = True # Asegura que sea requerido para superusuarios al añadir/editar
+            self.fields['empresa'].required = True 
 
-        # Asegurarse de que el campo de fecha se inicialice correctamente al editar
         if self.instance and self.instance.fecha_emision:
             self.fields['fecha_emision'].initial = self.instance.fecha_emision.strftime('%d/%m/%Y')
 
-    # Añadir clean_empresa para manejar la lógica de guardado cuando el campo es HiddenInput
+        for field_name, field in self.fields.items():
+            if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput)):
+                field.widget.attrs.update({'class': 'form-input'})
+            elif isinstance(field.widget, ClearableFileInput):
+                field.widget.attrs.update({'class': 'form-input-file'})
+
     def clean_empresa(self):
         if self.request and not self.request.user.is_superuser:
             if self.instance and self.instance.pk:
@@ -314,6 +347,12 @@ class ProveedorForm(forms.ModelForm):
             self.fields['empresa'].required = False
         elif self.request and self.request.user.is_superuser:
             self.fields['empresa'].required = True
+
+        for field_name, field in self.fields.items():
+            if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput, forms.URLInput)):
+                field.widget.attrs.update({'class': 'form-input'})
+            elif isinstance(field.widget, ClearableFileInput):
+                field.widget.attrs.update({'class': 'form-input-file'})
 
     def clean_empresa(self):
         if self.request and not self.request.user.is_superuser:
@@ -505,7 +544,7 @@ class BajaEquipoForm(forms.ModelForm):
     )
     class Meta:
         model = BajaEquipo
-        exclude = ('equipo', 'dado_de_baja_por',)
+        exclude = ('equipo', 'dado_de_baja_por',) 
         widgets = {
             'razon_baja': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 4}),
             'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
@@ -527,4 +566,3 @@ class ExcelUploadForm(forms.Form):
         help_text="Sube un archivo .xlsx con el listado de equipos.",
         widget=forms.FileInput(attrs={'class': 'form-input-file'})
     )
-

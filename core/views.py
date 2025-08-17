@@ -77,23 +77,26 @@ def get_projected_activities_for_year(equipment_queryset, activity_type, current
     Each projected activity will have a 'date' and 'status' (realized, overdue, pending).
     This function is primarily for the annual summary (pie charts).
     Applies to Calibracion and Comprobacion.
+    
+    Excludes equipment that is 'De Baja' or 'Inactivo'.
     """
     projected_activities = []
     
     # Filtrar equipos para excluir los que están "De Baja" o "Inactivo" de las proyecciones
+    # APLICACIÓN CLAVE: Excluir equipos inactivos o de baja de las proyecciones de las gráficas de línea.
     equipment_queryset = equipment_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
 
     # Fetch all realized activities for the current year for quick lookup
     realized_activities_for_year = []
     if activity_type == 'calibracion':
         realized_activities_for_year = Calibracion.objects.filter(
-            equipo__in=equipment_queryset,
+            equipo__in=equipment_queryset, # Filtrar por el queryset ya depurado
             fecha_calibracion__year=current_year
         ).values_list('equipo_id', 'fecha_calibracion')
         freq_attr = 'frecuencia_calibracion_meses'
     elif activity_type == 'comprobacion':
         realized_activities_for_year = Comprobacion.objects.filter(
-            equipo__in=equipment_queryset,
+            equipo__in=equipment_queryset, # Filtrar por el queryset ya depurado
             fecha_comprobacion__year=current_year
         ).values_list('equipo_id', 'fecha_comprobacion')
         freq_attr = 'frecuencia_comprobacion_meses'
@@ -105,7 +108,7 @@ def get_projected_activities_for_year(equipment_queryset, activity_type, current
     for eq_id, date_obj in realized_activities_for_year:
         realized_set.add((eq_id, date_obj.year, date_obj.month))
 
-    for equipo in equipment_queryset:
+    for equipo in equipment_queryset: # Iterar sobre los equipos ya filtrados
         freq_months = getattr(equipo, freq_attr)
 
         if freq_months is None or freq_months <= 0:
@@ -159,16 +162,19 @@ def get_projected_maintenance_compliance_for_year(equipment_queryset, current_ye
     Generates a list of projected maintenance activities for the current year,
     categorized by compliance status (realized, overdue, pending).
     This specifically targets 'Preventivo' and 'Predictivo' maintenance as they are typically scheduled.
+    
+    Excludes equipment that is 'De Baja' or 'Inactivo'.
     """
     projected_activities = []
     
     # Filtrar equipos para excluir los que están "De Baja" o "Inactivo" de las proyecciones
+    # APLICACIÓN CLAVE: Excluir equipos inactivos o de baja de las proyecciones de las gráficas de línea.
     equipment_queryset = equipment_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
 
     # Fetch all realized *scheduled* maintenance activities for the current year for quick lookup
     # Only consider 'Preventivo' and 'Predictivo' as scheduled
     realized_scheduled_maintenance_for_year = Mantenimiento.objects.filter(
-        equipo__in=equipment_queryset,
+        equipo__in=equipment_queryset, # Filtrar por el queryset ya depurado
         fecha_mantenimiento__year=current_year,
         tipo_mantenimiento__in=['Preventivo', 'Predictivo']
     ).values_list('equipo_id', 'fecha_mantenimiento')
@@ -177,7 +183,7 @@ def get_projected_maintenance_compliance_for_year(equipment_queryset, current_ye
     for eq_id, date_obj in realized_scheduled_maintenance_for_year:
         realized_set.add((eq_id, date_obj.year, date_obj.month))
 
-    for equipo in equipment_queryset:
+    for equipo in equipment_queryset: # Iterar sobre los equipos ya filtrados
         freq_months = equipo.frecuencia_mantenimiento_meses
 
         if freq_months is None or freq_months <= 0:
@@ -193,7 +199,7 @@ def get_projected_maintenance_compliance_for_year(equipment_queryset, current_ye
 
         num_intervals_to_reach_year = 0
         if freq_months > 0:
-            num_intervals_to_reach_year = max(0, (delta_months + freq_months - 1) // freq_months)
+            num_intervals = max(0, (delta_months + freq_months - 1) // freq_months)
         
         current_projection_date = plan_start_date + relativedelta(months=int(num_intervals_to_reach_year * freq_months))
 
@@ -796,7 +802,7 @@ def dashboard(request):
         equipos_queryset = equipos_queryset.filter(empresa_id=selected_company_id)
 
     # Excluir equipos "De Baja" de los cálculos del dashboard
-    equipos_para_dashboard = equipos_queryset.exclude(estado='De Baja')
+    equipos_para_dashboard = equipos_queryset.exclude(estado='De Baja').exclude(estado='Inactivo') # Se añadió exclusión de 'Inactivo'
 
     # --- Indicadores Clave ---
     total_equipos = equipos_queryset.count()
@@ -870,7 +876,7 @@ def dashboard(request):
         target_date = start_date_range + relativedelta(months=i)
         line_chart_labels.append(f"{calendar.month_abbr[target_date.month]}. {target_date.year}")
 
-    # Datos "Realizadas" (basado en registros de actividad) - Solo para equipos que no estén de baja
+    # Datos "Realizadas" (basado en registros de actividad) - Solo para equipos que no estén de baja o inactivos
     calibraciones_realizadas_period = Calibracion.objects.filter(
         equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_calibracion__gte=start_date_range,
@@ -912,7 +918,7 @@ def dashboard(request):
             realized_comprobaciones_line_data[month_index] += 1
 
     # Datos "Programadas" (basado en un plan fijo anual desde la fecha de adquisición/registro)
-    # Usar equipos_para_dashboard para la programación
+    # Usar equipos_para_dashboard para la programación (ya excluye De Baja e Inactivo)
     for equipo in equipos_para_dashboard:
         # Determinar la fecha de inicio del plan para este equipo (fecha de adquisición o registro)
         plan_start_date = equipo.fecha_adquisicion if equipo.fecha_adquisicion else \
@@ -1002,7 +1008,7 @@ def dashboard(request):
 
     # Estado de Equipos (Torta) - Usar el queryset general (incluye De Baja, Inactivo)
     estado_equipos_counts = defaultdict(int)
-    for equipo in equipos_queryset.all():
+    for equipo in equipos_queryset.all(): # NOTA: Este queryset original incluye todos los estados
         estado_equipos_counts[equipo.estado] += 1
     
     estado_equipos_labels = list(estado_equipos_counts.keys())
@@ -1306,7 +1312,7 @@ def home(request):
     else:
         # Por defecto, no mostrar "De Baja" a menos que se filtre explícitamente por él
         if not user.is_superuser or (user.is_superuser and not selected_company_id):
-            equipos_list = equipos_list.exclude(estado='De Baja')
+            equipos_list = equipos_list.exclude(estado='De Baja').exclude(estado='Inactivo') # Se añadió exclusión de 'Inactivo'
 
     # Añadir lógica para el estado de las fechas de próxima actividad
     for equipo in equipos_list:
@@ -1465,15 +1471,22 @@ def añadir_equipo(request):
     Handles adding a new equipment.
     """
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             equipo = form.save(commit=False)
+            # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
+            # Si el formulario deshabilita el campo 'empresa' para no superusuarios,
+            # Django no lo incluirá en request.POST. Aseguramos que se asigne aquí si es el caso.
+            if not request.user.is_superuser and not equipo.empresa:
+                equipo.empresa = request.user.empresa
             equipo.save()
             messages.success(request, 'Equipo añadido exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
+        # Pasar el request al formulario
         form = EquipoForm(request=request)
     
     return render(request, 'core/añadir_equipo.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Equipo'})
@@ -1734,15 +1747,20 @@ def editar_equipo(request, pk):
         return redirect('core:home')
 
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, instance=equipo, request=request)
         if form.is_valid():
             equipo = form.save(commit=False)
+            # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
+            if not request.user.is_superuser and not equipo.empresa:
+                equipo.empresa = request.user.empresa
             equipo.save()
             messages.success(request, 'Equipo actualizado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
+        # Pasar el request al formulario
         form = EquipoForm(instance=equipo, request=request)
 
     return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
@@ -2177,6 +2195,7 @@ def activar_equipo(request, equipo_pk):
         
         elif equipo.estado == 'Inactivo':
             equipo.estado = 'Activo'
+            # Es crucial recalcular las próximas fechas cuando un equipo pasa de Inactivo a Activo
             equipo.calcular_proxima_calibracion()
             equipo.calcular_proximo_mantenimiento()
             equipo.calcular_proxima_comprobacion()
@@ -2244,7 +2263,7 @@ def añadir_empresa(request):
     return render(request, 'core/añadir_empresa.html', {'formulario': formulario, 'titulo_pagina': 'Añadir Nueva Empresa'})
 
 @login_required
-@user_passes_test(lambda u: u.is_superuser or u.empresa.pk == pk, login_url='/core/access_denied/') # Restringe a superusuario o propia empresa
+@user_passes_test(lambda u: u.is_superuser or (u.empresa and u.empresa.pk == pk), login_url='/core/access_denied/') # Restringe a superusuario o propia empresa
 def detalle_empresa(request, pk):
     """
     Displays the details of a specific company and its associated equipment.
@@ -2252,7 +2271,7 @@ def detalle_empresa(request, pk):
     empresa = get_object_or_404(Empresa, pk=pk)
 
     # Permission check: superusers can see any company; regular users can only see their own.
-    if not request.user.is_superuser and request.user.empresa != empresa:
+    if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != empresa):
         messages.error(request, 'No tienes permiso para ver los detalles de esta empresa.')
         return redirect('core:listar_empresas') # Redirect to list if not permitted
 
@@ -2306,7 +2325,7 @@ def eliminar_empresa(request, pk):
 
 
 @login_required
-@permission_required('core.change_empresa', raise_exception=True)
+@permission_required('core.change_empresa', raise_exception=True) # Este permiso es apropiado para administrar usuarios de una empresa
 def añadir_usuario_a_empresa(request, empresa_pk):
     """
     Vista para añadir un usuario existente a una empresa específica.
@@ -2315,6 +2334,7 @@ def añadir_usuario_a_empresa(request, empresa_pk):
     empresa = get_object_or_404(Empresa, pk=empresa_pk)
     titulo_pagina = f"Añadir Usuario a {empresa.nombre}"
 
+    # REVISAR: Permiso: Superusuario o usuario asociado a la empresa (si la empresa es la del usuario)
     if not request.user.is_superuser and request.user.empresa != empresa:
         messages.error(request, 'No tienes permiso para añadir usuarios a esta empresa.')
         return redirect('core:detalle_empresa', pk=empresa.pk)
@@ -2357,6 +2377,12 @@ def listar_ubicaciones(request):
     Lists all locations.
     """
     ubicaciones = Ubicacion.objects.all()
+    # Filtrar por empresa si el usuario no es superusuario
+    if not request.user.is_superuser and request.user.empresa:
+        ubicaciones = ubicaciones.filter(empresa=request.user.empresa)
+    elif not request.user.is_superuser and not request.user.empresa: # Usuario normal sin empresa asignada
+        ubicaciones = Ubicacion.objects.none()
+
     return render(request, 'core/listar_ubicaciones.html', {'ubicaciones': ubicaciones, 'titulo_pagina': 'Listado de Ubicaciones'})
 
 @login_required
@@ -2366,15 +2392,20 @@ def añadir_ubicacion(request):
     Handles adding a new location.
     """
     if request.method == 'POST':
-        form = UbicacionForm(request.POST)
+        # Pasar el request al formulario
+        form = UbicacionForm(request.POST, request=request)
         if form.is_valid():
-            form.save()
+            ubicacion = form.save(commit=False)
+            if not request.user.is_superuser and not ubicacion.empresa:
+                ubicacion.empresa = request.user.empresa
+            ubicacion.save()
             messages.success(request, 'Ubicación añadida exitosamente.')
             return redirect('core:listar_ubicaciones')
         else:
             messages.error(request, 'Hubo un error al añadir la ubicación. Por favor, revisa los datos.')
     else:
-        form = UbicacionForm()
+        # Pasar el request al formulario
+        form = UbicacionForm(request=request)
     return render(request, 'core/añadir_ubicacion.html', {'form': form, 'titulo_pagina': 'Añadir Nueva Ubicación'})
 
 @login_required
@@ -2384,8 +2415,14 @@ def editar_ubicacion(request, pk):
     Handles editing an existing location.
     """
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
+    # Permiso: Superusuario o usuario asociado a la empresa de la ubicación
+    if not request.user.is_superuser and request.user.empresa != ubicacion.empresa:
+        messages.error(request, 'No tienes permiso para editar esta ubicación.')
+        return redirect('core:listar_ubicaciones')
+
     if request.method == 'POST':
-        form = UbicacionForm(request.POST, instance=ubicacion)
+        # Pasar el request al formulario
+        form = UbicacionForm(request.POST, instance=ubicacion, request=request)
         if form.is_valid():
             form.save()
             messages.success(request, 'Ubicación actualizada exitosamente.')
@@ -2393,7 +2430,8 @@ def editar_ubicacion(request, pk):
         else:
             messages.error(request, 'Hubo un error al actualizar la ubicación. Por favor, revisa los datos.')
     else:
-        form = UbicacionForm(instance=ubicacion)
+        # Pasar el request al formulario
+        form = UbicacionForm(instance=ubicacion, request=request)
     return render(request, 'core/editar_ubicacion.html', {'form': form, 'ubicacion': ubicacion, 'titulo_pagina': f'Editar Ubicación: {ubicacion.nombre}'})
 
 @login_required
@@ -2403,6 +2441,11 @@ def eliminar_ubicacion(request, pk):
     Handles deleting a location.
     """
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
+    # Permiso: Superusuario o usuario asociado a la empresa de la ubicación
+    if not request.user.is_superuser and request.user.empresa != ubicacion.empresa:
+        messages.error(request, 'No tienes permiso para eliminar esta ubicación.')
+        return redirect('core:listar_ubicaciones')
+
     if request.method == 'POST':
         try:
             ubicacion.delete()
@@ -2488,9 +2531,7 @@ def añadir_procedimiento(request):
         if form.is_valid():
             try:
                 procedimiento = form.save(commit=False)
-                # Si el usuario no es superusuario, asigna automáticamente su empresa
-                if not request.user.is_superuser:
-                    procedimiento.empresa = request.user.empresa
+                # La lógica de empresa ya se maneja en el formulario
                 procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
                 return redirect('core:listar_procedimientos')
@@ -2515,7 +2556,7 @@ def editar_procedimiento(request, pk):
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
     # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
-    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+    if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != procedimiento.empresa):
         messages.error(request, 'No tienes permiso para editar este procedimiento.')
         return redirect('core:listar_procedimientos')
 
@@ -2547,7 +2588,7 @@ def eliminar_procedimiento(request, pk):
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
     # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
-    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+    if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != procedimiento.empresa):
         messages.error(request, 'No tienes permiso para eliminar este procedimiento.')
         return redirect('core:listar_procedimientos')
 
@@ -2578,7 +2619,10 @@ def listar_proveedores(request):
     proveedores_list = Proveedor.objects.all().order_by('nombre_empresa')
 
     if not request.user.is_superuser:
-        proveedores_list = proveedores_list.filter(empresa=request.user.empresa)
+        if request.user.empresa:
+            proveedores_list = proveedores_list.filter(empresa=request.user.empresa)
+        else:
+            proveedores_list = Proveedor.objects.none() # Usuario normal sin empresa asignada
 
     if query:
         proveedores_list = proveedores_list.filter(
@@ -2624,6 +2668,7 @@ def añadir_proveedor(request):
         form = ProveedorForm(request.POST, request=request)
         if form.is_valid():
             proveedor = form.save(commit=False)
+            # La lógica de empresa ya se maneja en el formulario
             proveedor.save()
             messages.success(request, 'Proveedor añadido exitosamente.')
             return redirect('core:listar_proveedores')
@@ -2643,7 +2688,7 @@ def editar_proveedor(request, pk):
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
-    if not request.user.is_superuser and proveedor.empresa != request.user.empresa:
+    if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -2669,7 +2714,7 @@ def eliminar_proveedor(request, pk):
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
-    if not request.user.is_superuser and proveedor.empresa != request.user.empresa:
+    if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -2693,7 +2738,7 @@ def detalle_proveedor(request, pk):
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
-    if not request.user.is_superuser and proveedor.empresa != request.user.empresa:
+    if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -2716,7 +2761,10 @@ def listar_usuarios(request):
     usuarios_list = CustomUser.objects.all()
 
     if not request.user.is_superuser:
-        usuarios_list = usuarios_list.filter(empresa=request.user.empresa)
+        if request.user.empresa:
+            usuarios_list = usuarios_list.filter(empresa=request.user.empresa)
+        else: # Usuario normal sin empresa
+            usuarios_list = CustomUser.objects.none()
 
     if query:
         usuarios_list = usuarios_list.filter(
@@ -2746,19 +2794,29 @@ def añadir_usuario(request, empresa_pk=None):
     Handles adding a new custom user and assigning groups.
     """
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = CustomUserCreationForm(request.POST, request=request)
         if form.is_valid():
             user = form.save(commit=False)
+            # Si el usuario que crea NO es superusuario y no asignó una empresa (porque estaba deshabilitada),
+            # asegurarse de que la empresa del nuevo usuario sea la misma que la del usuario que crea.
+            if not request.user.is_superuser and not user.empresa:
+                user.empresa = request.user.empresa
             user.save()
-            form.save_m2m()
+            form.save_m2m() # Guarda las relaciones ManyToMany como los grupos y permisos
             messages.success(request, 'Usuario añadido exitosamente.')
             return redirect('core:listar_usuarios')
         else:
             messages.error(request, 'Hubo un error al añadir el usuario. Por favor, revisa los datos.')
     else:
+        # Pasar el request al formulario
         form = CustomUserCreationForm(request=request)
         if empresa_pk:
-            form.fields['empresa'].initial = get_object_or_404(Empresa, pk=empresa_pk)
+            try:
+                form.fields['empresa'].initial = Empresa.objects.get(pk=empresa_pk)
+            except Empresa.DoesNotExist:
+                messages.error(request, 'La empresa especificada no existe.')
+                return redirect('core:listar_usuarios')
 
     return render(request, 'core/añadir_usuario.html', {'form': form, 'empresa_pk': empresa_pk, 'titulo_pagina': 'Añadir Nuevo Usuario'})
 
@@ -2772,12 +2830,10 @@ def detalle_usuario(request, pk):
     usuario = get_object_or_404(CustomUser, pk=pk)
 
     if not request.user.is_superuser and request.user.pk != usuario.pk:
-        messages.error(request, 'No tienes permiso para ver este perfil de usuario.')
-        return redirect('core:perfil_usuario')
-
-    if request.user.is_staff and not request.user.is_superuser and usuario.empresa != request.user.empresa:
-        messages.error(request, 'No tienes permiso para ver usuarios de otras empresas.')
-        return redirect('core:listar_usuarios')
+        # Si no es superusuario y no es su propio perfil
+        if not request.user.empresa or request.user.empresa != usuario.empresa:
+            messages.error(request, 'No tienes permiso para ver usuarios de otras empresas.')
+            return redirect('core:listar_usuarios')
 
     return render(request, 'core/detalle_usuario.html', {
         'usuario_a_ver': usuario,
@@ -2793,27 +2849,35 @@ def editar_usuario(request, pk):
     """
     usuario_a_editar = get_object_or_404(CustomUser, pk=pk)
 
+    # Permiso:
+    # 1. Superusuario puede editar cualquiera.
+    # 2. Staff puede editar usuarios de su misma empresa, PERO NO su propio perfil con esta vista.
+    # 3. Si el usuario intenta editar su propio perfil, lo redirigimos a la vista de perfil de usuario.
+    if request.user.pk == usuario_a_editar.pk:
+        messages.info(request, "Estás editando tu propio perfil. Para cambiar tu contraseña o datos básicos, usa la opción específica en 'Mi Perfil'.")
+        return redirect('core:perfil_usuario')
+    
     if not request.user.is_superuser:
-        if request.user.pk == usuario_a_editar.pk:
-            messages.info(request, "Estás editando tu propio perfil. Para cambiar la contraseña, usa la opción específica en tu perfil.")
-            return redirect('core:perfil_usuario')
-        elif not request.user.is_staff or request.user.empresa != usuario_a_editar.empresa:
+        if not request.user.is_staff or (request.user.empresa and request.user.empresa != usuario_a_editar.empresa):
             messages.error(request, 'No tienes permiso para editar este usuario.')
             return redirect('core:listar_usuarios')
 
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = CustomUserChangeForm(request.POST, instance=usuario_a_editar, request=request)
         if form.is_valid():
             user = form.save(commit=False)
+            # Asegurar que la empresa no se cambie si el campo está deshabilitado para no superusuarios
             if not request.user.is_superuser:
-                user.empresa = usuario_a_editar.empresa 
+                 user.empresa = usuario_a_editar.empresa # Mantener la empresa original
             user.save()
-            form.save_m2m()
+            form.save_m2m() # Guarda las relaciones ManyToMany como los grupos y permisos
             messages.success(request, f'Usuario "{user.username}" actualizado exitosamente.')
             return redirect('core:detalle_usuario', pk=usuario_a_editar.pk)
         else:
             messages.error(request, 'Hubo un error al actualizar el usuario. Por favor, revisa los datos.')
     else:
+        # Pasar el request al formulario
         form = CustomUserChangeForm(instance=usuario_a_editar, request=request)
 
     return render(request, 'core/editar_usuario.html', {'form': form, 'usuario_a_editar': usuario_a_editar, 'titulo_pagina': f'Editar Usuario: {usuario_a_editar.username}'})
@@ -2831,6 +2895,9 @@ def eliminar_usuario(request, pk):
         messages.error(request, 'No puedes eliminar tu propia cuenta de superusuario.')
         return redirect('core:listar_usuarios')
 
+    # Si no es superusuario, no puede eliminar usuarios de otras empresas.
+    # Este check ya está implícito por el user_passes_test a is_superuser.
+    # Sin embargo, si un staff pudiera eliminar, la lógica sería similar a la de edición/detalle.
     if not request.user.is_superuser and request.user.empresa != usuario.empresa:
         messages.error(request, 'No tienes permiso para eliminar usuarios de otras empresas.')
         return redirect('core:listar_usuarios')
@@ -2848,7 +2915,7 @@ def eliminar_usuario(request, pk):
 
 
 @login_required
-@permission_required('auth.change_user', raise_exception=True)
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/') # Solo superusuarios pueden cambiar contraseñas de otros
 def change_user_password(request, pk):
     """
     Handles changing another user's password (admin only).
@@ -2857,11 +2924,13 @@ def change_user_password(request, pk):
 
     if request.user.pk == user_to_change.pk:
         messages.warning(request, "No puedes cambiar tu propia contraseña desde esta sección. Usa 'Mi Perfil' -> 'Cambiar contraseña'.")
-        return redirect('core:detalle_usuario', pk=pk)
+        return redirect('core:perfil_usuario') # Redirige a la vista de perfil para cambio de contraseña propio
 
-    if not request.user.is_superuser:
-        messages.error(request, 'No tienes permiso para cambiar la contraseña de otros usuarios.')
-        return redirect('core:detalle_usuario', pk=pk)
+    # Si un staff pudiera cambiar contraseñas (no superusuario), se añadiría una verificación de empresa.
+    # if not request.user.is_superuser and request.user.empresa != user_to_change.empresa:
+    #     messages.error(request, 'No tienes permiso para cambiar la contraseña de usuarios de otras empresas.')
+    #     return redirect('core:listar_usuarios')
+
 
     if request.method == 'POST':
         form = PasswordChangeForm(user_to_change, request.POST)
