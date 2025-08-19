@@ -59,7 +59,7 @@ from django.contrib.auth.models import Group # Importar el modelo Group
 
 # Importar para default_storage (manejo de archivos S3/local)
 from django.core.files.storage import default_storage
-
+from storages.backends.s3boto3 import S3Boto3Storage
 
 
 # =============================================================================
@@ -76,7 +76,7 @@ def subir_archivo(nombre_archivo, contenido):
     :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
     :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
     """
-    storage = default_storage # Usa el almacenamiento por defecto (S3 o local)
+    storage = S3Boto3Storage() # Usa el almacenamiento por defecto (S3 o local)
     ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
     storage.save(ruta, contenido)
     print(f'Archivo subido a: {ruta}') # Para depuración
@@ -2587,6 +2587,14 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
+                # 1. obtener el archivo desde request.FILES
+                archivo_subido = request.FILES["documento_pdf"]
+
+                # 2. obtener el nombre del archivo
+                nombre_archivo = archivo_subido.name
+
+                # 3. pasar a tu función (contenido puede ser directamente el objeto archivo)
+                subir_archivo(nombre_archivo, archivo_subido)
                 procedimiento = form.save(commit=False)
                 # La lógica de empresa ya se maneja en el formulario
                 procedimiento.save()
@@ -3558,13 +3566,3 @@ def access_denied(request):
     # =============================================================================
 # Funciones para Subida de Archivos a S3
 # =============================================================================
-def subir_archivo(nombre_archivo, contenido):
-    """
-    Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
-    :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
-    :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
-    """
-    storage = default_storage # Usa el almacenamiento por defecto (S3 o local)
-    ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
-    storage.save(ruta, contenido)
-    print(f'Archivo subido a: {ruta}') # Para depuración

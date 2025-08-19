@@ -155,10 +155,10 @@ STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 # Obtiene las credenciales de AWS desde las variables de entorno o usa los valores fijos
 # Usando los valores fijos que proporcionaste
-AWS_ACCESS_KEY_ID =
-AWS_SECRET_ACCESS_KEY = 
-AWS_STORAGE_BUCKET_NAME =
-AWS_S3_REGION_NAME = 
+AWS_ACCESS_KEY_ID ="AKIAY4RRUFZQPV3JBUN5"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_STORAGE_BUCKET_NAME = "sam-plataforma-media"
+AWS_S3_REGION_NAME = "us-east-2"
 AWS_S3_SIGNATURE_VERSION = "s3v4"
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
 AWS_DEFAULT_ACL = None # Acceso por defecto a los objetos subidos
