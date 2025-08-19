@@ -1,5 +1,6 @@
 # core/models.py
 # Ajustado para la lógica de la primera programación de mantenimiento y comprobación
+# y para la implementación de planes de suscripción simplificados.
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission # Asegúrate de que Group y Permission estén aquí
@@ -63,6 +64,18 @@ class Empresa(models.Model):
         null=True,
         verbose_name="Codificación del Formato (Empresa)"
     )
+    # Campos para la lógica de suscripción
+    es_periodo_prueba = models.BooleanField(default=False, verbose_name="¿Es Período de Prueba?")
+    duracion_prueba_dias = models.IntegerField(default=30, verbose_name="Duración Prueba (días)")
+    fecha_inicio_plan = models.DateField(blank=True, null=True, verbose_name="Fecha Inicio Plan")
+    plan_actual = models.ForeignKey('PlanSuscripcion', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Plan de Suscripción Actual")
+    acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
+    estado_suscripcion = models.CharField(
+        max_length=50,
+        choices=[('Activo', 'Activo'), ('Expirado', 'Expirado'), ('Cancelado', 'Cancelado')],
+        default='Activo',
+        verbose_name="Estado de Suscripción"
+    )
 
     class Meta:
         verbose_name = "Empresa"
@@ -73,6 +86,55 @@ class Empresa(models.Model):
             ("can_add_empresas", "Can add empresas"),
             ("can_change_empresas", "Can change empresas"),
             ("can_delete_empresas", "Can delete empresas"),
+        ]
+
+    def __str__(self):
+        return self.nombre
+
+    def get_limite_equipos(self):
+        """Retorna el límite de equipos basado en el plan o si es prueba/acceso manual."""
+        if self.acceso_manual_activo:
+            # Si el acceso es manual, el límite es infinito (o un número muy grande)
+            return float('inf') 
+        elif self.es_periodo_prueba:
+            # Durante el período de prueba, el límite es un valor predefinido (ej. 5 equipos)
+            return 5  # O define un campo para esto si quieres que sea configurable
+        elif self.plan_actual:
+            return self.plan_actual.limite_equipos
+        return 0 # Si no hay plan ni prueba activa, el límite es 0
+
+    def get_estado_suscripcion_display(self):
+        """Devuelve el estado de la suscripción, considerando el periodo de prueba."""
+        if self.es_periodo_prueba:
+            if self.fecha_inicio_plan:
+                if timezone.localdate() > self.fecha_inicio_plan + timedelta(days=self.duracion_prueba_dias):
+                    return "Período de Prueba Expirado"
+                else:
+                    return "Período de Prueba Activo"
+            return "Período de Prueba Activo (Fecha no definida)" # Fallback si fecha no está
+        
+        # Si no es período de prueba, devuelve el estado_suscripcion normal
+        return self.estado_suscripcion
+
+class PlanSuscripcion(models.Model):
+    """
+    Modelo para definir los diferentes planes de suscripción disponibles.
+    """
+    nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Plan")
+    limite_equipos = models.IntegerField(default=0, verbose_name="Límite de Equipos")
+    precio_mensual = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Precio Mensual")
+    descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción del Plan")
+    duracion_meses = models.IntegerField(default=0, help_text="Duración del plan en meses (0 para indefinido)", verbose_name="Duración (meses)")
+
+    class Meta:
+        verbose_name = "Plan de Suscripción"
+        verbose_name_plural = "Planes de Suscripción"
+        ordering = ['precio_mensual']
+        permissions = [
+            ("can_view_plansuscripcion", "Can view plan suscripcion"),
+            ("can_add_plansuscripcion", "Can add plan suscripcion"),
+            ("can_change_plansuscripcion", "Can change plan suscripcion"),
+            ("can_delete_plansuscripcion", "Can delete plan suscripcion"),
         ]
 
     def __str__(self):
@@ -134,13 +196,17 @@ def get_upload_path(instance, filename):
     # Manejar el caso de Procedimiento, si tiene un código
     elif isinstance(instance, Procedimiento):
         base_code = instance.codigo
+    elif isinstance(instance, Documento): # Para el nuevo modelo Documento
+        # Si es un documento genérico, podemos usar un ID o un nombre seguro
+        # Considera usar instance.pk si el objeto ya ha sido guardado
+        base_code = f"doc_{instance.pk}" if instance.pk else "temp_doc"
         
     if not base_code:
         # Si no se puede determinar el código, usar un nombre genérico o lanzar un error
         # Para evitar errores en desarrollo, podrías retornar algo como 'uploads/misc/'
         # o un valor predeterminado si es aceptable que no todos los modelos tengan un base_code.
         # Por ahora, lanza un error si no se encuentra.
-        raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
+        raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento/documento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
 
     # Convertir el código a un formato seguro para el nombre de archivo
     safe_base_code = base_code.replace('/', '_').replace('\\', '_').replace(' ', '_')
@@ -177,6 +243,8 @@ def get_upload_path(instance, filename):
             subfolder = "equipos/otros_documentos/"
     elif isinstance(instance, Procedimiento):
         subfolder = "procedimientos/" # Subcarpeta para documentos de procedimiento
+    elif isinstance(instance, Documento): # Nueva subcarpeta para documentos genéricos
+        subfolder = "generales/"
     
     # Asegurarse de que el nombre del archivo es seguro
     safe_filename = filename # Por simplicidad, se mantiene el nombre original, pero es un punto de mejora
@@ -212,6 +280,12 @@ class Ubicacion(models.Model):
     """Modelo para la gestión de ubicaciones de equipos."""
     nombre = models.CharField(max_length=255, unique=True)
     descripcion = models.TextField(blank=True, null=True)
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='ubicaciones',
+        verbose_name="Empresa"
+    )
 
     class Meta:
         verbose_name = "Ubicación"
@@ -222,9 +296,10 @@ class Ubicacion(models.Model):
             ("can_change_ubicacion", "Can change ubicacion"),
             ("can_delete_ubicacion", "Can delete ubicacion"),
         ]
+        unique_together = ('nombre', 'empresa') # Unicidad por empresa
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre} ({self.empresa.nombre})"
 
 class Procedimiento(models.Model):
     """Modelo para la gestión de procedimientos."""
@@ -581,6 +656,57 @@ class BajaEquipo(models.Model):
     def __str__(self):
         return f"Baja de {self.equipo.nombre} ({self.fecha_baja})"
 
+# ==============================================================================
+# MODELO PARA DOCUMENTOS GENÉRICOS (NUEVO)
+# ==============================================================================
+
+class Documento(models.Model):
+    """
+    Modelo para almacenar información sobre documentos genéricos subidos.
+    Puede ser usado para PDFs u otros archivos no directamente asociados a un equipo/actividad específica.
+    """
+    nombre_archivo = models.CharField(max_length=255, verbose_name="Nombre del Archivo")
+    descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    # Este campo almacenará la ruta relativa o clave del objeto en S3
+    archivo_s3_path = models.CharField(max_length=500, blank=True, null=True, verbose_name="Ruta en S3")
+    subido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Subido por"
+    )
+    fecha_subida = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Subida")
+    empresa = models.ForeignKey(
+        'Empresa', # Usa 'Empresa' como cadena si Empresa está definida más arriba o abajo
+        on_delete=models.CASCADE,
+        related_name='documentos_generales',
+        verbose_name="Empresa Asociada",
+        null=True, # Puede ser null si es un documento global o si el usuario no tiene empresa
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = "Documento"
+        verbose_name_plural = "Documentos"
+        ordering = ['-fecha_subida']
+        permissions = [
+            ("can_view_documento", "Can view documento"),
+            ("can_add_documento", "Can add documento"),
+            ("can_change_documento", "Can change documento"),
+            ("can_delete_documento", "Can delete documento"),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre_archivo} ({self.empresa.nombre if self.empresa else 'N/A'})"
+
+    def get_absolute_s3_url(self):
+        """Devuelve la URL pública del archivo en S3 si existe."""
+        if self.archivo_s3_path:
+            from django.core.files.storage import default_storage # Importar aquí para evitar dependencia circular
+            return default_storage.url(self.archivo_s3_path)
+        return None
+
 
 # --- Signals para actualizar el estado del equipo y las próximas fechas ---
 
@@ -722,5 +848,4 @@ def set_equipo_activo_on_delete_baja(sender, instance, **kwargs):
             equipo.calcular_proximo_mantenimiento()
             equipo.calcular_proxima_comprobacion()
             equipo.save(update_fields=['estado', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion'])
-
 

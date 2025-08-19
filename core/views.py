@@ -46,7 +46,6 @@ from .forms import (
     ExcelUploadForm,
     CustomUserCreationForm, CustomUserChangeForm, UserProfileForm, EmpresaForm, EmpresaFormatoForm,
 )
-
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
@@ -62,6 +61,7 @@ from django.contrib.auth.models import Group # Importar el modelo Group
 from django.core.files.storage import default_storage
 
 
+
 # =============================================================================
 # Funciones de utilidad (helpers)
 # =============================================================================
@@ -69,6 +69,17 @@ from django.core.files.storage import default_storage
 def es_miembro_empresa(user, empresa_id):
     """Verifica si el usuario pertenece a la empresa especificada."""
     return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
+
+def subir_archivo(nombre_archivo, contenido):
+    """
+    Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
+    :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
+    :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
+    """
+    storage = default_storage # Usa el almacenamiento por defecto (S3 o local)
+    ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
+    storage.save(ruta, contenido)
+    print(f'Archivo subido a: {ruta}') # Para depuración
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -1243,7 +1254,53 @@ def contact_us(request):
     return render(request, 'core/contact_us.html')
 
 # --- Vistas de Equipos ---
+# Asegúrate de importar DocumentoForm si no lo has hecho ya en .forms
+# from .forms import DocumentoForm # Si DocumentoForm es un formulario para subir documentos
 
+# core/views.py
+# ...
+from .forms import DocumentoForm # Asegúrate de que esta importación exista
+from .models import Documento # Asegúrate de que esta importación exista
+
+# ...
+
+@login_required
+def subir_pdf(request):
+    """
+    Vista para subir un archivo PDF y registrarlo en la base de datos.
+    """
+    if request.method == "POST":
+        form = DocumentoForm(request.POST, request.FILES, request=request) # Pasar el request al form
+        archivo_subido = request.FILES.get("archivo") # Obtener el archivo directamente del request.FILES
+
+        if form.is_valid() and archivo_subido: # Asegurarse de que el archivo también esté presente
+            nombre_archivo = archivo_subido.name
+            ruta_s3 = f'pdfs/{nombre_archivo}' # La ruta que se guardará en el modelo
+
+            try:
+                # Sube el archivo a S3 usando la función auxiliar
+                subir_archivo(nombre_archivo, archivo_subido)
+
+                # Guarda el objeto Documento en la base de datos
+                documento = form.save(commit=False)
+                documento.nombre_archivo = nombre_archivo # El nombre real del archivo
+                documento.archivo_s3_path = ruta_s3 # La ruta completa en S3
+                documento.subido_por = request.user
+                if not request.user.is_superuser and request.user.empresa:
+                    documento.empresa = request.user.empresa # Asigna la empresa automáticamente
+                documento.save()
+
+                messages.success(request, f'Archivo "{nombre_archivo}" subido y registrado exitosamente.')
+                return redirect("core:home") # O a una lista de documentos si creas una
+            except Exception as e:
+                messages.error(request, f'Error al subir o registrar el archivo: {e}')
+                print(f"DEBUG: Error al subir archivo {nombre_archivo}: {e}")
+        else:
+            messages.error(request, 'Por favor, corrige los errores del formulario y asegúrate de seleccionar un archivo.')
+    else:
+        form = DocumentoForm(request=request) # Pasa el request al inicializar
+    return render(request, "core/subir_pdf.html", {"form": form, 'titulo_pagina': 'Subir Documento PDF'})
+    
 @login_required
 @permission_required('core.view_equipo', raise_exception=True)
 def home(request):
@@ -3498,3 +3555,16 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
+    # =============================================================================
+# Funciones para Subida de Archivos a S3
+# =============================================================================
+def subir_archivo(nombre_archivo, contenido):
+    """
+    Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
+    :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
+    :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
+    """
+    storage = default_storage # Usa el almacenamiento por defecto (S3 o local)
+    ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
+    storage.save(ruta, contenido)
+    print(f'Archivo subido a: {ruta}') # Para depuración
