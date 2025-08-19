@@ -153,19 +153,24 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2') # Puedes definir un valor por defecto si lo deseas
 
+# Define STATIC_ROOT globalmente, es necesario para collectstatic
+# Cuando se usa S3 para estáticos, collectstatic los sube a S3.
+# Cuando se usa Whitenoise, collectstatic los recolecta en STATIC_ROOT local.
+STATIC_ROOT = BASE_DIR / 'staticfiles' # Siempre define STATIC_ROOT
+
 # Determina si usar S3 o almacenamiento local
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage' # También para archivos estáticos si los sirves desde S3
-
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage' # Si también para archivos estáticos
+    
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-    AWS_DEFAULT_ACL = None # Acceso por defecto a los objetos subidos
+    AWS_DEFAULT_ACL = None
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
     AWS_S3_USE_SSL = True
-    AWS_QUERYSTRING_AUTH = False # No añade el parámetro de autenticación como una cadena de consulta.
-    AWS_LOCATION = 'media' # Prefijo de la carpeta dentro de tu bucket S3 para los archivos media
-    AWS_S3_FILE_OVERWRITE = False # Asegúrate de que los archivos nuevos no sobrescriban los viejos con el mismo nombre.
+    AWS_QUERYSTRING_AUTH = False
+    AWS_LOCATION = 'media'
+    AWS_S3_FILE_OVERWRITE = False
     print("INFO: AWS S3 storage configured.")
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
@@ -174,8 +179,10 @@ else:
     MEDIA_ROOT = BASE_DIR / 'media' # Carpeta local donde se guardarán los archivos
     # Para STATICFILES_STORAGE, si no usas S3 para estáticos, Whitenoise es la opción por defecto.
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-    STATIC_ROOT = BASE_DIR / 'staticfiles' # Necesario para Whitenoise en producción
+    # STATIC_ROOT ya está definido arriba, no lo redefinas aquí
+
     print("WARNING: AWS S3 environment variables not found. Using local media storage.")
+
 
 # =============================================================================
 
