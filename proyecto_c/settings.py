@@ -153,6 +153,7 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2') # Puedes definir un valor por defecto si lo deseas
 
+
 # Define STATIC_ROOT globalmente, es necesario para collectstatic
 # Cuando se usa S3 para estáticos, collectstatic los sube a S3.
 # Cuando se usa Whitenoise, collectstatic los recolecta en STATIC_ROOT local.
