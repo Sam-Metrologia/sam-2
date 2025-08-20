@@ -81,6 +81,7 @@ urlpatterns = [
     path('usuarios/<int:pk>/eliminar/', views.eliminar_usuario, name='eliminar_usuario'),
     path('usuarios/<int:pk>/', views.detalle_usuario, name='detalle_usuario'),
     path('usuarios/<int:pk>/cambiar_password/', views.change_user_password, name='change_user_password'),
+    path('usuarios/toggle_active/', views.toggle_user_active_status, name='toggle_user_active_status'), # <--- AÑADIR ESTA LÍNEA
 
     # Informes
     path('informes/', views.informes, name='informes'),
@@ -93,10 +94,8 @@ urlpatterns = [
     # URL para AJAX de actualización de formato de empresa (se mantiene para usos AJAX específicos)
     path('update_empresa_formato/', views.update_empresa_formato, name='update_empresa_formato'),
     # NUEVA: URL para el endpoint AJAX de añadir mensajes
-    path('add_message/', views.add_message, name='add_message'), # <--- ¡AÑADIDA!
+    path('add_message/', views.add_message, name='add_message'),
 
     # Acceso Denegado
     path('access_denied/', views.access_denied, name='access_denied'),
 ]
-
-

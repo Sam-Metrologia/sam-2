@@ -11,8 +11,7 @@ from .models import (
 from django.forms.widgets import DateInput, FileInput, ClearableFileInput, TextInput
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from datetime import datetime
-import os
+from datetime import datetime # Asegúrate de que datetime esté importado aquí
 
 # Formulario de Autenticación personalizado para usar CustomUser
 class AuthenticationForm(DjangoAuthenticationForm):
@@ -93,7 +92,8 @@ class CustomUserChangeForm(UserChangeForm):
             self.fields['is_superuser'].widget.attrs['disabled'] = 'disabled'
             self.fields['groups'].widget.attrs['disabled'] = 'disabled'
             self.fields['user_permissions'].widget.attrs['disabled'] = 'disabled'
-            if self.instance != request.user:
+            # Permitir que un usuario no-superusuario edite su propio is_active, pero no el de otros
+            if self.instance and self.instance != request.user:
                 self.fields['is_active'].widget.attrs['disabled'] = 'disabled'
 
         # Aplicar clases de Tailwind CSS a los campos restantes
@@ -142,29 +142,106 @@ class UserProfileForm(forms.ModelForm):
 
 # Formularios de Empresa
 class EmpresaForm(forms.ModelForm):
+    # Añadir los nuevos campos y quitar los que ya no se usan del modelo
+    duracion_suscripcion_meses = forms.IntegerField(
+        label="Duración Suscripción (meses)",
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}),
+        help_text="Número de meses que dura la suscripción de la empresa."
+    )
+    limite_equipos_empresa = forms.IntegerField(
+        label="Límite Máximo de Equipos",
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}),
+        help_text="Cantidad máxima de equipos permitidos para esta empresa."
+    )
+
+    # AJUSTE: Usar forms.DateField con TextInput para fecha_inicio_plan
+    fecha_inicio_plan = forms.DateField(
+        label="Fecha Inicio Plan",
+        widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'], # Añadir estos formatos para parseo
+        required=False # Mantener como False si es opcional
+    )
+
     class Meta:
         model = Empresa
-        fields = '__all__'
+        # Ajustar los campos que se muestran en el formulario
+        fields = [
+            'nombre', 'nit', 'direccion', 'telefono', 'email', 'logo_empresa',
+            'formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa',
+            'es_periodo_prueba', 'duracion_prueba_dias', 'fecha_inicio_plan', # Asegurarse de que esté aquí
+            'limite_equipos_empresa', 'duracion_suscripcion_meses', # Nuevos campos
+            'acceso_manual_activo', 'estado_suscripcion',
+        ]
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),
             'nit': forms.TextInput(attrs={'class': 'form-input'}),
             'direccion': forms.TextInput(attrs={'class': 'form-input'}),
             'telefono': forms.TextInput(attrs={'class': 'form-input'}),
             'email': forms.EmailInput(attrs={'class': 'form-input'}),
-            # 'pais': forms.TextInput(attrs={'class': 'form-input'}), # Comentado si no existe en el modelo
-            # 'ciudad': forms.TextInput(attrs={'class': 'form-input'}), # Comentado si no existe en el modelo
             'logo_empresa': ClearableFileInput(attrs={'class': 'form-input-file'}),
             'formato_version_empresa': forms.TextInput(attrs={'class': 'form-input'}),
             'formato_fecha_version_empresa': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
             'formato_codificacion_empresa': forms.TextInput(attrs={'class': 'form-input'}),
-            # Nuevos campos de suscripción
             'es_periodo_prueba': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'duracion_prueba_dias': forms.NumberInput(attrs={'class': 'form-input'}),
-            'fecha_inicio_plan': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
-            'plan_actual': forms.Select(attrs={'class': 'form-select'}),
+            # 'fecha_inicio_plan': DateInput(attrs={'type': 'date', 'class': 'form-input'}), # ELIMINAR O COMENTAR ESTA LÍNEA si usas forms.DateField arriba
             'acceso_manual_activo': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'estado_suscripcion': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        request = kwargs.pop('request', None)
+        super().__init__(*args, **kwargs)
+
+        # AJUSTE: Inicializar fecha_inicio_plan para edición
+        if self.instance and self.instance.fecha_inicio_plan:
+            # Asegurarse de que el formato sea 'DD/MM/YYYY' para el TextInput
+            if isinstance(self.instance.fecha_inicio_plan, datetime):
+                self.fields['fecha_inicio_plan'].initial = self.instance.fecha_inicio_plan.date().strftime('%d/%m/%Y')
+            else:
+                self.fields['fecha_inicio_plan'].initial = self.instance.fecha_inicio_plan.strftime('%d/%m/%Y')
+
+        # Si el usuario NO es superusuario, deshabilitar/ocultar campos de suscripción
+        if request and not request.user.is_superuser:
+            # Ocultar o deshabilitar campos de gestión de suscripción
+            self.fields['es_periodo_prueba'].widget = forms.HiddenInput()
+            self.fields['duracion_prueba_dias'].widget = forms.HiddenInput()
+            self.fields['fecha_inicio_plan'].widget = forms.HiddenInput() # Asegúrate de que este también se oculte
+            self.fields['limite_equipos_empresa'].widget = forms.HiddenInput() # Ocultar para no superusuarios
+            self.fields['duracion_suscripcion_meses'].widget = forms.HiddenInput() # Ocultar para no superusuarios
+            self.fields['acceso_manual_activo'].widget = forms.HiddenInput()
+            self.fields['estado_suscripcion'].widget = forms.HiddenInput()
+            
+            # Asegurarse de que los datos no sean modificados accidentalmente si están ocultos
+            if self.instance and self.instance.pk:
+                self.fields['es_periodo_prueba'].initial = self.instance.es_periodo_prueba
+                self.fields['duracion_prueba_dias'].initial = self.instance.duracion_prueba_dias
+                self.fields['fecha_inicio_plan'].initial = self.instance.fecha_inicio_plan # Inicializar aunque esté oculto
+                self.fields['limite_equipos_empresa'].initial = self.instance.limite_equipos_empresa
+                self.fields['duracion_suscripcion_meses'].initial = self.instance.duracion_suscripcion_meses
+                self.fields['acceso_manual_activo'].initial = self.instance.acceso_manual_activo
+                self.fields['estado_suscripcion'].initial = self.instance.estado_suscripcion
+            
+            # Establecer required=False para los campos ocultos
+            self.fields['es_periodo_prueba'].required = False
+            self.fields['duracion_prueba_dias'].required = False
+            self.fields['fecha_inicio_plan'].required = False
+            self.fields['limite_equipos_empresa'].required = False
+            self.fields['duracion_suscripcion_meses'].required = False
+            self.fields['acceso_manual_activo'].required = False
+            self.fields['estado_suscripcion'].required = False
+        
+        # Aplicar clases de Tailwind CSS a los campos visibles restantes
+        for field_name, field in self.fields.items():
+            # Solo aplicar si el widget no es HiddenInput (es decir, el campo es visible)
+            if not isinstance(field.widget, forms.HiddenInput):
+                if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput, forms.URLInput)):
+                    field.widget.attrs.update({'class': 'form-input'})
+                elif isinstance(field.widget, ClearableFileInput):
+                    field.widget.attrs.update({'class': 'form-input-file'})
+
 
     def clean(self):
         cleaned_data = super().clean()
@@ -172,17 +249,23 @@ class EmpresaForm(forms.ModelForm):
 
 # NUEVO Formulario para la información de formato de la Empresa
 class EmpresaFormatoForm(forms.ModelForm):
-    fecha_version_formato_empresa = forms.CharField(
-        label="Fecha de Versión (DD/MM/YYYY)",
-        widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-        required=False
-    )
+    # Ya está usando DateInput type='date' en Meta.widgets, que es preferible
+    # a TextInput para fechas en la interfaz si se busca un selector de fecha nativo.
+    # Si quieres DD/MM/YYYY en el campo de texto, puedes mantenerlo como estaba:
+    # fecha_version_formato_empresa = forms.DateField( # Cambia a DateField
+    #     label="Fecha de Versión (DD/MM/YYYY)",
+    #     widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
+    #     input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'], # Asegura estos formatos
+    #     required=False
+    # )
 
     class Meta:
         model = Empresa
         fields = ['formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa']
         widgets = {
             'formato_version_empresa': forms.TextInput(attrs={'class': 'form-input'}),
+            # Mantener DateInput type='date' para facilitar la selección de fecha
+            'formato_fecha_version_empresa': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
             'formato_codificacion_empresa': forms.TextInput(attrs={'class': 'form-input'}),
         }
         labels = {
@@ -192,36 +275,25 @@ class EmpresaFormatoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.formato_fecha_version_empresa:
-            self.fields['formato_fecha_version_empresa'].initial = self.instance.formato_fecha_version_empresa.strftime('%d/%m/%Y')
+        # Si usas DateInput type='date', Django ya se encarga de la inicialización a 'YYYY-MM-DD'
+        # Si prefieres TextInput y DD/MM/YYYY, descomenta esta parte:
+        # if self.instance and self.instance.formato_fecha_version_empresa:
+        #     self.fields['formato_fecha_version_empresa'].initial = self.instance.formato_fecha_version_empresa.strftime('%d/%m/%Y')
+        pass # No se necesita inicialización explícita si el widget es type='date'
 
     def clean_formato_fecha_version_empresa(self):
-        fecha_str = self.cleaned_data.get('formato_fecha_version_empresa')
-        if fecha_str:
-            try:
-                # Intenta con los formatos esperados, incluyendo el de DateInput si se usa type='date'
-                fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            except ValueError:
-                try:
-                    fecha = datetime.strptime(fecha_str, '%d/%m/%Y').date()
-                except ValueError:
-                    try:
-                        fecha = datetime.strptime(fecha_str, '%d-%m-%Y').date()
-                    except ValueError:
-                        raise ValidationError("Formato de fecha inválido. Use YYYY-MM-DD, DD/MM/YYYY o DD-MM-YYYY.")
+        fecha = self.cleaned_data.get('formato_fecha_version_empresa')
+        if fecha and fecha > timezone.localdate():
+            raise ValidationError("La fecha de versión no puede ser en el futuro.")
+        return fecha
 
-            if fecha > timezone.localdate():
-                raise ValidationError("La fecha de versión no puede ser en el futuro.")
-            return fecha
-        return None
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        # El campo ya está mapeado directamente en fields, no es necesario reasignar
-        # instance.formato_fecha_version_empresa = self.cleaned_data.get('formato_fecha_version_empresa')
-        if commit:
-            instance.save()
-        return instance
+    # El método save no necesita ser sobreescrito si los campos están mapeados correctamente
+    # y la validación clean ya se encarga de transformar el valor.
+    # def save(self, commit=True):
+    #     instance = super().save(commit=False)
+    #     if commit:
+    #         instance.save()
+    #     return instance
 
 
 # Formularios de Ubicacion
@@ -236,17 +308,16 @@ class UbicacionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        request = kwargs.pop('request', None) # Asegúrate de obtener 'request' aquí
         super().__init__(*args, **kwargs)
-        if 'request' in kwargs:
-            request_user = kwargs.pop('request').user
-            if not request_user.is_superuser and request_user.empresa:
-                self.fields['empresa'].queryset = Empresa.objects.filter(pk=request_user.empresa.pk)
-                self.fields['empresa'].initial = request_user.empresa.pk
-                self.fields['empresa'].widget.attrs['disabled'] = 'disabled'
-            elif request_user.is_superuser:
-                self.fields['empresa'].queryset = Empresa.objects.all()
-            else:
-                self.fields['empresa'].queryset = Empresa.objects.none()
+        if request and not request.user.is_superuser and request.user.empresa:
+            self.fields['empresa'].queryset = Empresa.objects.filter(pk=request.user.empresa.pk)
+            self.fields['empresa'].initial = request.user.empresa.pk
+            self.fields['empresa'].widget.attrs['disabled'] = 'disabled'
+        elif request and request.user.is_superuser:
+            self.fields['empresa'].queryset = Empresa.objects.all()
+        else:
+            self.fields['empresa'].queryset = Empresa.objects.none() # Manejar caso sin empresa si no superusuario
 
         for field_name, field in self.fields.items():
             if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput)):

@@ -13,6 +13,7 @@ import os
 import zipfile
 from collections import defaultdict
 import decimal
+from functools import wraps # Importar wraps para decoradores
 
 # IMPORTACIONES ADICIONALES PARA LA IMPORTACIÓN DE EXCEL
 import openpyxl
@@ -28,6 +29,7 @@ from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from openpyxl.drawing.image import Image as ExcelImage
 
 from dateutil.relativedelta import relativedelta
+from django.urls import reverse # Importar reverse
 
 from django.conf import settings
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -45,11 +47,12 @@ from .forms import (
     BajaEquipoForm, UbicacionForm, ProcedimientoForm, ProveedorForm,
     ExcelUploadForm,
     CustomUserCreationForm, CustomUserChangeForm, UserProfileForm, EmpresaForm, EmpresaFormatoForm,
+    DocumentoForm # Asegúrate de que DocumentoForm esté importado aquí
 )
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
-    CustomUser, Ubicacion, Procedimiento, Proveedor
+    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento # ASEGÚRATE de que Documento esté importado aquí
 )
 
 # Importar para autenticación y grupos
@@ -61,6 +64,53 @@ from django.contrib.auth.models import Group # Importar el modelo Group
 from django.core.files.storage import default_storage
 from storages.backends.s3boto3 import S3Boto3Storage
 
+
+# =============================================================================
+# Decoradores personalizados
+# =============================================================================
+
+def access_check(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            # Si no está autenticado, redirigir a login
+            return redirect(settings.LOGIN_URL)
+
+        # Si es superusuario, siempre permitir el acceso (superusuario puede ver todo)
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+
+        # Para usuarios normales, verificar estado de usuario y empresa
+        user_empresa = request.user.empresa
+        
+        # 1. Verificar si el usuario mismo está activo
+        if not request.user.is_active:
+            messages.error(request, 'Tu cuenta de usuario ha sido desactivada. Contacta al administrador.')
+            return redirect('core:access_denied')
+
+        # 2. Verificar el estado de la empresa si el usuario tiene una asociada
+        if user_empresa:
+            # Usar el método actualizado del modelo Empresa para verificar el estado de la suscripción
+            # Consideramos que el estado 'Activo' o 'Período de Prueba' permite el acceso
+            # Otros estados como 'Expirado' o 'Cancelado' deniegan el acceso
+            estado_suscripcion_empresa = user_empresa.get_estado_suscripcion_display()
+            
+            # Acceso manual anula otras restricciones, si está activo
+            if user_empresa.acceso_manual_activo:
+                return view_func(request, *args, **kwargs)
+
+            # Denegar acceso si el plan está expirado o ha sido cancelado
+            if "Expirado" in estado_suscripcion_empresa or user_empresa.estado_suscripcion == 'Cancelado':
+                messages.error(request, f'El acceso para tu empresa ({user_empresa.nombre}) ha expirado o ha sido cancelado. Contacta al administrador.')
+                return redirect('core:access_denied')
+            
+            # Si pasa las verificaciones, continuar con la vista
+            return view_func(request, *args, **kwargs)
+        else:
+            # Si el usuario normal no tiene empresa asignada, denegar acceso
+            messages.warning(request, 'Tu cuenta no está asociada a ninguna empresa. Contacta al administrador.')
+            return redirect('core:access_denied')
+    return _wrapped_view
 
 # =============================================================================
 # Funciones de utilidad (helpers)
@@ -210,7 +260,7 @@ def get_projected_maintenance_compliance_for_year(equipment_queryset, current_ye
 
         num_intervals_to_reach_year = 0
         if freq_months > 0:
-            num_intervals = max(0, (delta_months + freq_months - 1) // freq_months)
+            num_intervals_to_reach_year = max(0, (delta_months + freq_months - 1) // freq_months)
         
         current_projection_date = plan_start_date + relativedelta(months=int(num_intervals_to_reach_year * freq_months))
 
@@ -385,10 +435,10 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
             float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
             equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento else '',
+            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
             float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
             equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion else '',
+            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
             float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
         ]
         sheet.append(row_data)
@@ -472,10 +522,10 @@ def _generate_equipment_general_info_excel_content(equipo):
         equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
         float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
         equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
-        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento else '',
+        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
         float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
         equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion else '',
+        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
         float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
     ]
     sheet.append(row_data)
@@ -739,6 +789,7 @@ def user_logout(request):
     messages.info(request, 'Has cerrado sesión exitosamente.')
     return redirect('core:login')
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def cambiar_password(request):
     """Vista para que el usuario cambie su propia contraseña."""
@@ -758,11 +809,13 @@ def cambiar_password(request):
         'titulo_pagina': 'Cambiar Contraseña'
     })
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def password_change_done(request):
     """Vista de confirmación de cambio de contraseña."""
     return render(request, 'core/password_change_done.html', {'titulo_pagina': 'Contraseña Cambiada'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def perfil_usuario(request):
     """
@@ -784,6 +837,7 @@ def perfil_usuario(request):
 # Vistas de Dashboard y Estadísticas
 # =============================================================================
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def dashboard(request):
     """
@@ -1246,6 +1300,7 @@ def dashboard(request):
     return render(request, 'core/dashboard.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def contact_us(request):
     """
@@ -1254,16 +1309,8 @@ def contact_us(request):
     return render(request, 'core/contact_us.html')
 
 # --- Vistas de Equipos ---
-# Asegúrate de importar DocumentoForm si no lo has hecho ya en .forms
-# from .forms import DocumentoForm # Si DocumentoForm es un formulario para subir documentos
 
-# core/views.py
-# ...
-from .forms import DocumentoForm # Asegúrate de que esta importación exista
-from .models import Documento # Asegúrate de que esta importación exista
-
-# ...
-
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def subir_pdf(request):
     """
@@ -1301,6 +1348,7 @@ def subir_pdf(request):
         form = DocumentoForm(request=request) # Pasa el request al inicializar
     return render(request, "core/subir_pdf.html", {"form": form, 'titulo_pagina': 'Subir Documento PDF'})
     
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_equipo', raise_exception=True)
 def home(request):
@@ -1442,6 +1490,7 @@ def home(request):
     }
     return render(request, 'core/home.html', context)
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @require_POST # Esta vista es solo para peticiones POST de AJAX
 @csrf_exempt
@@ -1488,6 +1537,7 @@ def update_empresa_formato(request):
 
 
 # NUEVA VISTA: Para editar la información de formato de una empresa (GET y POST)
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @require_http_methods(["GET", "POST"])
 def editar_empresa_formato(request, pk):
@@ -1521,6 +1571,7 @@ def editar_empresa_formato(request, pk):
     return render(request, 'core/editar_empresa_formato.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
 def añadir_equipo(request):
@@ -1549,6 +1600,7 @@ def añadir_equipo(request):
     return render(request, 'core/añadir_equipo.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Equipo'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
 def importar_equipos_excel(request):
@@ -1708,6 +1760,7 @@ def importar_equipos_excel(request):
     return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_equipo', raise_exception=True)
 def detalle_equipo(request, pk):
@@ -1791,6 +1844,7 @@ def detalle_equipo(request, pk):
         'titulo_pagina': f'Detalle de {equipo.nombre}',
     })
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_equipo', raise_exception=True)
 def editar_equipo(request, pk):
@@ -1823,6 +1877,7 @@ def editar_equipo(request, pk):
     return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_equipo', raise_exception=True)
 def eliminar_equipo(request, pk):
@@ -1847,10 +1902,19 @@ def eliminar_equipo(request, pk):
             print(f"DEBUG: Error al eliminar equipo {equipo.pk}: {e}") # Para depuración
             # Si hay un error, redirige a home, ya que detalle_equipo podría no ser válido
             return redirect('core:home') 
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': equipo, 'tipo': 'equipo', 'titulo_pagina': f'Eliminar Equipo: {equipo.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'el equipo "{equipo.nombre}" (Código: {equipo.codigo_interno})',
+        'return_url_name': 'core:detalle_equipo', # URL a la que volver si se cancela
+        'return_url_pk': equipo.pk, # PK para la URL de retorno si es un detalle, o None si es un listado
+        'titulo_pagina': f'Eliminar Equipo: {equipo.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 # --- Vistas de Calibraciones ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_calibracion', raise_exception=True)
 def añadir_calibracion(request, equipo_pk):
@@ -1882,6 +1946,7 @@ def añadir_calibracion(request, equipo_pk):
         form = CalibracionForm()
     return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_calibracion', raise_exception=True)
 def editar_calibracion(request, equipo_pk, pk):
@@ -1912,6 +1977,7 @@ def editar_calibracion(request, equipo_pk, pk):
         form = CalibracionForm(instance=calibracion)
     return render(request, 'core/editar_calibracion.html', {'form': form, 'equipo': equipo, 'calibracion': calibracion, 'titulo_pagina': f'Editar Calibración para {equipo.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_calibracion', raise_exception=True)
 def eliminar_calibracion(request, equipo_pk, pk):
@@ -1934,11 +2000,20 @@ def eliminar_calibracion(request, equipo_pk, pk):
             messages.error(request, f'Error al eliminar la calibración: {e}')
             print(f"DEBUG: Error al eliminar calibración {calibracion.pk}: {e}") # Para depuración
             return redirect('core:detalle_equipo', pk=equipo.pk)
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': calibracion, 'tipo': 'calibración', 'titulo_pagina': f'Eliminar Calibración de {equipo.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'la calibración de {equipo.nombre}',
+        'return_url_name': 'core:detalle_equipo', # URL a la que volver si se cancela
+        'return_url_pk': equipo.pk, # PK para la URL de retorno
+        'titulo_pagina': f'Eliminar Calibración de {equipo.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
 # --- Vistas de Mantenimientos ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_mantenimiento', raise_exception=True)
 def añadir_mantenimiento(request, equipo_pk):
@@ -1969,6 +2044,7 @@ def añadir_mantenimiento(request, equipo_pk):
         form = MantenimientoForm()
     return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_mantenimiento', raise_exception=True)
 def editar_mantenimiento(request, equipo_pk, pk):
@@ -1999,6 +2075,7 @@ def editar_mantenimiento(request, equipo_pk, pk):
         form = MantenimientoForm(instance=mantenimiento)
     return render(request, 'core/editar_mantenimiento.html', {'form': form, 'equipo': equipo, 'mantenimiento': mantenimiento, 'titulo_pagina': f'Editar Mantenimiento para {equipo.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_mantenimiento', raise_exception=True)
 def eliminar_mantenimiento(request, equipo_pk, pk):
@@ -2021,8 +2098,17 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
             messages.error(request, f'Error al eliminar el mantenimiento: {e}')
             print(f"DEBUG: Error al eliminar mantenimiento {mantenimiento.pk}: {e}") # Para depuración
             return redirect('core:detalle_equipo', pk=equipo.pk)
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': mantenimiento, 'tipo': 'mantenimiento', 'titulo_pagina': f'Eliminar Mantenimiento de {equipo.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'el mantenimiento de {equipo.nombre}',
+        'return_url_name': 'core:detalle_equipo', # URL a la que volver si se cancela
+        'return_url_pk': equipo.pk, # PK para la URL de retorno
+        'titulo_pagina': f'Eliminar Mantenimiento de {equipo.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_mantenimiento', raise_exception=True)
 def detalle_mantenimiento(request, equipo_pk, pk):
@@ -2046,6 +2132,7 @@ def detalle_mantenimiento(request, equipo_pk, pk):
 
 # --- Vistas de Comprobaciones ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_comprobacion', raise_exception=True)
 def añadir_comprobacion(request, equipo_pk):
@@ -2077,6 +2164,7 @@ def añadir_comprobacion(request, equipo_pk):
         form = ComprobacionForm()
     return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_comprobacion', raise_exception=True)
 def editar_comprobacion(request, equipo_pk, pk):
@@ -2107,6 +2195,7 @@ def editar_comprobacion(request, equipo_pk, pk):
         form = ComprobacionForm(instance=comprobacion)
     return render(request, 'core/editar_comprobacion.html', {'form': form, 'equipo': equipo, 'comprobacion': comprobacion, 'titulo_pagina': f'Editar Comprobación para {equipo.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_comprobacion', raise_exception=True)
 def eliminar_comprobacion(request, equipo_pk, pk):
@@ -2129,11 +2218,20 @@ def eliminar_comprobacion(request, equipo_pk, pk):
             messages.error(request, f'Error al eliminar la comprobación: {e}')
             print(f"DEBUG: Error al eliminar comprobación {comprobacion.pk}: {e}") # Para depuración
             return redirect('core:detalle_equipo', pk=equipo.pk)
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': comprobacion, 'tipo': 'comprobación', 'titulo_pagina': f'Eliminar Comprobación de {equipo.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'la comprobación de {equipo.nombre}',
+        'return_url_name': 'core:detalle_equipo', # URL a la que volver si se cancela
+        'return_url_pk': equipo.pk, # PK para la URL de retorno
+        'titulo_pagina': f'Eliminar Comprobación de {equipo.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
 # --- Vistas de Baja de Equipo y Nueva Inactivación ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_bajaequipo', raise_exception=True)
 @require_http_methods(["GET", "POST"]) # Asegúrate de permitir GET para la página de confirmación
@@ -2179,6 +2277,7 @@ def dar_baja_equipo(request, equipo_pk):
     })
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_equipo', raise_exception=True)
 @require_http_methods(["GET", "POST"])
@@ -2217,6 +2316,7 @@ def inactivar_equipo(request, equipo_pk):
     })
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_equipo', raise_exception=True)
 @require_http_methods(["GET", "POST"])
@@ -2269,6 +2369,7 @@ def activar_equipo(request, equipo_pk):
 
 # --- Vistas de Empresas ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def listar_empresas(request):
@@ -2290,6 +2391,17 @@ def listar_empresas(request):
             Q(email__icontains=query)
         )
 
+    # CAMBIO: Calcular fecha_fin_plan_display para cada empresa
+    today = timezone.localdate()
+    for empresa in empresas_list:
+        empresa.fecha_fin_plan_display = empresa.get_fecha_fin_plan()
+        # Lógica para el estado visual de la fecha
+        if empresa.fecha_fin_plan_display and empresa.fecha_fin_plan_display < today:
+            empresa.fecha_fin_plan_status = 'text-red-600 font-bold'
+        else:
+            empresa.fecha_fin_plan_status = 'text-gray-900'
+
+
     paginator = Paginator(empresas_list, 10)
     page_number = request.GET.get('page')
     try:
@@ -2301,6 +2413,7 @@ def listar_empresas(request):
 
     return render(request, 'core/listar_empresas.html', {'empresas': empresas, 'query': query, 'titulo_pagina': 'Listado de Empresas'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def añadir_empresa(request):
@@ -2319,6 +2432,7 @@ def añadir_empresa(request):
         formulario = EmpresaForm()
     return render(request, 'core/añadir_empresa.html', {'formulario': formulario, 'titulo_pagina': 'Añadir Nueva Empresa'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser or (u.empresa and u.empresa.pk == pk), login_url='/core/access_denied/') # Restringe a superusuario o propia empresa
 def detalle_empresa(request, pk):
@@ -2343,6 +2457,7 @@ def detalle_empresa(request, pk):
     return render(request, 'core/detalle_empresa.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def editar_empresa(request, pk):
@@ -2362,6 +2477,7 @@ def editar_empresa(request, pk):
         form = EmpresaForm(instance=empresa)
     return render(request, 'core/editar_empresa.html', {'form': form, 'empresa': empresa, 'titulo_pagina': f'Editar Empresa: {empresa.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def eliminar_empresa(request, pk):
@@ -2371,16 +2487,26 @@ def eliminar_empresa(request, pk):
     empresa = get_object_or_404(Empresa, pk=pk)
     if request.method == 'POST':
         try:
+            empresa_nombre = empresa.nombre # Capturar el nombre antes de eliminar
             empresa.delete()
-            messages.success(request, 'Empresa eliminada exitosamente.')
+            messages.success(request, f'Empresa "{empresa_nombre}" eliminada exitosamente.')
             return redirect('core:listar_empresas')
         except Exception as e:
             messages.error(request, f'Error al eliminar la empresa: {e}')
             print(f"DEBUG: Error al eliminar empresa {empresa.pk}: {e}")
             return redirect('core:listar_empresas')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': empresa, 'tipo': 'empresa', 'titulo_pagina': f'Eliminar Empresa: {empresa.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'la empresa "{empresa.nombre}"',
+        'return_url_name': 'core:listar_empresas', # URL a la que volver si se cancela
+        'return_url_pk': None, # No se necesita PK para la lista de empresas
+        'titulo_pagina': f'Eliminar Empresa: {empresa.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_empresa', raise_exception=True) # Este permiso es apropiado para administrar usuarios de una empresa
 def añadir_usuario_a_empresa(request, empresa_pk):
@@ -2427,6 +2553,7 @@ def añadir_usuario_a_empresa(request, empresa_pk):
 
 
 # --- Vistas de Ubicación ---
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_ubicacion', raise_exception=True)
 def listar_ubicaciones(request):
@@ -2442,6 +2569,7 @@ def listar_ubicaciones(request):
 
     return render(request, 'core/listar_ubicaciones.html', {'ubicaciones': ubicaciones, 'titulo_pagina': 'Listado de Ubicaciones'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_ubicacion', raise_exception=True)
 def añadir_ubicacion(request):
@@ -2465,6 +2593,7 @@ def añadir_ubicacion(request):
         form = UbicacionForm(request=request)
     return render(request, 'core/añadir_ubicacion.html', {'form': form, 'titulo_pagina': 'Añadir Nueva Ubicación'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_ubicacion', raise_exception=True)
 def editar_ubicacion(request, pk):
@@ -2491,6 +2620,7 @@ def editar_ubicacion(request, pk):
         form = UbicacionForm(instance=ubicacion, request=request)
     return render(request, 'core/editar_ubicacion.html', {'form': form, 'ubicacion': ubicacion, 'titulo_pagina': f'Editar Ubicación: {ubicacion.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_ubicacion', raise_exception=True)
 def eliminar_ubicacion(request, pk):
@@ -2505,17 +2635,27 @@ def eliminar_ubicacion(request, pk):
 
     if request.method == 'POST':
         try:
+            nombre_ubicacion = ubicacion.nombre # Capturar el nombre antes de eliminar
             ubicacion.delete()
-            messages.success(request, 'Ubicación eliminada exitosamente.')
+            messages.success(request, f'Ubicación "{nombre_ubicacion}" eliminada exitosamente.')
             return redirect('core:listar_ubicaciones')
         except Exception as e:
             messages.error(request, f'Error al eliminar la ubicación: {e}')
             print(f"DEBUG: Error al eliminar ubicación {ubicacion.pk}: {e}")
             return redirect('core:listar_ubicaciones')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': ubicacion, 'tipo': 'ubicación', 'titulo_pagina': f'Eliminar Ubicación: {ubicacion.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'la ubicación "{ubicacion.nombre}"',
+        'return_url_name': 'core:listar_ubicaciones', # URL a la que volver si se cancela
+        'return_url_pk': None, # No se necesita PK para la lista de ubicaciones
+        'titulo_pagina': f'Eliminar Ubicación: {ubicacion.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
 # --- Vistas de Procedimiento ---
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_procedimiento', raise_exception=True)
 def listar_procedimientos(request):
@@ -2575,7 +2715,7 @@ def listar_procedimientos(request):
     }
     return render(request, 'core/listar_procedimientos.html', context)
 
-
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_procedimiento', raise_exception=True)
 @require_http_methods(["GET", "POST"])
@@ -2610,7 +2750,7 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request=request) # Pasa el request al formulario para la lógica de empresa
     return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
 
-
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_procedimiento', raise_exception=True)
 @require_http_methods(["GET", "POST"])
@@ -2643,6 +2783,7 @@ def editar_procedimiento(request, pk):
         form = ProcedimientoForm(instance=procedimiento, request=request)
     return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_procedimiento', raise_exception=True)
 @require_http_methods(["GET", "POST"])
@@ -2667,11 +2808,20 @@ def eliminar_procedimiento(request, pk):
             messages.error(request, f'Error al eliminar el procedimiento: {e}. Revisa el log para más detalles.')
             print(f"DEBUG: Error al eliminar procedimiento {procedimiento.pk}: {e}")
             return redirect('core:listar_procedimientos')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': procedimiento, 'tipo': 'procedimiento', 'titulo_pagina': f'Eliminar Procedimiento: {procedimiento.nombre}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'el procedimiento "{procedimiento.nombre}"',
+        'return_url_name': 'core:listar_procedimientos', # URL a la que volver si se cancela
+        'return_url_pk': None, # No se necesita PK para la lista de procedimientos
+        'titulo_pagina': f'Eliminar Procedimiento: {procedimiento.nombre}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
 # --- Vistas de Proveedores (GENERAL) ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_proveedor', raise_exception=True)
 def listar_proveedores(request):
@@ -2723,6 +2873,7 @@ def listar_proveedores(request):
     return render(request, 'core/listar_proveedores.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_proveedor', raise_exception=True)
 def añadir_proveedor(request):
@@ -2745,6 +2896,7 @@ def añadir_proveedor(request):
     return render(request, 'core/añadir_proveedor.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Proveedor'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_proveedor', raise_exception=True)
 def editar_proveedor(request, pk):
@@ -2771,6 +2923,7 @@ def editar_proveedor(request, pk):
     return render(request, 'core/editar_proveedor.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor: {proveedor.nombre_empresa}'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.delete_proveedor', raise_exception=True)
 def eliminar_proveedor(request, pk):
@@ -2785,16 +2938,26 @@ def eliminar_proveedor(request, pk):
 
     if request.method == 'POST':
         try:
+            nombre_proveedor = proveedor.nombre_empresa # Capturar el nombre antes de eliminar
             proveedor.delete()
-            messages.success(request, 'Proveedor eliminado exitosamente.')
+            messages.success(request, f'Proveedor "{nombre_proveedor}" eliminado exitosamente.')
             return redirect('core:listar_proveedores')
         except Exception as e:
             messages.error(request, f'Error al eliminar el proveedor: {e}')
             print(f"DEBUG: Error al eliminar proveedor {proveedor.pk}: {e}")
             return redirect('core:listar_proveedores')
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': proveedor, 'tipo': 'proveedor', 'titulo_pagina': f'Eliminar Proveedor: {proveedor.nombre_empresa}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'el proveedor "{proveedor.nombre_empresa}"',
+        'return_url_name': 'core:listar_proveedores', # URL a la que volver si se cancela
+        'return_url_pk': None, # No se necesita PK para la lista de proveedores
+        'titulo_pagina': f'Eliminar Proveedor: {proveedor.nombre_empresa}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.view_proveedor', raise_exception=True)
 def detalle_proveedor(request, pk):
@@ -2816,6 +2979,7 @@ def detalle_proveedor(request, pk):
 
 # --- Vistas de Usuarios ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/')
 def listar_usuarios(request):
@@ -2852,6 +3016,7 @@ def listar_usuarios(request):
     return render(request, 'core/listar_usuarios.html', {'usuarios': usuarios, 'query': query, 'titulo_pagina': 'Listado de Usuarios'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/')
 def añadir_usuario(request, empresa_pk=None):
@@ -2886,6 +3051,7 @@ def añadir_usuario(request, empresa_pk=None):
     return render(request, 'core/añadir_usuario.html', {'form': form, 'empresa_pk': empresa_pk, 'titulo_pagina': 'Añadir Nuevo Usuario'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/')
 def detalle_usuario(request, pk):
@@ -2906,6 +3072,7 @@ def detalle_usuario(request, pk):
     })
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/')
 def editar_usuario(request, pk):
@@ -2948,6 +3115,7 @@ def editar_usuario(request, pk):
     return render(request, 'core/editar_usuario.html', {'form': form, 'usuario_a_editar': usuario_a_editar, 'titulo_pagina': f'Editar Usuario: {usuario_a_editar.username}'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def eliminar_usuario(request, pk):
@@ -2969,16 +3137,26 @@ def eliminar_usuario(request, pk):
 
     if request.method == 'POST':
         try:
+            username_to_delete = usuario.username # Capturar el nombre antes de eliminar
             usuario.delete()
-            messages.success(request, 'Usuario eliminado exitosamente.')
+            messages.success(request, f'Usuario "{username_to_delete}" eliminado exitosamente.')
             return redirect('core:listar_usuarios')
         except Exception as e:
             messages.error(request, f'Error al eliminar el usuario: {e}')
             print(f"DEBUG: Error al eliminar usuario {usuario.pk}: {e}")
             return redirect('core:detalle_usuario', pk=usuario.pk)
-    return render(request, 'core/confirmar_eliminacion.html', {'objeto': usuario, 'tipo': 'usuario', 'titulo_pagina': f'Eliminar Usuario: {usuario.username}'})
+    
+    # CAMBIO: Contexto para la plantilla genérica de confirmación
+    context = {
+        'object_name': f'el usuario "{usuario.username}"',
+        'return_url_name': 'core:detalle_usuario', # URL a la que volver si se cancela
+        'return_url_pk': usuario.pk, # PK para la URL de retorno
+        'titulo_pagina': f'Eliminar Usuario: {usuario.username}',
+    }
+    return render(request, 'core/confirmar_eliminacion.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/') # Solo superusuarios pueden cambiar contraseñas de otros
 def change_user_password(request, pk):
@@ -3018,6 +3196,7 @@ def change_user_password(request, pk):
 
 # --- Vistas de Informes ---
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def informes(request):
     """
@@ -3121,6 +3300,7 @@ def informes(request):
     return render(request, 'core/informes.html', context)
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def generar_informe_zip(request):
@@ -3323,6 +3503,7 @@ def generar_informe_zip(request):
     return response
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def informe_vencimientos_pdf(request):
@@ -3410,6 +3591,7 @@ def informe_vencimientos_pdf(request):
         return redirect('core:informes')
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def programmed_activities_list(request):
     """
@@ -3489,6 +3671,7 @@ def programmed_activities_list(request):
     return render(request, 'core/programmed_activities_list.html', {'page_obj': page_obj, 'titulo_pagina': 'Actividades Programadas'})
 
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.can_export_reports', raise_exception=True)
 def exportar_equipos_excel(request):
@@ -3508,6 +3691,7 @@ def exportar_equipos_excel(request):
     response.write(excel_content)
     return response
 
+@access_check # APLICAR ESTE DECORADOR
 @login_required
 def generar_hoja_vida_pdf(request, pk):
     """
@@ -3527,8 +3711,54 @@ def generar_hoja_vida_pdf(request, pk):
         messages.error(request, f'Tuvimos algunos errores al generar el PDF: {e}. Revisa los logs para más detalles.')
         print(f"DEBUG: Error al generar hoja_vida_pdf para equipo {equipo.pk}: {e}")
         return redirect('core:detalle_equipo', pk=equipo.pk)
+        
+@access_check # APLICAR ESTE DECORADOR
+@login_required
+@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='/core/access_denied/') # Solo superusuarios o staff
+@require_POST
+@csrf_exempt # Necesario para AJAX POST requests si no manejas el CSRF token de otra forma en JS
+def toggle_user_active_status(request):
+    """
+    Alterna el estado 'is_active' de un usuario vía AJAX POST.
+    Espera JSON con {'user_id': <id>, 'is_active': <true/false>}.
+    """
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        new_is_active_status = data.get('is_active') # Esperamos un booleano
 
+        if user_id is None or new_is_active_status is None:
+            return JsonResponse({'status': 'error', 'message': 'ID de usuario o estado activo no proporcionado.'}, status=400)
 
+        user_to_toggle = get_object_or_404(CustomUser, pk=user_id)
+
+        # Permisos: Superusuario puede alternar cualquiera. Staff solo puede alternar de su empresa.
+        if not request.user.is_superuser:
+            if not request.user.is_staff or (request.user.empresa and user_to_toggle.empresa != request.user.empresa):
+                return JsonResponse({'status': 'error', 'message': 'No tienes permiso para modificar este usuario.'}, status=403)
+
+        # Prevenir que un superusuario se desactive a sí mismo si es el único superusuario,
+        # o por seguridad general, no permitir que un superusuario se desactive a sí mismo desde esta API.
+        if request.user.pk == user_to_toggle.pk and request.user.is_superuser and not new_is_active_status:
+             return JsonResponse({'status': 'error', 'message': 'No puedes desactivar tu propia cuenta de superusuario.'}, status=403)
+
+        user_to_toggle.is_active = new_is_active_status
+        user_to_toggle.save(update_fields=['is_active'])
+
+        status_text = "activado" if new_is_active_status else "desactivado"
+        messages.success(request, f'Usuario "{user_to_toggle.username}" {status_text} exitosamente.')
+
+        return JsonResponse({'status': 'success', 'new_status': user_to_toggle.is_active, 'message': f'Usuario {user_to_toggle.username} {status_text}.'})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Formato JSON inválido.'}, status=400)
+    except CustomUser.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Usuario no encontrado.'}, status=404)
+    except Exception as e:
+        print(f"DEBUG: Error al alternar estado de usuario: {e}")
+        return JsonResponse({'status': 'error', 'message': f'Error interno del servidor: {str(e)}'}, status=500)
+
+@access_check # APLICAR ESTE DECORADOR
 @require_POST
 @csrf_exempt
 def add_message(request):
@@ -3563,6 +3793,3 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
-    # =============================================================================
-# Funciones para Subida de Archivos a S3
-# =============================================================================

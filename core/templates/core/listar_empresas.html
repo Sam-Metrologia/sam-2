@@ -1,115 +1,197 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Listado de Empresas{% endblock %}
+{% block header_title %}Listado de Empresas{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4">
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
-
-    {% if messages %}
-        <div class="mb-4">
-            {% for message in messages %}
-                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    <div class="flex justify-between items-center mb-6">
-        <form method="GET" action="{% url 'core:listar_empresas' %}" class="flex space-x-2">
-            <input type="text" name="q" placeholder="Buscar empresa..." value="{{ query }}"
-                   class="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md shadow-md">
-                Buscar
-            </button>
-        </form>
-        <a href="{% url 'core:añadir_empresa' %}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md shadow-md">
-            Añadir Empresa
-        </a>
-    </div>
-
-    <div class="bg-white shadow-md rounded-lg overflow-hidden">
-        <table class="min-w-full leading-normal">
-            <thead>
-                <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-                    <th class="py-3 px-6 text-left">Nombre</th>
-                    <th class="py-3 px-6 text-left">NIT</th>
-                    <th class="py-3 px-6 text-left">Teléfono</th>
-                    <th class="py-3 px-6 text-left">Email</th>
-                    <th class="py-3 px-6 text-center">Acciones</th>
-                </tr>
-            </thead>
-            <tbody class="text-gray-600 text-sm font-light">
-                {% for empresa in empresas %}
-                <tr class="border-b border-gray-200 hover:bg-gray-100">
-                    <td class="py-3 px-6 text-left whitespace-nowrap">
-                        <a href="{% url 'core:detalle_empresa' empresa.pk %}" class="text-blue-600 hover:text-blue-800 hover:underline">
-                            {{ empresa.nombre }}
-                        </a>
-                    </td>
-                    <td class="py-3 px-6 text-left">{{ empresa.nit|default:"N/A" }}</td>
-                    <td class="py-3 px-6 text-left">{{ empresa.telefono|default:"N/A" }}</td>
-                    <td class="py-3 px-6 text-left">{{ empresa.email|default:"N/A" }}</td>
-                    <td class="py-3 px-6 text-center">
-                        <div class="flex item-center justify-center space-x-2">
-                            <a href="{% url 'core:editar_empresa' empresa.pk %}" class="w-8 h-8 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center text-blue-600" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="{% url 'core:eliminar_empresa' empresa.pk %}" class="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-600" title="Eliminar">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="py-3 px-6 text-center">No hay empresas registradas.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    {# Paginación #}
-    {% if empresas.has_other_pages %}
-    <div class="flex justify-center mt-6">
-        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-            {% if empresas.has_previous %}
-                <a href="?page={{ empresas.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                    <span class="sr-only">Anterior</span>
-                    <i class="fas fa-chevron-left"></i>
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+            <h1 class="text-3xl font-bold text-gray-800">Listado de Empresas</h1>
+            <div class="flex flex-wrap space-x-2 gap-2">
+                {% if perms.core.add_empresa %}
+                <a href="{% url 'core:añadir_empresa' %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Añadir Nueva Empresa
                 </a>
-            {% else %}
-                <span class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-gray-50 text-sm font-medium text-gray-500 cursor-not-allowed">
-                    <span class="sr-only">Anterior</span>
-                    <i class="fas fa-chevron-left"></i>
-                </span>
-            {% endif %}
-
-            {% for i in empresas.paginator.page_range %}
-                {% if empresas.number == i %}
-                    <span aria-current="page" class="relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-500 text-sm font-medium text-white">
-                        {{ i }}
-                    </span>
-                {% else %}
-                    <a href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
-                        {{ i }}
-                    </a>
                 {% endif %}
-            {% endfor %}
-
-            {% if empresas.has_next %}
-                <a href="?page={{ empresas.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                    <span class="sr-only">Siguiente</span>
-                    <i class="fas fa-chevron-right"></i>
+                <a href="{% url 'core:dashboard' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Volver al Dashboard
                 </a>
-            {% else %}
-                <span class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-gray-50 text-sm font-medium text-gray-500 cursor-not-allowed">
-                    <span class="sr-only">Siguiente</span>
-                    <i class="fas fa-chevron-right"></i>
-                </span>
-            {% endif %}
-        </nav>
+            </div>
+        </div>
+
+        {# Mensajes de Django #}
+        {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                    <div class="p-3 rounded-md shadow-sm mb-2 
+                        {% if message.tags == 'success' %}bg-green-100 text-green-800{% elif message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}" 
+                        role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Filtro de búsqueda #}
+        <div class="mb-6 flex flex-wrap gap-4 items-center">
+            <form method="GET" action="{% url 'core:listar_empresas' %}" class="flex flex-grow items-center gap-2">
+                <input type="text" name="q" placeholder="Buscar empresa..." value="{{ query }}"
+                       class="form-input flex-grow px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+                <a href="{% url 'core:listar_empresas' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-redo"></i> Reset
+                </a>
+            </form>
+        </div>
+
+        {% if empresas %}
+        <div class="overflow-x-auto bg-white rounded-lg shadow overflow-y-auto relative" style="max-height: 70vh;">
+            <table class="w-full whitespace-nowrap table-auto">
+                <thead>
+                    <tr class="text-left font-bold bg-gray-200 text-gray-600 uppercase text-sm leading-normal sticky top-0">
+                        <th class="py-3 px-6 text-left">Nombre</th>
+                        <th class="py-3 px-6 text-left">NIT</th>
+                        <th class="py-3 px-6 text-left">Email</th>
+                        <th class="py-3 px-6 text-left">Teléfono</th>
+                        <th class="py-3 px-6 text-left">Dirección</th>
+                        {# INICIO: AÑADIR NUEVA COLUMNA PARA LA FECHA DE FIN DE PLAN #}
+                        <th class="py-3 px-6 text-left">Fin de Plan</th>
+                        {# FIN: AÑADIR NUEVA COLUMNA #}
+                        <th class="py-3 px-6 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-700 text-sm">
+                    {% for empresa in empresas %}
+                    <tr class="border-b border-gray-200 hover:bg-gray-100">
+                        <td class="py-3 px-6 text-left whitespace-nowrap">
+                            <a href="{% url 'core:detalle_empresa' pk=empresa.pk %}" class="text-blue-600 hover:text-blue-800 hover:underline font-semibold">
+                                {{ empresa.nombre }}
+                            </a>
+                        </td>
+                        <td class="py-3 px-6 text-left">{{ empresa.nit }}</td>
+                        <td class="py-3 px-6 text-left">{{ empresa.email }}</td>
+                        <td class="py-3 px-6 text-left">{{ empresa.telefono }}</td>
+                        <td class="py-3 px-6 text-left">{{ empresa.direccion }}</td>
+                        {# INICIO: MOSTRAR LA FECHA DE FIN DE PLAN #}
+                        <td class="py-3 px-6 text-left">
+                            <span class="{{ empresa.fecha_fin_plan_status }}">
+                                {% if empresa.fecha_fin_plan_display %}
+                                    {{ empresa.fecha_fin_plan_display|date:"d/m/Y" }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
+                        </td>
+                        {# FIN: MOSTRAR LA FECHA DE FIN DE PLAN #}
+                        <td class="py-3 px-6 text-center">
+                            <div class="flex item-center justify-center space-x-2">
+                                <a href="{% url 'core:detalle_empresa' pk=empresa.pk %}" class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition duration-300 ease-in-out" title="Ver Detalle">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if perms.core.change_empresa %}
+                                <a href="{% url 'core:editar_empresa' pk=empresa.pk %}" class="w-8 h-8 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center hover:bg-yellow-200 transition duration-300 ease-in-out" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                                {% if perms.core.delete_empresa %}
+                                <button onclick="showDeleteModal('{% url 'core:eliminar_empresa' pk=empresa.pk %}', '{{ empresa.nombre }}')" 
+                                        class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition duration-300 ease-in-out" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Paginación #}
+        <div class="flex justify-between items-center mt-6">
+            <span class="text-gray-700 text-sm">
+                Mostrando {{ empresas.start_index }} a {{ empresas.end_index }} de {{ empresas.paginator.count }} empresas
+            </span>
+            <div class="flex space-x-2">
+                {% if empresas.has_previous %}
+                    <a href="?page={{ empresas.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out">Anterior</a>
+                {% endif %}
+                
+                {% for i in empresas.paginator.page_range %}
+                    {% if empresas.number == i %}
+                        <span class="bg-blue-500 text-white font-bold py-2 px-4 rounded-md">{{ i }}</span>
+                    {% elif i > empresas.number|add:'-3' and i < empresas.number|add:'3' %}
+                        <a href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out">{{ i }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if empresas.has_next %}
+                    <a href="?page={{ empresas.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% else %}
+            <p class="text-gray-600">No se encontraron empresas.</p>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
-{% endblock %}
+
+{# Modal de confirmación de eliminación (ya tienes este, solo asegúrate de que esté incluido o sea compatible) #}
+<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            Confirmar Eliminación
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">
+                                ¿Estás seguro de que quieres eliminar a <strong id="entityName" class="font-semibold text-gray-700"></strong>?
+                                Esta acción no se puede deshacer.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="items-center px-4 py-3 bg-gray-50 flex justify-end">
+                <form id="deleteForm" method="post" action="">
+                    {% csrf_token %}
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Eliminar
+                    </button>
+                    <button type="button" onclick="hideDeleteModal()" class="mt-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showDeleteModal(deleteUrl, entityName) {
+        document.getElementById('entityName').innerText = entityName;
+        document.getElementById('deleteForm').action = deleteUrl;
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+
+    function hideDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+    }
+</script>
+
+{% endblock content %}

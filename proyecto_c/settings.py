@@ -5,7 +5,7 @@ from pathlib import Path
 from django.contrib.messages import constants as messages
 import dj_database_url # Importado para configurar la base de datos
 # Importa S3Boto3Storage de django-storages para la configuración de S3
-from storages.backends.s3boto3 import S3Boto3Storage
+# from storages.backends.s3boto3 import S3Boto3Storage # No es necesario importar la clase directamente aquí, ya que se referencia por cadena
 
 # ==============================================================================
 # CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AJUSTADO PARA DEPURACIÓN MÁS VERBOSA)
@@ -138,46 +138,51 @@ USE_TZ = True
 
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STATIC_ROOT y STATICFILES_STORAGE se definirán condicionalmente más abajo si se usa S3
 STATICFILES_DIRS = [
     BASE_DIR / 'core/static',
 ]
 
-# =============================================================================
-# CONFIGURACIÓN DE ALMACENAMIENTO DE ARCHIVOS EN AWS S3 (AJUSTADA)
-# =============================================================================
+# ==============================================================================
+# CONFIGURACIÓN DE ALMACENAMIENTO DE ARCHIVOS EN AWS S3 (AJUSTADA Y SEGURA)
+# ==============================================================================
 
-# Define la clase de almacenamiento para usar S3 para archivos de medios
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-# También para archivos estáticos, si vas a servirlos desde S3 directamente
-STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+# Obtiene las credenciales de AWS desde las variables de entorno
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2') # Puedes definir un valor por defecto si lo deseas
 
-# Obtiene las credenciales de AWS desde las variables de entorno o usa los valores fijos
-# Usando los valores fijos que proporcionaste
-AWS_ACCESS_KEY_ID ="AKIAY4RRUFZQPV3JBUN5"
-AWS_SECRET_ACCESS_KEY = "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"
-AWS_STORAGE_BUCKET_NAME = "sam-plataforma-media"
-AWS_S3_REGION_NAME = "us-east-2"
-AWS_S3_SIGNATURE_VERSION = "s3v4"
-AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-AWS_DEFAULT_ACL = None # Acceso por defecto a los objetos subidos
+# Define STATIC_ROOT globalmente, es necesario para collectstatic
+# Cuando se usa S3 para estáticos, collectstatic los sube a S3.
+# Cuando se usa Whitenoise, collectstatic los recolecta en STATIC_ROOT local.
+STATIC_ROOT = BASE_DIR / 'staticfiles' # Siempre define STATIC_ROOT
 
-# Ruta para acceder a los archivos de medios desde la web
-MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/' 
+# Determina si usar S3 o almacenamiento local
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage' # Si también para archivos estáticos
+    
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    AWS_DEFAULT_ACL = None
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    AWS_S3_USE_SSL = True
+    AWS_QUERYSTRING_AUTH = False
+    AWS_LOCATION = 'media'
+    AWS_S3_FILE_OVERWRITE = False
+    print("INFO: AWS S3 storage configured.")
+else:
+    # Si las variables de entorno de S3 no están, usa la configuración local
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media' # Carpeta local donde se guardarán los archivos
+    # Para STATICFILES_STORAGE, si no usas S3 para estáticos, Whitenoise es la opción por defecto.
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    # STATIC_ROOT ya está definido arriba, no lo redefinas aquí
 
-# Asegura que boto3 esté configurado y usa SSL
-AWS_S3_USE_SSL = True
+    print("WARNING: AWS S3 environment variables not found. Using local media storage.")
 
-# No añade el parámetro de autenticación como una cadena de consulta.
-# Esto es importante para URLs limpias y accesibles directamente.
-AWS_QUERYSTRING_AUTH = False 
-
-# Prefijo de la carpeta dentro de tu bucket S3 para los archivos media
-AWS_LOCATION = 'media' 
-
-# Asegúrate de que los archivos nuevos no sobrescriban los viejos con el mismo nombre.
-AWS_S3_FILE_OVERWRITE = False
 
 # =============================================================================
 

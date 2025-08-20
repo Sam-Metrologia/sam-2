@@ -64,11 +64,16 @@ class Empresa(models.Model):
         null=True,
         verbose_name="Codificación del Formato (Empresa)"
     )
-    # Campos para la lógica de suscripción
+    # Campos para la lógica de suscripción (Simplificados)
     es_periodo_prueba = models.BooleanField(default=False, verbose_name="¿Es Período de Prueba?")
     duracion_prueba_dias = models.IntegerField(default=30, verbose_name="Duración Prueba (días)")
     fecha_inicio_plan = models.DateField(blank=True, null=True, verbose_name="Fecha Inicio Plan")
-    plan_actual = models.ForeignKey('PlanSuscripcion', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Plan de Suscripción Actual")
+    # plan_actual = models.ForeignKey('PlanSuscripcion', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Plan de Suscripción Actual") # Eliminado para simplificar
+    
+    # Nuevos campos directos para el plan
+    limite_equipos_empresa = models.IntegerField(default=5, verbose_name="Límite Máximo de Equipos") # Nuevo campo
+    duracion_suscripcion_meses = models.IntegerField(default=12, blank=True, null=True, verbose_name="Duración Suscripción (meses)") # Nuevo campo
+    
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
         max_length=50,
@@ -98,27 +103,45 @@ class Empresa(models.Model):
             return float('inf') 
         elif self.es_periodo_prueba:
             # Durante el período de prueba, el límite es un valor predefinido (ej. 5 equipos)
-            return 5  # O define un campo para esto si quieres que sea configurable
-        elif self.plan_actual:
-            return self.plan_actual.limite_equipos
+            return self.duracion_prueba_dias # Usar este campo para el límite de equipos en prueba si así se define
+            # O puedes tener un valor fijo como 5, 10, etc. return 5
+        # Modificado para usar el nuevo campo limite_equipos_empresa
+        elif self.limite_equipos_empresa is not None:
+            return self.limite_equipos_empresa
         return 0 # Si no hay plan ni prueba activa, el límite es 0
 
     def get_estado_suscripcion_display(self):
-        """Devuelve el estado de la suscripción, considerando el periodo de prueba."""
-        if self.es_periodo_prueba:
-            if self.fecha_inicio_plan:
-                if timezone.localdate() > self.fecha_inicio_plan + timedelta(days=self.duracion_prueba_dias):
-                    return "Período de Prueba Expirado"
-                else:
-                    return "Período de Prueba Activo"
-            return "Período de Prueba Activo (Fecha no definida)" # Fallback si fecha no está
+        """Devuelve el estado de la suscripción, considerando el periodo de prueba y la duración del plan."""
+        current_date = timezone.localdate()
+
+        if self.es_periodo_prueba and self.fecha_inicio_plan:
+            end_date_trial = self.fecha_inicio_plan + timedelta(days=self.duracion_prueba_dias)
+            if current_date > end_date_trial:
+                return "Período de Prueba Expirado"
+            else:
+                return "Período de Prueba Activo"
+        elif self.fecha_inicio_plan and self.duracion_suscripcion_meses:
+            end_date_plan = self.fecha_inicio_plan + relativedelta(months=self.duracion_suscripcion_meses)
+            if current_date > end_date_plan:
+                return "Plan Expirado"
         
-        # Si no es período de prueba, devuelve el estado_suscripcion normal
+        # Si no es período de prueba ni plan expirado, devuelve el estado_suscripcion normal
         return self.estado_suscripcion
+
+    def get_fecha_fin_plan(self):
+        """Calcula y devuelve la fecha de fin del plan o periodo de prueba."""
+        if self.es_periodo_prueba and self.fecha_inicio_plan:
+            return self.fecha_inicio_plan + timedelta(days=self.duracion_prueba_dias)
+        elif self.fecha_inicio_plan and self.duracion_suscripcion_meses:
+            return self.fecha_inicio_plan + relativedelta(months=self.duracion_suscripcion_meses)
+        return None # No hay fecha de fin si no hay plan ni prueba
+
 
 class PlanSuscripcion(models.Model):
     """
     Modelo para definir los diferentes planes de suscripción disponibles.
+    Se mantiene si en el futuro se desea una gestión de planes más compleja,
+    pero ya no tiene una FK directa desde Empresa para la lógica de uso actual.
     """
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Plan")
     limite_equipos = models.IntegerField(default=0, verbose_name="Límite de Equipos")
