@@ -44,8 +44,14 @@ class Empresa(models.Model):
     direccion = models.CharField(max_length=255, blank=True, null=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
-    logo_empresa = models.ImageField(upload_to='empresas_logos/', blank=True, null=True) # Simplificado upload_to
+    logo_empresa = models.ImageField(upload_to='empresas_logos/', blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
+    limite_equipos = models.IntegerField(
+        default=0,
+        help_text="Número máximo de equipos que esta empresa puede registrar. 0 para ilimitado.",
+        blank=True,
+        null=True
+    )
     # Nuevos campos para la información de formato por empresa
     formato_version_empresa = models.CharField(
         max_length=50,

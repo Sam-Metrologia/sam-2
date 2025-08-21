@@ -1392,6 +1392,22 @@ def home(request):
         # If superuser and no company selected, current_company_format_info remains None,
         # meaning no specific company format info will be displayed at the top.
 
+    # --- INICIO: LÓGICA DE VALIDACIÓN DE LÍMITE DE EQUIPOS ---
+    limite_alcanzado = False
+    empresa_para_limite = None
+    if user.is_authenticated and not user.is_superuser:
+        empresa_para_limite = user.empresa
+    elif user.is_superuser and selected_company_id:
+        try:
+            empresa_para_limite = Empresa.objects.get(pk=selected_company_id)
+        except Empresa.DoesNotExist:
+            empresa_para_limite = None
+
+    if empresa_para_limite and empresa_para_limite.limite_equipos is not None and empresa_para_limite.limite_equipos > 0:
+        equipos_actuales = Equipo.objects.filter(empresa=empresa_para_limite).count()
+        if equipos_actuales >= empresa_para_limite.limite_equipos:
+            limite_alcanzado = True
+    # --- FIN: LÓGICA DE VALIDACIÓN DE LÍMITE DE EQUIPOS ---
 
     today = timezone.localdate() # Obtener la fecha actual con la zona horaria configurada
 
@@ -1487,6 +1503,7 @@ def home(request):
         'empresas_disponibles': empresas_disponibles, # Pasar empresas_disponibles al contexto
         'selected_company_id': selected_company_id, # Pasar selected_company_id al contexto
         'current_company_format_info': current_company_format_info, # Información de formato de la empresa actual
+        'limite_alcanzado': limite_alcanzado, # <--- SE AÑADIÓ ESTA VARIABLE
     }
     return render(request, 'core/home.html', context)
 
@@ -1575,29 +1592,49 @@ def editar_empresa_formato(request, pk):
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
 def añadir_equipo(request):
-    """
-    Handles adding a new equipment.
-    """
+    # Obtener el objeto empresa del usuario actual (si no es superusuario)
+    # o de los datos del formulario (si es superusuario)
+    empresa_actual = None
+    if request.user.is_authenticated and not request.user.is_superuser:
+        empresa_actual = request.user.empresa
+    
+    # Calcular si el límite ha sido alcanzado
+    limite_alcanzado = False
+    if empresa_actual:
+        if empresa_actual.limite_equipos is not None and empresa_actual.limite_equipos > 0:
+            equipos_actuales = Equipo.objects.filter(empresa=empresa_actual).count()
+            if equipos_actuales >= empresa_actual.limite_equipos:
+                limite_alcanzado = True
+
     if request.method == 'POST':
-        # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
-            equipo = form.save(commit=False)
-            # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
-            # Si el formulario deshabilita el campo 'empresa' para no superusuarios,
-            # Django no lo incluirá en request.POST. Aseguramos que se asigne aquí si es el caso.
-            if not request.user.is_superuser and not equipo.empresa:
-                equipo.empresa = request.user.empresa
-            equipo.save()
-            messages.success(request, 'Equipo añadido exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                # La validación del límite ocurre aquí dentro del form.save()
+                equipo = form.save()
+                messages.success(request, 'Equipo añadido exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except forms.ValidationError as e:
+                # Capturar el ValidationError si el límite se alcanza
+                messages.error(request, str(e))
+                # Pasar la empresa y el estado del límite para la renderización
+                context = {
+                    'form': form,
+                    'titulo_pagina': 'Añadir Nuevo Equipo',
+                    'limite_alcanzado': limite_alcanzado,
+                }
+                return render(request, 'core/añadir_equipo.html', context)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        # Pasar el request al formulario
         form = EquipoForm(request=request)
     
-    return render(request, 'core/añadir_equipo.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Equipo'})
+    context = {
+        'form': form,
+        'titulo_pagina': 'Añadir Nuevo Equipo',
+        'limite_alcanzado': limite_alcanzado,
+    }
+    return render(request, 'core/añadir_equipo.html', context)
 
 
 @access_check # APLICAR ESTE DECORADOR

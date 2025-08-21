@@ -534,6 +534,35 @@ class EquipoForm(forms.ModelForm):
                 return self.request.user.empresa
         return self.cleaned_data['empresa']
 
+    def clean_empresa(self):
+        if self.request and not self.request.user.is_superuser:
+            if self.instance and self.instance.pk:
+                return self.instance.empresa
+            elif self.request.user.empresa:
+                return self.request.user.empresa
+        return self.cleaned_data['empresa']
+
+    def save(self, commit=True):
+        # Antes de guardar, verificar el límite de equipos si se está creando uno nuevo
+        if not self.instance.pk:
+            # Obtener la empresa, ya sea del formulario (para superusuarios) o del usuario
+            if self.request and not self.request.user.is_superuser:
+                empresa = self.request.user.empresa
+            else:
+                empresa = self.cleaned_data.get('empresa')
+
+            if empresa:
+                equipos_actuales = Equipo.objects.filter(empresa=empresa).count()
+                limite_equipos = empresa.limite_equipos
+
+                if limite_equipos is not None and limite_equipos > 0:
+                    if equipos_actuales >= limite_equipos:
+                        raise forms.ValidationError(
+                            f"Esta empresa ya ha alcanzado su límite de {limite_equipos} equipos. No se puede agregar más."
+                        )
+        
+        # Después de la validación, guardar el objeto
+        return super().save(commit)
 
 # Formulario para Calibracion
 class CalibracionForm(forms.ModelForm):
