@@ -181,6 +181,10 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
     
     print("INFO: AWS S3 storage configured.")
+    print(f"DEBUG: S3 Bucket Name: {AWS_STORAGE_BUCKET_NAME}") # Línea de depuración añadida
+    print(f"DEBUG: S3 Region Name: {AWS_S3_REGION_NAME}") # Línea de depuración añadida
+    print(f"DEBUG: S3 Custom Domain: {AWS_S3_CUSTOM_DOMAIN}") # Línea de depuración añadida
+    print(f"DEBUG: MEDIA_URL: {MEDIA_URL}") # Línea de depuración añadida
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
@@ -195,6 +199,7 @@ else:
     WHITENOISE_MAX_AGE = 3600 # Cachear archivos estáticos por 1 hora en desarrollo
     
     print("WARNING: AWS S3 environment variables not found. Using local media storage.")
+    print("DEBUG: Using local file storage.") # Línea de depuración añadida
 
 
 # =============================================================================
