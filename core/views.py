@@ -62,8 +62,6 @@ from django.contrib.auth.models import Group # Importar el modelo Group
 
 # Importar para default_storage (manejo de archivos S3/local)
 from django.core.files.storage import default_storage
-# No es necesario importar S3Boto3Storage directamente aquí si ya está en settings.DEFAULT_FILE_STORAGE
-# from storages.backends.s3boto3 import S3Boto3Storage
 
 
 # =============================================================================
@@ -136,18 +134,16 @@ def subir_archivo(nombre_archivo, contenido):
     # La ruta completa en S3 será: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/{nombre_archivo}
     ruta_completa_en_s3 = os.path.join(settings.AWS_LOCATION, nombre_archivo) 
     
-    print(f"DEBUG_SUBIDA: Intentando subir archivo '{nombre_archivo}' a S3.")
-    print(f"DEBUG_SUBIDA: Ruta final esperada en S3: '{ruta_completa_en_s3}'")
-    print(f"DEBUG_SUBIDA: Usando storage backend: {type(default_storage).__name__}")
-    
     try:
         # Guardar el archivo usando default_storage
         # Esto usará S3 si DEFAULT_FILE_STORAGE está configurado para S3Boto3Storage
         # o el sistema de archivos local si no lo está.
         default_storage.save(ruta_completa_en_s3, contenido)
-        print(f"DEBUG_SUBIDA: Archivo '{nombre_archivo}' subido exitosamente a S3 en la ruta '{ruta_completa_en_s3}'.")
     except Exception as e:
+        # En producción, no queremos que un error de subida rompa la aplicación
+        # Pero sí queremos registrarlo.
         print(f"ERROR_SUBIDA_S3: Fallo al subir archivo '{nombre_archivo}' a S3 en la ruta '{ruta_completa_en_s3}'. Error: {e}")
+        # Considera usar un logger de Django aquí en lugar de print
         raise # Re-lanza la excepción para que la vista pueda manejarla
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
@@ -483,7 +479,7 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
 def _generate_equipment_general_info_excel_content(equipo):
     """
     Generates an Excel file with general information of a specific equipment.
-    This is similar to _generate_general_equipment_list_excel_content but for a single equipment.
+    This is similar to _generate_general_equipment_list_excel_content but for a single equipo.
     """
     workbook = Workbook()
     sheet = workbook.active
@@ -517,38 +513,37 @@ def _generate_equipment_general_info_excel_content(equipo):
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
-    for equipo in equipos_queryset:
-        row_data = [
-            equipo.codigo_interno,
-            equipo.nombre,
-            equipo.empresa.nombre if equipo.empresa else "N/A",
-            equipo.get_tipo_equipo_display(),
-            equipo.marca,
-            equipo.modelo,
-            equipo.numero_serie,
-            equipo.ubicacion,
-            equipo.responsable,
-            equipo.estado,
-            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-            equipo.rango_medida,
-            equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
-            equipo.observaciones,
-            equipo.version_formato,
-            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-            equipo.codificacion_formato,
-            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-        ]
-        sheet.append(row_data)
+    row_data = [
+        equipo.codigo_interno,
+        equipo.nombre,
+        equipo.empresa.nombre if equipo.empresa else "N/A",
+        equipo.get_tipo_equipo_display(),
+        equipo.marca,
+        equipo.modelo,
+        equipo.numero_serie,
+        equipo.ubicacion,
+        equipo.responsable,
+        equipo.estado,
+        equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+        equipo.rango_medida,
+        equipo.resolucion,
+        equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+        equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+        equipo.observaciones,
+        equipo.version_formato,
+        equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+        equipo.codificacion_formato,
+        equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+        equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+        float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+        equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
+        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
+        float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+        equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
+        float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+    ]
+    sheet.append(row_data)
 
     for col in sheet.columns:
         max_length = 0
@@ -570,7 +565,7 @@ def _generate_equipment_general_info_excel_content(equipo):
 
 def _generate_equipment_activities_excel_content(equipo):
     """
-    Generates an Excel file with the activities (calibrations, maintenances, verifications) of a specific equipment.
+    Generates an Excel file with the activities (calibrations, maintenances, verifications) of a specific equipo.
     """
     workbook = Workbook()
 
@@ -1417,9 +1412,9 @@ def home(request):
     # --- INICIO: LÓGICA DE VALIDACIÓN DE LÍMITE DE EQUIPOS ---
     limite_alcanzado = False
     empresa_para_limite = None
-    if user.is_authenticated and not user.is_superuser:
-        empresa_para_limite = user.empresa
-    elif user.is_superuser and selected_company_id:
+    if request.user.is_authenticated and not request.user.is_superuser:
+        empresa_para_limite = request.user.empresa
+    elif request.user.is_superuser and selected_company_id:
         try:
             empresa_para_limite = Empresa.objects.get(pk=selected_company_id)
         except Empresa.DoesNotExist:
@@ -1458,7 +1453,7 @@ def home(request):
         equipos_list = equipos_list.filter(estado=estado_filter)
     else:
         # Por defecto, no mostrar "De Baja" a menos que se filtre explícitamente por él
-        if not user.is_superuser or (user.is_superuser and not selected_company_id):
+        if not request.user.is_superuser or (request.user.is_superuser and not selected_company_id):
             equipos_list = equipos_list.exclude(estado='De Baja').exclude(estado='Inactivo') # Se añadió exclusión de 'Inactivo'
 
     # Añadir lógica para el estado de las fechas de próxima actividad
@@ -1525,7 +1520,7 @@ def home(request):
         'tipo_equipo_choices': tipo_equipo_choices,
         'estado_choices': estado_choices,
         'titulo_pagina': 'Listado de Equipos',
-        'is_superuser': user.is_superuser, # Pasar is_superuser al contexto
+        'is_superuser': request.user.is_superuser, # Pasar is_superuser al contexto
         'empresas_disponibles': empresas_disponibles, # Pasar empresas_disponibles al contexto
         'selected_company_id': selected_company_id, # Pasar selected_company_id al contexto
         'current_company_format_info': current_company_format_info, # Información de formato de la empresa actual
@@ -1931,13 +1926,18 @@ def editar_equipo(request, pk):
         # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, instance=equipo, request=request)
         if form.is_valid():
-            equipo = form.save(commit=False)
-            # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
-            if not request.user.is_superuser and not equipo.empresa:
-                equipo.empresa = request.user.empresa
-            equipo.save()
-            messages.success(request, 'Equipo actualizado exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try: # Añadido try-except para depuración de S3
+                equipo = form.save(commit=False)
+                # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
+                if not request.user.is_superuser and not equipo.empresa:
+                    equipo.empresa = request.user.empresa
+                equipo.save()
+                messages.success(request, 'Equipo actualizado exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                print(f"ERROR_SUBIDA_S3: Fallo al guardar equipo {equipo.pk} (editando). Error: {e}")
+                messages.error(request, f'Hubo un error al actualizar el equipo: {e}')
+                return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
@@ -1999,7 +1999,7 @@ def añadir_calibracion(request, equipo_pk):
     if request.method == 'POST':
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 calibracion = form.save(commit=False)
                 calibracion.equipo = equipo
                 calibracion.save() # Esto guardará el archivo usando default_storage
@@ -2007,7 +2007,7 @@ def añadir_calibracion(request, equipo_pk):
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                print(f"ERROR al guardar calibración o archivo en S3: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al guardar calibración para equipo {equipo.pk}. Error: {e}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
                 return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
         else:
@@ -2033,12 +2033,12 @@ def editar_calibracion(request, equipo_pk, pk):
     if request.method == 'POST':
         form = CalibracionForm(request.POST, request.FILES, instance=calibracion)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Calibración actualizada exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                print(f"ERROR al actualizar calibración o archivo en S3: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar calibración {calibracion.pk}. Error: {e}")
                 messages.error(request, f'Hubo un error al actualizar la calibración: {e}')
                 return render(request, 'core/editar_calibracion.html', {'form': form, 'equipo': equipo, 'calibracion': calibracion, 'titulo_pagina': f'Editar Calibración para {equipo.nombre}'})
         else:
@@ -2062,7 +2062,7 @@ def eliminar_calibracion(request, equipo_pk, pk):
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        try:
+        try: # Añadido try-except para depuración de S3
             calibracion.delete()
             messages.success(request, 'Calibración eliminada exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2098,14 +2098,14 @@ def añadir_mantenimiento(request, equipo_pk):
     if request.method == 'POST':
         form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 mantenimiento = form.save(commit=False)
                 mantenimiento.equipo = equipo
                 mantenimiento.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Mantenimiento añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                print(f"ERROR al guardar mantenimiento o archivo en S3: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al guardar mantenimiento para equipo {equipo.pk}. Error: {e}")
                 messages.error(request, f'Hubo un error al guardar el mantenimiento: {e}')
                 return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
         else:
@@ -2131,12 +2131,12 @@ def editar_mantenimiento(request, equipo_pk, pk):
     if request.method == 'POST':
         form = MantenimientoForm(request.POST, request.FILES, instance=mantenimiento)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Mantenimiento actualizado exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                print(f"ERROR al actualizar mantenimiento o archivo en S3: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar mantenimiento {mantenimiento.pk}. Error: {e}")
                 messages.error(request, f'Hubo un error al actualizar el mantenimiento: {e}')
                 return render(request, 'core/editar_mantenimiento.html', {'form': form, 'equipo': equipo, 'mantenimiento': mantenimiento, 'titulo_pagina': f'Editar Mantenimiento para {equipo.nombre}'})
         else:
@@ -2160,7 +2160,7 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        try:
+        try: # Añadido try-except para depuración de S3
             mantenimiento.delete()
             messages.success(request, 'Mantenimiento eliminado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2217,7 +2217,7 @@ def añadir_comprobacion(request, equipo_pk):
     if request.method == 'POST':
         form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 comprobacion = form.save(commit=False)
                 comprobacion.equipo = equipo
                 comprobacion.save() # Esto guardará el archivo usando default_storage
@@ -2225,7 +2225,7 @@ def añadir_comprobacion(request, equipo_pk):
                 messages.success(request, 'Comprobación añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                print(f"ERROR al guardar comprobación o archivo en S3: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al guardar comprobación para equipo {equipo.pk}. Error: {e}")
                 messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
                 return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
         else:
@@ -2251,12 +2251,12 @@ def editar_comprobacion(request, equipo_pk, pk):
     if request.method == 'POST':
         form = ComprobacionForm(request.POST, request.FILES, instance=comprobacion)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Comprobación actualizada exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
-                print(f"ERROR al actualizar comprobación o archivo en S3: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar comprobación {comprobacion.pk}. Error: {e}")
                 messages.error(request, f'Hubo un error al actualizar la comprobación: {e}')
                 return render(request, 'core/editar_comprobacion.html', {'form': form, 'equipo': equipo, 'comprobacion': comprobacion, 'titulo_pagina': f'Editar Comprobación para {equipo.nombre}'})
         else:
@@ -2280,7 +2280,7 @@ def eliminar_comprobacion(request, equipo_pk, pk):
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        try:
+        try: # Añadido try-except para depuración de S3
             comprobacion.delete()
             messages.success(request, 'Comprobación eliminada exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2323,7 +2323,7 @@ def dar_baja_equipo(request, equipo_pk):
     if request.method == 'POST':
         form = BajaEquipoForm(request.POST, request.FILES)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 baja_registro = form.save(commit=False)
                 baja_registro.equipo = equipo
                 baja_registro.dado_de_baja_por = request.user
@@ -2333,7 +2333,7 @@ def dar_baja_equipo(request, equipo_pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
                 messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
-                print(f"DEBUG: Error al dar de baja equipo {equipo.pk}: {e}") # Para depuración
+                print(f"ERROR_SUBIDA_S3: Fallo al dar de baja equipo {equipo.pk}. Error: {e}") # Para depuración
                 return render(request, 'core/dar_baja_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario de baja.')
@@ -2493,9 +2493,14 @@ def añadir_empresa(request):
     if request.method == 'POST':
         formulario = EmpresaForm(request.POST, request.FILES)
         if formulario.is_valid():
-            formulario.save() # Aquí se guarda el logo si se subió
-            messages.success(request, 'Empresa añadida exitosamente.')
-            return redirect('core:listar_empresas')
+            try: # Añadido try-except para depuración de S3
+                formulario.save() # Aquí se guarda el logo si se subió
+                messages.success(request, 'Empresa añadida exitosamente.')
+                return redirect('core:listar_empresas')
+            except Exception as e:
+                print(f"ERROR_SUBIDA_S3: Fallo al añadir empresa. Error: {e}")
+                messages.error(request, f'Hubo un error al añadir la empresa: {e}')
+                return render(request, 'core/añadir_empresa.html', {'formulario': formulario, 'titulo_pagina': 'Añadir Nueva Empresa'})
         else:
             messages.error(request, 'Hubo un error al añadir la empresa. Por favor, revisa los datos.')
     else:
@@ -2542,9 +2547,14 @@ def editar_empresa(request, pk):
     if request.method == 'POST':
         form = EmpresaForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
-            form.save() # Aquí se guarda el logo si se subió
-            messages.success(request, 'Empresa actualizada exitosamente.')
-            return redirect('core:detalle_empresa', pk=empresa.pk)
+            try: # Añadido try-except para depuración de S3
+                form.save() # Aquí se guarda el logo si se subió
+                messages.success(request, 'Empresa actualizada exitosamente.')
+                return redirect('core:detalle_empresa', pk=empresa.pk)
+            except Exception as e:
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar empresa {empresa.pk}. Error: {e}")
+                messages.error(request, f'Hubo un error al actualizar la empresa: {e}')
+                return render(request, 'core/editar_empresa.html', {'form': form, 'empresa': empresa, 'titulo_pagina': f'Editar Empresa: {empresa.nombre}'})
         else:
             messages.error(request, 'Hubo un error al actualizar la empresa. Por favor, revisa los datos.')
     else:
@@ -2560,7 +2570,7 @@ def eliminar_empresa(request, pk):
     """
     empresa = get_object_or_404(Empresa, pk=pk)
     if request.method == 'POST':
-        try:
+        try: # Añadido try-except para depuración de S3
             empresa_nombre = empresa.nombre # Capturar el nombre antes de eliminar
             empresa.delete()
             messages.success(request, f'Empresa "{empresa_nombre}" eliminada exitosamente.')
@@ -2684,7 +2694,10 @@ def editar_ubicacion(request, pk):
         # Pasar el request al formulario
         form = UbicacionForm(request.POST, instance=ubicacion, request=request)
         if form.is_valid():
-            form.save()
+            ubicacion = form.save(commit=False)
+            if not request.user.is_superuser and not ubicacion.empresa:
+                ubicacion.empresa = request.user.empresa
+            ubicacion.save()
             messages.success(request, 'Ubicación actualizada exitosamente.')
             return redirect('core:listar_ubicaciones')
         else:
@@ -2783,7 +2796,7 @@ def listar_procedimientos(request):
         'procedimientos': procedimientos,
         'titulo_pagina': 'Listado de Procedimientos',
         'current_company_format_info': current_company_format_info,
-        'is_superuser': user.is_superuser,
+        'is_superuser': request.user.is_superuser,
         'empresas_disponibles': empresas_disponibles,
         'selected_company_id': selected_company_id,
     }
@@ -2800,7 +2813,7 @@ def añadir_procedimiento(request):
     if request.method == 'POST':
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 # 1. obtener el archivo desde request.FILES
                 archivo_subido = request.FILES["documento_pdf"]
 
@@ -2816,7 +2829,7 @@ def añadir_procedimiento(request):
                 return redirect('core:listar_procedimientos')
             except Exception as e:
                 messages.error(request, f'Hubo un error al añadir el procedimiento: {e}. Revisa el log para más detalles.')
-                print(f"DEBUG: Error al añadir procedimiento: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al añadir procedimiento. Error: {e}")
                 return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
@@ -2842,14 +2855,14 @@ def editar_procedimiento(request, pk):
     if request.method == 'POST':
         form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
-            try:
+            try: # Añadido try-except para depuración de S3
                 # La lógica de empresa ya se maneja en el formulario, solo guardar
                 form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
                 messages.error(request, f'Hubo un error al actualizar el procedimiento: {e}. Revisa el log para más detalles.')
-                print(f"DEBUG: Error al actualizar procedimiento: {e}")
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar procedimiento {procedimiento.pk}. Error: {e}")
                 return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
@@ -2873,7 +2886,7 @@ def eliminar_procedimiento(request, pk):
         return redirect('core:listar_procedimientos')
 
     if request.method == 'POST':
-        try:
+        try: # Añadido try-except para depuración de S3
             nombre_proc = procedimiento.nombre
             procedimiento.delete()
             messages.success(request, f'Procedimiento "{nombre_proc}" eliminado exitosamente.')
@@ -2957,11 +2970,16 @@ def añadir_proveedor(request):
     if request.method == 'POST':
         form = ProveedorForm(request.POST, request=request)
         if form.is_valid():
-            proveedor = form.save(commit=False)
-            # La lógica de empresa ya se maneja en el formulario
-            proveedor.save() # Esto guardará el archivo usando default_storage
-            messages.success(request, 'Proveedor añadido exitosamente.')
-            return redirect('core:listar_proveedores')
+            try: # Añadido try-except para depuración de S3
+                proveedor = form.save(commit=False)
+                # La lógica de empresa ya se maneja en el formulario
+                proveedor.save() # Esto guardará el archivo usando default_storage
+                messages.success(request, 'Proveedor añadido exitosamente.')
+                return redirect('core:listar_proveedores')
+            except Exception as e:
+                messages.error(request, f'Hubo un error al añadir el proveedor: {e}. Revisa el log para más detalles.')
+                print(f"ERROR_SUBIDA_S3: Fallo al añadir proveedor. Error: {e}")
+                return render(request, 'core/añadir_proveedor.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Proveedor'})
         else:
             messages.error(request, 'Hubo un error al añadir el proveedor. Por favor, revisa los datos.')
     else:
@@ -2986,10 +3004,15 @@ def editar_proveedor(request, pk):
     if request.method == 'POST':
         form = ProveedorForm(request.POST, instance=proveedor, request=request)
         if form.is_valid():
-            proveedor = form.save(commit=False)
-            proveedor.save() # Esto guardará el archivo usando default_storage
-            messages.success(request, 'Proveedor actualizado exitosamente.')
-            return redirect('core:listar_proveedores')
+            try: # Añadido try-except para depuración de S3
+                proveedor = form.save(commit=False)
+                proveedor.save() # Esto guardará el archivo usando default_storage
+                messages.success(request, 'Proveedor actualizado exitosamente.')
+                return redirect('core:listar_proveedores')
+            except Exception as e:
+                messages.error(request, f'Hubo un error al actualizar el proveedor: {e}. Revisa el log para más detalles.')
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar proveedor {proveedor.pk}. Error: {e}")
+                return render(request, 'core/editar_proveedor.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor: {proveedor.nombre_empresa}'})
         else:
             messages.error(request, 'Hubo un error al actualizar el proveedor. Por favor, revisa los datos.')
     else:
@@ -3011,7 +3034,7 @@ def eliminar_proveedor(request, pk):
         return redirect('core:listar_proveedores')
 
     if request.method == 'POST':
-        try:
+        try: # Añadido try-except para depuración de S3
             nombre_proveedor = proveedor.nombre_empresa # Capturar el nombre antes de eliminar
             proveedor.delete()
             messages.success(request, f'Proveedor "{nombre_proveedor}" eliminado exitosamente.')
@@ -3113,7 +3136,6 @@ def añadir_usuario(request, empresa_pk=None):
         else:
             messages.error(request, 'Hubo un error al añadir el usuario. Por favor, revisa los datos.')
     else:
-        # Pasar el request al formulario
         form = CustomUserCreationForm(request=request)
         if empresa_pk:
             try:
@@ -3169,8 +3191,7 @@ def editar_usuario(request, pk):
             return redirect('core:listar_usuarios')
 
     if request.method == 'POST':
-        # Pasar el request al formulario
-        form = CustomUserChangeForm(request.POST, instance=usuario_a_editar, request=request)
+        form = CustomUserChangeForm(request.POST, request.FILES, instance=usuario_a_editar, request=request)
         if form.is_valid():
             user = form.save(commit=False)
             # Asegurar que la empresa no se cambie si el campo está deshabilitado para no superusuarios
@@ -3183,7 +3204,6 @@ def editar_usuario(request, pk):
         else:
             messages.error(request, 'Hubo un error al actualizar el usuario. Por favor, revisa los datos.')
     else:
-        # Pasar el request al formulario
         form = CustomUserChangeForm(instance=usuario_a_editar, request=request)
 
     return render(request, 'core/editar_usuario.html', {'form': form, 'usuario_a_editar': usuario_a_editar, 'titulo_pagina': f'Editar Usuario: {usuario_a_editar.username}'})
@@ -3362,7 +3382,7 @@ def informes(request):
 
     context = {
         'titulo_pagina': 'Informes y Actividades',
-        'is_superuser': user.is_superuser,
+        'is_superuser': request.user.is_superuser,
         'empresas_disponibles': empresas_disponibles,
         'selected_company_id': selected_company_id,
         'today': today,
@@ -3442,7 +3462,7 @@ def generar_informe_zip(request):
         zf.writestr(f"{empresa.nombre}/Listado_de_procedimientos.xlsx", excel_buffer_procedimientos)
 
 
-        # 4. For each equipment, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
+        # 4. For each equipo, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
         for equipo in equipos_empresa:
             # Asegura que el código interno no contenga caracteres que puedan causar problemas en nombres de archivo/ruta
             safe_equipo_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(':', '_')
@@ -3477,9 +3497,9 @@ def generar_informe_zip(request):
                     with default_storage.open(baja_registro.documento_baja.name, 'rb') as f:
                         file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
                         zf.writestr(f"{baja_folder}/{file_name_in_zip}", f.read())
-                    print(f"DEBUG: Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
-                else:
-                    print(f"DEBUG: No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
+                    # print(f"DEBUG: Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}") # Comentar en producción
+                # else:
+                    # print(f"DEBUG: No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.") # Comentar en producción
             except Exception as e:
                 print(f"Error adding decommission document for {equipo.codigo_interno} to zip: {e}")
                 zf.writestr(f"{equipo_folder}/Baja/Documento_Baja_ERROR.txt", f"Error adding decommission document: {e}")
@@ -3493,8 +3513,8 @@ def generar_informe_zip(request):
                         if default_storage.exists(cal.documento_calibracion.name):
                             with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{os.path.basename(cal.documento_calibracion.name)}", f.read())
-                        else:
-                            print(f"DEBUG: Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
+                        # else:
+                            # print(f"DEBUG: Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}") # Comentar en producción
                     except Exception as e:
                         print(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
 
@@ -3503,8 +3523,8 @@ def generar_informe_zip(request):
                         if default_storage.exists(cal.confirmacion_metrologica_pdf.name):
                             with default_storage.open(cal.confirmacion_metrologica_pdf.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{os.path.basename(cal.confirmacion_metrologica_pdf.name)}", f.read())
-                        else:
-                            print(f"DEBUG: Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}")
+                        # else:
+                            # print(f"DEBUG: Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}") # Comentar en producción
                     except Exception as e:
                         print(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
 
@@ -3513,8 +3533,8 @@ def generar_informe_zip(request):
                         if default_storage.exists(cal.intervalos_calibracion_pdf.name):
                             with default_storage.open(cal.intervalos_calibracion_pdf.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{os.path.basename(cal.intervalos_calibracion_pdf.name)}", f.read())
-                        else:
-                            print(f"DEBUG: Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}")
+                        # else:
+                            # print(f"DEBUG: Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}") # Comentar en producción
                     except Exception as e:
                         print(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
 
@@ -3526,8 +3546,8 @@ def generar_informe_zip(request):
                         if default_storage.exists(mant.documento_mantenimiento.name):
                             with default_storage.open(mant.documento_mantenimiento.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Mantenimientos/{os.path.basename(mant.documento_mantenimiento.name)}", f.read())
-                        else:
-                            print(f"DEBUG: Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}")
+                        # else:
+                            # print(f"DEBUG: Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}") # Comentar en producción
                     except Exception as e:
                         print(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
 
@@ -3539,8 +3559,8 @@ def generar_informe_zip(request):
                         if default_storage.exists(comp.documento_comprobacion.name):
                             with default_storage.open(comp.documento_comprobacion.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/Comprobaciones/{os.path.basename(comp.documento_comprobacion.name)}", f.read())
-                        else:
-                            print(f"DEBUG: Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}")
+                        # else:
+                            # print(f"DEBUG: Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}") # Comentar en producción
                     except Exception as e:
                         print(f"Error adding comprobacion document {comp.documento_comprobacion.name} to zip: {e}")
             
@@ -3557,8 +3577,8 @@ def generar_informe_zip(request):
                         if default_storage.exists(doc_field.name) and doc_field.name.lower().endswith('.pdf'):
                             with default_storage.open(doc_field.name, 'rb') as f:
                                 zf.writestr(f"{equipo_folder}/{os.path.basename(doc_field.name)}", f.read())
-                        else:
-                             print(f"DEBUG: Archivo no encontrado en storage (doc. equipo): {doc_field.name}")
+                        # else:
+                             # print(f"DEBUG: Archivo no encontrado en storage (doc. equipo): {doc_field.name}") # Comentar en producción
                     except Exception as e:
                         print(f"Error adding equipment document {doc_field.name} to zip: {e}")
 
@@ -3574,9 +3594,9 @@ def generar_informe_zip(request):
                             # Usar código del procedimiento como prefijo para el nombre del archivo en el zip
                             zip_path = f"{proc_folder}/{safe_proc_code}_{file_name_in_zip}"
                             zf.writestr(zip_path, f.read())
-                        print(f"DEBUG: Documento de procedimiento '{file_name_in_zip}' añadido para procedimiento {proc.codigo}")
-                    else:
-                        print(f"DEBUG: Archivo de procedimiento no encontrado en storage: {proc.documento_pdf.name}")
+                        # print(f"DEBUG: Documento de procedimiento '{file_name_in_zip}' añadido para procedimiento {proc.codigo}") # Comentar en producción
+                    # else:
+                        # print(f"DEBUG: Archivo de procedimiento no encontrado en storage: {proc.documento_pdf.name}") # Comentar en producción
                 except Exception as e:
                     print(f"Error adding procedure document {proc.documento_pdf.name} to zip: {e}")
                     zf.writestr(f"{empresa.nombre}/Procedimientos/Documento_Procedimiento_{proc.codigo}_ERROR.txt", f"Error adding procedure document: {e}")

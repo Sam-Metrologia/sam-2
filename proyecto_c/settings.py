@@ -9,8 +9,9 @@ import dj_database_url
 # CONFIGURACIÓN DE LOS LOGS PARA AWS S3 (AJUSTADO PARA DEPURACIÓN MÁS VERBOSA)
 # ==============================================================================
 import logging
-# logging.getLogger('botocore').setLevel(logging.DEBUG) # Comentar para reducir ruido en producción
-# logging.getLogger('s3transfer').setLevel(logging.DEBUG) # Comentar para reducir ruido en producción
+# Comentar estas líneas para reducir el ruido de los logs en producción si no es necesario
+# logging.getLogger('botocore').setLevel(logging.DEBUG)
+# logging.getLogger('s3transfer').setLevel(logging.DEBUG)
 # ==============================================================================
 
 
@@ -147,12 +148,13 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # ==============================================================================
 
 # Obtiene las credenciales de AWS desde las variables de entorno
-AWS_ACCESS_KEY_ID = "AKIAY4RRUFZQPV3JBUN5"
-AWS_SECRET_ACCESS_KEY = "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"
-AWS_STORAGE_BUCKET_NAME = "sam-plataforma-media"
-AWS_S3_REGION_NAME = "us-east-2"  # Cambia según tu región
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2') # Define una región por defecto
 
 # Configuración S3 que se aplica SIEMPRE si las variables están presentes
+# Esta estructura asegura que django-storages se configure correctamente
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage' 
@@ -175,12 +177,12 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
     
-    print("INFO: AWS S3 storage configured.")
-    print(f"DEBUG: S3 Bucket Name: {AWS_STORAGE_BUCKET_NAME}")
-    print(f"DEBUG: S3 Region Name: {AWS_S3_REGION_NAME}")
-    print(f"DEBUG: S3 Custom Domain: {AWS_S3_CUSTOM_DOMAIN}")
-    print(f"DEBUG: MEDIA_URL: {MEDIA_URL}")
-    print(f"DEBUG: AWS_S3_ENDPOINT_URL: {AWS_S3_ENDPOINT_URL}") # Añadido para depuración
+    # print("INFO: AWS S3 storage configured.") # Comentar en producción
+    # print(f"DEBUG: S3 Bucket Name: {AWS_STORAGE_BUCKET_NAME}") # Comentar en producción
+    # print(f"DEBUG: S3 Region Name: {AWS_S3_REGION_NAME}") # Comentar en producción
+    # print(f"DEBUG: S3 Custom Domain: {AWS_S3_CUSTOM_DOMAIN}") # Comentar en producción
+    # print(f"DEBUG: MEDIA_URL: {MEDIA_URL}") # Comentar en producción
+    # print(f"DEBUG: AWS_S3_ENDPOINT_URL: {AWS_S3_ENDPOINT_URL}") # Comentar en producción
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
@@ -193,8 +195,8 @@ else:
     # Configuración de Whitenoise para desarrollo (opcional, pero buena práctica)
     WHITENOISE_MAX_AGE = 3600 # Cachear archivos estáticos por 1 hora en desarrollo
     
-    print("WARNING: AWS S3 environment variables not found. Using local media storage.")
-    print("DEBUG: Using local file storage.")
+    # print("WARNING: AWS S3 environment variables not found. Using local media storage.") # Comentar en producción
+    # print("DEBUG: Using local file storage.") # Comentar en producción
 
 
 # =============================================================================
