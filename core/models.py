@@ -195,71 +195,72 @@ class CustomUser(AbstractUser):
 # ==============================================================================
 
 def get_upload_path(instance, filename):
-    """Define la ruta de subida para los archivos de equipo y sus actividades."""
-    # La ruta base en S3 debe incluir el prefijo MEDIA_LOCATION
-    # Esto asegura que todos los archivos vayan a 'media/' dentro del bucket
-    base_path_segments = [settings.AWS_LOCATION] # Inicia con 'media'
+    """
+    Define la ruta de subida para los archivos de equipo y sus actividades.
+    Esta función ahora genera la ruta RELATIVA DENTRO del prefijo MEDIA_LOCATION.
+    """
+    # Convertir el nombre del archivo a un formato seguro
+    safe_filename = filename.replace('/', '_').replace('\\', '_').replace(' ', '_')
 
-    base_code = None
+    # Determinar la subcarpeta base según el tipo de instancia
+    base_folder = ""
     if isinstance(instance, Empresa):
-        base_code = instance.nombre
-        base_path_segments.append("empresas_logos")
+        base_folder = "empresas_logos"
+        if instance.nombre:
+            base_folder = os.path.join(base_folder, instance.nombre.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Equipo):
-        base_code = instance.codigo_interno
-        base_path_segments.append("equipos")
+        base_folder = "equipos"
+        if instance.codigo_interno:
+            base_folder = os.path.join(base_folder, instance.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
-        base_code = instance.equipo.codigo_interno
-        base_path_segments.append("equipos") # Para actividades de equipo
+        # Para modelos relacionados con Equipo (Calibracion, Mantenimiento, Comprobacion, BajaEquipo)
+        base_folder = os.path.join("equipos", instance.equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Procedimiento):
-        base_code = instance.codigo
-        base_path_segments.append("procedimientos")
+        base_folder = "procedimientos"
+        if instance.codigo:
+            base_folder = os.path.join(base_folder, instance.codigo.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Documento):
-        # Para documentos genéricos, no usamos un base_code complejo en la ruta principal
-        base_path_segments.append("generales")
-        # El nombre del archivo ya incluirá el UUID si es nuevo, como en views.py
-        return os.path.join(*base_path_segments, filename) # Retorna directamente para generales
+        base_folder = "generales"
+        # Para documentos genéricos, el nombre del archivo ya puede incluir un UUID si es nuevo
+        # No añadimos otra subcarpeta basada en PK aquí para evitar redundancia con el nombre de archivo.
+        return os.path.join(base_folder, safe_filename) # Retorna directamente para generales
 
-    if not base_code:
-        raise AttributeError(f"No se pudo determinar el código base para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
+    if not base_folder:
+        raise AttributeError(f"No se pudo determinar la carpeta base para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código o nombre definido.")
 
-    safe_base_code = base_code.replace('/', '_').replace('\\', '_').replace(' ', '_')
-    base_path_segments.append(safe_base_code) # Añadir el código seguro
-
-    # Determinar subcarpeta específica para el tipo de documento
-    subfolder = ""
-    if isinstance(instance, Empresa):
-        pass # Ya se añadió "empresas_logos" y el código de la empresa
-    elif isinstance(instance, Calibracion):
-        subfolder = "calibraciones/"
+    # Determinar subcarpeta específica para el tipo de documento dentro de la base_folder
+    sub_subfolder = ""
+    if isinstance(instance, Calibracion):
+        sub_subfolder = "calibraciones/"
         if 'confirmacion' in filename.lower():
-            subfolder += "confirmaciones/"
+            sub_subfolder += "confirmaciones/"
         elif 'intervalos' in filename.lower():
-            subfolder += "intervalos/"
+            sub_subfolder += "intervalos/"
         else:
-            subfolder += "certificados/"
+            sub_subfolder += "certificados/"
     elif isinstance(instance, Mantenimiento):
-        subfolder = "mantenimientos/"
+        sub_subfolder = "mantenimientos/"
     elif isinstance(instance, Comprobacion):
-        subfolder = "comprobaciones/"
+        sub_subfolder = "comprobaciones/"
     elif isinstance(instance, BajaEquipo):
-        subfolder = "bajas_equipo/"
+        sub_subfolder = "bajas_equipo/"
     elif isinstance(instance, Equipo):
-        subfolder = "documentos_equipo/"
+        sub_subfolder = "documentos_equipo/"
         if 'compra' in filename.lower():
-            subfolder += "compra/"
+            sub_subfolder += "compra/"
         elif 'ficha_tecnica' in filename.lower() or 'ficha-tecnica' in filename.lower():
-            subfolder += "ficha_tecnica/"
+            sub_subfolder += "ficha_tecnica/"
         elif 'manual' in filename.lower():
-            subfolder += "manuales/"
+            sub_subfolder += "manuales/"
         elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            subfolder += "imagenes/"
+            sub_subfolder += "imagenes/"
         else:
-            subfolder += "otros_documentos/"
+            sub_subfolder += "otros_documentos/"
     elif isinstance(instance, Procedimiento):
-        pass # Ya se añadió "procedimientos" y el código del procedimiento
-    
+        pass # La base_folder ya incluye el código del procedimiento
+
     # Unir todos los segmentos de la ruta
-    full_path_segments = base_path_segments + [subfolder, filename]
+    full_path_segments = [base_folder, sub_subfolder, safe_filename]
     # Limpiar segmentos vacíos y unirlos
     return os.path.join(*[s for s in full_path_segments if s])
 
@@ -327,7 +328,7 @@ class Procedimiento(models.Model):
 
     class Meta:
         verbose_name = "Procedimiento"
-        verbose_name_plural = "Procedimientos"
+        verbose_name_plural = "Procedimientos" # CORREGIDO: verbose_plural a verbose_name_plural
         permissions = [
             ("can_view_procedimiento", "Can view procedimiento"),
             ("can_add_procedimiento", "Can add procedimiento"),

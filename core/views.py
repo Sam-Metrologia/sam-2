@@ -637,126 +637,6 @@ def _generate_equipment_activities_excel_content(equipo):
     return excel_buffer.getvalue()
 
 
-def _generate_general_proveedor_list_excel_content(proveedores_queryset):
-    """
-    Generates an Excel file with the general list of providers.
-    """
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Listado de Proveedores"
-
-    headers = [
-        "Nombre de la Empresa Proveedora", "Empresa Cliente", "Tipo de Servicio", "Nombre de Contacto",
-        "Número de Contacto", "Correo Electrónico", "Página Web",
-        "Alcance", "Servicio Prestado"
-    ]
-    sheet.append(headers)
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    header_alignment = Alignment(horizontal="center", vertical="center")
-    header_border = Border(left=Side(style='thin'),
-                           right=Side(style='thin'),
-                           top=Side(style='thin'),
-                           bottom=Side(style='thin'))
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 25
-
-    for proveedor in proveedores_queryset:
-        row_data = [
-            proveedor.nombre_empresa,
-            proveedor.empresa.nombre if proveedor.empresa else "N/A",
-            proveedor.get_tipo_servicio_display(),
-            proveedor.nombre_contacto,
-            proveedor.numero_contacto,
-            proveedor.correo_electronico,
-            proveedor.pagina_web,
-            proveedor.alcance,
-            proveedor.servicio_prestado,
-        ]
-        sheet.append(row_data)
-
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-def _generate_procedimiento_info_excel_content(procedimientos_queryset):
-    """
-    Generates an Excel file with the general list of procedures.
-    """
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Listado de Procedimientos"
-
-    headers = [
-        "Nombre", "Código", "Versión", "Fecha de Emisión", "Empresa", "Observaciones", "Documento PDF"
-    ]
-    sheet.append(headers)
-
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    header_alignment = Alignment(horizontal="center", vertical="center")
-    header_border = Border(left=Side(style='thin'),
-                           right=Side(style='thin'),
-                           top=Side(style='thin'),
-                           bottom=Side(style='thin'))
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 25
-
-    for proc in procedimientos_queryset:
-        row_data = [
-            proc.nombre,
-            proc.codigo,
-            proc.version,
-            proc.fecha_emision.strftime('%Y-%m-%d') if proc.fecha_emision else '',
-            proc.empresa.nombre if proc.empresa else "N/A",
-            proc.documento_pdf.url if proc.documento_pdf else 'N/A',
-        ]
-        sheet.append(row_data)
-
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
 # =============================================================================
 # Vistas de Autenticación y Perfil de Usuario
 # =============================================================================
@@ -1332,7 +1212,8 @@ def subir_pdf(request):
                 # Para esto, necesitamos una instancia del modelo Documento
                 # Como aún no se ha guardado, creamos una instancia temporal
                 temp_doc_instance = Documento(nombre_archivo=nombre_base_archivo)
-                ruta_destino_s3 = temp_doc_instance.archivo.field.upload_to(temp_doc_instance, nombre_base_archivo)
+                # CAMBIO CRÍTICO: Llamar a get_upload_path directamente con la instancia y el nombre
+                ruta_destino_s3 = get_upload_path(temp_doc_instance, nombre_base_archivo)
 
                 # Sube el archivo a S3 usando la función auxiliar
                 subir_archivo(ruta_destino_s3, archivo_subido)
@@ -1955,6 +1836,23 @@ def eliminar_equipo(request, pk):
     if request.method == 'POST':
         try:
             equipo_nombre = equipo.nombre
+            # Si el equipo tiene archivos asociados, intentar eliminarlos de S3
+            if equipo.imagen_equipo:
+                try: default_storage.delete(equipo.imagen_equipo.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar imagen '{equipo.imagen_equipo.name}' de S3: {s3_e}")
+            if equipo.archivo_compra_pdf:
+                try: default_storage.delete(equipo.archivo_compra_pdf.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar archivo compra '{equipo.archivo_compra_pdf.name}' de S3: {s3_e}")
+            if equipo.ficha_tecnica_pdf:
+                try: default_storage.delete(equipo.ficha_tecnica_pdf.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar ficha tecnica '{equipo.ficha_tecnica_pdf.name}' de S3: {s3_e}")
+            if equipo.manual_pdf:
+                try: default_storage.delete(equipo.manual_pdf.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar manual '{equipo.manual_pdf.name}' de S3: {s3_e}")
+            if equipo.otros_documentos_pdf:
+                try: default_storage.delete(equipo.otros_documentos_pdf.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar otros docs '{equipo.otros_documentos_pdf.name}' de S3: {s3_e}")
+
             equipo.delete()
             messages.success(request, f'Equipo "{equipo_nombre}" eliminado exitosamente.')
             # Redirige a la página principal después de eliminar para evitar NoReverseMatch
@@ -2055,6 +1953,17 @@ def eliminar_calibracion(request, equipo_pk, pk):
 
     if request.method == 'POST':
         try: # Añadido try-except para depuración de S3
+            # Si el documento existe, intentar eliminarlo de S3
+            if calibracion.documento_calibracion:
+                try: default_storage.delete(calibracion.documento_calibracion.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar el documento de calibración '{calibracion.documento_calibracion.name}' de S3: {s3_e}")
+            if calibracion.confirmacion_metrologica_pdf:
+                try: default_storage.delete(calibracion.confirmacion_metrologica_pdf.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar la confirmación metrológica '{calibracion.confirmacion_metrologica_pdf.name}' de S3: {s3_e}")
+            if calibracion.intervalos_calibracion_pdf:
+                try: default_storage.delete(calibracion.intervalos_calibracion_pdf.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar los intervalos de calibración '{calibracion.intervalos_calibracion_pdf.name}' de S3: {s3_e}")
+
             calibracion.delete()
             messages.success(request, 'Calibración eliminada exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2153,6 +2062,11 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
 
     if request.method == 'POST':
         try: # Añadido try-except para depuración de S3
+            # Si el documento existe, intentar eliminarlo de S3
+            if mantenimiento.documento_mantenimiento:
+                try: default_storage.delete(mantenimiento.documento_mantenimiento.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar el documento de mantenimiento '{mantenimiento.documento_mantenimiento.name}' de S3: {s3_e}")
+
             mantenimiento.delete()
             messages.success(request, 'Mantenimiento eliminado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2213,7 +2127,6 @@ def añadir_comprobacion(request, equipo_pk):
                 comprobacion = form.save(commit=False)
                 comprobacion.equipo = equipo
                 comprobacion.save() # Esto guardará el archivo usando default_storage
-                
                 messages.success(request, 'Comprobación añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
@@ -2273,6 +2186,11 @@ def eliminar_comprobacion(request, equipo_pk, pk):
 
     if request.method == 'POST':
         try: # Añadido try-except para depuración de S3
+            # Si el documento existe, intentar eliminarlo de S3
+            if comprobacion.documento_comprobacion:
+                try: default_storage.delete(comprobacion.documento_comprobacion.name)
+                except Exception as s3_e: print(f"WARNING: No se pudo eliminar el documento de comprobación '{comprobacion.documento_comprobacion.name}' de S3: {s3_e}")
+
             comprobacion.delete()
             messages.success(request, 'Comprobación eliminada exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2321,7 +2239,7 @@ def dar_baja_equipo(request, equipo_pk):
                 baja_registro.dado_de_baja_por = request.user
                 baja_registro.save() # El signal post_save ya se encarga de cambiar el estado del equipo
                 
-                messages.success(request, f'Equipo "{equipo.nombre}" dado de baja exitosamente.')
+                messages.success(request, 'Equipo dado de baja exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
                 messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
@@ -2564,6 +2482,14 @@ def eliminar_empresa(request, pk):
     if request.method == 'POST':
         try: # Añadido try-except para depuración de S3
             empresa_nombre = empresa.nombre # Capturar el nombre antes de eliminar
+            # Si el logo existe, intentar eliminarlo de S3
+            if empresa.logo_empresa:
+                try:
+                    default_storage.delete(empresa.logo_empresa.name)
+                    print(f"DEBUG: Logo '{empresa.logo_empresa.name}' eliminado de S3.")
+                except Exception as s3_e:
+                    print(f"WARNING: No se pudo eliminar el logo '{empresa.logo_empresa.name}' de S3: {s3_e}")
+
             empresa.delete()
             messages.success(request, f'Empresa "{empresa_nombre}" eliminada exitosamente.')
             return redirect('core:listar_empresas')
@@ -2816,7 +2742,8 @@ def añadir_procedimiento(request):
                 # Para esto, necesitamos una instancia del modelo Procedimiento
                 # Como aún no se ha guardado, creamos una instancia temporal
                 temp_proc_instance = Procedimiento(codigo="temp", nombre="temp") # Código y nombre temporal
-                ruta_destino_s3 = temp_proc_instance.documento_pdf.field.upload_to(temp_proc_instance, nombre_base_archivo)
+                # CAMBIO CRÍTICO: Llamar a get_upload_path directamente con la instancia y el nombre
+                ruta_destino_s3 = get_upload_path(temp_proc_instance, nombre_base_archivo)
 
                 # Sube el archivo a S3 usando la función auxiliar
                 subir_archivo(ruta_destino_s3, archivo_subido)
@@ -2861,7 +2788,8 @@ def editar_procedimiento(request, pk):
                     archivo_subido = request.FILES["documento_pdf"]
                     nombre_base_archivo = os.path.basename(archivo_subido.name)
                     # Generar la ruta de destino en S3 usando get_upload_path del modelo Procedimiento
-                    ruta_destino_s3 = procedimiento.documento_pdf.field.upload_to(procedimiento, nombre_base_archivo)
+                    # CAMBIO CRÍTICO: Llamar a get_upload_path directamente con la instancia y el nombre
+                    ruta_destino_s3 = get_upload_path(procedimiento, nombre_base_archivo)
                     subir_archivo(ruta_destino_s3, archivo_subido)
                     procedimiento.documento_pdf.name = ruta_destino_s3 # Asignar la ruta generada
                 
@@ -2902,7 +2830,7 @@ def eliminar_procedimiento(request, pk):
                     default_storage.delete(procedimiento.documento_pdf.name)
                     print(f"DEBUG: Documento '{procedimiento.documento_pdf.name}' eliminado de S3.")
                 except Exception as s3_e:
-                    print(f"WARNING: No se pudo eliminar el archivo '{procedimiento.documento_pdf.name}' de S3. Error: {s3_e}")
+                    print(f"WARNING: No se pudo eliminar el archivo '{procedimiento.documento_pdf.name}' de S3: {s3_e}")
 
             procedimiento.delete()
             messages.success(request, f'Procedimiento "{nombre_proc}" eliminado exitosamente.')
@@ -3177,11 +3105,21 @@ def detalle_usuario(request, pk):
         if not request.user.empresa or request.user.empresa != usuario.empresa:
             messages.error(request, 'No tienes permiso para ver usuarios de otras empresas.')
             return redirect('core:listar_usuarios')
+    
+    # Obtener la URL del logo de la empresa del usuario
+    logo_empresa_url = None
+    if usuario.empresa and usuario.empresa.logo_empresa:
+        try:
+            logo_empresa_url = default_storage.url(usuario.empresa.logo_empresa.name)
+        except Exception as e:
+            print(f"DEBUG: Error obteniendo URL de logo para usuario {usuario.username}: {e}")
 
-    return render(request, 'core/detalle_usuario.html', {
+    context = {
         'usuario_a_ver': usuario,
         'titulo_pagina': f'Detalle de Usuario: {usuario.username}',
-    })
+        'logo_empresa_url': logo_empresa_url, # Pasar la URL del logo al contexto
+    }
+    return render(request, 'core/detalle_usuario.html', context)
 
 
 @access_check # APLICAR ESTE DECORADOR
