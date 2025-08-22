@@ -224,8 +224,8 @@ def get_upload_path(instance, filename):
     elif isinstance(instance, Documento):
         base_folder_segments.append("generales")
         # Para documentos genéricos, el nombre del archivo ya puede incluir un UUID si es nuevo
-        # La ruta final será: media/generales/{safe_filename}
-        return os.path.join(settings.AWS_LOCATION, *base_folder_segments, safe_filename)
+        # La ruta final será: generales/{safe_filename} (sin el prefijo media/ aquí)
+        return os.path.join(*base_folder_segments, safe_filename) # Retorna directamente para generales
 
     if not base_folder_segments:
         raise AttributeError(f"No se pudo determinar la carpeta base para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código o nombre definido.")
@@ -261,9 +261,9 @@ def get_upload_path(instance, filename):
     elif isinstance(instance, Procedimiento):
         pass # La base_folder_segments ya incluye el código del procedimiento
 
-    # Unir todos los segmentos de la ruta, incluyendo settings.AWS_LOCATION al inicio
-    # Esto asegura que la ruta final en S3 sea media/ruta/subcarpeta/archivo.ext
-    full_path_segments = [settings.AWS_LOCATION] + base_folder_segments + sub_subfolder_segments + [safe_filename]
+    # Unir todos los segmentos de la ruta.
+    # Django-storages añadirá settings.AWS_LOCATION al inicio automáticamente.
+    full_path_segments = base_folder_segments + sub_subfolder_segments + [safe_filename]
     # Limpiar segmentos vacíos y unirlos
     return os.path.join(*[s for s in full_path_segments if s])
 

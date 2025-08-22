@@ -2469,10 +2469,10 @@ def editar_empresa(request, pk):
                 return redirect('core:detalle_empresa', pk=empresa.pk)
             except Exception as e:
                 print(f"ERROR_SUBIDA_S3: Fallo al actualizar empresa {empresa.pk}. Error: {e}")
-                messages.error(request, f'Hubo un error al actualizar la empresa: {e}')
+                messages.error(request, f'Hubo un error al actualizar el empresa: {e}')
                 return render(request, 'core/editar_empresa.html', {'form': form, 'empresa': empresa, 'titulo_pagina': f'Editar Empresa: {empresa.nombre}'})
         else:
-            messages.error(request, 'Hubo un error al actualizar la empresa. Por favor, revisa los datos.')
+            messages.error(request, 'Hubo un error al actualizar el empresa. Por favor, revisa los datos.')
     else:
         form = EmpresaForm(instance=empresa)
     return render(request, 'core/editar_empresa.html', {'form': form, 'empresa': empresa, 'titulo_pagina': f'Editar Empresa: {empresa.nombre}'})
@@ -2767,7 +2767,7 @@ def añadir_procedimiento(request):
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
     else:
-        form = ProcedimientoForm(request=request) # Pasa el request al formulario para la lógica de empresa
+        form = ProcedimientoForm(request=request) # Pasa el request al inicializar
     return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
 
 @access_check # APLICAR ESTE DECORADOR
@@ -3071,7 +3071,6 @@ def añadir_usuario(request, empresa_pk=None):
     Handles adding a new custom user and assigning groups.
     """
     if request.method == 'POST':
-        # Pasar el request al formulario
         form = CustomUserCreationForm(request.POST, request=request)
         if form.is_valid():
             user = form.save(commit=False)
@@ -3210,7 +3209,7 @@ def eliminar_usuario(request, pk):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/') # Solo superusuarios pueden cambiar contraseñas de otros
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def change_user_password(request, pk):
     """
     Handles changing another user's password (admin only).
