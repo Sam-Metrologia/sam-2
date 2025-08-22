@@ -52,7 +52,8 @@ from .forms import (
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
-    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento # ASEGÚRATE de que Documento esté importado aquí
+    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento, # ASEGÚRATE de que Documento esté importado aquí
+    get_upload_path # <--- ¡CAMBIO CRÍTICO: Importar get_upload_path!
 )
 
 # Importar para autenticación y grupos
@@ -1464,11 +1465,16 @@ def editar_empresa_formato(request, pk):
         return redirect('core:dashboard') # O a la lista de empresas si aplica
 
     if request.method == 'POST':
-        form = EmpresaFormatoForm(request.POST, instance=empresa)
+        form = EmpresaFormatoForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
-            return redirect('core:detalle_empresa', pk=empresa.pk) # O a listar_empresas si prefieres
+            try: # Añadido try-except para depuración de S3
+                form.save() # Aquí se guarda el logo si se subió
+                messages.success(request, 'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
+                return redirect('core:detalle_empresa', pk=empresa.pk)
+            except Exception as e:
+                print(f"ERROR_SUBIDA_S3: Fallo al actualizar formato de empresa {empresa.pk}. Error: {e}")
+                messages.error(request, f'Hubo un error al actualizar el formato: {e}')
+                return render(request, 'core/editar_empresa_formato.html', {'form': form, 'empresa': empresa, 'titulo_pagina': f'Editar Formato de Empresa: {empresa.nombre}'})
         else:
             messages.error(request, 'Hubo un error al actualizar el formato. Por favor, revisa los datos.')
     else:
@@ -1766,7 +1772,7 @@ def detalle_equipo(request, pk):
     otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
 
 
-    return render(request, 'core/detalle_equipo.html', {
+    context = {
         'equipo': equipo,
         'calibraciones': calibraciones,
         'mantenimientos': mantenimientos,
@@ -1780,7 +1786,8 @@ def detalle_equipo(request, pk):
         'manual_pdf_url': manual_pdf_url,
         'otros_documentos_pdf_url': otros_documentos_pdf_url,
         'titulo_pagina': f'Detalle de {equipo.nombre}',
-    })
+    }
+    return render(request, 'core/detalle_equipo.html', context)
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -1855,7 +1862,6 @@ def eliminar_equipo(request, pk):
 
             equipo.delete()
             messages.success(request, f'Equipo "{equipo_nombre}" eliminado exitosamente.')
-            # Redirige a la página principal después de eliminar para evitar NoReverseMatch
             return redirect('core:home') 
         except Exception as e:
             messages.error(request, f'Error al eliminar el equipo: {e}')
@@ -2946,7 +2952,7 @@ def editar_proveedor(request, pk):
         return redirect('core:listar_proveedores')
 
     if request.method == 'POST':
-        form = ProveedorForm(request.POST, instance=proveedor, request=request)
+        form = ProveedorForm(request.POST, request.FILES, instance=proveedor, request=request)
         if form.is_valid():
             try: # Añadido try-except para depuración de S3
                 proveedor = form.save(commit=False)
