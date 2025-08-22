@@ -203,64 +203,67 @@ def get_upload_path(instance, filename):
     safe_filename = filename.replace('/', '_').replace('\\', '_').replace(' ', '_')
 
     # Determinar la subcarpeta base según el tipo de instancia
-    base_folder = ""
+    base_folder_segments = []
+
     if isinstance(instance, Empresa):
-        base_folder = "empresas_logos"
+        base_folder_segments.append("empresas_logos")
         if instance.nombre:
-            base_folder = os.path.join(base_folder, instance.nombre.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+            base_folder_segments.append(instance.nombre.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Equipo):
-        base_folder = "equipos"
+        base_folder_segments.append("equipos")
         if instance.codigo_interno:
-            base_folder = os.path.join(base_folder, instance.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+            base_folder_segments.append(instance.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
         # Para modelos relacionados con Equipo (Calibracion, Mantenimiento, Comprobacion, BajaEquipo)
-        base_folder = os.path.join("equipos", instance.equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+        base_folder_segments.append("equipos")
+        base_folder_segments.append(instance.equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Procedimiento):
-        base_folder = "procedimientos"
+        base_folder_segments.append("procedimientos")
         if instance.codigo:
-            base_folder = os.path.join(base_folder, instance.codigo.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+            base_folder_segments.append(instance.codigo.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Documento):
-        base_folder = "generales"
+        base_folder_segments.append("generales")
         # Para documentos genéricos, el nombre del archivo ya puede incluir un UUID si es nuevo
-        # No añadimos otra subcarpeta basada en PK aquí para evitar redundancia con el nombre de archivo.
-        return os.path.join(base_folder, safe_filename) # Retorna directamente para generales
+        # La ruta final será: media/generales/{safe_filename}
+        return os.path.join(settings.AWS_LOCATION, *base_folder_segments, safe_filename)
 
-    if not base_folder:
+    if not base_folder_segments:
         raise AttributeError(f"No se pudo determinar la carpeta base para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código o nombre definido.")
 
     # Determinar subcarpeta específica para el tipo de documento dentro de la base_folder
-    sub_subfolder = ""
+    sub_subfolder_segments = []
     if isinstance(instance, Calibracion):
-        sub_subfolder = "calibraciones/"
+        sub_subfolder_segments.append("calibraciones")
         if 'confirmacion' in filename.lower():
-            sub_subfolder += "confirmaciones/"
+            sub_subfolder_segments.append("confirmaciones")
         elif 'intervalos' in filename.lower():
-            sub_subfolder += "intervalos/"
+            sub_subfolder_segments.append("intervalos")
         else:
-            sub_subfolder += "certificados/"
+            sub_subfolder_segments.append("certificados")
     elif isinstance(instance, Mantenimiento):
-        sub_subfolder = "mantenimientos/"
+        sub_subfolder_segments.append("mantenimientos")
     elif isinstance(instance, Comprobacion):
-        sub_subfolder = "comprobaciones/"
+        sub_subfolder_segments.append("comprobaciones")
     elif isinstance(instance, BajaEquipo):
-        sub_subfolder = "bajas_equipo/"
+        sub_subfolder_segments.append("bajas_equipo")
     elif isinstance(instance, Equipo):
-        sub_subfolder = "documentos_equipo/"
+        sub_subfolder_segments.append("documentos_equipo")
         if 'compra' in filename.lower():
-            sub_subfolder += "compra/"
+            sub_subfolder_segments.append("compra")
         elif 'ficha_tecnica' in filename.lower() or 'ficha-tecnica' in filename.lower():
-            sub_subfolder += "ficha_tecnica/"
+            sub_subfolder_segments.append("ficha_tecnica")
         elif 'manual' in filename.lower():
-            sub_subfolder += "manuales/"
+            sub_subfolder_segments.append("manuales")
         elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            sub_subfolder += "imagenes/"
+            sub_subfolder_segments.append("imagenes")
         else:
-            sub_subfolder += "otros_documentos/"
+            sub_subfolder_segments.append("otros_documentos")
     elif isinstance(instance, Procedimiento):
-        pass # La base_folder ya incluye el código del procedimiento
+        pass # La base_folder_segments ya incluye el código del procedimiento
 
-    # Unir todos los segmentos de la ruta
-    full_path_segments = [base_folder, sub_subfolder, safe_filename]
+    # Unir todos los segmentos de la ruta, incluyendo settings.AWS_LOCATION al inicio
+    # Esto asegura que la ruta final en S3 sea media/ruta/subcarpeta/archivo.ext
+    full_path_segments = [settings.AWS_LOCATION] + base_folder_segments + sub_subfolder_segments + [safe_filename]
     # Limpiar segmentos vacíos y unirlos
     return os.path.join(*[s for s in full_path_segments if s])
 
