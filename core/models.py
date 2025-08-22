@@ -151,7 +151,7 @@ class PlanSuscripcion(models.Model):
         ]
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre} - Límite: {self.limite_equipos}"
 
 
 class CustomUser(AbstractUser):
@@ -197,14 +197,15 @@ class CustomUser(AbstractUser):
 def get_upload_path(instance, filename):
     """Define la ruta de subida para los archivos de equipo y sus actividades."""
     base_code = None
-    if isinstance(instance, Equipo):
+    if isinstance(instance, Empresa): # Añadido para logos de empresa
+        base_code = instance.nombre
+    elif isinstance(instance, Equipo):
         base_code = instance.codigo_interno
     elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
         base_code = instance.equipo.codigo_interno
     elif isinstance(instance, Procedimiento):
         base_code = instance.codigo
     elif isinstance(instance, Documento): # Para el nuevo modelo Documento
-        # CAMBIO: Usar PK si existe, si no, generar un UUID temporal
         if instance.pk:
             base_code = f"doc_{instance.pk}"
         else:
@@ -212,50 +213,56 @@ def get_upload_path(instance, filename):
 
     if not base_code:
         # Si no se puede determinar el código, usar un nombre genérico o lanzar un error
-        raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento/documento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
+        raise AttributeError(f"No se pudo determinar el código base para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
 
     # Convertir el código a un formato seguro para el nombre de archivo
     safe_base_code = base_code.replace('/', '_').replace('\\', '_').replace(' ', '_')
 
-    # Construir la ruta base dentro de MEDIA_ROOT
-    base_path = f"documentos/{safe_base_code}/" # Una carpeta más genérica 'documentos'
+    # La ruta base en S3 debe incluir el prefijo MEDIA_LOCATION
+    # Esto asegura que todos los archivos vayan a 'media/' dentro del bucket
+    base_path_in_s3 = settings.AWS_LOCATION # Esto ya es 'media'
 
     # Determinar subcarpeta específica para el tipo de documento
     subfolder = ""
-    if isinstance(instance, Calibracion):
+    if isinstance(instance, Empresa): # Subcarpeta específica para logos de empresa
+        subfolder = f"empresas_logos/{safe_base_code}/" # Añadir el código de la empresa aquí
+    elif isinstance(instance, Calibracion):
+        subfolder = f"equipos/{safe_base_code}/calibraciones/" # Ruta más específica
         if 'confirmacion' in filename.lower():
-            subfolder = "calibraciones/confirmaciones/"
+            subfolder += "confirmaciones/"
         elif 'intervalos' in filename.lower():
-            subfolder = "calibraciones/intervalos/"
+            subfolder += "intervalos/"
         else: # Por defecto, si no es confirmación o intervalos, es certificado
-            subfolder = "calibraciones/certificados/"
+            subfolder += "certificados/"
     elif isinstance(instance, Mantenimiento):
-        subfolder = "mantenimientos/"
+        subfolder = f"equipos/{safe_base_code}/mantenimientos/"
     elif isinstance(instance, Comprobacion):
-        subfolder = "comprobaciones/"
+        subfolder = f"equipos/{safe_base_code}/comprobaciones/"
     elif isinstance(instance, BajaEquipo):
-        subfolder = "bajas_equipo/"
+        subfolder = f"equipos/{safe_base_code}/bajas_equipo/"
     elif isinstance(instance, Equipo):
         # Para los documentos directos del equipo, usar subcarpetas más específicas
+        subfolder = f"equipos/{safe_base_code}/documentos_equipo/"
         if 'compra' in filename.lower():
-            subfolder = "equipos/compra/"
+            subfolder += "compra/"
         elif 'ficha_tecnica' in filename.lower() or 'ficha-tecnica' in filename.lower():
-            subfolder = "equipos/ficha_tecnica/"
+            subfolder += "ficha_tecnica/"
         elif 'manual' in filename.lower():
-            subfolder = "equipos/manuales/"
+            subfolder += "manuales/"
         elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            subfolder = "equipos/imagenes/"
+            subfolder += "imagenes/"
         else:
-            subfolder = "equipos/otros_documentos/"
+            subfolder += "otros_documentos/"
     elif isinstance(instance, Procedimiento):
-        subfolder = "procedimientos/" # Subcarpeta para documentos de procedimiento
+        subfolder = f"procedimientos/{safe_base_code}/" # Subcarpeta para documentos de procedimiento
     elif isinstance(instance, Documento): # Nueva subcarpeta para documentos genéricos
         subfolder = "generales/"
     
     # Asegurarse de que el nombre del archivo es seguro
     safe_filename = filename # Por simplicidad, se mantiene el nombre original, pero es un punto de mejora
 
-    return os.path.join(base_path, subfolder, safe_filename)
+    # La ruta final será: media/subfolder/filename
+    return os.path.join(base_path_in_s3, subfolder, safe_filename)
 
 
 # ==============================================================================

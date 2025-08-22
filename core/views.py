@@ -62,6 +62,7 @@ from django.contrib.auth.models import Group # Importar el modelo Group
 
 # Importar para default_storage (manejo de archivos S3/local)
 from django.core.files.storage import default_storage
+# No es necesario importar S3Boto3Storage directamente aquí si ya está en settings.DEFAULT_FILE_STORAGE
 
 
 # =============================================================================
@@ -119,30 +120,18 @@ def es_miembro_empresa(user, empresa_id):
     """Verifica si el usuario pertenece a la empresa especificada."""
     return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
 
-def subir_archivo(nombre_archivo, contenido):
+def subir_archivo(ruta_destino_s3, contenido):
     """
     Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
-    Esta función ahora es más genérica y añade depuración.
-    :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
+    :param ruta_destino_s3: La ruta completa (incluyendo prefijo media/ y subcarpetas) en S3.
     :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
     """
-    # default_storage ya está configurado para S3Boto3Storage si las variables de entorno están presentes
-    # No necesitamos instanciar S3Boto3Storage aquí directamente.
-    
-    # Construir la ruta final en S3.
-    # settings.AWS_LOCATION es el prefijo para MEDIA_URL (ej. 'media/')
-    # La ruta completa en S3 será: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/{nombre_archivo}
-    ruta_completa_en_s3 = os.path.join(settings.AWS_LOCATION, nombre_archivo) 
-    
     try:
-        # Guardar el archivo usando default_storage
-        # Esto usará S3 si DEFAULT_FILE_STORAGE está configurado para S3Boto3Storage
-        # o el sistema de archivos local si no lo está.
-        default_storage.save(ruta_completa_en_s3, contenido)
+        default_storage.save(ruta_destino_s3, contenido)
     except Exception as e:
         # En producción, no queremos que un error de subida rompa la aplicación
         # Pero sí queremos registrarlo.
-        print(f"ERROR_SUBIDA_S3: Fallo al subir archivo '{nombre_archivo}' a S3 en la ruta '{ruta_completa_en_s3}'. Error: {e}")
+        print(f"ERROR_SUBIDA_S3: Fallo al subir archivo a S3 en la ruta '{ruta_destino_s3}'. Error: {e}")
         # Considera usar un logger de Django aquí en lugar de print
         raise # Re-lanza la excepción para que la vista pueda manejarla
 
@@ -339,11 +328,10 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     # Utilizar default_storage para acceder a las URLs de los archivos
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
-        # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
         if file_field and file_field.name:
             try:
-                if default_storage.exists(file_field.name):
-                    return request.build_absolute_uri(default_storage.url(file_field.name)) # Usar default_storage.url
+                # CAMBIO: Usar default_storage.url() directamente
+                return default_storage.url(file_field.name) 
             except Exception as e:
                 print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
         return None
@@ -478,7 +466,7 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
 
 def _generate_equipment_general_info_excel_content(equipo):
     """
-    Generates an Excel file with general information of a specific equipment.
+    Generates an Excel file with general information of a specific equipo.
     This is similar to _generate_general_equipment_list_excel_content but for a single equipo.
     """
     workbook = Workbook()
@@ -1340,15 +1328,19 @@ def subir_pdf(request):
             nombre_base_archivo = os.path.basename(archivo_subido.name)
 
             try:
+                # Generar la ruta de destino en S3 usando get_upload_path del modelo Documento
+                # Para esto, necesitamos una instancia del modelo Documento
+                # Como aún no se ha guardado, creamos una instancia temporal
+                temp_doc_instance = Documento(nombre_archivo=nombre_base_archivo)
+                ruta_destino_s3 = temp_doc_instance.archivo.field.upload_to(temp_doc_instance, nombre_base_archivo)
+
                 # Sube el archivo a S3 usando la función auxiliar
-                # La función subir_archivo ahora usa settings.AWS_LOCATION para construir la ruta en S3
-                subir_archivo(nombre_base_archivo, archivo_subido)
+                subir_archivo(ruta_destino_s3, archivo_subido)
 
                 # Guarda el objeto Documento en la base de datos
                 documento = form.save(commit=False)
                 documento.nombre_archivo = nombre_base_archivo # El nombre real del archivo
-                # La ruta en S3 se construye usando AWS_LOCATION + nombre_base_archivo
-                documento.archivo_s3_path = os.path.join(settings.AWS_LOCATION, nombre_base_archivo) 
+                documento.archivo_s3_path = ruta_destino_s3 # La ruta completa en S3
                 documento.subido_por = request.user
                 if not request.user.is_superuser and request.user.empresa:
                     documento.empresa = request.user.empresa # Asigna la empresa automáticamente
@@ -1866,8 +1858,8 @@ def detalle_equipo(request, pk):
     def get_file_url(file_field):
         if file_field and file_field.name:
             try:
-                if default_storage.exists(file_field.name):
-                    return request.build_absolute_uri(default_storage.url(file_field.name)) # Usar default_storage.url
+                # CAMBIO: Usar default_storage.url() directamente
+                return default_storage.url(file_field.name) 
             except Exception as e:
                 print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
         return None
@@ -2498,8 +2490,8 @@ def añadir_empresa(request):
                 messages.success(request, 'Empresa añadida exitosamente.')
                 return redirect('core:listar_empresas')
             except Exception as e:
-                print(f"ERROR_SUBIDA_S3: Fallo al añadir empresa. Error: {e}")
                 messages.error(request, f'Hubo un error al añadir la empresa: {e}')
+                print(f"ERROR_SUBIDA_S3: Fallo al añadir empresa. Error: {e}")
                 return render(request, 'core/añadir_empresa.html', {'formulario': formulario, 'titulo_pagina': 'Añadir Nueva Empresa'})
         else:
             messages.error(request, 'Hubo un error al añadir la empresa. Por favor, revisa los datos.')
@@ -2724,7 +2716,7 @@ def eliminar_ubicacion(request, pk):
         try:
             nombre_ubicacion = ubicacion.nombre # Capturar el nombre antes de eliminar
             ubicacion.delete()
-            messages.success(request, f'Ubicación "{nombre_ubicacion}" eliminada exitosamente.')
+            messages.success(request, 'Ubicación eliminada exitosamente.')
             return redirect('core:listar_ubicaciones')
         except Exception as e:
             messages.error(request, f'Error al eliminar la ubicación: {e}')
@@ -2820,10 +2812,18 @@ def añadir_procedimiento(request):
                 # 2. obtener el nombre del archivo
                 nombre_base_archivo = os.path.basename(archivo_subido.name)
 
-                # 3. pasar a tu función (contenido puede ser directamente el objeto archivo)
-                subir_archivo(nombre_base_archivo, archivo_subido)
+                # Generar la ruta de destino en S3 usando get_upload_path del modelo Procedimiento
+                # Para esto, necesitamos una instancia del modelo Procedimiento
+                # Como aún no se ha guardado, creamos una instancia temporal
+                temp_proc_instance = Procedimiento(codigo="temp", nombre="temp") # Código y nombre temporal
+                ruta_destino_s3 = temp_proc_instance.documento_pdf.field.upload_to(temp_proc_instance, nombre_base_archivo)
+
+                # Sube el archivo a S3 usando la función auxiliar
+                subir_archivo(ruta_destino_s3, archivo_subido)
+
                 procedimiento = form.save(commit=False)
                 # La lógica de empresa ya se maneja en el formulario
+                procedimiento.documento_pdf.name = ruta_destino_s3 # Asignar la ruta generada
                 procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
                 return redirect('core:listar_procedimientos')
@@ -2856,7 +2856,15 @@ def editar_procedimiento(request, pk):
         form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
             try: # Añadido try-except para depuración de S3
-                # La lógica de empresa ya se maneja en el formulario, solo guardar
+                # Si se sube un nuevo documento_pdf, se maneja aquí
+                if 'documento_pdf' in request.FILES:
+                    archivo_subido = request.FILES["documento_pdf"]
+                    nombre_base_archivo = os.path.basename(archivo_subido.name)
+                    # Generar la ruta de destino en S3 usando get_upload_path del modelo Procedimiento
+                    ruta_destino_s3 = procedimiento.documento_pdf.field.upload_to(procedimiento, nombre_base_archivo)
+                    subir_archivo(ruta_destino_s3, archivo_subido)
+                    procedimiento.documento_pdf.name = ruta_destino_s3 # Asignar la ruta generada
+                
                 form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
@@ -2888,6 +2896,14 @@ def eliminar_procedimiento(request, pk):
     if request.method == 'POST':
         try: # Añadido try-except para depuración de S3
             nombre_proc = procedimiento.nombre
+            # Si el documento_pdf existe, intentar eliminarlo de S3
+            if procedimiento.documento_pdf:
+                try:
+                    default_storage.delete(procedimiento.documento_pdf.name)
+                    print(f"DEBUG: Documento '{procedimiento.documento_pdf.name}' eliminado de S3.")
+                except Exception as s3_e:
+                    print(f"WARNING: No se pudo eliminar el archivo '{procedimiento.documento_pdf.name}' de S3. Error: {s3_e}")
+
             procedimiento.delete()
             messages.success(request, f'Procedimiento "{nombre_proc}" eliminado exitosamente.')
             return redirect('core:listar_procedimientos')
@@ -3177,18 +3193,16 @@ def editar_usuario(request, pk):
     """
     usuario_a_editar = get_object_or_404(CustomUser, pk=pk)
 
-    # Permiso:
-    # 1. Superusuario puede editar cualquiera.
-    # 2. Staff puede editar usuarios de su misma empresa, PERO NO su propio perfil con esta vista.
-    # 3. Si el usuario intenta editar su propio perfil, lo redirigimos a la vista de perfil de usuario.
+    if not request.user.is_superuser and request.user.pk != usuario_a_editar.pk:
+        # Si no es superusuario y no es su propio perfil
+        if not request.user.empresa or request.user.empresa != usuario_a_editar.empresa:
+            messages.error(request, 'No tienes permiso para editar usuarios de otras empresas.')
+            return redirect('core:listar_usuarios')
+    
+    # Si el usuario intenta editar su propio perfil, lo redirigimos a la vista de perfil de usuario.
     if request.user.pk == usuario_a_editar.pk:
         messages.info(request, "Estás editando tu propio perfil. Para cambiar tu contraseña o datos básicos, usa la opción específica en 'Mi Perfil'.")
         return redirect('core:perfil_usuario')
-    
-    if not request.user.is_superuser:
-        if not request.user.is_staff or (request.user.empresa and request.user.empresa != usuario_a_editar.empresa):
-            messages.error(request, 'No tienes permiso para editar este usuario.')
-            return redirect('core:listar_usuarios')
 
     if request.method == 'POST':
         form = CustomUserChangeForm(request.POST, request.FILES, instance=usuario_a_editar, request=request)
