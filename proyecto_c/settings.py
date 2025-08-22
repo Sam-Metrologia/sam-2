@@ -147,10 +147,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # ==============================================================================
 
 # Obtiene las credenciales de AWS desde las variables de entorno
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2') # Define una región por defecto
+AWS_ACCESS_KEY_ID = "AKIAY4RRUFZQPV3JBUN5"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_STORAGE_BUCKET_NAME = "sam-plataforma-media"
+AWS_S3_REGION_NAME = "us-east-2"  # Cambia según tu región
 
 # Configuración S3 que se aplica SIEMPRE si las variables están presentes
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
