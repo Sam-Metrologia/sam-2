@@ -62,7 +62,8 @@ from django.contrib.auth.models import Group # Importar el modelo Group
 
 # Importar para default_storage (manejo de archivos S3/local)
 from django.core.files.storage import default_storage
-from storages.backends.s3boto3 import S3Boto3Storage
+# No es necesario importar S3Boto3Storage directamente aquí si ya está en settings.DEFAULT_FILE_STORAGE
+# from storages.backends.s3boto3 import S3Boto3Storage
 
 
 # =============================================================================
@@ -123,13 +124,31 @@ def es_miembro_empresa(user, empresa_id):
 def subir_archivo(nombre_archivo, contenido):
     """
     Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
+    Esta función ahora es más genérica y añade depuración.
     :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
     :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
     """
-    storage = S3Boto3Storage() # Usa el almacenamiento por defecto (S3 o local)
-    ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
-    storage.save(ruta, contenido)
-    print(f'Archivo subido a: {ruta}') # Para depuración
+    # default_storage ya está configurado para S3Boto3Storage si las variables de entorno están presentes
+    # No necesitamos instanciar S3Boto3Storage aquí directamente.
+    
+    # Construir la ruta final en S3.
+    # settings.AWS_LOCATION es el prefijo para MEDIA_URL (ej. 'media/')
+    # La ruta completa en S3 será: {AWS_STORAGE_BUCKET_NAME}/{AWS_LOCATION}/{nombre_archivo}
+    ruta_completa_en_s3 = os.path.join(settings.AWS_LOCATION, nombre_archivo) 
+    
+    print(f"DEBUG_SUBIDA: Intentando subir archivo '{nombre_archivo}' a S3.")
+    print(f"DEBUG_SUBIDA: Ruta final esperada en S3: '{ruta_completa_en_s3}'")
+    print(f"DEBUG_SUBIDA: Usando storage backend: {type(default_storage).__name__}")
+    
+    try:
+        # Guardar el archivo usando default_storage
+        # Esto usará S3 si DEFAULT_FILE_STORAGE está configurado para S3Boto3Storage
+        # o el sistema de archivos local si no lo está.
+        default_storage.save(ruta_completa_en_s3, contenido)
+        print(f"DEBUG_SUBIDA: Archivo '{nombre_archivo}' subido exitosamente a S3 en la ruta '{ruta_completa_en_s3}'.")
+    except Exception as e:
+        print(f"ERROR_SUBIDA_S3: Fallo al subir archivo '{nombre_archivo}' a S3 en la ruta '{ruta_completa_en_s3}'. Error: {e}")
+        raise # Re-lanza la excepción para que la vista pueda manejarla
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -328,7 +347,7 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         if file_field and file_field.name:
             try:
                 if default_storage.exists(file_field.name):
-                    return request.build_absolute_uri(file_field.url)
+                    return request.build_absolute_uri(default_storage.url(file_field.name)) # Usar default_storage.url
             except Exception as e:
                 print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
         return None
@@ -434,7 +453,7 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
             equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
             float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
+            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
             equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
             float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
             equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
@@ -733,7 +752,6 @@ def _generate_procedimiento_info_excel_content(procedimientos_queryset):
             proc.version,
             proc.fecha_emision.strftime('%Y-%m-%d') if proc.fecha_emision else '',
             proc.empresa.nombre if proc.empresa else "N/A",
-            proc.observaciones,
             proc.documento_pdf.url if proc.documento_pdf else 'N/A',
         ]
         sheet.append(row_data)
@@ -1322,27 +1340,30 @@ def subir_pdf(request):
         archivo_subido = request.FILES.get('archivo') # Obtener el archivo directamente del request.FILES
 
         if form.is_valid() and archivo_subido: # Asegurarse de que el archivo también esté presente
-            nombre_archivo = archivo_subido.name
-            ruta_s3 = f'pdfs/{nombre_archivo}' # La ruta que se guardará en el modelo
+            # La ruta para Documento se construye en models.get_upload_path
+            # Aquí solo necesitamos el nombre del archivo para pasarlo a subir_archivo
+            nombre_base_archivo = os.path.basename(archivo_subido.name)
 
             try:
                 # Sube el archivo a S3 usando la función auxiliar
-                subir_archivo(nombre_archivo, archivo_subido)
+                # La función subir_archivo ahora usa settings.AWS_LOCATION para construir la ruta en S3
+                subir_archivo(nombre_base_archivo, archivo_subido)
 
                 # Guarda el objeto Documento en la base de datos
                 documento = form.save(commit=False)
-                documento.nombre_archivo = nombre_archivo # El nombre real del archivo
-                documento.archivo_s3_path = ruta_s3 # La ruta completa en S3
+                documento.nombre_archivo = nombre_base_archivo # El nombre real del archivo
+                # La ruta en S3 se construye usando AWS_LOCATION + nombre_base_archivo
+                documento.archivo_s3_path = os.path.join(settings.AWS_LOCATION, nombre_base_archivo) 
                 documento.subido_por = request.user
                 if not request.user.is_superuser and request.user.empresa:
                     documento.empresa = request.user.empresa # Asigna la empresa automáticamente
                 documento.save()
 
-                messages.success(request, f'Archivo "{nombre_archivo}" subido y registrado exitosamente.')
+                messages.success(request, f'Archivo "{nombre_base_archivo}" subido y registrado exitosamente.')
                 return redirect('core:home') # O a una lista de documentos si creas una
             except Exception as e:
                 messages.error(request, f'Error al subir o registrar el archivo: {e}')
-                print(f'DEBUG: Error al subir archivo {nombre_archivo}: {e}')
+                print(f'DEBUG: Error al subir archivo {nombre_base_archivo}: {e}')
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario y asegúrate de seleccionar un archivo.')
     else:
@@ -1849,10 +1870,14 @@ def detalle_equipo(request, pk):
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
         if file_field and file_field.name:
-            if default_storage.exists(file_field.name):
-                return request.build_absolute_uri(file_field.url)
+            try:
+                if default_storage.exists(file_field.name):
+                    return request.build_absolute_uri(default_storage.url(file_field.name)) # Usar default_storage.url
+            except Exception as e:
+                print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
         return None
 
+    # Obtener URLs de los archivos para pasarlos al contexto
     logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = get_file_url(equipo.imagen_equipo)
     documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
@@ -1977,7 +2002,7 @@ def añadir_calibracion(request, equipo_pk):
             try:
                 calibracion = form.save(commit=False)
                 calibracion.equipo = equipo
-                calibracion.save()
+                calibracion.save() # Esto guardará el archivo usando default_storage
                 
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2009,7 +2034,7 @@ def editar_calibracion(request, equipo_pk, pk):
         form = CalibracionForm(request.POST, request.FILES, instance=calibracion)
         if form.is_valid():
             try:
-                form.save()
+                form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Calibración actualizada exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
@@ -2076,7 +2101,7 @@ def añadir_mantenimiento(request, equipo_pk):
             try:
                 mantenimiento = form.save(commit=False)
                 mantenimiento.equipo = equipo
-                mantenimiento.save()
+                mantenimiento.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Mantenimiento añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
@@ -2107,7 +2132,7 @@ def editar_mantenimiento(request, equipo_pk, pk):
         form = MantenimientoForm(request.POST, request.FILES, instance=mantenimiento)
         if form.is_valid():
             try:
-                form.save()
+                form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Mantenimiento actualizado exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
@@ -2195,7 +2220,7 @@ def añadir_comprobacion(request, equipo_pk):
             try:
                 comprobacion = form.save(commit=False)
                 comprobacion.equipo = equipo
-                comprobacion.save()
+                comprobacion.save() # Esto guardará el archivo usando default_storage
                 
                 messages.success(request, 'Comprobación añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2227,7 +2252,7 @@ def editar_comprobacion(request, equipo_pk, pk):
         form = ComprobacionForm(request.POST, request.FILES, instance=comprobacion)
         if form.is_valid():
             try:
-                form.save()
+                form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Comprobación actualizada exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
@@ -2468,7 +2493,7 @@ def añadir_empresa(request):
     if request.method == 'POST':
         formulario = EmpresaForm(request.POST, request.FILES)
         if formulario.is_valid():
-            formulario.save()
+            formulario.save() # Aquí se guarda el logo si se subió
             messages.success(request, 'Empresa añadida exitosamente.')
             return redirect('core:listar_empresas')
         else:
@@ -2517,7 +2542,7 @@ def editar_empresa(request, pk):
     if request.method == 'POST':
         form = EmpresaForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
-            form.save()
+            form.save() # Aquí se guarda el logo si se subió
             messages.success(request, 'Empresa actualizada exitosamente.')
             return redirect('core:detalle_empresa', pk=empresa.pk)
         else:
@@ -2780,10 +2805,10 @@ def añadir_procedimiento(request):
                 archivo_subido = request.FILES["documento_pdf"]
 
                 # 2. obtener el nombre del archivo
-                nombre_archivo = archivo_subido.name
+                nombre_base_archivo = os.path.basename(archivo_subido.name)
 
                 # 3. pasar a tu función (contenido puede ser directamente el objeto archivo)
-                subir_archivo(nombre_archivo, archivo_subido)
+                subir_archivo(nombre_base_archivo, archivo_subido)
                 procedimiento = form.save(commit=False)
                 # La lógica de empresa ya se maneja en el formulario
                 procedimiento.save()
@@ -2819,7 +2844,7 @@ def editar_procedimiento(request, pk):
         if form.is_valid():
             try:
                 # La lógica de empresa ya se maneja en el formulario, solo guardar
-                form.save()
+                form.save() # Esto guardará el archivo usando default_storage
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -2934,7 +2959,7 @@ def añadir_proveedor(request):
         if form.is_valid():
             proveedor = form.save(commit=False)
             # La lógica de empresa ya se maneja en el formulario
-            proveedor.save()
+            proveedor.save() # Esto guardará el archivo usando default_storage
             messages.success(request, 'Proveedor añadido exitosamente.')
             return redirect('core:listar_proveedores')
         else:
@@ -2962,7 +2987,7 @@ def editar_proveedor(request, pk):
         form = ProveedorForm(request.POST, instance=proveedor, request=request)
         if form.is_valid():
             proveedor = form.save(commit=False)
-            proveedor.save()
+            proveedor.save() # Esto guardará el archivo usando default_storage
             messages.success(request, 'Proveedor actualizado exitosamente.')
             return redirect('core:listar_proveedores')
         else:
