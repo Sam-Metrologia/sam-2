@@ -434,7 +434,7 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
             equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
             float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
+            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
             equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
             float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
             equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
@@ -498,37 +498,38 @@ def _generate_equipment_general_info_excel_content(equipo):
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
-    row_data = [
-        equipo.codigo_interno,
-        equipo.nombre,
-        equipo.empresa.nombre if equipo.empresa else "N/A",
-        equipo.get_tipo_equipo_display(),
-        equipo.marca,
-        equipo.modelo,
-        equipo.numero_serie,
-        equipo.ubicacion,
-        equipo.responsable,
-        equipo.estado,
-        equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-        equipo.rango_medida,
-        equipo.resolucion,
-        equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-        equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
-        equipo.observaciones,
-        equipo.version_formato,
-        equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-        equipo.codificacion_formato,
-        equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-        equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-        float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-        equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
-        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-        float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-        equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-        float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-    ]
-    sheet.append(row_data)
+    for equipo in equipos_queryset:
+        row_data = [
+            equipo.codigo_interno,
+            equipo.nombre,
+            equipo.empresa.nombre if equipo.empresa else "N/A",
+            equipo.get_tipo_equipo_display(),
+            equipo.marca,
+            equipo.modelo,
+            equipo.numero_serie,
+            equipo.ubicacion,
+            equipo.responsable,
+            equipo.estado,
+            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+            equipo.rango_medida,
+            equipo.resolucion,
+            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+            equipo.observaciones,
+            equipo.version_formato,
+            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+            equipo.codificacion_formato,
+            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
+            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
+            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
+            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+        ]
+        sheet.append(row_data)
 
     for col in sheet.columns:
         max_length = 0
@@ -1114,7 +1115,7 @@ def dashboard(request):
             cal_realized_anual_percent = 0
             cal_no_cumplido_anual_percent = 0
             cal_pendiente_anual_percent = 0
-
+            
 
     # Comprobaciones (similar logic)
     projected_comprobaciones = get_projected_activities_for_year(equipos_queryset, 'comprobacion', current_year, today)
@@ -1316,9 +1317,9 @@ def subir_pdf(request):
     """
     Vista para subir un archivo PDF y registrarlo en la base de datos.
     """
-    if request.method == "POST":
+    if request.method == 'POST':
         form = DocumentoForm(request.POST, request.FILES, request=request) # Pasar el request al form
-        archivo_subido = request.FILES.get("archivo") # Obtener el archivo directamente del request.FILES
+        archivo_subido = request.FILES.get('archivo') # Obtener el archivo directamente del request.FILES
 
         if form.is_valid() and archivo_subido: # Asegurarse de que el archivo también esté presente
             nombre_archivo = archivo_subido.name
@@ -1338,15 +1339,15 @@ def subir_pdf(request):
                 documento.save()
 
                 messages.success(request, f'Archivo "{nombre_archivo}" subido y registrado exitosamente.')
-                return redirect("core:home") # O a una lista de documentos si creas una
+                return redirect('core:home') # O a una lista de documentos si creas una
             except Exception as e:
                 messages.error(request, f'Error al subir o registrar el archivo: {e}')
-                print(f"DEBUG: Error al subir archivo {nombre_archivo}: {e}")
+                print(f'DEBUG: Error al subir archivo {nombre_archivo}: {e}')
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario y asegúrate de seleccionar un archivo.')
     else:
         form = DocumentoForm(request=request) # Pasa el request al inicializar
-    return render(request, "core/subir_pdf.html", {"form": form, 'titulo_pagina': 'Subir Documento PDF'})
+    return render(request, 'core/subir_pdf.html', {'form': form, 'titulo_pagina': 'Subir Documento PDF'})
     
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -1403,10 +1404,14 @@ def home(request):
         except Empresa.DoesNotExist:
             empresa_para_limite = None
 
-    if empresa_para_limite and empresa_para_limite.limite_equipos is not None and empresa_para_limite.limite_equipos > 0:
-        equipos_actuales = Equipo.objects.filter(empresa=empresa_para_limite).count()
-        if equipos_actuales >= empresa_para_limite.limite_equipos:
-            limite_alcanzado = True
+    if empresa_para_limite: # Asegurarse de que hay una empresa válida
+        # Obtener el límite de equipos usando el método del modelo Empresa
+        limite_equipos_empresa = empresa_para_limite.get_limite_equipos() 
+        
+        if limite_equipos_empresa is not None and limite_equipos_empresa != float('inf') and limite_equipos_empresa > 0:
+            equipos_actuales = Equipo.objects.filter(empresa=empresa_para_limite).count()
+            if equipos_actuales >= limite_equipos_empresa:
+                limite_alcanzado = True
     # --- FIN: LÓGICA DE VALIDACIÓN DE LÍMITE DE EQUIPOS ---
 
     today = timezone.localdate() # Obtener la fecha actual con la zona horaria configurada
@@ -1601,9 +1606,12 @@ def añadir_equipo(request):
     # Calcular si el límite ha sido alcanzado
     limite_alcanzado = False
     if empresa_actual:
-        if empresa_actual.limite_equipos is not None and empresa_actual.limite_equipos > 0:
+        # Usar el método get_limite_equipos() del modelo Empresa
+        limite_equipos_empresa = empresa_actual.get_limite_equipos() 
+        
+        if limite_equipos_empresa is not None and limite_equipos_empresa != float('inf') and limite_equipos_empresa > 0:
             equipos_actuales = Equipo.objects.filter(empresa=empresa_actual).count()
-            if equipos_actuales >= empresa_actual.limite_equipos:
+            if equipos_actuales >= limite_equipos_empresa:
                 limite_alcanzado = True
 
     if request.method == 'POST':
@@ -2486,9 +2494,13 @@ def detalle_empresa(request, pk):
     # Obtener los equipos asociados a esta empresa
     equipos_asociados = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
 
+    # Obtener los usuarios asociados a esta empresa
+    usuarios_empresa = CustomUser.objects.filter(empresa=empresa).order_by('username') # <--- SE AÑADIÓ ESTA LÍNEA
+
     context = {
         'empresa': empresa,
         'equipos_asociados': equipos_asociados,
+        'usuarios_empresa': usuarios_empresa, # <--- SE AÑADIÓ ESTA LÍNEA AL CONTEXTO
         'titulo_pagina': f'Detalle de Empresa: {empresa.nombre}'
     }
     return render(request, 'core/detalle_empresa.html', context)
@@ -3276,7 +3288,11 @@ def informes(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    for equipo in equipos_activos_para_actividades.filter(proximo_mantenimiento__isnull=False).order_by('proximo_mantenimiento'):
+    mantenimientos_query = equipos_activos_para_actividades.filter(
+        proximo_mantenimiento__isnull=False
+    ).order_by('proximo_mantenimiento')
+
+    for equipo in mantenimientos_query:
         if equipo.proximo_mantenimiento:
             days_remaining = (equipo.proximo_mantenimiento - today).days
             estado_vencimiento = 'Vencida' if days_remaining < 0 else 'Próxima'
@@ -3288,7 +3304,11 @@ def informes(request):
                 'estado_vencimiento': estado_vencimiento
             })
 
-    for equipo in equipos_activos_para_actividades.filter(proxima_comprobacion__isnull=False).order_by('proxima_comprobacion'):
+    comprobaciones_query = equipos_activos_para_actividades.filter(
+        proxima_comprobacion__isnull=False
+    ).order_by('proxima_comprobacion')
+
+    for equipo in comprobaciones_query:
         if equipo.proxima_comprobacion:
             days_remaining = (equipo.proxima_comprobacion - today).days
             estado_vencimiento = 'Vencida' if days_remaining < 0 else 'Próxima'
@@ -3351,8 +3371,11 @@ def generar_informe_zip(request):
     │   │   ├── Baja/ (Documento de Baja del Equipo)
     │   │   ├── Calibraciones/
     │   │   │   ├── Certificados/
+    │   │   │   │   └── (Calibration PDFs)
     │   │   │   ├── Confirmaciones/
+    │   │   │   │   └── (Confirmation PDFs)
     │   │   │   └── Intervalos/
+    │   │   │       └── (Intervals PDFs)
     │   │   ├── Comprobaciones/
     │   │   │   └── (Verification PDFs)
     │   │   ├── Mantenimientos/
@@ -3751,7 +3774,7 @@ def generar_hoja_vida_pdf(request, pk):
         
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='/core/access_denied/') # Solo superusuarios o staff
+@user_passes_test(lambda u: u.is_staff or u.is_superuser, login_url='/core/access_denied/') # Solo superusuarios o staff
 @require_POST
 @csrf_exempt # Necesario para AJAX POST requests si no manejas el CSRF token de otra forma en JS
 def toggle_user_active_status(request):
@@ -3770,14 +3793,27 @@ def toggle_user_active_status(request):
         user_to_toggle = get_object_or_404(CustomUser, pk=user_id)
 
         # Permisos: Superusuario puede alternar cualquiera. Staff solo puede alternar de su empresa.
+        # Un staff NO puede desactivar a otro staff o superusuario si no es superusuario.
         if not request.user.is_superuser:
+            # Si el usuario que intenta cambiar NO es superusuario:
+            # 1. Debe ser staff.
+            # 2. El usuario a cambiar debe pertenecer a la misma empresa que el staff.
+            # 3. El staff NO puede desactivar a un superusuario.
+            # 4. El staff NO puede desactivar a otro staff (si es is_staff) de su misma empresa.
             if not request.user.is_staff or (request.user.empresa and user_to_toggle.empresa != request.user.empresa):
                 return JsonResponse({'status': 'error', 'message': 'No tienes permiso para modificar este usuario.'}, status=403)
+            
+            if user_to_toggle.is_superuser:
+                return JsonResponse({'status': 'error', 'message': 'Un usuario staff no puede desactivar a un superusuario.'}, status=403)
+            
+            if user_to_toggle.is_staff and not request.user.is_superuser:
+                return JsonResponse({'status': 'error', 'message': 'Un usuario staff no puede desactivar a otro staff.'}, status=403)
 
-        # Prevenir que un superusuario se desactive a sí mismo si es el único superusuario,
-        # o por seguridad general, no permitir que un superusuario se desactive a sí mismo desde esta API.
-        if request.user.pk == user_to_toggle.pk and request.user.is_superuser and not new_is_active_status:
-             return JsonResponse({'status': 'error', 'message': 'No puedes desactivar tu propia cuenta de superusuario.'}, status=403)
+        # Prevenir que un superusuario se desactive a sí mismo (por seguridad general).
+        # Esto es importante para evitar que se bloquee el único superusuario.
+        if request.user.pk == user_to_toggle.pk and not new_is_active_status:
+             return JsonResponse({'status': 'error', 'message': 'No puedes desactivar tu propia cuenta.'}, status=403)
+
 
         user_to_toggle.is_active = new_is_active_status
         user_to_toggle.save(update_fields=['is_active'])

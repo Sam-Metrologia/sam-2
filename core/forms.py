@@ -142,20 +142,6 @@ class UserProfileForm(forms.ModelForm):
 
 # Formularios de Empresa
 class EmpresaForm(forms.ModelForm):
-    # Añadir los nuevos campos y quitar los que ya no se usan del modelo
-    duracion_suscripcion_meses = forms.IntegerField(
-        label="Duración Suscripción (meses)",
-        required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}),
-        help_text="Número de meses que dura la suscripción de la empresa."
-    )
-    limite_equipos_empresa = forms.IntegerField(
-        label="Límite Máximo de Equipos",
-        required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}),
-        help_text="Cantidad máxima de equipos permitidos para esta empresa."
-    )
-
     # AJUSTE: Usar forms.DateField con TextInput para fecha_inicio_plan
     fecha_inicio_plan = forms.DateField(
         label="Fecha Inicio Plan",
@@ -170,8 +156,8 @@ class EmpresaForm(forms.ModelForm):
         fields = [
             'nombre', 'nit', 'direccion', 'telefono', 'email', 'logo_empresa',
             'formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa',
-            'es_periodo_prueba', 'duracion_prueba_dias', 'fecha_inicio_plan', # Asegurarse de que esté aquí
-            'limite_equipos_empresa', 'duracion_suscripcion_meses', # Nuevos campos
+            'es_periodo_prueba', 'duracion_prueba_dias', 'fecha_inicio_plan',
+            'limite_equipos_empresa', 'duracion_suscripcion_meses', # Estos campos ya están en el modelo
             'acceso_manual_activo', 'estado_suscripcion',
         ]
         widgets = {
@@ -186,7 +172,8 @@ class EmpresaForm(forms.ModelForm):
             'formato_codificacion_empresa': forms.TextInput(attrs={'class': 'form-input'}),
             'es_periodo_prueba': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'duracion_prueba_dias': forms.NumberInput(attrs={'class': 'form-input'}),
-            # 'fecha_inicio_plan': DateInput(attrs={'type': 'date', 'class': 'form-input'}), # ELIMINAR O COMENTAR ESTA LÍNEA si usas forms.DateField arriba
+            'limite_equipos_empresa': forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}), # Widget para el límite de equipos
+            'duracion_suscripcion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0'}), # Widget para duración
             'acceso_manual_activo': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'estado_suscripcion': forms.Select(attrs={'class': 'form-select'}),
         }
@@ -249,22 +236,11 @@ class EmpresaForm(forms.ModelForm):
 
 # NUEVO Formulario para la información de formato de la Empresa
 class EmpresaFormatoForm(forms.ModelForm):
-    # Ya está usando DateInput type='date' en Meta.widgets, que es preferible
-    # a TextInput para fechas en la interfaz si se busca un selector de fecha nativo.
-    # Si quieres DD/MM/YYYY en el campo de texto, puedes mantenerlo como estaba:
-    # fecha_version_formato_empresa = forms.DateField( # Cambia a DateField
-    #     label="Fecha de Versión (DD/MM/YYYY)",
-    #     widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-    #     input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'], # Asegura estos formatos
-    #     required=False
-    # )
-
     class Meta:
         model = Empresa
         fields = ['formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa']
         widgets = {
             'formato_version_empresa': forms.TextInput(attrs={'class': 'form-input'}),
-            # Mantener DateInput type='date' para facilitar la selección de fecha
             'formato_fecha_version_empresa': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
             'formato_codificacion_empresa': forms.TextInput(attrs={'class': 'form-input'}),
         }
@@ -275,10 +251,6 @@ class EmpresaFormatoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Si usas DateInput type='date', Django ya se encarga de la inicialización a 'YYYY-MM-DD'
-        # Si prefieres TextInput y DD/MM/YYYY, descomenta esta parte:
-        # if self.instance and self.instance.formato_fecha_version_empresa:
-        #     self.fields['formato_fecha_version_empresa'].initial = self.instance.formato_fecha_version_empresa.strftime('%d/%m/%Y')
         pass # No se necesita inicialización explícita si el widget es type='date'
 
     def clean_formato_fecha_version_empresa(self):
@@ -286,14 +258,6 @@ class EmpresaFormatoForm(forms.ModelForm):
         if fecha and fecha > timezone.localdate():
             raise ValidationError("La fecha de versión no puede ser en el futuro.")
         return fecha
-
-    # El método save no necesita ser sobreescrito si los campos están mapeados correctamente
-    # y la validación clean ya se encarga de transformar el valor.
-    # def save(self, commit=True):
-    #     instance = super().save(commit=False)
-    #     if commit:
-    #         instance.save()
-    #     return instance
 
 
 # Formularios de Ubicacion
@@ -379,30 +343,6 @@ class ProcedimientoForm(forms.ModelForm):
                 return self.request.user.empresa
         return self.cleaned_data['empresa']
 
-
-# Formularios de Proveedores (se mantienen, aunque Calibracion ya no use ProveedorCalibracionForm directamente)
-# Considera eliminar estas clases si ya no usas ProveedorCalibracion, ProveedorMantenimiento, ProveedorComprobacion
-# y solo usas el modelo general Proveedor.
-# class ProveedorCalibracionForm(forms.ModelForm):
-#     class Meta:
-#         # Asegúrate de que ProveedorCalibracion existe o elimínalo
-#         # model = ProveedorCalibracion
-#         fields = '__all__'
-#         # Widgets existentes...
-
-# class ProveedorMantenimientoForm(forms.ModelForm):
-#     class Meta:
-#         # Asegúrate de que ProveedorMantenimiento existe o elimínalo
-#         # model = ProveedorMantenimiento
-#         fields = '__all__'
-#         # Widgets existentes...
-
-# class ProveedorComprobacionForm(forms.ModelForm):
-#     class Meta:
-#         # Asegúrate de que ProveedorComprobacion existe o elimínalo
-#         # model = ProveedorComprobacion
-#         fields = '__all__'
-#         # Widgets existentes...
 
 # NUEVO FORMULARIO: Proveedor General
 class ProveedorForm(forms.ModelForm):
@@ -534,28 +474,21 @@ class EquipoForm(forms.ModelForm):
                 return self.request.user.empresa
         return self.cleaned_data['empresa']
 
-    def clean_empresa(self):
-        if self.request and not self.request.user.is_superuser:
-            if self.instance and self.instance.pk:
-                return self.instance.empresa
-            elif self.request.user.empresa:
-                return self.request.user.empresa
-        return self.cleaned_data['empresa']
-
     def save(self, commit=True):
         # Antes de guardar, verificar el límite de equipos si se está creando uno nuevo
-        if not self.instance.pk:
-            # Obtener la empresa, ya sea del formulario (para superusuarios) o del usuario
+        if not self.instance.pk: # Solo aplica al crear un nuevo equipo
+            # Obtener la empresa, ya sea del formulario (para superusuarios) o del usuario actual
             if self.request and not self.request.user.is_superuser:
                 empresa = self.request.user.empresa
             else:
                 empresa = self.cleaned_data.get('empresa')
 
             if empresa:
-                equipos_actuales = Equipo.objects.filter(empresa=empresa).count()
-                limite_equipos = empresa.limite_equipos
+                # Usar el campo correcto: limite_equipos_empresa
+                limite_equipos = empresa.limite_equipos_empresa 
 
                 if limite_equipos is not None and limite_equipos > 0:
+                    equipos_actuales = Equipo.objects.filter(empresa=empresa).count()
                     if equipos_actuales >= limite_equipos:
                         raise forms.ValidationError(
                             f"Esta empresa ya ha alcanzado su límite de {limite_equipos} equipos. No se puede agregar más."
@@ -637,7 +570,7 @@ class ComprobacionForm(forms.ModelForm):
     fecha_comprobacion = forms.DateField(
         label="Fecha de Comprobación",
         widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-        input_formats=['%d/%m/%Y', '%d-%m/%Y', '%Y-%m-%d']
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
     )
 
     class Meta:
@@ -698,20 +631,13 @@ class ExcelUploadForm(forms.Form):
 
 # MODIFICADO: DocumentoForm para usar el modelo Documento
 class DocumentoForm(forms.ModelForm):
-    # Aquí ya no necesitamos el campo 'archivo' directamente, se manejará en la vista
-    # y su ruta se guardará en 'archivo_s3_path' del modelo.
-    
     class Meta:
         model = Documento
-        # Solo incluimos los campos que el usuario introducirá o que serán llenados automáticamente por el formulario
         fields = ['nombre_archivo', 'descripcion', 'empresa']
         widgets = {
-            # nombre_archivo se podría inferir, o hacerlo TextInput
-            'nombre_archivo': forms.TextInput(attrs={'class': 'form-input'}), # Dejarlo editable para que el usuario pueda poner un nombre
-            'descripcion': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}), # Cambiado a Textarea
-            'empresa': forms.Select(attrs={'class': 'form-select'}), # Permitir seleccionar empresa
-            # 'archivo_s3_path' no se incluye aquí porque es llenado por la vista
-            # 'subido_por' y 'fecha_subida' son auto-llenados por el modelo
+            'nombre_archivo': forms.TextInput(attrs={'class': 'form-input'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'empresa': forms.Select(attrs={'class': 'form-select'}),
         }
     
     def __init__(self, *args, **kwargs):
@@ -733,7 +659,7 @@ class DocumentoForm(forms.ModelForm):
         for field_name, field in self.fields.items():
             if isinstance(field.widget, (forms.TextInput, forms.EmailInput, forms.Textarea, forms.Select, forms.DateInput, forms.NumberInput, forms.URLInput)):
                 field.widget.attrs.update({'class': 'form-input'})
-            elif isinstance(field.widget, ClearableFileInput): # Aunque no hay FileInput directo, por si acaso
+            elif isinstance(field.widget, ClearableFileInput):
                 field.widget.attrs.update({'class': 'form-input-file'})
             
     def clean_empresa(self):

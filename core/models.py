@@ -3,7 +3,7 @@
 # y para la implementación de planes de suscripción simplificados.
 
 from django.db import models
-from django.contrib.auth.models import AbstractUser, Group, Permission # Asegúrate de que Group y Permission estén aquí
+from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from datetime import date, timedelta
@@ -11,32 +11,14 @@ from django.utils import timezone # Importar timezone para obtener la fecha actu
 import decimal # Importar el módulo decimal (mantener por si otros campos lo usan o se necesita para importación/exportación de otros numéricos)
 import os
 from django.utils.translation import gettext_lazy as _
-from dateutil.relativedelta import relativedelta # Mantener por si se necesita para otros cálculos, aunque no para este específico
+from dateutil.relativedelta import relativedelta
 from django.conf import settings # ¡ASEGURARSE DE QUE ESTA LÍNEA ESTÉ PRESENTE!
 import calendar # Importar calendar para nombres de meses
-
+import uuid # Importar uuid para generar nombres únicos temporales
 
 # ==============================================================================
 # MODELO DE USUARIO PERSONALIZADO (AÑADIDO Y AJUSTADO)
 # ==============================================================================
-
-# Define las opciones para los campos Cargo y Sede (si se necesitan)
-# Aunque no están en la versión final que generé, los mantengo como referencia
-# por si decides reincorporarlos con los related_name correctos si los necesitas.
-# CARGO_CHOICES = [
-#     ('Gerente', 'Gerente'),
-#     ('Coordinador', 'Coordinador'),
-#     ('Técnico', 'Técnico'),
-#     ('Asistente', 'Asistente'),
-#     ('Otro', 'Otro'),
-# ]
-
-# SEDE_CHOICES = [
-#     ('Sede A', 'Sede A'),
-#     ('Sede B', 'Sede B'),
-#     ('Sede C', 'Sede C'),
-#     ('Otra', 'Otra'),
-# ]
 
 class Empresa(models.Model):
     nombre = models.CharField(max_length=200, unique=True)
@@ -46,12 +28,15 @@ class Empresa(models.Model):
     email = models.EmailField(blank=True, null=True)
     logo_empresa = models.ImageField(upload_to='empresas_logos/', blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
-    limite_equipos = models.IntegerField(
-        default=0,
-        help_text="Número máximo de equipos que esta empresa puede registrar. 0 para ilimitado.",
-        blank=True,
-        null=True
-    )
+    
+    # CAMBIO: Eliminado el campo 'limite_equipos' para usar solo 'limite_equipos_empresa'
+    # limite_equipos = models.IntegerField(
+    #     default=0,
+    #     help_text="Número máximo de equipos que esta empresa puede registrar. 0 para ilimitado.",
+    #     blank=True,
+    #     null=True
+    # )
+
     # Nuevos campos para la información de formato por empresa
     formato_version_empresa = models.CharField(
         max_length=50,
@@ -74,11 +59,10 @@ class Empresa(models.Model):
     es_periodo_prueba = models.BooleanField(default=False, verbose_name="¿Es Período de Prueba?")
     duracion_prueba_dias = models.IntegerField(default=30, verbose_name="Duración Prueba (días)")
     fecha_inicio_plan = models.DateField(blank=True, null=True, verbose_name="Fecha Inicio Plan")
-    # plan_actual = models.ForeignKey('PlanSuscripcion', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Plan de Suscripción Actual") # Eliminado para simplificar
     
-    # Nuevos campos directos para el plan
-    limite_equipos_empresa = models.IntegerField(default=5, verbose_name="Límite Máximo de Equipos") # Nuevo campo
-    duracion_suscripcion_meses = models.IntegerField(default=12, blank=True, null=True, verbose_name="Duración Suscripción (meses)") # Nuevo campo
+    # Campo para el límite de equipos (ahora el único y principal)
+    limite_equipos_empresa = models.IntegerField(default=5, verbose_name="Límite Máximo de Equipos")
+    duracion_suscripcion_meses = models.IntegerField(default=12, blank=True, null=True, verbose_name="Duración Suscripción (meses)")
     
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
@@ -109,9 +93,9 @@ class Empresa(models.Model):
             return float('inf') 
         elif self.es_periodo_prueba:
             # Durante el período de prueba, el límite es un valor predefinido (ej. 5 equipos)
-            return self.duracion_prueba_dias # Usar este campo para el límite de equipos en prueba si así se define
-            # O puedes tener un valor fijo como 5, 10, etc. return 5
-        # Modificado para usar el nuevo campo limite_equipos_empresa
+            # Podrías usar self.duracion_prueba_dias como límite si así lo deseas,
+            # o un valor fijo como 5, 10, etc.
+            return 5 # Ejemplo: un límite fijo de 5 equipos durante la prueba
         elif self.limite_equipos_empresa is not None:
             return self.limite_equipos_empresa
         return 0 # Si no hay plan ni prueba activa, el límite es 0
@@ -175,11 +159,7 @@ class CustomUser(AbstractUser):
     Modelo de usuario personalizado para añadir campos adicionales como la empresa a la que pertenece.
     """
     empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True, related_name='usuarios_empresa') # Cambiado related_name
-    # Puedes añadir más campos específicos para tu usuario aquí si es necesario
-    # perfil_completo = models.BooleanField(default=False) # Si lo necesitas, descomenta
-    # cargo = models.CharField(max_length=50, choices=CARGO_CHOICES, default='Otro') # Si lo necesitas, descomenta
-    # sede = models.CharField(max_length=50, choices=SEDE_CHOICES, default='Otra') # Si lo necesitas, descomenta
-
+    
     # Asegúrate de que estos related_name sean ÚNICOS a nivel de la aplicación
     groups = models.ManyToManyField(
         'auth.Group',
@@ -221,20 +201,17 @@ def get_upload_path(instance, filename):
         base_code = instance.codigo_interno
     elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
         base_code = instance.equipo.codigo_interno
-    
-    # Manejar el caso de Procedimiento, si tiene un código
     elif isinstance(instance, Procedimiento):
         base_code = instance.codigo
     elif isinstance(instance, Documento): # Para el nuevo modelo Documento
-        # Si es un documento genérico, podemos usar un ID o un nombre seguro
-        # Considera usar instance.pk si el objeto ya ha sido guardado
-        base_code = f"doc_{instance.pk}" if instance.pk else "temp_doc"
-        
+        # CAMBIO: Usar PK si existe, si no, generar un UUID temporal
+        if instance.pk:
+            base_code = f"doc_{instance.pk}"
+        else:
+            base_code = f"temp_doc_{uuid.uuid4()}" # Generar un UUID único para documentos nuevos
+
     if not base_code:
         # Si no se puede determinar el código, usar un nombre genérico o lanzar un error
-        # Para evitar errores en desarrollo, podrías retornar algo como 'uploads/misc/'
-        # o un valor predeterminado si es aceptable que no todos los modelos tengan un base_code.
-        # Por ahora, lanza un error si no se encuentra.
         raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento/documento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
 
     # Convertir el código a un formato seguro para el nombre de archivo
@@ -279,10 +256,6 @@ def get_upload_path(instance, filename):
     safe_filename = filename # Por simplicidad, se mantiene el nombre original, pero es un punto de mejora
 
     return os.path.join(base_path, subfolder, safe_filename)
-
-
-# La función get_empresa_logo_upload_path se ha simplificado y no es necesaria una función separada
-# ya que el upload_to de logo_empresa en el modelo Empresa puede ser una cadena directa.
 
 
 # ==============================================================================
@@ -361,7 +334,7 @@ class Procedimiento(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.codigo}) - {self.empresa.nombre}"
 
-class Proveedor(models.Model): # <--- MODELO PROVEEDOR MOVIDO AQUÍ
+class Proveedor(models.Model):
     """Modelo general para proveedores de cualquier tipo de servicio."""
     TIPO_SERVICIO_CHOICES = [
         ('Calibración', 'Calibración'),
@@ -480,23 +453,22 @@ class Equipo(models.Model):
         return f"{self.nombre} ({self.codigo_interno})"
 
     def save(self, *args, **kwargs):
-        """Sobreescribe save para calcular las próximas fechas antes de guardar."""
+        """
+        Sobreescribe save para calcular las próximas fechas antes de guardar
+        y para asegurar que solo se llame a super().save() una vez.
+        """
         is_new = self.pk is None
-        super().save(*args, **kwargs) # Guardar primero para asegurar que tenemos PK para señales
+        
+        # Calcular las próximas fechas ANTES de guardar, para que estén disponibles en el primer save
+        # y para que los signals no tengan que recalcular desde cero.
+        self.calcular_proxima_calibracion()
+        self.calcular_proximo_mantenimiento()
+        self.calcular_proxima_comprobacion()
 
-        if is_new:
-            # Si es un equipo nuevo, las señales post_save se encargarán de inicializar
-            # fecha_ultima_X y proxima_X si se añade la primera actividad.
-            # No se necesita recalcular aquí directamente, las señales son la fuente.
-            pass
-        else:
-            # Para equipos existentes, recalcular si los campos de frecuencia han cambiado o
-            # si el estado ha cambiado a algo que afecte la programación
-            self.calcular_proxima_calibracion()
-            self.calcular_proximo_mantenimiento()
-            self.calcular_proxima_comprobacion()
-            # Usar update_fields para evitar bucles de guardado si solo cambian estos campos
-            super().save(update_fields=['proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion', 'estado'])
+        # Llamar al método save original.
+        # Los signals post_save se encargarán de guardar de nuevo con update_fields
+        # si se actualizan las fechas de última actividad.
+        super().save(*args, **kwargs)
 
 
     def calcular_proxima_calibracion(self):
@@ -877,4 +849,3 @@ def set_equipo_activo_on_delete_baja(sender, instance, **kwargs):
             equipo.calcular_proximo_mantenimiento()
             equipo.calcular_proxima_comprobacion()
             equipo.save(update_fields=['estado', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion'])
-
