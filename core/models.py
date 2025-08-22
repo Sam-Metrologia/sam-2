@@ -80,7 +80,7 @@ class Empresa(models.Model):
             ("can_view_empresas", "Can view empresas"),
             ("can_add_empresas", "Can add empresas"),
             ("can_change_empresas", "Can change empresas"),
-            ("can_delete_empresas", "Can delete empresas"),
+            ("can_delete_empresas", "Can can delete empresas"),
         ]
 
     def __str__(self):
@@ -187,7 +187,7 @@ class CustomUser(AbstractUser):
         ]
 
     def __str__(self):
-        return self.username
+        return f"{self.username} - {self.empresa.nombre if self.empresa else 'Sin Empresa'}"
 
 
 # ==============================================================================
@@ -203,69 +203,69 @@ def get_upload_path(instance, filename):
     safe_filename = filename.replace('/', '_').replace('\\', '_').replace(' ', '_')
 
     # Determinar la subcarpeta base según el tipo de instancia
-    base_folder_segments = []
+    path_segments = []
 
     if isinstance(instance, Empresa):
-        base_folder_segments.append("empresas_logos")
+        path_segments.append("empresas_logos")
         if instance.nombre:
-            base_folder_segments.append(instance.nombre.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+            path_segments.append(instance.nombre.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Equipo):
-        base_folder_segments.append("equipos")
+        path_segments.append("equipos")
         if instance.codigo_interno:
-            base_folder_segments.append(instance.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+            path_segments.append(instance.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
         # Para modelos relacionados con Equipo (Calibracion, Mantenimiento, Comprobacion, BajaEquipo)
-        base_folder_segments.append("equipos")
-        base_folder_segments.append(instance.equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+        path_segments.append("equipos")
+        path_segments.append(instance.equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Procedimiento):
-        base_folder_segments.append("procedimientos")
+        path_segments.append("procedimientos")
         if instance.codigo:
-            base_folder_segments.append(instance.codigo.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+            path_segments.append(instance.codigo.replace('/', '_').replace('\\', '_').replace(' ', '_'))
     elif isinstance(instance, Documento):
-        base_folder_segments.append("generales")
+        path_segments.append("generales")
         # Para documentos genéricos, el nombre del archivo ya puede incluir un UUID si es nuevo
         # La ruta final será: generales/{safe_filename} (sin el prefijo media/ aquí)
-        return os.path.join(*base_folder_segments, safe_filename) # Retorna directamente para generales
+        return os.path.join(*path_segments, safe_filename) # Retorna directamente para generales
 
-    if not base_folder_segments:
-        raise AttributeError(f"No se pudo determinar la carpeta base para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código o nombre definido.")
+    if not path_segments:
+        # Si no se puede determinar la carpeta base, usar un nombre genérico o lanzar un error
+        # Esto debería ser un caso excepcional si todos los modelos tienen un identificador
+        return os.path.join("otros", safe_filename)
+
 
     # Determinar subcarpeta específica para el tipo de documento dentro de la base_folder
-    sub_subfolder_segments = []
     if isinstance(instance, Calibracion):
-        sub_subfolder_segments.append("calibraciones")
+        path_segments.append("calibraciones")
         if 'confirmacion' in filename.lower():
-            sub_subfolder_segments.append("confirmaciones")
+            path_segments.append("confirmaciones")
         elif 'intervalos' in filename.lower():
-            sub_subfolder_segments.append("intervalos")
+            path_segments.append("intervalos")
         else:
-            sub_subfolder_segments.append("certificados")
+            path_segments.append("certificados")
     elif isinstance(instance, Mantenimiento):
-        sub_subfolder_segments.append("mantenimientos")
+        path_segments.append("mantenimientos")
     elif isinstance(instance, Comprobacion):
-        sub_subfolder_segments.append("comprobaciones")
+        path_segments.append("comprobaciones")
     elif isinstance(instance, BajaEquipo):
-        sub_subfolder_segments.append("bajas_equipo")
+        path_segments.append("bajas_equipo")
     elif isinstance(instance, Equipo):
-        sub_subfolder_segments.append("documentos_equipo")
+        path_segments.append("documentos_equipo")
         if 'compra' in filename.lower():
-            sub_subfolder_segments.append("compra")
+            path_segments.append("compra")
         elif 'ficha_tecnica' in filename.lower() or 'ficha-tecnica' in filename.lower():
-            sub_subfolder_segments.append("ficha_tecnica")
+            path_segments.append("ficha_tecnica")
         elif 'manual' in filename.lower():
-            sub_subfolder_segments.append("manuales")
+            path_segments.append("manuales")
         elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            sub_subfolder_segments.append("imagenes")
+            path_segments.append("imagenes")
         else:
-            sub_subfolder_segments.append("otros_documentos")
+            path_segments.append("otros_documentos")
     elif isinstance(instance, Procedimiento):
         pass # La base_folder_segments ya incluye el código del procedimiento
-
+    
     # Unir todos los segmentos de la ruta.
     # Django-storages añadirá settings.AWS_LOCATION al inicio automáticamente.
-    full_path_segments = base_folder_segments + sub_subfolder_segments + [safe_filename]
-    # Limpiar segmentos vacíos y unirlos
-    return os.path.join(*[s for s in full_path_segments if s])
+    return os.path.join(*path_segments, safe_filename)
 
 
 # ==============================================================================
