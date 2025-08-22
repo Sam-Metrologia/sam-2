@@ -234,6 +234,23 @@ class EmpresaForm(forms.ModelForm):
         cleaned_data = super().clean()
         return cleaned_data
 
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para EmpresaForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        if self.instance and self.instance.pk: # Editando una empresa existente
+            old_logo = Empresa.objects.get(pk=self.instance.pk).logo_empresa
+            new_logo = self.cleaned_data.get('logo_empresa')
+            if old_logo and not new_logo: # Si había un logo y ahora no se sube uno nuevo (se borró)
+                print(f"DEBUG_FORM_SAVE: Logo existente '{old_logo.name}' será eliminado.")
+                # default_storage.delete(old_logo.name) # No es necesario llamar delete explícitamente aquí, Django lo maneja
+            elif new_logo and new_logo != old_logo: # Si se sube un nuevo logo
+                print(f"DEBUG_FORM_SAVE: Nuevo logo '{new_logo.name}' subido. Antiguo logo '{old_logo.name if old_logo else 'None'}'")
+
+        # Llamar al save original del ModelForm, que maneja la subida de FileField/ImageField
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: EmpresaForm save completado. Logo guardado: {instance.logo_empresa.name if instance.logo_empresa else 'None'}")
+        return instance
+
+
 # NUEVO Formulario para la información de formato de la Empresa
 class EmpresaFormatoForm(forms.ModelForm):
     class Meta:
@@ -342,6 +359,19 @@ class ProcedimientoForm(forms.ModelForm):
             elif self.request.user.empresa:
                 return self.request.user.empresa
         return self.cleaned_data['empresa']
+
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para ProcedimientoForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        if self.instance and self.instance.pk:
+            old_doc = Procedimiento.objects.get(pk=self.instance.pk).documento_pdf
+            new_doc = self.cleaned_data.get('documento_pdf')
+            if old_doc and not new_doc:
+                print(f"DEBUG_FORM_SAVE: Documento existente '{old_doc.name}' será eliminado.")
+            elif new_doc and new_doc != old_doc:
+                print(f"DEBUG_FORM_SAVE: Nuevo documento '{new_doc.name}' subido. Antiguo documento '{old_doc.name if old_doc else 'None'}'")
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: ProcedimientoForm save completado. Documento guardado: {instance.documento_pdf.name if instance.documento_pdf else 'None'}")
+        return instance
 
 
 # NUEVO FORMULARIO: Proveedor General
@@ -475,6 +505,8 @@ class EquipoForm(forms.ModelForm):
         return self.cleaned_data['empresa']
 
     def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para EquipoForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        
         # Antes de guardar, verificar el límite de equipos si se está creando uno nuevo
         if not self.instance.pk: # Solo aplica al crear un nuevo equipo
             # Obtener la empresa, ya sea del formulario (para superusuarios) o del usuario actual
@@ -494,8 +526,17 @@ class EquipoForm(forms.ModelForm):
                             f"Esta empresa ya ha alcanzado su límite de {limite_equipos} equipos. No se puede agregar más."
                         )
         
+        # Debugging para archivos adjuntos en EquipoForm
+        for field_name in ['archivo_compra_pdf', 'ficha_tecnica_pdf', 'manual_pdf', 'otros_documentos_pdf', 'imagen_equipo']:
+            if field_name in self.cleaned_data and self.cleaned_data[field_name]:
+                print(f"DEBUG_FORM_SAVE: EquipoForm - Archivo '{field_name}' presente: {self.cleaned_data[field_name].name}")
+            elif field_name in self.changed_data and not self.cleaned_data.get(field_name):
+                print(f"DEBUG_FORM_SAVE: EquipoForm - Archivo '{field_name}' eliminado.")
+
         # Después de la validación, guardar el objeto
-        return super().save(commit)
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: EquipoForm save completado. Equipo: {instance.nombre} ({instance.codigo_interno})")
+        return instance
 
 # Formulario para Calibracion
 class CalibracionForm(forms.ModelForm):
@@ -531,6 +572,17 @@ class CalibracionForm(forms.ModelForm):
         cleaned_data = super().clean()
         return cleaned_data
 
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para CalibracionForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        for field_name in ['documento_calibracion', 'confirmacion_metrologica_pdf', 'intervalos_calibracion_pdf']:
+            if field_name in self.cleaned_data and self.cleaned_data[field_name]:
+                print(f"DEBUG_FORM_SAVE: CalibracionForm - Archivo '{field_name}' presente: {self.cleaned_data[field_name].name}")
+            elif field_name in self.changed_data and not self.cleaned_data.get(field_name):
+                print(f"DEBUG_FORM_SAVE: CalibracionForm - Archivo '{field_name}' eliminado.")
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: CalibracionForm save completado. Calibración: {instance.equipo.nombre} ({instance.fecha_calibracion})")
+        return instance
+
 
 # Formulario para Mantenimiento
 class MantenimientoForm(forms.ModelForm):
@@ -565,6 +617,17 @@ class MantenimientoForm(forms.ModelForm):
         cleaned_data = super().clean()
         return cleaned_data
 
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para MantenimientoForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        if 'documento_mantenimiento' in self.cleaned_data and self.cleaned_data['documento_mantenimiento']:
+            print(f"DEBUG_FORM_SAVE: MantenimientoForm - Archivo 'documento_mantenimiento' presente: {self.cleaned_data['documento_mantenimiento'].name}")
+        elif 'documento_mantenimiento' in self.changed_data and not self.cleaned_data.get('documento_mantenimiento'):
+            print(f"DEBUG_FORM_SAVE: MantenimientoForm - Archivo 'documento_mantenimiento' eliminado.")
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: MantenimientoForm save completado. Mantenimiento: {instance.equipo.nombre} ({instance.fecha_mantenimiento})")
+        return instance
+
+
 # Formulario para Comprobacion
 class ComprobacionForm(forms.ModelForm):
     fecha_comprobacion = forms.DateField(
@@ -597,6 +660,17 @@ class ComprobacionForm(forms.ModelForm):
         cleaned_data = super().clean()
         return cleaned_data
 
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para ComprobacionForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        if 'documento_comprobacion' in self.cleaned_data and self.cleaned_data['documento_comprobacion']:
+            print(f"DEBUG_FORM_SAVE: ComprobacionForm - Archivo 'documento_comprobacion' presente: {self.cleaned_data['documento_comprobacion'].name}")
+        elif 'documento_comprobacion' in self.changed_data and not self.cleaned_data.get('documento_comprobacion'):
+            print(f"DEBUG_FORM_SAVE: ComprobacionForm - Archivo 'documento_comprobacion' eliminado.")
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: ComprobacionForm save completado. Comprobación: {instance.equipo.nombre} ({instance.fecha_comprobacion})")
+        return instance
+
+
 # Formulario para BajaEquipo
 class BajaEquipoForm(forms.ModelForm):
     fecha_baja = forms.DateField(
@@ -620,6 +694,17 @@ class BajaEquipoForm(forms.ModelForm):
                 self.fields['fecha_baja'].initial = self.instance.fecha_baja.date().strftime('%d/%m/%Y')
             else:
                 self.fields['fecha_baja'].initial = self.instance.fecha_baja.strftime('%d/%m/%Y')
+
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para BajaEquipoForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        if 'documento_baja' in self.cleaned_data and self.cleaned_data['documento_baja']:
+            print(f"DEBUG_FORM_SAVE: BajaEquipoForm - Archivo 'documento_baja' presente: {self.cleaned_data['documento_baja'].name}")
+        elif 'documento_baja' in self.changed_data and not self.cleaned_data.get('documento_baja'):
+            print(f"DEBUG_FORM_SAVE: BajaEquipoForm - Archivo 'documento_baja' eliminado.")
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: BajaEquipoForm save completado. Baja: {instance.equipo.nombre} ({instance.fecha_baja})")
+        return instance
+
 
 # NUEVO FORMULARIO: Para la subida de archivos Excel
 class ExcelUploadForm(forms.Form):
@@ -669,3 +754,12 @@ class DocumentoForm(forms.ModelForm):
             elif self.request.user.empresa: # Si es nuevo, asignar la empresa del usuario
                 return self.request.user.empresa
         return self.cleaned_data.get('empresa') # Para superusuarios o si no se asignó automáticamente
+
+    def save(self, commit=True):
+        print(f"DEBUG_FORM_SAVE: Iniciando save para DocumentoForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
+        # Para DocumentoForm, el archivo se maneja en la vista (subir_pdf) y se guarda el path en archivo_s3_path
+        # No hay FileField directo en este formulario para que ModelForm lo maneje automáticamente.
+        # Solo imprimimos que se está guardando el objeto Documento.
+        instance = super().save(commit=commit)
+        print(f"DEBUG_FORM_SAVE: DocumentoForm save completado. Documento: {instance.nombre_archivo} (Path S3: {instance.archivo_s3_path})")
+        return instance
