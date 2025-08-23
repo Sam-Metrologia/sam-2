@@ -52,7 +52,7 @@ from .forms import (
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
-    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento, # ASEGÚRATE de que Documento esté importado aquí
+    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento,
     get_upload_path # <--- ¡CAMBIO CRÍTICO: Importar get_upload_path!
 )
 
@@ -121,20 +121,9 @@ def es_miembro_empresa(user, empresa_id):
     """Verifica si el usuario pertenece a la empresa especificada."""
     return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
 
-def subir_archivo(ruta_destino_s3, contenido):
-    """
-    Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
-    :param ruta_destino_s3: La ruta completa (incluyendo prefijo media/ y subcarpetas) en S3.
-    :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
-    """
-    try:
-        default_storage.save(ruta_destino_s3, contenido)
-    except Exception as e:
-        # En producción, no queremos que un error de subida rompa la aplicación
-        # Pero sí queremos registrarlo.
-        print(f"ERROR_SUBIDA_S3: Fallo al subir archivo a S3 en la ruta '{ruta_destino_s3}'. Error: {e}")
-        # Considera usar un logger de Django aquí en lugar de print
-        raise # Re-lanza la excepción para que la vista pueda manejarla
+# Eliminamos la función 'subir_archivo' ya que Django FileField/ImageField lo manejan directamente
+# con default_storage y get_upload_path.
+
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -1217,7 +1206,9 @@ def subir_pdf(request):
                 ruta_destino_s3 = get_upload_path(temp_doc_instance, nombre_base_archivo)
 
                 # Sube el archivo a S3 usando la función auxiliar
-                subir_archivo(ruta_destino_s3, archivo_subido)
+                # Ya no usamos la función auxiliar subir_archivo, sino que asignamos el nombre al FileField
+                # y dejamos que Django lo suba automáticamente al guardar el formulario.
+                # subir_archivo(ruta_destino_s3, archivo_subido) # ELIMINADO
 
                 # Guarda el objeto Documento en la base de datos
                 documento = form.save(commit=False)
@@ -1226,7 +1217,7 @@ def subir_pdf(request):
                 documento.subido_por = request.user
                 if not request.user.is_superuser and request.user.empresa:
                     documento.empresa = request.user.empresa # Asigna la empresa automáticamente
-                documento.save()
+                documento.save() # Aquí Django guardará el archivo en S3
 
                 messages.success(request, f'Archivo "{nombre_base_archivo}" subido y registrado exitosamente.')
                 return redirect('core:home') # O a una lista de documentos si creas una
@@ -1866,7 +1857,6 @@ def eliminar_equipo(request, pk):
         except Exception as e:
             messages.error(request, f'Error al eliminar el equipo: {e}')
             print(f"DEBUG: Error al eliminar equipo {equipo.pk}: {e}") # Para depuración
-            # Si hay un error, redirige a home, ya que detalle_equipo podría no ser válido
             return redirect('core:home') 
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -2502,7 +2492,7 @@ def eliminar_empresa(request, pk):
         except Exception as e:
             messages.error(request, f'Error al eliminar la empresa: {e}')
             print(f"DEBUG: Error al eliminar empresa {empresa.pk}: {e}")
-            return redirect('core:listar_empresas')
+            return render(request, 'core/listar_empresas.html', {'titulo_pagina': 'Listado de Empresas'}) # Redirige a la lista para evitar error
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
     context = {
@@ -2738,26 +2728,10 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try: # Añadido try-except para depuración de S3
-                # 1. obtener el archivo desde request.FILES
-                archivo_subido = request.FILES["documento_pdf"]
-
-                # 2. obtener el nombre del archivo
-                nombre_base_archivo = os.path.basename(archivo_subido.name)
-
-                # Generar la ruta de destino en S3 usando get_upload_path del modelo Procedimiento
-                # Para esto, necesitamos una instancia del modelo Procedimiento
-                # Como aún no se ha guardado, creamos una instancia temporal
-                temp_proc_instance = Procedimiento(codigo="temp", nombre="temp") # Código y nombre temporal
-                # CAMBIO CRÍTICO: Llamar a get_upload_path directamente con la instancia y el nombre
-                ruta_destino_s3 = get_upload_path(temp_proc_instance, nombre_base_archivo)
-
-                # Sube el archivo a S3 usando la función auxiliar
-                subir_archivo(ruta_destino_s3, archivo_subido)
-
                 procedimiento = form.save(commit=False)
-                # La lógica de empresa ya se maneja en el formulario
-                procedimiento.documento_pdf.name = ruta_destino_s3 # Asignar la ruta generada
-                procedimiento.save()
+                # Si hay un archivo subido, el FileField ya lo habrá procesado y asignado a procedimiento.documento_pdf
+                # No necesitamos llamar a subir_archivo aquí directamente ni asignar .name
+                procedimiento.save() # Esto guardará el archivo en S3 a través de default_storage y get_upload_path
                 messages.success(request, 'Procedimiento añadido exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -2789,17 +2763,9 @@ def editar_procedimiento(request, pk):
         form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
             try: # Añadido try-except para depuración de S3
-                # Si se sube un nuevo documento_pdf, se maneja aquí
-                if 'documento_pdf' in request.FILES:
-                    archivo_subido = request.FILES["documento_pdf"]
-                    nombre_base_archivo = os.path.basename(archivo_subido.name)
-                    # Generar la ruta de destino en S3 usando get_upload_path del modelo Procedimiento
-                    # CAMBIO CRÍTICO: Llamar a get_upload_path directamente con la instancia y el nombre
-                    ruta_destino_s3 = get_upload_path(procedimiento, nombre_base_archivo)
-                    subir_archivo(ruta_destino_s3, archivo_subido)
-                    procedimiento.documento_pdf.name = ruta_destino_s3 # Asignar la ruta generada
-                
-                form.save() # Esto guardará el archivo usando default_storage
+                # Si se sube un nuevo documento_pdf, el FileField ya lo habrá procesado y asignado a procedimiento.documento_pdf
+                # No necesitamos llamar a subir_archivo aquí directamente ni asignar .name
+                form.save() # Esto guardará el archivo en S3 a través de default_storage y get_upload_path
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -2844,7 +2810,7 @@ def eliminar_procedimiento(request, pk):
         except Exception as e:
             messages.error(request, f'Error al eliminar el procedimiento: {e}. Revisa el log para más detalles.')
             print(f"DEBUG: Error al eliminar procedimiento {procedimiento.pk}: {e}")
-            return redirect('core:listar_procedimientos')
+            return render(request, 'core/listar_procedimientos.html', {'titulo_pagina': 'Listado de Procedimientos'})
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
     context = {
@@ -2960,8 +2926,8 @@ def editar_proveedor(request, pk):
                 messages.success(request, 'Proveedor actualizado exitosamente.')
                 return redirect('core:listar_proveedores')
             except Exception as e:
-                messages.error(request, f'Hubo un error al actualizar el proveedor: {e}. Revisa el log para más detalles.')
                 print(f"ERROR_SUBIDA_S3: Fallo al actualizar proveedor {proveedor.pk}. Error: {e}")
+                messages.error(request, f'Hubo un error al actualizar el proveedor: {e}')
                 return render(request, 'core/editar_proveedor.html', {'form': form, 'proveedor': proveedor, 'titulo_pagina': f'Editar Proveedor: {proveedor.nombre_empresa}'})
         else:
             messages.error(request, 'Hubo un error al actualizar el proveedor. Por favor, revisa los datos.')
@@ -2992,7 +2958,7 @@ def eliminar_proveedor(request, pk):
         except Exception as e:
             messages.error(request, f'Error al eliminar el proveedor: {e}')
             print(f"DEBUG: Error al eliminar proveedor {proveedor.pk}: {e}")
-            return redirect('core:listar_proveedores')
+            return render(request, 'core/listar_proveedores.html', {'titulo_pagina': 'Listado de Proveedores'})
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
     context = {
@@ -3195,7 +3161,7 @@ def eliminar_usuario(request, pk):
         except Exception as e:
             messages.error(request, f'Error al eliminar el usuario: {e}')
             print(f"DEBUG: Error al eliminar usuario {usuario.pk}: {e}")
-            return redirect('core:detalle_usuario', pk=usuario.pk)
+            return render(request, 'core/listar_usuarios.html', {'titulo_pagina': 'Listado de Usuarios'})
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
     context = {
@@ -3272,8 +3238,7 @@ def informes(request):
     if selected_company_id:
         equipos_queryset = equipos_queryset.filter(empresa_id=selected_company_id)
 
-    # --- Actividades a Realizar (Listados Detallados) ---
-    # Filtrar solo equipos activos y no de baja o inactivos
+    # Excluir equipos "De Baja" y "Inactivo" para este informe
     equipos_activos_para_actividades = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
 
     scheduled_activities = []
@@ -3868,3 +3833,4 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
+
