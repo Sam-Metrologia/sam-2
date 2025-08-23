@@ -162,8 +162,9 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     # Construir el CUSTOM_DOMAIN incluyendo la región para mayor robustez
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
-    # CAMBIO CRÍTICO: Forzar ACL público al subir objetos
-    AWS_DEFAULT_ACL = 'public-read' 
+    # CAMBIO CRÍTICO: Eliminar AWS_DEFAULT_ACL o establecerlo en None
+    # El bucket no permite ACLs, así que no debemos intentar establecerlos.
+    AWS_DEFAULT_ACL = None 
     AWS_S3_USE_SSL = True
     AWS_QUERYSTRING_AUTH = False # Los archivos son accesibles públicamente sin firma
     AWS_LOCATION = 'media' # Prefijo para archivos de media en el bucket
