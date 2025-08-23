@@ -1442,11 +1442,11 @@ def editar_empresa_formato(request, pk):
         return redirect('core:dashboard') # O a la lista de empresas si aplica
 
     if request.method == 'POST':
-        form = EmpresaFormatoForm(request.POST, instance=empresa)
+        form = EmpresaFormatoForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
             form.save()
             messages.success(request, f'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
-            return redirect('core:detalle_empresa', pk=empresa.pk) # O a listar_empresas si prefieres
+            return redirect('core:detalle_empresa', pk=empresa.pk)
         else:
             messages.error(request, 'Hubo un error al actualizar el formato. Por favor, revisa los datos.')
     else:
@@ -1485,7 +1485,6 @@ def añadir_equipo(request):
         form = EquipoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
-                # La validación del límite ocurre aquí dentro del form.save()
                 equipo = form.save()
                 messages.success(request, 'Equipo añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2167,7 +2166,7 @@ def dar_baja_equipo(request, equipo_pk):
                 baja_registro.dado_de_baja_por = request.user
                 baja_registro.save() # El signal post_save ya se encarga de cambiar el estado del equipo
                 
-                messages.success(request, f'Equipo "{equipo.nombre}" dado de baja exitosamente.')
+                messages.success(request, 'Equipo dado de baja exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
                 messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
@@ -2267,7 +2266,7 @@ def activar_equipo(request, equipo_pk):
             equipo.save()
             messages.success(request, f'Equipo "{equipo.nombre}" activado exitosamente.')
             
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+        return redirect('core:detalle_equipo', pk=equipo_pk)
     
     return render(request, 'core/confirmar_activacion.html', {
         'equipo': equipo,
@@ -2473,7 +2472,6 @@ def listar_ubicaciones(request):
     Lists all locations.
     """
     ubicaciones = Ubicacion.objects.all()
-    # Filtrar por empresa si el usuario no es superusuario
     if not request.user.is_superuser and request.user.empresa:
         ubicaciones = ubicaciones.filter(empresa=request.user.empresa)
     elif not request.user.is_superuser and not request.user.empresa: # Usuario normal sin empresa asignada
@@ -2543,7 +2541,7 @@ def eliminar_ubicacion(request, pk):
         try:
             nombre_ubicacion = ubicacion.nombre # Capturar el nombre antes de eliminar
             ubicacion.delete()
-            messages.success(request, f'Ubicación "{nombre_ubicacion}" eliminada exitosamente.')
+            messages.success(request, 'Ubicación eliminada exitosamente.')
             return redirect('core:listar_ubicaciones')
         except Exception as e:
             messages.error(request, f'Error al eliminar la ubicación: {e}')
@@ -2692,7 +2690,6 @@ def eliminar_procedimiento(request, pk):
     """
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
-    # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
     if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != procedimiento.empresa):
         messages.error(request, 'No tienes permiso para eliminar este procedimiento.')
         return redirect('core:listar_procedimientos')
@@ -2706,7 +2703,7 @@ def eliminar_procedimiento(request, pk):
         except Exception as e:
             messages.error(request, f'Error al eliminar el procedimiento: {e}')
             print(f"DEBUG: Error al eliminar procedimiento {procedimiento.pk}: {e}")
-            return redirect('core:listar_procedimientos')
+            return render(request, 'core/listar_procedimientos.html', {'titulo_pagina': 'Listado de Procedimientos'})
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
     context = {
@@ -2803,7 +2800,6 @@ def editar_proveedor(request, pk):
     Handles editing an existing general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
-
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2829,7 +2825,6 @@ def eliminar_proveedor(request, pk):
     Handles deleting a general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
-
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2838,7 +2833,7 @@ def eliminar_proveedor(request, pk):
         try:
             nombre_proveedor = proveedor.nombre_empresa # Capturar el nombre antes de eliminar
             proveedor.delete()
-            messages.success(request, 'Proveedor eliminado exitosamente.')
+            messages.success(request, f'Proveedor "{nombre_proveedor}" eliminado exitosamente.')
             return redirect('core:listar_proveedores')
         except Exception as e:
             messages.error(request, f'Error al eliminar el proveedor: {e}')
@@ -2863,7 +2858,6 @@ def detalle_proveedor(request, pk):
     Displays the details of a specific general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
-
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
@@ -3495,7 +3489,6 @@ def informe_vencimientos_pdf(request):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@permission_required('core.can_export_reports', raise_exception=True)
 def programmed_activities_list(request):
     """
     Lists all programmed activities.
@@ -3590,7 +3583,7 @@ def exportar_equipos_excel(request):
     excel_content = _generate_general_equipment_list_excel_content(equipos)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="listado_equipos.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="listado_equipos.xlsx"'
     response.write(excel_content)
     return response
 
