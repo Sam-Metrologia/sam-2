@@ -80,7 +80,7 @@ class Empresa(models.Model):
             ("can_view_empresas", "Can view empresas"),
             ("can_add_empresas", "Can add empresas"),
             ("can_change_empresas", "Can change empresas"),
-            ("can_delete_empresas", "Can can delete empresas"),
+            ("can_delete_empresas", "Can delete empresas"),
         ]
 
     def __str__(self):
@@ -151,7 +151,7 @@ class PlanSuscripcion(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.nombre} - Límite: {self.limite_equipos}"
+        return self.nombre
 
 
 class CustomUser(AbstractUser):
@@ -187,7 +187,7 @@ class CustomUser(AbstractUser):
         ]
 
     def __str__(self):
-        return f"{self.username} - {self.empresa.nombre if self.empresa else 'Sin Empresa'}"
+        return self.username
 
 
 # ==============================================================================
@@ -195,77 +195,67 @@ class CustomUser(AbstractUser):
 # ==============================================================================
 
 def get_upload_path(instance, filename):
-    """
-    Define la ruta de subida para los archivos de equipo y sus actividades.
-    Esta función ahora genera la ruta RELATIVA DENTRO del prefijo MEDIA_LOCATION.
-    """
-    # Convertir el nombre del archivo a un formato seguro
-    safe_filename = filename.replace('/', '_').replace('\\', '_').replace(' ', '_')
-
-    # Determinar la subcarpeta base según el tipo de instancia
-    path_segments = []
-
-    if isinstance(instance, Empresa):
-        path_segments.append("empresas_logos")
-        if instance.nombre:
-            path_segments.append(instance.nombre.replace('/', '_').replace('\\', '_').replace(' ', '_'))
-    elif isinstance(instance, Equipo):
-        path_segments.append("equipos")
-        if instance.codigo_interno:
-            path_segments.append(instance.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+    """Define la ruta de subida para los archivos de equipo y sus actividades."""
+    base_code = None
+    if isinstance(instance, Equipo):
+        base_code = instance.codigo_interno
     elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
-        # Para modelos relacionados con Equipo (Calibracion, Mantenimiento, Comprobacion, BajaEquipo)
-        path_segments.append("equipos")
-        path_segments.append(instance.equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(' ', '_'))
+        base_code = instance.equipo.codigo_interno
     elif isinstance(instance, Procedimiento):
-        path_segments.append("procedimientos")
-        if instance.codigo:
-            path_segments.append(instance.codigo.replace('/', '_').replace('\\', '_').replace(' ', '_'))
-    elif isinstance(instance, Documento):
-        path_segments.append("generales")
-        # Para documentos genéricos, el nombre del archivo ya puede incluir un UUID si es nuevo
-        # La ruta final será: generales/{safe_filename} (sin el prefijo media/ aquí)
-        return os.path.join(*path_segments, safe_filename) # Retorna directamente para generales
+        base_code = instance.codigo
+    elif isinstance(instance, Documento): # Para el nuevo modelo Documento
+        # CAMBIO: Usar PK si existe, si no, generar un UUID temporal
+        if instance.pk:
+            base_code = f"doc_{instance.pk}"
+        else:
+            base_code = f"temp_doc_{uuid.uuid4()}" # Generar un UUID único para documentos nuevos
 
-    if not path_segments:
-        # Si no se puede determinar la carpeta base, usar un nombre genérico o lanzar un error
-        # Esto debería ser un caso excepcional si todos los modelos tienen un identificador
-        return os.path.join("otros", safe_filename)
+    if not base_code:
+        # Si no se puede determinar el código, usar un nombre genérico o lanzar un error
+        raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento/documento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
 
+    # Convertir el código a un formato seguro para el nombre de archivo
+    safe_base_code = base_code.replace('/', '_').replace('\\', '_').replace(' ', '_')
 
-    # Determinar subcarpeta específica para el tipo de documento dentro de la base_folder
+    # Construir la ruta base dentro de MEDIA_ROOT
+    base_path = f"documentos/{safe_base_code}/" # Una carpeta más genérica 'documentos'
+
+    # Determinar subcarpeta específica para el tipo de documento
+    subfolder = ""
     if isinstance(instance, Calibracion):
-        path_segments.append("calibraciones")
         if 'confirmacion' in filename.lower():
-            path_segments.append("confirmaciones")
+            subfolder = "calibraciones/confirmaciones/"
         elif 'intervalos' in filename.lower():
-            path_segments.append("intervalos")
-        else:
-            path_segments.append("certificados")
+            subfolder = "calibraciones/intervalos/"
+        else: # Por defecto, si no es confirmación o intervalos, es certificado
+            subfolder = "calibraciones/certificados/"
     elif isinstance(instance, Mantenimiento):
-        path_segments.append("mantenimientos")
+        subfolder = "mantenimientos/"
     elif isinstance(instance, Comprobacion):
-        path_segments.append("comprobaciones")
+        subfolder = "comprobaciones/"
     elif isinstance(instance, BajaEquipo):
-        path_segments.append("bajas_equipo")
+        subfolder = "bajas_equipo/"
     elif isinstance(instance, Equipo):
-        path_segments.append("documentos_equipo")
+        # Para los documentos directos del equipo, usar subcarpetas más específicas
         if 'compra' in filename.lower():
-            path_segments.append("compra")
+            subfolder = "equipos/compra/"
         elif 'ficha_tecnica' in filename.lower() or 'ficha-tecnica' in filename.lower():
-            path_segments.append("ficha_tecnica")
+            subfolder = "equipos/ficha_tecnica/"
         elif 'manual' in filename.lower():
-            path_segments.append("manuales")
+            subfolder = "equipos/manuales/"
         elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            path_segments.append("imagenes")
+            subfolder = "equipos/imagenes/"
         else:
-            path_segments.append("otros_documentos")
+            subfolder = "equipos/otros_documentos/"
     elif isinstance(instance, Procedimiento):
-        pass # La base_folder_segments ya incluye el código del procedimiento
+        subfolder = "procedimientos/" # Subcarpeta para documentos de procedimiento
+    elif isinstance(instance, Documento): # Nueva subcarpeta para documentos genéricos
+        subfolder = "generales/"
     
-    # Unir todos los segmentos de la ruta.
-    # Django-storages añadirá settings.AWS_LOCATION al inicio automáticamente.
-    return os.path.join(*path_segments, safe_filename)
+    # Asegurarse de que el nombre del archivo es seguro
+    safe_filename = filename # Por simplicidad, se mantiene el nombre original, pero es un punto de mejora
+
+    return os.path.join(base_path, subfolder, safe_filename)
 
 
 # ==============================================================================
@@ -331,7 +321,7 @@ class Procedimiento(models.Model):
 
     class Meta:
         verbose_name = "Procedimiento"
-        verbose_name_plural = "Procedimientos" # CORREGIDO: verbose_plural a verbose_name_plural
+        verbose_name_plural = "Procedimientos"
         permissions = [
             ("can_view_procedimiento", "Can view procedimiento"),
             ("can_add_procedimiento", "Can add procedimiento"),
@@ -523,7 +513,6 @@ class Equipo(models.Model):
             freq = int(self.frecuencia_mantenimiento_meses)
             self.proximo_mantenimiento = latest_mantenimiento.fecha_mantenimiento + relativedelta(months=freq)
         else:
-            # Si no hay mantenimientos previos, proyectar desde la fecha de adquisición o registro del equipo
             base_date = self.fecha_adquisicion if self.fecha_adquisicion else self.fecha_registro.date()
             if base_date:
                 freq = int(self.frecuencia_mantenimiento_meses)
@@ -547,7 +536,6 @@ class Equipo(models.Model):
             freq = int(self.frecuencia_comprobacion_meses)
             self.proxima_comprobacion = latest_comprobacion.fecha_comprobacion + relativedelta(months=freq)
         else:
-            # Si no hay comprobaciones previas, proyectar desde la fecha de adquisición o registro del equipo
             base_date = self.fecha_adquisicion if self.fecha_adquisicion else self.fecha_registro.date()
             if base_date:
                 freq = int(self.frecuencia_comprobacion_meses)
