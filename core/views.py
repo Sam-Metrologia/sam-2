@@ -319,14 +319,10 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
         if file_field and file_field.name:
-            try:
-                # CAMBIO: Usar default_storage.url() directamente
-                return default_storage.url(file_field.name) 
-            except Exception as e:
-                print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
+            if default_storage.exists(file_field.name):
+                return request.build_absolute_uri(file_field.url)
         return None
 
-    # Obtener URLs de los archivos para pasarlos al contexto
     logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = get_file_url(equipo.imagen_equipo)
     documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
@@ -1840,7 +1836,7 @@ def añadir_calibracion(request, equipo_pk):
             try:
                 calibracion = form.save(commit=False)
                 calibracion.equipo = equipo
-                calibracion.save()
+                calibracion.save() # Guardar la instancia (esto subirá los archivos)
                 
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2541,7 +2537,7 @@ def eliminar_ubicacion(request, pk):
         try:
             nombre_ubicacion = ubicacion.nombre # Capturar el nombre antes de eliminar
             ubicacion.delete()
-            messages.success(request, 'Ubicación eliminada exitosamente.')
+            messages.success(request, f'Ubicación "{nombre_ubicacion}" eliminada exitosamente.')
             return redirect('core:listar_ubicaciones')
         except Exception as e:
             messages.error(request, f'Error al eliminar la ubicación: {e}')
@@ -2800,6 +2796,7 @@ def editar_proveedor(request, pk):
     Handles editing an existing general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
+
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2825,6 +2822,7 @@ def eliminar_proveedor(request, pk):
     Handles deleting a general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
+
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2858,6 +2856,7 @@ def detalle_proveedor(request, pk):
     Displays the details of a specific general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
+
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
@@ -3489,6 +3488,7 @@ def informe_vencimientos_pdf(request):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
+@permission_required('core.can_export_reports', raise_exception=True)
 def programmed_activities_list(request):
     """
     Lists all programmed activities.
