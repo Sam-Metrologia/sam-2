@@ -162,13 +162,14 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     # Construir el CUSTOM_DOMAIN incluyendo la región para mayor robustez
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
-    # CAMBIO CRÍTICO: Eliminar AWS_DEFAULT_ACL o establecerlo en None
     # El bucket no permite ACLs, así que no debemos intentar establecerlos.
     AWS_DEFAULT_ACL = None 
     AWS_S3_USE_SSL = True
     AWS_QUERYSTRING_AUTH = False # Los archivos son accesibles públicamente sin firma
-    AWS_LOCATION = 'media' # Prefijo para archivos de media en el bucket
-    STATIC_LOCATION = 'static' # Prefijo para archivos estáticos en el bucket
+    
+    # CAMBIO CRÍTICO: Establecer AWS_LOCATION como cadena vacía para subir a la raíz del bucket
+    AWS_LOCATION = '' 
+    STATIC_LOCATION = 'static' # Prefijo para archivos estáticos en el bucket (siempre es bueno tenerlo)
     AWS_S3_FILE_OVERWRITE = False # No sobrescribir archivos con el mismo nombre por defecto
 
     # Endpoint URL explícito para la región
@@ -177,14 +178,9 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     
     # URLs para archivos estáticos y de medios
     STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+    # CAMBIO: MEDIA_URL ahora apunta directamente a la raíz del bucket, sin un prefijo 'media/' adicional
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/' 
     
-    # print("INFO: AWS S3 storage configured.") # Comentar en producción
-    # print(f"DEBUG: S3 Bucket Name: {AWS_STORAGE_BUCKET_NAME}") # Comentar en producción
-    # print(f"DEBUG: S3 Region Name: {AWS_S3_REGION_NAME}") # Comentar en producción
-    # print(f"DEBUG: S3 Custom Domain: {AWS_S3_CUSTOM_DOMAIN}") # Comentar en producción
-    # print(f"DEBUG: MEDIA_URL: {MEDIA_URL}") # Comentar en producción
-    # print(f"DEBUG: AWS_S3_ENDPOINT_URL: {AWS_S3_ENDPOINT_URL}") # Comentar en producción
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
@@ -197,11 +193,6 @@ else:
     # Configuración de Whitenoise para desarrollo (opcional, pero buena práctica)
     WHITENOISE_MAX_AGE = 3600 # Cachear archivos estáticos por 1 hora en desarrollo
     
-    # print("WARNING: AWS S3 environment variables not found. Using local media storage.") # Comentar en producción
-    # print("DEBUG: Using local file storage.") # Comentar en producción
-
-
-# =============================================================================
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

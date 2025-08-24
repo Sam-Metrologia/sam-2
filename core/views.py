@@ -52,17 +52,20 @@ from .forms import (
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
-    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento,
-    get_upload_path # Importar get_upload_path
+    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento # ASEGÚRATE de que Documento esté importado aquí
 )
 
 # Importar para autenticación y grupos
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import Group # Importar el modelo Group
+from django.core.exceptions import ValidationError
 
 # Importar para default_storage (manejo de archivos S3/local)
 from django.core.files.storage import default_storage
+from storages.backends.s3boto3 import S3Boto3Storage
+# Importar el módulo forms de Django para las excepciones
+from django import forms
 
 
 # =============================================================================
@@ -120,9 +123,16 @@ def es_miembro_empresa(user, empresa_id):
     """Verifica si el usuario pertenece a la empresa especificada."""
     return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
 
-# La función 'subir_archivo' ha sido eliminada.
-# Django FileField/ImageField manejan la subida a través de default_storage y get_upload_path del modelo directamente.
-
+def subir_archivo(nombre_archivo, contenido):
+    """
+    Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
+    :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
+    :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
+    """
+    storage = S3Boto3Storage() # Usa el almacenamiento por defecto (S3 o local)
+    ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
+    storage.save(ruta, contenido)
+    print(f'Archivo subido a: {ruta}') # Para depuración
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -257,7 +267,6 @@ def get_projected_maintenance_compliance_for_year(equipment_queryset, current_ye
         
         current_projection_date = plan_start_date + relativedelta(months=int(num_intervals_to_reach_year * freq_months))
 
-
         # Now, project activities for the entire current year
         for _ in range(int(12 / freq_months) + 2 if freq_months > 0 else 0):
             if current_projection_date.year == current_year:
@@ -318,11 +327,16 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     # Utilizar default_storage para acceder a las URLs de los archivos
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
+        # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
         if file_field and file_field.name:
-            if default_storage.exists(file_field.name):
-                return request.build_absolute_uri(file_field.url)
+            try:
+                if default_storage.exists(file_field.name):
+                    return request.build_absolute_uri(file_field.url)
+            except Exception as e:
+                print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
         return None
 
+    # Obtener URLs de los archivos para pasarlos al contexto
     logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = get_file_url(equipo.imagen_equipo)
     documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
@@ -487,37 +501,38 @@ def _generate_equipment_general_info_excel_content(equipo):
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
-    row_data = [
-        equipo.codigo_interno,
-        equipo.nombre,
-        equipo.empresa.nombre if equipo.empresa else "N/A",
-        equipo.get_tipo_equipo_display(),
-        equipo.marca,
-        equipo.modelo,
-        equipo.numero_serie,
-        equipo.ubicacion,
-        equipo.responsable,
-        equipo.estado,
-        equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-        equipo.rango_medida,
-        equipo.resolucion,
-        equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-        equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
-        equipo.observaciones,
-        equipo.version_formato,
-        equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-        equipo.codificacion_formato,
-        equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-        equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-        float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-        equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
-        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-        float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-        equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-        float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-    ]
-    sheet.append(row_data)
+    for equipo in equipos_queryset:
+        row_data = [
+            equipo.codigo_interno,
+            equipo.nombre,
+            equipo.empresa.nombre if equipo.empresa else "N/A",
+            equipo.get_tipo_equipo_display(),
+            equipo.marca,
+            equipo.modelo,
+            equipo.numero_serie,
+            equipo.ubicacion,
+            equipo.responsable,
+            equipo.estado,
+            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+            equipo.rango_medida,
+            equipo.resolucion,
+            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+            equipo.observaciones,
+            equipo.version_formato,
+            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+            equipo.codificacion_formato,
+            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
+            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
+            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
+            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+        ]
+        sheet.append(row_data)
 
     for col in sheet.columns:
         max_length = 0
@@ -616,6 +631,127 @@ def _generate_equipment_activities_excel_content(equipo):
                 pass
         adjusted_width = (max_length + 2)
         sheet_comp.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+
+def _generate_general_proveedor_list_excel_content(proveedores_queryset):
+    """
+    Generates an Excel file with the general list of providers.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Listado de Proveedores"
+
+    headers = [
+        "Nombre de la Empresa Proveedora", "Empresa Cliente", "Tipo de Servicio", "Nombre de Contacto",
+        "Número de Contacto", "Correo Electrónico", "Página Web",
+        "Alcance", "Servicio Prestado"
+    ]
+    sheet.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    header_border = Border(left=Side(style='thin'),
+                           right=Side(style='thin'),
+                           top=Side(style='thin'),
+                           bottom=Side(style='thin'))
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = header_border
+        sheet.column_dimensions[cell.column_letter].width = 25
+
+    for proveedor in proveedores_queryset:
+        row_data = [
+            proveedor.nombre_empresa,
+            proveedor.empresa.nombre if proveedor.empresa else "N/A",
+            proveedor.get_tipo_servicio_display(),
+            proveedor.nombre_contacto,
+            proveedor.numero_contacto,
+            proveedor.correo_electronico,
+            proveedor.pagina_web,
+            proveedor.alcance,
+            proveedor.servicio_prestado,
+        ]
+        sheet.append(row_data)
+
+    for col in sheet.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column].width = adjusted_width
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+def _generate_procedimiento_info_excel_content(procedimientos_queryset):
+    """
+    Generates an Excel file with the general list of procedures.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Listado de Procedimientos"
+
+    headers = [
+        "Nombre", "Código", "Versión", "Fecha de Emisión", "Empresa", "Observaciones", "Documento PDF"
+    ]
+    sheet.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    header_border = Border(left=Side(style='thin'),
+                           right=Side(style='thin'),
+                           top=Side(style='thin'),
+                           bottom=Side(style='thin'))
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = header_border
+        sheet.column_dimensions[cell.column_letter].width = 25
+
+    for proc in procedimientos_queryset:
+        row_data = [
+            proc.nombre,
+            proc.codigo,
+            proc.version,
+            proc.fecha_emision.strftime('%Y-%m-%d') if proc.fecha_emision else '',
+            proc.empresa.nombre if proc.empresa else "N/A",
+            proc.observaciones,
+            proc.documento_pdf.url if proc.documento_pdf else 'N/A',
+        ]
+        sheet.append(row_data)
+
+    for col in sheet.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column].width = adjusted_width
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
@@ -1189,23 +1325,27 @@ def subir_pdf(request):
         archivo_subido = request.FILES.get('archivo') # Obtener el archivo directamente del request.FILES
 
         if form.is_valid() and archivo_subido: # Asegurarse de que el archivo también esté presente
-            # Guarda el objeto Documento en la base de datos
-            documento = form.save(commit=False)
-            documento.nombre_archivo = os.path.basename(archivo_subido.name) # El nombre real del archivo
-            
-            # Asignar el archivo directamente al FileField
-            documento.archivo = archivo_subido 
-            
-            documento.subido_por = request.user
-            if not request.user.is_superuser and request.user.empresa:
-                documento.empresa = request.user.empresa # Asigna la empresa automáticamente
+            nombre_archivo = archivo_subido.name
+            ruta_s3 = f'pdfs/{nombre_archivo}' # La ruta que se guardará en el modelo
+
             try:
-                documento.save() # Esto guardará el archivo en S3 a través de default_storage y get_upload_path
-                messages.success(request, f'Archivo "{documento.nombre_archivo}" subido y registrado exitosamente.')
+                # Sube el archivo a S3 usando la función auxiliar
+                subir_archivo(nombre_archivo, archivo_subido)
+
+                # Guarda el objeto Documento en la base de datos
+                documento = form.save(commit=False)
+                documento.nombre_archivo = nombre_archivo # El nombre real del archivo
+                documento.archivo_s3_path = ruta_s3 # La ruta completa en S3
+                documento.subido_por = request.user
+                if not request.user.is_superuser and request.user.empresa:
+                    documento.empresa = request.user.empresa # Asigna la empresa automáticamente
+                documento.save()
+
+                messages.success(request, f'Archivo "{nombre_archivo}" subido y registrado exitosamente.')
                 return redirect('core:home') # O a una lista de documentos si creas una
             except Exception as e:
                 messages.error(request, f'Error al subir o registrar el archivo: {e}')
-                print(f'DEBUG: Error al subir archivo {documento.nombre_archivo}: {e}')
+                print(f'DEBUG: Error al subir archivo {nombre_archivo}: {e}')
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario y asegúrate de seleccionar un archivo.')
     else:
@@ -1259,9 +1399,9 @@ def home(request):
     # --- INICIO: LÓGICA DE VALIDACIÓN DE LÍMITE DE EQUIPOS ---
     limite_alcanzado = False
     empresa_para_limite = None
-    if request.user.is_authenticated and not request.user.is_superuser:
-        empresa_para_limite = request.user.empresa
-    elif request.user.is_superuser and selected_company_id:
+    if user.is_authenticated and not user.is_superuser:
+        empresa_para_limite = user.empresa
+    elif user.is_superuser and selected_company_id:
         try:
             empresa_para_limite = Empresa.objects.get(pk=selected_company_id)
         except Empresa.DoesNotExist:
@@ -1442,7 +1582,7 @@ def editar_empresa_formato(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
-            return redirect('core:detalle_empresa', pk=empresa.pk)
+            return redirect('core:detalle_empresa', pk=empresa.pk) # O a listar_empresas si prefieres
         else:
             messages.error(request, 'Hubo un error al actualizar el formato. Por favor, revisa los datos.')
     else:
@@ -1481,6 +1621,7 @@ def añadir_equipo(request):
         form = EquipoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
+                # La validación del límite ocurre aquí dentro del form.save()
                 equipo = form.save()
                 messages.success(request, 'Equipo añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -1735,7 +1876,7 @@ def detalle_equipo(request, pk):
     otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
 
 
-    context = {
+    return render(request, 'core/detalle_equipo.html', {
         'equipo': equipo,
         'calibraciones': calibraciones,
         'mantenimientos': mantenimientos,
@@ -1749,8 +1890,7 @@ def detalle_equipo(request, pk):
         'manual_pdf_url': manual_pdf_url,
         'otros_documentos_pdf_url': otros_documentos_pdf_url,
         'titulo_pagina': f'Detalle de {equipo.nombre}',
-    }
-    return render(request, 'core/detalle_equipo.html', context)
+    })
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -1766,6 +1906,7 @@ def editar_equipo(request, pk):
         return redirect('core:home')
 
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, instance=equipo, request=request)
         if form.is_valid():
             equipo = form.save(commit=False)
@@ -1778,6 +1919,7 @@ def editar_equipo(request, pk):
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
+        # Pasar el request al formulario
         form = EquipoForm(instance=equipo, request=request)
 
     return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
@@ -1801,10 +1943,12 @@ def eliminar_equipo(request, pk):
             equipo_nombre = equipo.nombre
             equipo.delete()
             messages.success(request, f'Equipo "{equipo_nombre}" eliminado exitosamente.')
+            # Redirige a la página principal después de eliminar para evitar NoReverseMatch
             return redirect('core:home') 
         except Exception as e:
             messages.error(request, f'Error al eliminar el equipo: {e}')
             print(f"DEBUG: Error al eliminar equipo {equipo.pk}: {e}") # Para depuración
+            # Si hay un error, redirige a home, ya que detalle_equipo podría no ser válido
             return redirect('core:home') 
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -1822,27 +1966,47 @@ def eliminar_equipo(request, pk):
 @login_required
 @permission_required('core.add_calibracion', raise_exception=True)
 def añadir_calibracion(request, equipo_pk):
-    """
-    Handles adding a new calibration for an equipment.
-    """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para añadir calibraciones a este equipo.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
+        # Instanciar el formulario sin el equipo, ya que se le va a asignar después
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                calibracion = form.save(commit=False)
-                calibracion.equipo = equipo
-                calibracion.save() # Guardar la instancia (esto subirá los archivos)
+                # 1. Crear el objeto de calibración en memoria
+                calibracion = Calibracion(
+                    equipo=equipo,
+                    fecha_calibracion=form.cleaned_data['fecha_calibracion'],
+                    proveedor=form.cleaned_data['proveedor'],
+                    nombre_proveedor=form.cleaned_data['nombre_proveedor'],
+                    resultado=form.cleaned_data['resultado'],
+                    numero_certificado=form.cleaned_data['numero_certificado'],
+                    observaciones=form.cleaned_data['observaciones'],
+                )
                 
+                # 2. Asignar los archivos subidos al objeto creado
+                if 'documento_calibracion' in request.FILES:
+                    calibracion.documento_calibracion = request.FILES['documento_calibracion']
+                if 'confirmacion_metrologica_pdf' in request.FILES:
+                    calibracion.confirmacion_metrologica_pdf = request.FILES['confirmacion_metrologica_pdf']
+                if 'intervalos_calibracion_pdf' in request.FILES:
+                    calibracion.intervalos_calibracion_pdf = request.FILES['intervalos_calibracion_pdf']
+
+                # 3. Guardar el objeto en la base de datos y subir los archivos
+                calibracion.save()
+
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
                 print(f"ERROR al guardar calibración o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
+                # Si falla, volver a renderizar con el formulario, pero sin los archivos ya que se perdieron
+                form.fields['documento_calibracion'].initial = None
+                form.fields['confirmacion_metrologica_pdf'].initial = None
+                form.fields['intervalos_calibracion_pdf'].initial = None
                 return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
@@ -1921,9 +2085,6 @@ def eliminar_calibracion(request, equipo_pk, pk):
 @login_required
 @permission_required('core.add_mantenimiento', raise_exception=True)
 def añadir_mantenimiento(request, equipo_pk):
-    """
-    Handles adding a new maintenance record for an equipment.
-    """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para añadir mantenimientos a este equipo.')
@@ -1933,8 +2094,23 @@ def añadir_mantenimiento(request, equipo_pk):
         form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                mantenimiento = form.save(commit=False)
-                mantenimiento.equipo = equipo
+                # CREAR EL OBJETO MANUALMENTE
+                mantenimiento = Mantenimiento(
+                    equipo=equipo,
+                    fecha_mantenimiento=form.cleaned_data['fecha_mantenimiento'],
+                    tipo_mantenimiento=form.cleaned_data['tipo_mantenimiento'],
+                    proveedor=form.cleaned_data['proveedor'],
+                    nombre_proveedor=form.cleaned_data['nombre_proveedor'],
+                    responsable=form.cleaned_data['responsable'],
+                    costo=form.cleaned_data['costo'],
+                    descripcion=form.cleaned_data['descripcion'],
+                    observaciones=form.cleaned_data['observaciones'],
+                )
+                
+                # Asignar el archivo
+                if 'documento_mantenimiento' in request.FILES:
+                    mantenimiento.documento_mantenimiento = request.FILES['documento_mantenimiento']
+                
                 mantenimiento.save()
                 messages.success(request, 'Mantenimiento añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -1947,7 +2123,7 @@ def añadir_mantenimiento(request, equipo_pk):
     else:
         form = MantenimientoForm()
     return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
-
+    
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_mantenimiento', raise_exception=True)
@@ -2040,9 +2216,6 @@ def detalle_mantenimiento(request, equipo_pk, pk):
 @login_required
 @permission_required('core.add_comprobacion', raise_exception=True)
 def añadir_comprobacion(request, equipo_pk):
-    """
-    Handles adding a new verification record for an equipment.
-    """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para añadir comprobaciones a este equipo.')
@@ -2052,10 +2225,22 @@ def añadir_comprobacion(request, equipo_pk):
         form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                comprobacion = form.save(commit=False)
-                comprobacion.equipo = equipo
-                comprobacion.save()
+                # CREAR EL OBJETO MANUALMENTE
+                comprobacion = Comprobacion(
+                    equipo=equipo,
+                    fecha_comprobacion=form.cleaned_data['fecha_comprobacion'],
+                    proveedor=form.cleaned_data['proveedor'],
+                    nombre_proveedor=form.cleaned_data['nombre_proveedor'],
+                    responsable=form.cleaned_data['responsable'],
+                    resultado=form.cleaned_data['resultado'],
+                    observaciones=form.cleaned_data['observaciones'],
+                )
                 
+                # Asignar el archivo
+                if 'documento_comprobacion' in request.FILES:
+                    comprobacion.documento_comprobacion = request.FILES['documento_comprobacion']
+                
+                comprobacion.save()
                 messages.success(request, 'Comprobación añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
@@ -2067,7 +2252,7 @@ def añadir_comprobacion(request, equipo_pk):
     else:
         form = ComprobacionForm()
     return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
-
+    
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_comprobacion', raise_exception=True)
@@ -2140,11 +2325,8 @@ def eliminar_comprobacion(request, equipo_pk, pk):
 @permission_required('core.add_bajaequipo', raise_exception=True)
 @require_http_methods(["GET", "POST"]) # Asegúrate de permitir GET para la página de confirmación
 def dar_baja_equipo(request, equipo_pk):
-    """
-    Permite dar de baja un equipo de forma permanente (cambia estado a 'De Baja').
-    Si el equipo ya está 'De Baja', muestra un mensaje.
-    """
     equipo = get_object_or_404(Equipo, pk=equipo_pk)
+
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para dar de baja este equipo.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2157,16 +2339,26 @@ def dar_baja_equipo(request, equipo_pk):
         form = BajaEquipoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                baja_registro = form.save(commit=False)
-                baja_registro.equipo = equipo
-                baja_registro.dado_de_baja_por = request.user
-                baja_registro.save() # El signal post_save ya se encarga de cambiar el estado del equipo
+                # CREAR EL OBJETO MANUALMENTE
+                baja_registro = BajaEquipo(
+                    equipo=equipo,
+                    fecha_baja=form.cleaned_data['fecha_baja'],
+                    razon_baja=form.cleaned_data['razon_baja'],
+                    observaciones=form.cleaned_data['observaciones'],
+                    dado_de_baja_por=request.user,
+                )
                 
-                messages.success(request, 'Equipo dado de baja exitosamente.')
+                # Asignar el archivo
+                if 'documento_baja' in request.FILES:
+                    baja_registro.documento_baja = request.FILES['documento_baja']
+                
+                baja_registro.save()
+                
+                messages.success(request, f'Equipo "{equipo.nombre}" dado de baja exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
             except Exception as e:
                 messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
-                print(f"DEBUG: Error al dar de baja equipo {equipo.pk}: {e}") # Para depuración
+                print(f"DEBUG: Error al dar de baja equipo {equipo.pk}: {e}")
                 return render(request, 'core/dar_baja_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario de baja.')
@@ -2178,7 +2370,6 @@ def dar_baja_equipo(request, equipo_pk):
         'equipo': equipo,
         'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'
     })
-
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -2468,6 +2659,7 @@ def listar_ubicaciones(request):
     Lists all locations.
     """
     ubicaciones = Ubicacion.objects.all()
+    # Filtrar por empresa si el usuario no es superusuario
     if not request.user.is_superuser and request.user.empresa:
         ubicaciones = ubicaciones.filter(empresa=request.user.empresa)
     elif not request.user.is_superuser and not request.user.empresa: # Usuario normal sin empresa asignada
@@ -2483,6 +2675,7 @@ def añadir_ubicacion(request):
     Handles adding a new location.
     """
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = UbicacionForm(request.POST, request=request)
         if form.is_valid():
             ubicacion = form.save(commit=False)
@@ -2494,6 +2687,7 @@ def añadir_ubicacion(request):
         else:
             messages.error(request, 'Hubo un error al añadir la ubicación. Por favor, revisa los datos.')
     else:
+        # Pasar el request al formulario
         form = UbicacionForm(request=request)
     return render(request, 'core/añadir_ubicacion.html', {'form': form, 'titulo_pagina': 'Añadir Nueva Ubicación'})
 
@@ -2505,11 +2699,13 @@ def editar_ubicacion(request, pk):
     Handles editing an existing location.
     """
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
+    # Permiso: Superusuario o usuario asociado a la empresa de la ubicación
     if not request.user.is_superuser and request.user.empresa != ubicacion.empresa:
         messages.error(request, 'No tienes permiso para editar esta ubicación.')
         return redirect('core:listar_ubicaciones')
 
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = UbicacionForm(request.POST, instance=ubicacion, request=request)
         if form.is_valid():
             form.save()
@@ -2518,6 +2714,7 @@ def editar_ubicacion(request, pk):
         else:
             messages.error(request, 'Hubo un error al actualizar la ubicación. Por favor, revisa los datos.')
     else:
+        # Pasar el request al formulario
         form = UbicacionForm(instance=ubicacion, request=request)
     return render(request, 'core/editar_ubicacion.html', {'form': form, 'ubicacion': ubicacion, 'titulo_pagina': f'Editar Ubicación: {ubicacion.nombre}'})
 
@@ -2529,6 +2726,7 @@ def eliminar_ubicacion(request, pk):
     Handles deleting a location.
     """
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
+    # Permiso: Superusuario o usuario asociado a la empresa de la ubicación
     if not request.user.is_superuser and request.user.empresa != ubicacion.empresa:
         messages.error(request, 'No tienes permiso para eliminar esta ubicación.')
         return redirect('core:listar_ubicaciones')
@@ -2627,10 +2825,8 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
-                procedimiento = form.save(commit=False)
-                # Si hay un archivo subido, el FileField ya lo habrá procesado y asignado a procedimiento.documento_pdf
-                # No necesitamos llamar a subir_archivo aquí directamente ni asignar .name
-                procedimiento.save() # Esto guardará el archivo en S3 a través de default_storage y get_upload_path
+                # La subida del archivo se maneja automáticamente por el modelo.
+                procedimiento = form.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -2640,7 +2836,7 @@ def añadir_procedimiento(request):
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
     else:
-        form = ProcedimientoForm(request=request) # Pasa el request al inicializar
+        form = ProcedimientoForm(request=request) # Pasa el request al formulario para la lógica de empresa
     return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
 
 @access_check # APLICAR ESTE DECORADOR
@@ -2653,6 +2849,7 @@ def editar_procedimiento(request, pk):
     """
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
+    # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
     if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != procedimiento.empresa):
         messages.error(request, 'No tienes permiso para editar este procedimiento.')
         return redirect('core:listar_procedimientos')
@@ -2661,9 +2858,8 @@ def editar_procedimiento(request, pk):
         form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
             try:
-                # Si se sube un nuevo documento_pdf, el FileField ya lo habrá procesado y asignado a procedimiento.documento_pdf
-                # No necesitamos llamar a subir_archivo aquí directamente ni asignar .name
-                form.save() # Esto guardará el archivo en S3 a través de default_storage y get_upload_path
+                # La lógica de empresa ya se maneja en el formulario, solo guardar
+                form.save()
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -2686,6 +2882,7 @@ def eliminar_procedimiento(request, pk):
     """
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
+    # Permiso: Superusuario o usuario asociado a la empresa del procedimiento
     if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != procedimiento.empresa):
         messages.error(request, 'No tienes permiso para eliminar este procedimiento.')
         return redirect('core:listar_procedimientos')
@@ -2697,9 +2894,9 @@ def eliminar_procedimiento(request, pk):
             messages.success(request, f'Procedimiento "{nombre_proc}" eliminado exitosamente.')
             return redirect('core:listar_procedimientos')
         except Exception as e:
-            messages.error(request, f'Error al eliminar el procedimiento: {e}')
+            messages.error(request, f'Error al eliminar el procedimiento: {e}. Revisa el log para más detalles.')
             print(f"DEBUG: Error al eliminar procedimiento {procedimiento.pk}: {e}")
-            return render(request, 'core/listar_procedimientos.html', {'titulo_pagina': 'Listado de Procedimientos'})
+            return redirect('core:listar_procedimientos')
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
     context = {
@@ -2796,6 +2993,7 @@ def editar_proveedor(request, pk):
     Handles editing an existing general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
+
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2803,7 +3001,8 @@ def editar_proveedor(request, pk):
     if request.method == 'POST':
         form = ProveedorForm(request.POST, instance=proveedor, request=request)
         if form.is_valid():
-            form.save()
+            proveedor = form.save(commit=False)
+            proveedor.save()
             messages.success(request, 'Proveedor actualizado exitosamente.')
             return redirect('core:listar_proveedores')
         else:
@@ -2821,6 +3020,7 @@ def eliminar_proveedor(request, pk):
     Handles deleting a general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
+
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2854,6 +3054,7 @@ def detalle_proveedor(request, pk):
     Displays the details of a specific general provider.
     """
     proveedor = get_object_or_404(Proveedor, pk=pk)
+
     if not request.user.is_superuser and (not request.user.empresa or proveedor.empresa != request.user.empresa):
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
@@ -2912,6 +3113,7 @@ def añadir_usuario(request, empresa_pk=None):
     Handles adding a new custom user and assigning groups.
     """
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = CustomUserCreationForm(request.POST, request=request)
         if form.is_valid():
             user = form.save(commit=False)
@@ -2926,6 +3128,7 @@ def añadir_usuario(request, empresa_pk=None):
         else:
             messages.error(request, 'Hubo un error al añadir el usuario. Por favor, revisa los datos.')
     else:
+        # Pasar el request al formulario
         form = CustomUserCreationForm(request=request)
         if empresa_pk:
             try:
@@ -2967,18 +3170,21 @@ def editar_usuario(request, pk):
     """
     usuario_a_editar = get_object_or_404(CustomUser, pk=pk)
 
-    if not request.user.is_superuser and request.user.pk != usuario_a_editar.pk:
-        # Si no es superusuario y no es su propio perfil
-        if not request.user.empresa or request.user.empresa != usuario_a_editar.empresa:
-            messages.error(request, 'No tienes permiso para editar usuarios de otras empresas.')
-            return redirect('core:listar_usuarios')
-    
-    # Si el usuario intenta editar su propio perfil, lo redirigimos a la vista de perfil de usuario.
+    # Permiso:
+    # 1. Superusuario puede editar cualquiera.
+    # 2. Staff puede editar usuarios de su misma empresa, PERO NO su propio perfil con esta vista.
+    # 3. Si el usuario intenta editar su propio perfil, lo redirigimos a la vista de perfil de usuario.
     if request.user.pk == usuario_a_editar.pk:
         messages.info(request, "Estás editando tu propio perfil. Para cambiar tu contraseña o datos básicos, usa la opción específica en 'Mi Perfil'.")
         return redirect('core:perfil_usuario')
+    
+    if not request.user.is_superuser:
+        if not request.user.is_staff or (request.user.empresa and request.user.empresa != usuario_a_editar.empresa):
+            messages.error(request, 'No tienes permiso para editar este usuario.')
+            return redirect('core:listar_usuarios')
 
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = CustomUserChangeForm(request.POST, instance=usuario_a_editar, request=request)
         if form.is_valid():
             user = form.save(commit=False)
@@ -2992,6 +3198,7 @@ def editar_usuario(request, pk):
         else:
             messages.error(request, 'Hubo un error al actualizar el usuario. Por favor, revisa los datos.')
     else:
+        # Pasar el request al formulario
         form = CustomUserChangeForm(instance=usuario_a_editar, request=request)
 
     return render(request, 'core/editar_usuario.html', {'form': form, 'usuario_a_editar': usuario_a_editar, 'titulo_pagina': f'Editar Usuario: {usuario_a_editar.username}'})
@@ -3040,7 +3247,7 @@ def eliminar_usuario(request, pk):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/') # Solo superusuarios pueden cambiar contraseñas de otros
 def change_user_password(request, pk):
     """
     Handles changing another user's password (admin only).
@@ -3103,7 +3310,8 @@ def informes(request):
     if selected_company_id:
         equipos_queryset = equipos_queryset.filter(empresa_id=selected_company_id)
 
-    # Excluir equipos "De Baja" y "Inactivo" para este informe
+    # --- Actividades a Realizar (Listados Detallados) ---
+    # Filtrar solo equipos activos y no de baja o inactivos
     equipos_activos_para_actividades = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
 
     scheduled_activities = []
@@ -3475,7 +3683,7 @@ def informe_vencimientos_pdf(request):
     try:
         pdf_file = _generate_pdf_content(request, template_path, context)
         response = HttpResponse(pdf_file, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="informe_vencimientos.pdf"'
+        response['Content-Disposition'] = 'attachment; filename="informe_vencimientos.pdf"'
         return response
     except Exception as e:
         messages.error(request, f'Tuvimos algunos errores al generar el PDF de vencimientos: {e}. Revisa los logs para más detalles.')
@@ -3485,7 +3693,6 @@ def informe_vencimientos_pdf(request):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@permission_required('core.can_export_reports', raise_exception=True)
 def programmed_activities_list(request):
     """
     Lists all programmed activities.
@@ -3580,7 +3787,7 @@ def exportar_equipos_excel(request):
     excel_content = _generate_general_equipment_list_excel_content(equipos)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="listado_equipos.xlsx"'
+    response['Content-Disposition'] = 'attachment; filename="listado_equipos.xlsx"'
     response.write(excel_content)
     return response
 
