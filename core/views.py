@@ -1972,11 +1972,9 @@ def añadir_calibracion(request, equipo_pk):
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        # Instanciar el formulario sin el equipo, ya que se le va a asignar después
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # 1. Crear el objeto de calibración en memoria
                 calibracion = Calibracion(
                     equipo=equipo,
                     fecha_calibracion=form.cleaned_data['fecha_calibracion'],
@@ -1986,34 +1984,51 @@ def añadir_calibracion(request, equipo_pk):
                     numero_certificado=form.cleaned_data['numero_certificado'],
                     observaciones=form.cleaned_data['observaciones'],
                 )
-                
-                # 2. Asignar los archivos subidos al objeto creado
-                if 'documento_calibracion' in request.FILES:
-                    calibracion.documento_calibracion = request.FILES['documento_calibracion']
-                if 'confirmacion_metrologica_pdf' in request.FILES:
-                    calibracion.confirmacion_metrologica_pdf = request.FILES['confirmacion_metrologica_pdf']
-                if 'intervalos_calibracion_pdf' in request.FILES:
-                    calibracion.intervalos_calibracion_pdf = request.FILES['intervalos_calibracion_pdf']
 
-                # 3. Guardar el objeto en la base de datos y subir los archivos
+                # --- Manejo de archivos y subida a S3 ---
+                if 'documento_calibracion' in request.FILES:
+                    archivo_subido = request.FILES['documento_calibracion']
+                    nombre_archivo = archivo_subido.name
+                    subir_archivo(nombre_archivo, archivo_subido)
+                    calibracion.documento_calibracion = nombre_archivo
+
+                if 'confirmacion_metrologica_pdf' in request.FILES:
+                    archivo_subido = request.FILES['confirmacion_metrologica_pdf']
+                    nombre_archivo = archivo_subido.name
+                    subir_archivo(nombre_archivo, archivo_subido)
+                    calibracion.confirmacion_metrologica_pdf = nombre_archivo
+
+                if 'intervalos_calibracion_pdf' in request.FILES:
+                    archivo_subido = request.FILES['intervalos_calibracion_pdf']
+                    nombre_archivo = archivo_subido.name
+                    subir_archivo(nombre_archivo, archivo_subido)
+                    calibracion.intervalos_calibracion_pdf = nombre_archivo
+
+                # Guardar en DB
                 calibracion.save()
 
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
+
             except Exception as e:
                 print(f"ERROR al guardar calibración o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
-                # Si falla, volver a renderizar con el formulario, pero sin los archivos ya que se perdieron
-                form.fields['documento_calibracion'].initial = None
-                form.fields['confirmacion_metrologica_pdf'].initial = None
-                form.fields['intervalos_calibracion_pdf'].initial = None
-                return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
+                return render(request, 'core/añadir_calibracion.html', {
+                    'form': form,
+                    'equipo': equipo,
+                    'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'
+                })
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
         form = CalibracionForm()
-    return render(request, 'core/añadir_calibracion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'})
 
+    return render(request, 'core/añadir_calibracion.html', {
+        'form': form,
+        'equipo': equipo,
+        'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'
+    })
+    
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_calibracion', raise_exception=True)
@@ -2825,8 +2840,17 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
-                # La subida del archivo se maneja automáticamente por el modelo.
-                procedimiento = form.save()
+                # 1. obtener el archivo desde request.FILES
+                archivo_subido = request.FILES["documento_pdf"]
+
+                # 2. obtener el nombre del archivo
+                nombre_archivo = archivo_subido.name
+
+                # 3. pasar a tu función (contenido puede ser directamente el objeto archivo)
+                subir_archivo(nombre_archivo, archivo_subido)
+                procedimiento = form.save(commit=False)
+                # La lógica de empresa ya se maneja en el formulario
+                procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -2838,7 +2862,7 @@ def añadir_procedimiento(request):
     else:
         form = ProcedimientoForm(request=request) # Pasa el request al formulario para la lógica de empresa
     return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
-
+    
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_procedimiento', raise_exception=True)
