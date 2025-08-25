@@ -1600,14 +1600,18 @@ def editar_empresa_formato(request, pk):
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
 def añadir_equipo(request):
+    # Obtener el objeto empresa del usuario actual (si no es superusuario)
+    # o de los datos del formulario (si es superusuario)
     empresa_actual = None
     if request.user.is_authenticated and not request.user.is_superuser:
         empresa_actual = request.user.empresa
     
-    # Validar límite de equipos
+    # Calcular si el límite ha sido alcanzado
     limite_alcanzado = False
     if empresa_actual:
+        # Usar el método get_limite_equipos() del modelo Empresa
         limite_equipos_empresa = empresa_actual.get_limite_equipos() 
+        
         if limite_equipos_empresa is not None and limite_equipos_empresa != float('inf') and limite_equipos_empresa > 0:
             equipos_actuales = Equipo.objects.filter(empresa=empresa_actual).count()
             if equipos_actuales >= limite_equipos_empresa:
@@ -1617,31 +1621,14 @@ def añadir_equipo(request):
         form = EquipoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
-                equipo = form.save(commit=False)
-
-                # --- Subida manual de archivos a S3 ---
-                archivos = {
-                    'manual_pdf': 'manual_pdf',
-                    'archivo_compra_pdf': 'archivo_compra_pdf',
-                    'ficha_tecnica_pdf': 'ficha_tecnica_pdf',
-                    'otros_documentos_pdf': 'otros_documentos_pdf',
-                    'imagen_equipo': 'imagen_equipo',
-                }
-
-                for campo_form, campo_modelo in archivos.items():
-                    if campo_form in request.FILES:
-                        archivo_subido = request.FILES[campo_form]
-                        nombre_archivo = archivo_subido.name
-                        subir_archivo(nombre_archivo, archivo_subido)
-                        setattr(equipo, campo_modelo, nombre_archivo)
-
-                equipo.save()
-
+                # La validación del límite ocurre aquí dentro del form.save()
+                equipo = form.save()
                 messages.success(request, 'Equipo añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
-
             except forms.ValidationError as e:
+                # Capturar el ValidationError si el límite se alcanza
                 messages.error(request, str(e))
+                # Pasar la empresa y el estado del límite para la renderización
                 context = {
                     'form': form,
                     'titulo_pagina': 'Añadir Nuevo Equipo',
@@ -1659,6 +1646,7 @@ def añadir_equipo(request):
         'limite_alcanzado': limite_alcanzado,
     }
     return render(request, 'core/añadir_equipo.html', context)
+
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -2121,7 +2109,7 @@ def añadir_mantenimiento(request, equipo_pk):
         form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # Crear el objeto manualmente
+                # CREAR EL OBJETO MANUALMENTE
                 mantenimiento = Mantenimiento(
                     equipo=equipo,
                     fecha_mantenimiento=form.cleaned_data['fecha_mantenimiento'],
@@ -2134,37 +2122,22 @@ def añadir_mantenimiento(request, equipo_pk):
                     observaciones=form.cleaned_data['observaciones'],
                 )
                 
-                # --- Manejo del archivo y subida a S3 ---
+                # Asignar el archivo
                 if 'documento_mantenimiento' in request.FILES:
-                    archivo_subido = request.FILES['documento_mantenimiento']
-                    nombre_archivo = archivo_subido.name
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    mantenimiento.documento_mantenimiento = nombre_archivo
-
-                # Guardar en DB
+                    mantenimiento.documento_mantenimiento = request.FILES['documento_mantenimiento']
+                
                 mantenimiento.save()
-
                 messages.success(request, 'Mantenimiento añadido exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
-
             except Exception as e:
                 print(f"ERROR al guardar mantenimiento o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar el mantenimiento: {e}')
-                return render(request, 'core/añadir_mantenimiento.html', {
-                    'form': form,
-                    'equipo': equipo,
-                    'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'
-                })
+                return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
         form = MantenimientoForm()
-
-    return render(request, 'core/añadir_mantenimiento.html', {
-        'form': form,
-        'equipo': equipo,
-        'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'
-    })
+    return render(request, 'core/añadir_mantenimiento.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Mantenimiento para {equipo.nombre}'})
     
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -2267,7 +2240,7 @@ def añadir_comprobacion(request, equipo_pk):
         form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # Crear el objeto manualmente
+                # CREAR EL OBJETO MANUALMENTE
                 comprobacion = Comprobacion(
                     equipo=equipo,
                     fecha_comprobacion=form.cleaned_data['fecha_comprobacion'],
@@ -2277,38 +2250,23 @@ def añadir_comprobacion(request, equipo_pk):
                     resultado=form.cleaned_data['resultado'],
                     observaciones=form.cleaned_data['observaciones'],
                 )
-
-                # --- Manejo de archivo y subida a S3 ---
+                
+                # Asignar el archivo
                 if 'documento_comprobacion' in request.FILES:
-                    archivo_subido = request.FILES['documento_comprobacion']
-                    nombre_archivo = archivo_subido.name
-                    subir_archivo(nombre_archivo, archivo_subido)  # función que ya usas en añadir_procedimiento
-                    comprobacion.documento_comprobacion = nombre_archivo
-
-                # Guardar en DB
+                    comprobacion.documento_comprobacion = request.FILES['documento_comprobacion']
+                
                 comprobacion.save()
-
                 messages.success(request, 'Comprobación añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
-
             except Exception as e:
                 print(f"ERROR al guardar comprobación o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
-                return render(request, 'core/añadir_comprobacion.html', {
-                    'form': form,
-                    'equipo': equipo,
-                    'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'
-                })
+                return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
         form = ComprobacionForm()
-
-    return render(request, 'core/añadir_comprobacion.html', {
-        'form': form,
-        'equipo': equipo,
-        'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'
-    })
+    return render(request, 'core/añadir_comprobacion.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Añadir Comprobación para {equipo.nombre}'})
     
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -2396,7 +2354,7 @@ def dar_baja_equipo(request, equipo_pk):
         form = BajaEquipoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # Crear el objeto manualmente
+                # CREAR EL OBJETO MANUALMENTE
                 baja_registro = BajaEquipo(
                     equipo=equipo,
                     fecha_baja=form.cleaned_data['fecha_baja'],
@@ -2405,27 +2363,18 @@ def dar_baja_equipo(request, equipo_pk):
                     dado_de_baja_por=request.user,
                 )
                 
-                # --- Manejo del archivo y subida a S3 ---
+                # Asignar el archivo
                 if 'documento_baja' in request.FILES:
-                    archivo_subido = request.FILES['documento_baja']
-                    nombre_archivo = archivo_subido.name
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    baja_registro.documento_baja = nombre_archivo  # guardamos el nombre (o URL en caso de que lo prefieras)
-
-                # Guardar en DB
+                    baja_registro.documento_baja = request.FILES['documento_baja']
+                
                 baja_registro.save()
                 
                 messages.success(request, f'Equipo "{equipo.nombre}" dado de baja exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
-
             except Exception as e:
                 messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
                 print(f"DEBUG: Error al dar de baja equipo {equipo.pk}: {e}")
-                return render(request, 'core/dar_baja_equipo.html', {
-                    'form': form,
-                    'equipo': equipo,
-                    'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'
-                })
+                return render(request, 'core/dar_baja_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Dar de Baja Equipo: {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario de baja.')
     else:

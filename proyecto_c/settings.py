@@ -161,7 +161,7 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     
     AWS_S3_SIGNATURE_VERSION = "s3v4"
     # Construir el CUSTOM_DOMAIN incluyendo la región para mayor robustez
-    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
     # CAMBIO CRÍTICO: Eliminar AWS_DEFAULT_ACL o establecerlo en None
     # El bucket no permite ACLs, así que no debemos intentar establecerlos.
     AWS_DEFAULT_ACL = None 
@@ -177,7 +177,7 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     
     # URLs para archivos estáticos y de medios
     STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/"
     
     # print("INFO: AWS S3 storage configured.") # Comentar en producción
     # print(f"DEBUG: S3 Bucket Name: {AWS_STORAGE_BUCKET_NAME}") # Comentar en producción

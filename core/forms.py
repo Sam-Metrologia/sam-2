@@ -434,6 +434,24 @@ class EquipoForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
         input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
     )
+    fecha_ultima_calibracion = forms.DateField(
+        label="Fecha Última Calibración",
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
+    )
+    fecha_ultimo_mantenimiento = forms.DateField(
+        label="Fecha Último Mantenimiento",
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
+    )
+    fecha_ultima_comprobacion = forms.DateField(
+        label="Fecha Última Comprobación",
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
+        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
+    )
 
     class Meta:
         model = Equipo
@@ -453,31 +471,22 @@ class EquipoForm(forms.ModelForm):
             'resolucion': forms.TextInput(attrs={'class': 'form-input'}),
             'error_maximo_permisible': forms.TextInput(attrs={'class': 'form-input'}),
             'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
-            'archivo_compra_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}),
-            'ficha_tecnica_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}),
-            'manual_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}),
-            'otros_documentos_pdf': ClearableFileInput(attrs={'class': 'form-input-file'}),
+            'archivo_compra': ClearableFileInput(attrs={'class': 'form-input-file'}),
+            'manual': ClearableFileInput(attrs={'class': 'form-input-file'}),
+            'otros_documentos': ClearableFileInput(attrs={'class': 'form-input-file'}),
             'imagen_equipo': ClearableFileInput(attrs={'class': 'form-input-file'}),
             'version_formato': forms.TextInput(attrs={'class': 'form-input'}),
             'codificacion_formato': forms.TextInput(attrs={'class': 'form-input'}),
-            'fecha_ultima_calibracion': forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-            'fecha_ultimo_mantenimiento': forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-            'fecha_ultima_comprobacion': forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
             'frecuencia_calibracion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0', 'step': '0.01'}),
             'frecuencia_mantenimiento_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0', 'step': '0.01'}),
             'frecuencia_comprobacion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0', 'step': '0.01'}),
         }
-        input_formats = {
-            'fecha_ultima_calibracion': ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
-            'fecha_ultimo_mantenimiento': ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
-            'fecha_ultima_comprobacion': ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'],
-        }
-
 
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
+        # Control de visibilidad de empresa
         if self.request and not self.request.user.is_superuser:
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
@@ -488,6 +497,7 @@ class EquipoForm(forms.ModelForm):
             self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select w-full'})
             self.fields['empresa'].required = True
 
+        # Inicializar fechas en formato DD/MM/YYYY
         if self.instance:
             if self.instance.fecha_ultima_calibracion:
                 self.fields['fecha_ultima_calibracion'].initial = self.instance.fecha_ultima_calibracion.strftime('%d/%m/%Y')
@@ -506,34 +516,28 @@ class EquipoForm(forms.ModelForm):
 
     def save(self, commit=True):
         print(f"DEBUG_FORM_SAVE: Iniciando save para EquipoForm. Instancia PK: {self.instance.pk if self.instance else 'None'}")
-        
-        # Antes de guardar, verificar el límite de equipos si se está creando uno nuevo
-        if not self.instance.pk: # Solo aplica al crear un nuevo equipo
-            # Obtener la empresa, ya sea del formulario (para superusuarios) o del usuario actual
+
+        # Validar límite de equipos al crear
+        if not self.instance.pk:
             if self.request and not self.request.user.is_superuser:
                 empresa = self.request.user.empresa
             else:
                 empresa = self.cleaned_data.get('empresa')
 
             if empresa:
-                # Usar el campo correcto: limite_equipos_empresa
-                limite_equipos = empresa.limite_equipos_empresa 
-
+                limite_equipos = empresa.limite_equipos_empresa
                 if limite_equipos is not None and limite_equipos > 0:
                     equipos_actuales = Equipo.objects.filter(empresa=empresa).count()
                     if equipos_actuales >= limite_equipos:
-                        raise forms.ValidationError(
-                            f"Esta empresa ya ha alcanzado su límite de {limite_equipos} equipos. No se puede agregar más."
-                        )
-        
-        # Debugging para archivos adjuntos en EquipoForm
-        for field_name in ['archivo_compra_pdf', 'ficha_tecnica_pdf', 'manual_pdf', 'otros_documentos_pdf', 'imagen_equipo']:
-            if field_name in self.cleaned_data and self.cleaned_data[field_name]:
-                print(f"DEBUG_FORM_SAVE: EquipoForm - Archivo '{field_name}' presente: {self.cleaned_data[field_name].name}")
-            elif field_name in self.changed_data and not self.cleaned_data.get(field_name):
-                print(f"DEBUG_FORM_SAVE: EquipoForm - Archivo '{field_name}' eliminado.")
+                        self.add_error('empresa', f"La empresa ya alcanzó su límite de {limite_equipos} equipos.")
 
-        # Después de la validación, guardar el objeto
+        # Debug archivos
+        for field_name in ['archivo_compra', 'manual', 'otros_documentos', 'imagen_equipo']:
+            if field_name in self.cleaned_data and self.cleaned_data[field_name]:
+                print(f"DEBUG_FORM_SAVE: Archivo '{field_name}' presente: {self.cleaned_data[field_name].name}")
+            elif field_name in self.changed_data and not self.cleaned_data.get(field_name):
+                print(f"DEBUG_FORM_SAVE: Archivo '{field_name}' eliminado.")
+
         instance = super().save(commit=commit)
         print(f"DEBUG_FORM_SAVE: EquipoForm save completado. Equipo: {instance.nombre} ({instance.codigo_interno})")
         return instance

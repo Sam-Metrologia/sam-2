@@ -218,7 +218,7 @@ def get_upload_path(instance, filename):
     safe_base_code = base_code.replace('/', '_').replace('\\', '_').replace(' ', '_')
 
     # Construir la ruta base dentro de MEDIA_ROOT
-    base_path = f"documentos/{safe_base_code}/" # Una carpeta más genérica 'documentos'
+    base_path = f"{safe_base_code}/" # Una carpeta más genérica 'documentos'
 
     # Determinar subcarpeta específica para el tipo de documento
     subfolder = ""
@@ -233,6 +233,10 @@ def get_upload_path(instance, filename):
         subfolder = "mantenimientos/"
     elif isinstance(instance, Comprobacion):
         subfolder = "comprobaciones/"
+    elif isinstance(instance, Procedimiento):
+        subfolder = "procedimientos/"
+    elif isinstance(instance, Documento):
+        subfolder = "generales/"  
     elif isinstance(instance, BajaEquipo):
         subfolder = "bajas_equipo/"
     elif isinstance(instance, Equipo):
