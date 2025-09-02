@@ -2583,16 +2583,19 @@ def añadir_empresa(request):
         formulario = EmpresaForm(request.POST, request.FILES)
         if formulario.is_valid():
             try:
-                # 1. obtener el archivo del logo
+                empresa = formulario.save(commit=False)
+
                 if "logo" in request.FILES:
                     archivo_subido = request.FILES["logo"]
-                    # 2. obtener el nombre del archivo
                     nombre_archivo = archivo_subido.name
-                    # 3. subir a S3 en carpeta media/pdfs/
-                    subir_archivo(f"pdfs/{nombre_archivo}", archivo_subido)
+                    # Subir a S3 en media/pdfs/
+                    ruta_s3 = f"pdfs/{nombre_archivo}"
+                    subir_archivo(ruta_s3, archivo_subido)
 
-                # Guardar la empresa en la BD
-                empresa = formulario.save()
+                    # Guardar la ruta en el campo logo de la empresa
+                    empresa.logo.name = ruta_s3  
+
+                empresa.save()
                 messages.success(request, 'Empresa añadida exitosamente.')
                 return redirect('core:listar_empresas')
             except Exception as e:
