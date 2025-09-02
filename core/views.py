@@ -2578,20 +2578,35 @@ def listar_empresas(request):
 @login_required
 @user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
 def añadir_empresa(request):
-    """
-    Handles adding a new company (superuser only).
-    """
+    """ Handles adding a new company (superuser only). """
     if request.method == 'POST':
         formulario = EmpresaForm(request.POST, request.FILES)
         if formulario.is_valid():
-            formulario.save()
-            messages.success(request, 'Empresa añadida exitosamente.')
-            return redirect('core:listar_empresas')
+            try:
+                # 1. obtener el archivo del logo
+                if "logo" in request.FILES:
+                    archivo_subido = request.FILES["logo"]
+                    # 2. obtener el nombre del archivo
+                    nombre_archivo = archivo_subido.name
+                    # 3. subir a S3 en carpeta empresas
+                    subir_archivo(f"empresas/{nombre_archivo}", archivo_subido)
+
+                # Guardar la empresa en la BD
+                empresa = formulario.save()
+                messages.success(request, 'Empresa añadida exitosamente.')
+                return redirect('core:listar_empresas')
+            except Exception as e:
+                messages.error(request, f'Hubo un error al añadir la empresa: {e}. Revisa el log para más detalles.')
+                print(f"DEBUG: Error al añadir empresa: {e}")
         else:
             messages.error(request, 'Hubo un error al añadir la empresa. Por favor, revisa los datos.')
     else:
         formulario = EmpresaForm()
-    return render(request, 'core/añadir_empresa.html', {'formulario': formulario, 'titulo_pagina': 'Añadir Nueva Empresa'})
+
+    return render(request, 'core/añadir_empresa.html', {
+        'formulario': formulario,
+        'titulo_pagina': 'Añadir Nueva Empresa'
+    })
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
