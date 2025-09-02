@@ -2593,8 +2593,9 @@ def añadir_empresa(request):
                     ruta_s3 = f"pdfs/{nombre_archivo}"
                     # 3. subir el archivo a S3
                     subir_archivo(ruta_s3, archivo_subido)
-                    # 4. guardar la ruta en el campo logo de la empresa
+                    # 4. guardar la ruta en el campo logo
                     empresa.logo.name = ruta_s3
+                    print(f"DEBUG: Logo guardado en S3 con ruta {ruta_s3}")
 
                 # Guardar la empresa en la BD
                 empresa.save()
