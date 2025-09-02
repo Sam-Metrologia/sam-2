@@ -2588,8 +2588,8 @@ def añadir_empresa(request):
                     archivo_subido = request.FILES["logo"]
                     # 2. obtener el nombre del archivo
                     nombre_archivo = archivo_subido.name
-                    # 3. subir a S3 en carpeta empresas
-                    subir_archivo(f"empresas/{nombre_archivo}", archivo_subido)
+                    # 3. subir a S3 en carpeta media/pdfs/
+                    subir_archivo(f"pdfs/{nombre_archivo}", archivo_subido)
 
                 # Guardar la empresa en la BD
                 empresa = formulario.save()
