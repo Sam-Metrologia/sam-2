@@ -154,30 +154,32 @@ AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2') # Define una región por defecto
 
 # Configuración S3 que se aplica SIEMPRE si las variables están presentes
-# Esta estructura asegura que django-storages se configure correctamente
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage' 
-    
+    # Configuración común de S3
     AWS_S3_SIGNATURE_VERSION = "s3v4"
-    # Construir el CUSTOM_DOMAIN incluyendo la región para mayor robustez
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
-    # CAMBIO CRÍTICO: Eliminar AWS_DEFAULT_ACL o establecerlo en None
-    # El bucket no permite ACLs, así que no debemos intentar establecerlos.
-    AWS_DEFAULT_ACL = None 
+    AWS_DEFAULT_ACL = None
     AWS_S3_USE_SSL = True
-    AWS_QUERYSTRING_AUTH = False # Los archivos son accesibles públicamente sin firma
-    AWS_LOCATION = 'media' # Prefijo para archivos de media en el bucket
-    STATIC_LOCATION = 'static' # Prefijo para archivos estáticos en el bucket
-    AWS_S3_FILE_OVERWRITE = False # No sobrescribir archivos con el mismo nombre por defecto
-
-    # Endpoint URL explícito para la región
-    # Esto es crucial para algunas regiones o si hay problemas de resolución
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+    AWS_S3_FILE_OVERWRITE = False
     AWS_S3_ENDPOINT_URL = f'https://s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     
-    # URLs para archivos estáticos y de medios
-    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/'
+    # Configuración para archivos de media (uploads de usuarios)
+    STATICFILES_STORAGE = 'proyecto_c.storages.S3StaticStorage'
+    AWS_LOCATION = 'media'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+    
+    # Para archivos estáticos, usar S3 solo en producción
+    if RENDER_EXTERNAL_HOSTNAME:
+        STATICFILES_STORAGE = 'proyecto_c.storages.S3StaticStorage'
+        AWS_STATIC_LOCATION = 'static'
+        STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_STATIC_LOCATION}/'
+    else:
+        # En desarrollo local, usar WhiteNoise para estáticos
+        STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
     
     # print("INFO: AWS S3 storage configured.") # Comentar en producción
     # print(f"DEBUG: S3 Bucket Name: {AWS_STORAGE_BUCKET_NAME}") # Comentar en producción
@@ -187,15 +189,14 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     # print(f"DEBUG: AWS_S3_ENDPOINT_URL: {AWS_S3_ENDPOINT_URL}") # Comentar en producción
 else:
     # Si las variables de entorno de S3 no están, usa la configuración local
+    print(f"DEBUG: S3 Region Name: {AWS_S3_REGION_NAME}")
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media' # Carpeta local donde se guardarán los archivos
+    MEDIA_ROOT = BASE_DIR / 'media'
     
-    # Para STATICFILES_STORAGE, Whitenoise es la opción por defecto en Render si no se usa S3
+    # Para STATICFILES_STORAGE, Whitenoise es la opción por defecto
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-    
-    # Configuración de Whitenoise para desarrollo (opcional, pero buena práctica)
-    WHITENOISE_MAX_AGE = 3600 # Cachear archivos estáticos por 1 hora en desarrollo
+    WHITENOISE_MAX_AGE = 3600
     
     # print("WARNING: AWS S3 environment variables not found. Using local media storage.") # Comentar en producción
     # print("DEBUG: Using local file storage.") # Comentar en producción

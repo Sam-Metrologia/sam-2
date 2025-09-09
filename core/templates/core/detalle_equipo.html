@@ -123,8 +123,8 @@
             <div class="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
                 <h2 class="text-xl font-semibold text-gray-800 mb-3">Documentos del Equipo</h2>
                 <ul class="list-disc list-inside space-y-1">
-                    {% if equipo.archivo_compra_pdf %}
-                        <li><a href="{{ equipo.archivo_compra_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Archivo de Compra</a></li>
+                    {% if archivo_compra_pdf_url %}
+                        <li><a href="{{ archivo_compra_pdf_url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Archivo de Compra</a></li>
                     {% else %}
                         <li>Archivo de Compra: N/A</li>
                     {% endif %}

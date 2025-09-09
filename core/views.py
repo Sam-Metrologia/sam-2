@@ -123,16 +123,45 @@ def es_miembro_empresa(user, empresa_id):
     """Verifica si el usuario pertenece a la empresa especificada."""
     return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
 
+def sanitize_filename(filename):
+    """
+    Sanitiza el nombre del archivo para prevenir path traversal y caracteres peligrosos.
+    """
+    import re
+    import os
+    
+    # Obtener solo el nombre del archivo, sin ruta
+    filename = os.path.basename(filename)
+    
+    # Reemplazar caracteres peligrosos
+    filename = filename.replace('..', '_')
+    filename = filename.replace('/', '_')
+    filename = filename.replace('\\', '_')
+    filename = filename.replace(':', '_')
+    
+    # Remover caracteres no alfanuméricos excepto puntos, guiones y guiones bajos
+    filename = re.sub(r'[^\w\-_\.]', '_', filename)
+    
+    # Limitar longitud
+    if len(filename) > 100:
+        name, ext = os.path.splitext(filename)
+        filename = name[:95] + ext
+    
+    return filename
+
 def subir_archivo(nombre_archivo, contenido):
     """
     Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
-    :param nombre_archivo: Nombre con el que se guardará el archivo en S3 (incluyendo la ruta).
+    :param nombre_archivo: Nombre con el que se guardará el archivo en S3.
     :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
     """
-    storage = S3Boto3Storage() # Usa el almacenamiento por defecto (S3 o local)
-    ruta = f'pdfs/{nombre_archivo}' # Prefijo 'pdfs/' como solicitado
-    storage.save(ruta, contenido)
-    print(f'Archivo subido a: {ruta}') # Para depuración
+    # Sanitizar el nombre del archivo
+    nombre_archivo_seguro = sanitize_filename(nombre_archivo)
+    
+    storage = default_storage
+    ruta_s3 = f'pdfs/{nombre_archivo_seguro}'
+    storage.save(ruta_s3, contenido)
+    print(f'Archivo subido a: {ruta_s3}')
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -1631,7 +1660,8 @@ def añadir_equipo(request):
                 for campo_form, campo_modelo in archivos.items():
                     if campo_form in request.FILES:
                         archivo_subido = request.FILES[campo_form]
-                        nombre_archivo = archivo_subido.name
+                        nombre_archivo = sanitize_filename(archivo_subido.name)
+                        ruta_s3 = f'pdfs/{nombre_archivo}'
                         subir_archivo(nombre_archivo, archivo_subido)
                         setattr(equipo, campo_modelo, nombre_archivo)
 
@@ -1865,8 +1895,13 @@ def detalle_equipo(request, pk):
     # Helper para obtener URL segura desde default_storage
     def get_file_url(file_field):
         if file_field and file_field.name:
-            if default_storage.exists(file_field.name):
-                return request.build_absolute_uri(file_field.url)
+            # Para logos de empresa, usar empresas_logos/
+            if 'logo_empresa' in str(file_field):
+                ruta_s3 = f'empresas_logos/{file_field.name}'
+            else:
+                ruta_s3 = f'pdfs/{file_field.name}'
+            if default_storage.exists(ruta_s3):
+                return default_storage.url(ruta_s3)
         return None
 
     logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
@@ -1886,6 +1921,7 @@ def detalle_equipo(request, pk):
     archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
     ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
     manual_pdf_url = get_file_url(equipo.manual_pdf)
+    print(f'DEBUG: archivo_compra_pdf_url {archivo_compra_pdf_url}')
     otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
 
 
@@ -1919,20 +1955,39 @@ def editar_equipo(request, pk):
         return redirect('core:home')
 
     if request.method == 'POST':
-        # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, instance=equipo, request=request)
         if form.is_valid():
-            equipo = form.save(commit=False)
-            # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
-            if not request.user.is_superuser and not equipo.empresa:
-                equipo.empresa = request.user.empresa
-            equipo.save()
-            messages.success(request, 'Equipo actualizado exitosamente.')
-            return redirect('core:detalle_equipo', pk=equipo.pk)
+            try:
+                equipo = form.save(commit=False)
+                
+                # Manejar subida de archivos a S3
+                archivos = {
+                    'manual_pdf': 'manual_pdf',
+                    'archivo_compra_pdf': 'archivo_compra_pdf', 
+                    'ficha_tecnica_pdf': 'ficha_tecnica_pdf',
+                    'otros_documentos_pdf': 'otros_documentos_pdf',
+                    'imagen_equipo': 'imagen_equipo',
+                }
+
+                for campo_form, campo_modelo in archivos.items():
+                    if campo_form in request.FILES:
+                        archivo_subido = request.FILES[campo_form]
+                        # Sanitizar nombre de archivo
+                        nombre_archivo = archivo_subido.name.replace('/', '_').replace('\\', '_').replace('..', '_')
+                        subir_archivo(nombre_archivo, archivo_subido)
+                        setattr(equipo, campo_modelo, nombre_archivo)
+
+                if not request.user.is_superuser and not equipo.empresa:
+                    equipo.empresa = request.user.empresa
+                equipo.save()
+                messages.success(request, 'Equipo actualizado exitosamente.')
+                return redirect('core:detalle_equipo', pk=equipo.pk)
+            except Exception as e:
+                messages.error(request, f'Error al actualizar el equipo: {e}')
+                return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        # Pasar el request al formulario
         form = EquipoForm(instance=equipo, request=request)
 
     return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
@@ -2001,19 +2056,19 @@ def añadir_calibracion(request, equipo_pk):
                 # --- Manejo de archivos y subida a S3 ---
                 if 'documento_calibracion' in request.FILES:
                     archivo_subido = request.FILES['documento_calibracion']
-                    nombre_archivo = archivo_subido.name
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
                     calibracion.documento_calibracion = nombre_archivo
 
                 if 'confirmacion_metrologica_pdf' in request.FILES:
                     archivo_subido = request.FILES['confirmacion_metrologica_pdf']
-                    nombre_archivo = archivo_subido.name
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
                     calibracion.confirmacion_metrologica_pdf = nombre_archivo
 
                 if 'intervalos_calibracion_pdf' in request.FILES:
                     archivo_subido = request.FILES['intervalos_calibracion_pdf']
-                    nombre_archivo = archivo_subido.name
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
                     calibracion.intervalos_calibracion_pdf = nombre_archivo
 
@@ -2138,7 +2193,7 @@ def añadir_mantenimiento(request, equipo_pk):
                 # --- Manejo del archivo y subida a S3 ---
                 if 'documento_mantenimiento' in request.FILES:
                     archivo_subido = request.FILES['documento_mantenimiento']
-                    nombre_archivo = archivo_subido.name
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
                     mantenimiento.documento_mantenimiento = nombre_archivo
 
@@ -2282,9 +2337,9 @@ def añadir_comprobacion(request, equipo_pk):
                 # --- Manejo de archivo y subida a S3 ---
                 if 'documento_comprobacion' in request.FILES:
                     archivo_subido = request.FILES['documento_comprobacion']
-                    nombre_archivo = archivo_subido.name
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
-                    comprobacion.documento_comprobacion = nombre_archivo  # guardas el nombre (o URL si prefieres)
+                    comprobacion.documento_comprobacion = nombre_archivo
 
                 # Guardar en DB
                 comprobacion.save()
@@ -2409,9 +2464,9 @@ def dar_baja_equipo(request, equipo_pk):
                 # --- Manejo del archivo y subida a S3 ---
                 if 'documento_baja' in request.FILES:
                     archivo_subido = request.FILES['documento_baja']
-                    nombre_archivo = archivo_subido.name
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
-                    baja_registro.documento_baja = nombre_archivo  # guardamos el nombre (o URL en caso de que lo prefieras)
+                    baja_registro.documento_baja = nombre_archivo
 
                 # Guardar en DB
                 baja_registro.save()
@@ -2580,24 +2635,18 @@ def listar_empresas(request):
 def añadir_empresa(request):
     """ Handles adding a new company (superuser only). """
     if request.method == 'POST':
-        formulario = EmpresaForm(request.POST, request.FILES)
+        formulario = EmpresaForm(request.POST)
         if formulario.is_valid():
             try:
                 empresa = formulario.save(commit=False)
 
-                # 1. obtener el archivo del logo
-                if "logo" in request.FILES:
-                    archivo_subido = request.FILES["logo"]
-                    nombre_archivo = archivo_subido.name
-                    # 2. definir la ruta en S3 (media/pdfs/)
-                    ruta_s3 = f"pdfs/{nombre_archivo}"
-                    # 3. subir el archivo a S3
-                    subir_archivo(ruta_s3, archivo_subido)
-                    # 4. guardar la ruta en el campo logo
-                    empresa.logo.name = ruta_s3
-                    print(f"DEBUG: Logo guardado en S3 con ruta {ruta_s3}")
+                if 'logo_empresa' in request.FILES:
+                    archivo_subido = request.FILES['logo_empresa']
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
+                    ruta_s3 = f'empresas_logos/{nombre_archivo}'
+                    default_storage.save(ruta_s3, archivo_subido)
+                    empresa.logo_empresa = nombre_archivo
 
-                # Guardar la empresa en la BD
                 empresa.save()
                 messages.success(request, 'Empresa añadida exitosamente.')
                 return redirect('core:listar_empresas')
@@ -2652,11 +2701,25 @@ def editar_empresa(request, pk):
     """
     empresa = get_object_or_404(Empresa, pk=pk)
     if request.method == 'POST':
-        form = EmpresaForm(request.POST, request.FILES, instance=empresa)
+        form = EmpresaForm(request.POST, instance=empresa)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Empresa actualizada exitosamente.')
-            return redirect('core:detalle_empresa', pk=empresa.pk)
+            try:
+                empresa = form.save(commit=False)
+                
+                if 'logo_empresa' in request.FILES:
+                    archivo_subido = request.FILES['logo_empresa']
+                    nombre_archivo = sanitize_filename(archivo_subido.name)
+                    ruta_s3 = f'empresas_logos/{nombre_archivo}'
+                    default_storage.save(ruta_s3, archivo_subido)
+                    empresa.logo_empresa = ruta_s3
+                    print(f'Archivo subido a: {ruta_s3}')
+                
+                empresa.save()
+                messages.success(request, 'Empresa actualizada exitosamente.')
+                return redirect('core:detalle_empresa', pk=empresa.pk)
+            except Exception as e:
+                messages.error(request, f'Error al actualizar la empresa: {e}')
+                print(f"DEBUG: Error al editar empresa: {e}")
         else:
             messages.error(request, 'Hubo un error al actualizar la empresa. Por favor, revisa los datos.')
     else:
@@ -2916,8 +2979,8 @@ def añadir_procedimiento(request):
                 # 1. obtener el archivo desde request.FILES
                 archivo_subido = request.FILES["documento_pdf"]
 
-                # 2. obtener el nombre del archivo
-                nombre_archivo = archivo_subido.name
+                # 2. obtener y sanitizar el nombre del archivo
+                nombre_archivo = sanitize_filename(archivo_subido.name)
 
                 # 3. pasar a tu función (contenido puede ser directamente el objeto archivo)
                 subir_archivo(nombre_archivo, archivo_subido)

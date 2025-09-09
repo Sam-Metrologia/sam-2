@@ -196,6 +196,13 @@ class CustomUser(AbstractUser):
 
 def get_upload_path(instance, filename):
     """Define la ruta de subida para los archivos de equipo y sus actividades."""
+    import re
+    import os
+    
+    # Sanitizar el nombre del archivo
+    filename = os.path.basename(filename)
+    filename = re.sub(r'[^\w\-_\.]', '_', filename)
+    
     base_code = None
     if isinstance(instance, Equipo):
         base_code = instance.codigo_interno
@@ -203,22 +210,20 @@ def get_upload_path(instance, filename):
         base_code = instance.equipo.codigo_interno
     elif isinstance(instance, Procedimiento):
         base_code = instance.codigo
-    elif isinstance(instance, Documento): # Para el nuevo modelo Documento
-        # CAMBIO: Usar PK si existe, si no, generar un UUID temporal
+    elif isinstance(instance, Documento):
         if instance.pk:
             base_code = f"doc_{instance.pk}"
         else:
-            base_code = f"temp_doc_{uuid.uuid4()}" # Generar un UUID único para documentos nuevos
+            base_code = f"temp_doc_{uuid.uuid4()}"
 
     if not base_code:
-        # Si no se puede determinar el código, usar un nombre genérico o lanzar un error
         raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento/documento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
 
-    # Convertir el código a un formato seguro para el nombre de archivo
-    safe_base_code = base_code.replace('/', '_').replace('\\', '_').replace(' ', '_')
+    # Sanitizar el código base
+    safe_base_code = re.sub(r'[^\w\-_]', '_', str(base_code))
 
     # Construir la ruta base dentro de MEDIA_ROOT
-    base_path = f"documentos/{safe_base_code}/" # Una carpeta más genérica 'documentos'
+    base_path = f"documentos/{safe_base_code}/"
 
     # Determinar subcarpeta específica para el tipo de documento
     subfolder = ""
@@ -703,9 +708,10 @@ class Documento(models.Model):
 
     def get_absolute_s3_url(self):
         """Devuelve la URL pública del archivo en S3 si existe."""
-        if self.archivo_s3_path:
+        if self.nombre_archivo:
+            ruta_s3 = f'pdfs/{self.nombre_archivo}'
             from django.core.files.storage import default_storage # Importar aquí para evitar dependencia circular
-            return default_storage.url(self.archivo_s3_path)
+            return default_storage.url(ruta_s3)
         return None
 
 
