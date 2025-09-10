@@ -2015,7 +2015,7 @@ def eliminar_equipo(request, pk):
 
 # --- Vistas de Calibraciones ---
 
-@access_check # APLICAR ESTE DECORADOR
+@access_check
 @login_required
 @permission_required('core.add_calibracion', raise_exception=True)
 def añadir_calibracion(request, equipo_pk):
@@ -2028,47 +2028,40 @@ def añadir_calibracion(request, equipo_pk):
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
+                # CREAR LA INSTANCIA DEL FORMULARIO PERO NO LA GUARDAR AÚN
                 calibracion = form.save(commit=False)
+                # ASIGNAR LA RELACIÓN DE CLAVE FORÁNEA (el equipo)
                 calibracion.equipo = equipo
-
-                # --- Manejo de archivos y subida a S3 (REFACTORIZADO) ---
+                
+                # REFACTORIZACIÓN DEL MANEJO DE ARCHIVOS
+                # Se asignan los archivos directamente a la instancia antes de guardar
                 if 'documento_calibracion' in request.FILES:
                     archivo_subido = request.FILES['documento_calibracion']
-                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
-                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
-                    subir_archivo(ruta_destino, archivo_subido)
-                    calibracion.documento_calibracion = ruta_destino
+                    calibracion.documento_calibracion.save(sanitize_filename(archivo_subido.name), archivo_subido)
 
                 if 'confirmacion_metrologica_pdf' in request.FILES:
                     archivo_subido = request.FILES['confirmacion_metrologica_pdf']
-                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
-                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
-                    subir_archivo(ruta_destino, archivo_subido)
-                    calibracion.confirmacion_metrologica_pdf = ruta_destino
+                    calibracion.confirmacion_metrologica_pdf.save(sanitize_filename(archivo_subido.name), archivo_subido)
 
                 if 'intervalos_calibracion_pdf' in request.FILES:
                     archivo_subido = request.FILES['intervalos_calibracion_pdf']
-                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
-                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
-                    subir_archivo(ruta_destino, archivo_subido)
-                    calibracion.intervalos_calibracion_pdf = ruta_destino
-                
-                # Guardar en DB
+                    calibracion.intervalos_calibracion_pdf.save(sanitize_filename(archivo_subido.name), archivo_subido)
+
+                # GUARDAR EL OBJETO EN LA BASE DE DATOS
                 calibracion.save()
 
                 messages.success(request, 'Calibración añadida exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
-
+            
             except Exception as e:
+                # Si ocurre un error, muestra un mensaje de error y vuelve a la página
                 print(f"ERROR al guardar calibración o archivo en S3: {e}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
-                return render(request, 'core/añadir_calibracion.html', {
-                    'form': form,
-                    'equipo': equipo,
-                    'titulo_pagina': f'Añadir Calibración para {equipo.nombre}'
-                })
+
+        # Si el formulario no es válido, se mostrarán los errores del formulario en la plantilla
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
+
     else:
         form = CalibracionForm()
 
