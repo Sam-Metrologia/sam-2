@@ -52,7 +52,8 @@ from .forms import (
 # Importar modelos
 from .models import (
     Equipo, Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Empresa,
-    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento # ASEGÚRATE de que Documento esté importado aquí
+    CustomUser, Ubicacion, Procedimiento, Proveedor, Documento, # ASEGÚRATE de que Documento esté importado aquí
+    get_upload_path, # Importa la función de tu models.py para obtener las rutas
 )
 
 # Importar para autenticación y grupos
@@ -66,6 +67,7 @@ from django.core.files.storage import default_storage
 from storages.backends.s3boto3 import S3Boto3Storage
 # Importar el módulo forms de Django para las excepciones
 from django import forms
+import re
 
 
 # =============================================================================
@@ -118,50 +120,32 @@ def access_check(view_func):
 # =============================================================================
 # Funciones de utilidad (helpers)
 # =============================================================================
-
-def es_miembro_empresa(user, empresa_id):
-    """Verifica si el usuario pertenece a la empresa especificada."""
-    return user.is_authenticated and user.empresa and user.empresa.pk == empresa_id
-
 def sanitize_filename(filename):
     """
-    Sanitiza el nombre del archivo para prevenir path traversal y caracteres peligrosos.
+    Sanitiza un nombre de archivo para prevenir problemas de seguridad y de sistema de archivos.
+    Elimina caracteres que no son alfanuméricos, guiones, guiones bajos o puntos.
     """
-    import re
-    import os
-    
-    # Obtener solo el nombre del archivo, sin ruta
+    # Eliminar la ruta si está presente y obtener solo el nombre del archivo
     filename = os.path.basename(filename)
-    
-    # Reemplazar caracteres peligrosos
-    filename = filename.replace('..', '_')
-    filename = filename.replace('/', '_')
-    filename = filename.replace('\\', '_')
-    filename = filename.replace(':', '_')
-    
-    # Remover caracteres no alfanuméricos excepto puntos, guiones y guiones bajos
-    filename = re.sub(r'[^\w\-_\.]', '_', filename)
-    
-    # Limitar longitud
-    if len(filename) > 100:
-        name, ext = os.path.splitext(filename)
-        filename = name[:95] + ext
-    
-    return filename
+    # Reemplazar caracteres no válidos con guiones bajos
+    safe_filename = re.sub(r'[^\w\-_\.]', '_', filename)
+    # Reemplazar múltiples guiones bajos con uno solo y puntos duplicados
+    safe_filename = re.sub(r'_{2,}', '_', safe_filename)
+    safe_filename = re.sub(r'\.{2,}', '.', safe_filename)
+    # Limitar la longitud del nombre del archivo
+    safe_filename = safe_filename[:100]
+    return safe_filename
 
-def subir_archivo(nombre_archivo, contenido):
+def subir_archivo(ruta_destino, contenido):
     """
     Sube un archivo a AWS S3 usando el almacenamiento configurado en Django.
-    :param nombre_archivo: Nombre con el que se guardará el archivo en S3.
+    :param ruta_destino: Ruta completa del archivo en el almacenamiento (ej. 'pdfs/nombre_archivo.pdf').
     :param contenido: El objeto de archivo (ej. InMemoryUploadedFile de request.FILES).
     """
-    # Sanitizar el nombre del archivo
-    nombre_archivo_seguro = sanitize_filename(nombre_archivo)
-    
     storage = default_storage
-    ruta_s3 = f'pdfs/{nombre_archivo_seguro}'
-    storage.save(ruta_s3, contenido)
-    print(f'Archivo subido a: {ruta_s3}')
+    storage.save(ruta_destino, contenido)
+    print(f'Archivo subido a: {ruta_destino}') # Para depuración
+
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -355,18 +339,24 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
 
     # Utilizar default_storage para acceder a las URLs de los archivos
     # Helper para obtener URL segura desde default_storage
-    def get_file_url(file_field):
+    def get_file_url(file_field, is_logo=False):
         # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
         if file_field and file_field.name:
             try:
-                if default_storage.exists(file_field.name):
+                # La lógica de get_upload_path genera rutas relativas
+                # default_storage.url() las convierte a URLs absolutas (S3 o local)
+                # No es necesario verificar si existe, ya que url() debe funcionar de todas formas
+                if is_logo:
+                    # Si es un logo de empresa, la ruta no se genera con get_upload_path
+                    return request.build_absolute_uri(file_field.url)
+                else:
                     return request.build_absolute_uri(file_field.url)
             except Exception as e:
-                print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
+                print(f"DEBUG: Error getting URL for {file_field.name}: {e}")
         return None
 
     # Obtener URLs de los archivos para pasarlos al contexto
-    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa, is_logo=True) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = get_file_url(equipo.imagen_equipo)
     documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
@@ -530,38 +520,38 @@ def _generate_equipment_general_info_excel_content(equipo):
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
-    for equipo in equipos_queryset:
-        row_data = [
-            equipo.codigo_interno,
-            equipo.nombre,
-            equipo.empresa.nombre if equipo.empresa else "N/A",
-            equipo.get_tipo_equipo_display(),
-            equipo.marca,
-            equipo.modelo,
-            equipo.numero_serie,
-            equipo.ubicacion,
-            equipo.responsable,
-            equipo.estado,
-            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-            equipo.rango_medida,
-            equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
-            equipo.observaciones,
-            equipo.version_formato,
-            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-            equipo.codificacion_formato,
-            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-        ]
-        sheet.append(row_data)
+    # Lógica de datos ajustada para un solo equipo
+    row_data = [
+        equipo.codigo_interno,
+        equipo.nombre,
+        equipo.empresa.nombre if equipo.empresa else "N/A",
+        equipo.get_tipo_equipo_display(),
+        equipo.marca,
+        equipo.modelo,
+        equipo.numero_serie,
+        equipo.ubicacion,
+        equipo.responsable,
+        equipo.estado,
+        equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+        equipo.rango_medida,
+        equipo.resolucion,
+        equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+        equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+        equipo.observaciones,
+        equipo.version_formato,
+        equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+        equipo.codificacion_formato,
+        equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+        equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+        float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+        equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
+        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
+        float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+        equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
+        float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+    ]
+    sheet.append(row_data)
 
     for col in sheet.columns:
         max_length = 0
@@ -1354,12 +1344,12 @@ def subir_pdf(request):
         archivo_subido = request.FILES.get('archivo') # Obtener el archivo directamente del request.FILES
 
         if form.is_valid() and archivo_subido: # Asegurarse de que el archivo también esté presente
-            nombre_archivo = archivo_subido.name
+            nombre_archivo = sanitize_filename(archivo_subido.name) # Sanitizar el nombre del archivo
             ruta_s3 = f'pdfs/{nombre_archivo}' # La ruta que se guardará en el modelo
 
             try:
                 # Sube el archivo a S3 usando la función auxiliar
-                subir_archivo(nombre_archivo, archivo_subido)
+                subir_archivo(ruta_s3, archivo_subido)
 
                 # Guarda el objeto Documento en la base de datos
                 documento = form.save(commit=False)
@@ -1648,23 +1638,23 @@ def añadir_equipo(request):
             try:
                 equipo = form.save(commit=False)
 
-                # --- Subida manual de archivos a S3 ---
-                archivos = {
-                    'manual_pdf': 'manual_pdf',
-                    'archivo_compra_pdf': 'archivo_compra_pdf',
-                    'ficha_tecnica_pdf': 'ficha_tecnica_pdf',
-                    'otros_documentos_pdf': 'otros_documentos_pdf',
-                    'imagen_equipo': 'imagen_equipo',
+                # La lógica de subida de archivos se ha refactorizado
+                archivos_a_subir = {
+                    'manual_pdf': equipo.manual_pdf,
+                    'archivo_compra_pdf': equipo.archivo_compra_pdf,
+                    'ficha_tecnica_pdf': equipo.ficha_tecnica_pdf,
+                    'otros_documentos_pdf': equipo.otros_documentos_pdf,
+                    'imagen_equipo': equipo.imagen_equipo,
                 }
-
-                for campo_form, campo_modelo in archivos.items():
+                
+                for campo_form, file_field in archivos_a_subir.items():
                     if campo_form in request.FILES:
                         archivo_subido = request.FILES[campo_form]
-                        nombre_archivo = sanitize_filename(archivo_subido.name)
-                        ruta_s3 = f'pdfs/{nombre_archivo}'
-                        subir_archivo(nombre_archivo, archivo_subido)
-                        setattr(equipo, campo_modelo, nombre_archivo)
-
+                        nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                        ruta_destino = get_upload_path(equipo, nombre_archivo_sanitizado)
+                        subir_archivo(ruta_destino, archivo_subido)
+                        setattr(equipo, campo_form, ruta_destino)
+                
                 equipo.save()
 
                 messages.success(request, 'Equipo añadido exitosamente.')
@@ -1893,18 +1883,23 @@ def detalle_equipo(request, pk):
 
     # Utilizar default_storage para acceder a las URLs de los archivos
     # Helper para obtener URL segura desde default_storage
-    def get_file_url(file_field):
+    def get_file_url(file_field, is_logo=False):
         if file_field and file_field.name:
-            # Para logos de empresa, usar empresas_logos/
-            if 'logo_empresa' in str(file_field):
-                ruta_s3 = f'empresas_logos/{file_field.name}'
-            else:
-                ruta_s3 = f'pdfs/{file_field.name}'
-            if default_storage.exists(ruta_s3):
-                return default_storage.url(ruta_s3)
+            try:
+                # Comprobar si es el logo de la empresa para construir la ruta correctamente
+                if is_logo:
+                    # Usar la URL directamente del campo ImageField
+                    return file_field.url
+                
+                # Para el resto de los archivos, que usan get_upload_path
+                return default_storage.url(file_field.name)
+            except Exception as e:
+                print(f"DEBUG: Error getting URL for {file_field.name}: {e}")
         return None
 
-    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+    # Obtener URLs de los archivos para pasarlos al contexto
+    # CAMBIO: Usar get_file_url con el flag is_logo para el logo de la empresa
+    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa, is_logo=True) if equipo.empresa and equipo.empresa.logo_empresa else None
     imagen_equipo_url = get_file_url(equipo.imagen_equipo)
     documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
@@ -1921,7 +1916,6 @@ def detalle_equipo(request, pk):
     archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
     ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
     manual_pdf_url = get_file_url(equipo.manual_pdf)
-    print(f'DEBUG: archivo_compra_pdf_url {archivo_compra_pdf_url}')
     otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
 
 
@@ -1955,39 +1949,30 @@ def editar_equipo(request, pk):
         return redirect('core:home')
 
     if request.method == 'POST':
+        # Pasar el request al formulario
         form = EquipoForm(request.POST, request.FILES, instance=equipo, request=request)
         if form.is_valid():
-            try:
-                equipo = form.save(commit=False)
-                
-                # Manejar subida de archivos a S3
-                archivos = {
-                    'manual_pdf': 'manual_pdf',
-                    'archivo_compra_pdf': 'archivo_compra_pdf', 
-                    'ficha_tecnica_pdf': 'ficha_tecnica_pdf',
-                    'otros_documentos_pdf': 'otros_documentos_pdf',
-                    'imagen_equipo': 'imagen_equipo',
-                }
+            equipo = form.save(commit=False)
 
-                for campo_form, campo_modelo in archivos.items():
-                    if campo_form in request.FILES:
-                        archivo_subido = request.FILES[campo_form]
-                        # Sanitizar nombre de archivo
-                        nombre_archivo = archivo_subido.name.replace('/', '_').replace('\\', '_').replace('..', '_')
-                        subir_archivo(nombre_archivo, archivo_subido)
-                        setattr(equipo, campo_modelo, nombre_archivo)
-
-                if not request.user.is_superuser and not equipo.empresa:
-                    equipo.empresa = request.user.empresa
-                equipo.save()
-                messages.success(request, 'Equipo actualizado exitosamente.')
-                return redirect('core:detalle_equipo', pk=equipo.pk)
-            except Exception as e:
-                messages.error(request, f'Error al actualizar el equipo: {e}')
-                return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
+            # Lógica de subida de archivos refactorizada
+            for campo_form in ['manual_pdf', 'archivo_compra_pdf', 'ficha_tecnica_pdf', 'otros_documentos_pdf', 'imagen_equipo']:
+                if campo_form in request.FILES:
+                    archivo_subido = request.FILES[campo_form]
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(equipo, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    setattr(equipo, campo_form, ruta_destino)
+            
+            # La lógica para asignar la empresa si no es superusuario está ahora en form.save()
+            if not request.user.is_superuser and not equipo.empresa:
+                equipo.empresa = request.user.empresa
+            equipo.save()
+            messages.success(request, 'Equipo actualizado exitosamente.')
+            return redirect('core:detalle_equipo', pk=equipo.pk)
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
+        # Pasar el request al formulario
         form = EquipoForm(instance=equipo, request=request)
 
     return render(request, 'core/editar_equipo.html', {'form': form, 'equipo': equipo, 'titulo_pagina': f'Editar Equipo: {equipo.nombre}'})
@@ -2043,35 +2028,31 @@ def añadir_calibracion(request, equipo_pk):
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                calibracion = Calibracion(
-                    equipo=equipo,
-                    fecha_calibracion=form.cleaned_data['fecha_calibracion'],
-                    proveedor=form.cleaned_data['proveedor'],
-                    nombre_proveedor=form.cleaned_data['nombre_proveedor'],
-                    resultado=form.cleaned_data['resultado'],
-                    numero_certificado=form.cleaned_data['numero_certificado'],
-                    observaciones=form.cleaned_data['observaciones'],
-                )
+                calibracion = form.save(commit=False)
+                calibracion.equipo = equipo
 
-                # --- Manejo de archivos y subida a S3 ---
+                # --- Manejo de archivos y subida a S3 (REFACTORIZADO) ---
                 if 'documento_calibracion' in request.FILES:
                     archivo_subido = request.FILES['documento_calibracion']
-                    nombre_archivo = sanitize_filename(archivo_subido.name)
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    calibracion.documento_calibracion = nombre_archivo
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    calibracion.documento_calibracion = ruta_destino
 
                 if 'confirmacion_metrologica_pdf' in request.FILES:
                     archivo_subido = request.FILES['confirmacion_metrologica_pdf']
-                    nombre_archivo = sanitize_filename(archivo_subido.name)
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    calibracion.confirmacion_metrologica_pdf = nombre_archivo
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    calibracion.confirmacion_metrologica_pdf = ruta_destino
 
                 if 'intervalos_calibracion_pdf' in request.FILES:
                     archivo_subido = request.FILES['intervalos_calibracion_pdf']
-                    nombre_archivo = sanitize_filename(archivo_subido.name)
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    calibracion.intervalos_calibracion_pdf = nombre_archivo
-
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    calibracion.intervalos_calibracion_pdf = ruta_destino
+                
                 # Guardar en DB
                 calibracion.save()
 
@@ -2115,6 +2096,28 @@ def editar_calibracion(request, equipo_pk, pk):
         form = CalibracionForm(request.POST, request.FILES, instance=calibracion)
         if form.is_valid():
             try:
+                # --- Manejo de archivos y subida a S3 (REFACTORIZADO) ---
+                if 'documento_calibracion' in request.FILES:
+                    archivo_subido = request.FILES['documento_calibracion']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    calibracion.documento_calibracion = ruta_destino
+
+                if 'confirmacion_metrologica_pdf' in request.FILES:
+                    archivo_subido = request.FILES['confirmacion_metrologica_pdf']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    calibracion.confirmacion_metrologica_pdf = ruta_destino
+
+                if 'intervalos_calibracion_pdf' in request.FILES:
+                    archivo_subido = request.FILES['intervalos_calibracion_pdf']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(calibracion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    calibracion.intervalos_calibracion_pdf = ruta_destino
+
                 form.save()
                 messages.success(request, 'Calibración actualizada exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2177,25 +2180,16 @@ def añadir_mantenimiento(request, equipo_pk):
         form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # Crear el objeto manualmente
-                mantenimiento = Mantenimiento(
-                    equipo=equipo,
-                    fecha_mantenimiento=form.cleaned_data['fecha_mantenimiento'],
-                    tipo_mantenimiento=form.cleaned_data['tipo_mantenimiento'],
-                    proveedor=form.cleaned_data['proveedor'],
-                    nombre_proveedor=form.cleaned_data['nombre_proveedor'],
-                    responsable=form.cleaned_data['responsable'],
-                    costo=form.cleaned_data['costo'],
-                    descripcion=form.cleaned_data['descripcion'],
-                    observaciones=form.cleaned_data['observaciones'],
-                )
+                mantenimiento = form.save(commit=False)
+                mantenimiento.equipo = equipo
                 
-                # --- Manejo del archivo y subida a S3 ---
+                # --- Manejo del archivo y subida a S3 (REFACTORIZADO) ---
                 if 'documento_mantenimiento' in request.FILES:
                     archivo_subido = request.FILES['documento_mantenimiento']
-                    nombre_archivo = sanitize_filename(archivo_subido.name)
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    mantenimiento.documento_mantenimiento = nombre_archivo
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(mantenimiento, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    mantenimiento.documento_mantenimiento = ruta_destino
 
                 # Guardar en DB
                 mantenimiento.save()
@@ -2240,6 +2234,14 @@ def editar_mantenimiento(request, equipo_pk, pk):
         form = MantenimientoForm(request.POST, request.FILES, instance=mantenimiento)
         if form.is_valid():
             try:
+                # --- Manejo del archivo y subida a S3 (REFACTORIZADO) ---
+                if 'documento_mantenimiento' in request.FILES:
+                    archivo_subido = request.FILES['documento_mantenimiento']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(mantenimiento, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    mantenimiento.documento_mantenimiento = ruta_destino
+
                 form.save()
                 messages.success(request, 'Mantenimiento actualizado exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2323,23 +2325,16 @@ def añadir_comprobacion(request, equipo_pk):
         form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # Crear el objeto manualmente
-                comprobacion = Comprobacion(
-                    equipo=equipo,
-                    fecha_comprobacion=form.cleaned_data['fecha_comprobacion'],
-                    proveedor=form.cleaned_data['proveedor'],
-                    nombre_proveedor=form.cleaned_data['nombre_proveedor'],
-                    responsable=form.cleaned_data['responsable'],
-                    resultado=form.cleaned_data['resultado'],
-                    observaciones=form.cleaned_data['observaciones'],
-                )
+                comprobacion = form.save(commit=False)
+                comprobacion.equipo = equipo
 
-                # --- Manejo de archivo y subida a S3 ---
+                # --- Manejo de archivo y subida a S3 (REFACTORIZADO) ---
                 if 'documento_comprobacion' in request.FILES:
                     archivo_subido = request.FILES['documento_comprobacion']
-                    nombre_archivo = sanitize_filename(archivo_subido.name)
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    comprobacion.documento_comprobacion = nombre_archivo
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(comprobacion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    comprobacion.documento_comprobacion = ruta_destino
 
                 # Guardar en DB
                 comprobacion.save()
@@ -2384,6 +2379,14 @@ def editar_comprobacion(request, equipo_pk, pk):
         form = ComprobacionForm(request.POST, request.FILES, instance=comprobacion)
         if form.is_valid():
             try:
+                # --- Manejo de archivo y subida a S3 (REFACTORIZADO) ---
+                if 'documento_comprobacion' in request.FILES:
+                    archivo_subido = request.FILES['documento_comprobacion']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(comprobacion, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    comprobacion.documento_comprobacion = ruta_destino
+                    
                 form.save()
                 messages.success(request, 'Comprobación actualizada exitosamente.')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
@@ -2452,21 +2455,17 @@ def dar_baja_equipo(request, equipo_pk):
         form = BajaEquipoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                # Crear el objeto manualmente
-                baja_registro = BajaEquipo(
-                    equipo=equipo,
-                    fecha_baja=form.cleaned_data['fecha_baja'],
-                    razon_baja=form.cleaned_data['razon_baja'],
-                    observaciones=form.cleaned_data['observaciones'],
-                    dado_de_baja_por=request.user,
-                )
+                baja_registro = form.save(commit=False)
+                baja_registro.equipo = equipo
+                baja_registro.dado_de_baja_por = request.user
                 
-                # --- Manejo del archivo y subida a S3 ---
+                # --- Manejo del archivo y subida a S3 (REFACTORIZADO) ---
                 if 'documento_baja' in request.FILES:
                     archivo_subido = request.FILES['documento_baja']
-                    nombre_archivo = sanitize_filename(archivo_subido.name)
-                    subir_archivo(nombre_archivo, archivo_subido)
-                    baja_registro.documento_baja = nombre_archivo
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    ruta_destino = get_upload_path(baja_registro, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    baja_registro.documento_baja = ruta_destino
 
                 # Guardar en DB
                 baja_registro.save()
@@ -2635,17 +2634,22 @@ def listar_empresas(request):
 def añadir_empresa(request):
     """ Handles adding a new company (superuser only). """
     if request.method == 'POST':
-        formulario = EmpresaForm(request.POST)
+        formulario = EmpresaForm(request.POST, request.FILES)
         if formulario.is_valid():
             try:
                 empresa = formulario.save(commit=False)
 
+                # --- Manejo del logo (REFACTORIZADO) ---
                 if 'logo_empresa' in request.FILES:
                     archivo_subido = request.FILES['logo_empresa']
+                    # Sanitizar el nombre del archivo
                     nombre_archivo = sanitize_filename(archivo_subido.name)
+                    # Define la ruta específica para los logos de empresa
                     ruta_s3 = f'empresas_logos/{nombre_archivo}'
-                    default_storage.save(ruta_s3, archivo_subido)
-                    empresa.logo_empresa = nombre_archivo
+                    # Sube el archivo
+                    subir_archivo(ruta_s3, archivo_subido)
+                    # Asigna la ruta al campo del modelo
+                    empresa.logo_empresa.name = ruta_s3
 
                 empresa.save()
                 messages.success(request, 'Empresa añadida exitosamente.')
@@ -2701,25 +2705,31 @@ def editar_empresa(request, pk):
     """
     empresa = get_object_or_404(Empresa, pk=pk)
     if request.method == 'POST':
-        form = EmpresaForm(request.POST, instance=empresa)
+        form = EmpresaForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
             try:
-                empresa = form.save(commit=False)
+                empresa_actualizada = form.save(commit=False)
                 
+                # --- Manejo del logo (REFACTORIZADO) ---
                 if 'logo_empresa' in request.FILES:
                     archivo_subido = request.FILES['logo_empresa']
+                    # Sanitizar el nombre del archivo
                     nombre_archivo = sanitize_filename(archivo_subido.name)
+                    # Define la ruta específica para los logos de empresa
                     ruta_s3 = f'empresas_logos/{nombre_archivo}'
-                    default_storage.save(ruta_s3, archivo_subido)
-                    empresa.logo_empresa = ruta_s3
-                    print(f'Archivo subido a: {ruta_s3}')
-                
-                empresa.save()
+                    # Sube el archivo
+                    subir_archivo(ruta_s3, archivo_subido)
+                    # Asigna la ruta al campo del modelo
+                    empresa_actualizada.logo_empresa.name = ruta_s3
+
+                empresa_actualizada.save()
+
                 messages.success(request, 'Empresa actualizada exitosamente.')
                 return redirect('core:detalle_empresa', pk=empresa.pk)
             except Exception as e:
-                messages.error(request, f'Error al actualizar la empresa: {e}')
+                messages.error(request, f'Hubo un error al actualizar la empresa: {e}. Revisa el log para más detalles.')
                 print(f"DEBUG: Error al editar empresa: {e}")
+                return render(request, 'core/editar_empresa.html', {'form': form, 'empresa': empresa, 'titulo_pagina': f'Editar Empresa: {empresa.nombre}'})
         else:
             messages.error(request, 'Hubo un error al actualizar la empresa. Por favor, revisa los datos.')
     else:
@@ -2976,15 +2986,17 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
-                # 1. obtener el archivo desde request.FILES
-                archivo_subido = request.FILES["documento_pdf"]
-
-                # 2. obtener y sanitizar el nombre del archivo
-                nombre_archivo = sanitize_filename(archivo_subido.name)
-
-                # 3. pasar a tu función (contenido puede ser directamente el objeto archivo)
-                subir_archivo(nombre_archivo, archivo_subido)
                 procedimiento = form.save(commit=False)
+
+                # --- Manejo del archivo y subida a S3 (REFACTORIZADO) ---
+                if 'documento_pdf' in request.FILES:
+                    archivo_subido = request.FILES['documento_pdf']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    # Usar la función get_upload_path para obtener la ruta
+                    ruta_destino = get_upload_path(procedimiento, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    procedimiento.documento_pdf = ruta_destino
+
                 # La lógica de empresa ya se maneja en el formulario
                 procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
@@ -3018,8 +3030,17 @@ def editar_procedimiento(request, pk):
         form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
             try:
-                # La lógica de empresa ya se maneja en el formulario, solo guardar
-                form.save()
+                procedimiento_actualizado = form.save(commit=False)
+                # --- Manejo del archivo y subida a S3 (REFACTORIZADO) ---
+                if 'documento_pdf' in request.FILES:
+                    archivo_subido = request.FILES['documento_pdf']
+                    nombre_archivo_sanitizado = sanitize_filename(archivo_subido.name)
+                    # Usar la función get_upload_path para obtener la ruta
+                    ruta_destino = get_upload_path(procedimiento_actualizado, nombre_archivo_sanitizado)
+                    subir_archivo(ruta_destino, archivo_subido)
+                    procedimiento_actualizado.documento_pdf = ruta_destino
+
+                procedimiento_actualizado.save()
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
             except Exception as e:
@@ -3366,7 +3387,7 @@ def editar_usuario(request, pk):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/') # Solo superusuarios pueden cambiar contraseñas de otros
 def eliminar_usuario(request, pk):
     """
     Handles deleting a custom user (superuser only).
@@ -4066,3 +4087,4 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
+}
