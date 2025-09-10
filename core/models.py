@@ -15,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings # ¡ASEGURARSE DE QUE ESTA LÍNEA ESTÉ PRESENTE!
 import calendar # Importar calendar para nombres de meses
 import uuid # Importar uuid para generar nombres únicos temporales
+import re
 
 # ==============================================================================
 # MODELO DE USUARIO PERSONALIZADO (AÑADIDO Y AJUSTADO)
@@ -26,17 +27,10 @@ class Empresa(models.Model):
     direccion = models.CharField(max_length=255, blank=True, null=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
+    # CAMBIO: Usar una ruta fija para logos
     logo_empresa = models.ImageField(upload_to='empresas_logos/', blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     
-    # CAMBIO: Eliminado el campo 'limite_equipos' para usar solo 'limite_equipos_empresa'
-    # limite_equipos = models.IntegerField(
-    #     default=0,
-    #     help_text="Número máximo de equipos que esta empresa puede registrar. 0 para ilimitado.",
-    #     blank=True,
-    #     null=True
-    # )
-
     # Nuevos campos para la información de formato por empresa
     formato_version_empresa = models.CharField(
         max_length=50,
@@ -89,16 +83,12 @@ class Empresa(models.Model):
     def get_limite_equipos(self):
         """Retorna el límite de equipos basado en el plan o si es prueba/acceso manual."""
         if self.acceso_manual_activo:
-            # Si el acceso es manual, el límite es infinito (o un número muy grande)
             return float('inf') 
         elif self.es_periodo_prueba:
-            # Durante el período de prueba, el límite es un valor predefinido (ej. 5 equipos)
-            # Podrías usar self.duracion_prueba_dias como límite si así lo deseas,
-            # o un valor fijo como 5, 10, etc.
-            return 5 # Ejemplo: un límite fijo de 5 equipos durante la prueba
+            return 5
         elif self.limite_equipos_empresa is not None:
             return self.limite_equipos_empresa
-        return 0 # Si no hay plan ni prueba activa, el límite es 0
+        return 0
 
     def get_estado_suscripcion_display(self):
         """Devuelve el estado de la suscripción, considerando el periodo de prueba y la duración del plan."""
@@ -115,7 +105,6 @@ class Empresa(models.Model):
             if current_date > end_date_plan:
                 return "Plan Expirado"
         
-        # Si no es período de prueba ni plan expirado, devuelve el estado_suscripcion normal
         return self.estado_suscripcion
 
     def get_fecha_fin_plan(self):
@@ -124,14 +113,12 @@ class Empresa(models.Model):
             return self.fecha_inicio_plan + timedelta(days=self.duracion_prueba_dias)
         elif self.fecha_inicio_plan and self.duracion_suscripcion_meses:
             return self.fecha_inicio_plan + relativedelta(months=self.duracion_suscripcion_meses)
-        return None # No hay fecha de fin si no hay plan ni prueba
+        return None
 
 
 class PlanSuscripcion(models.Model):
     """
     Modelo para definir los diferentes planes de suscripción disponibles.
-    Se mantiene si en el futuro se desea una gestión de planes más compleja,
-    pero ya no tiene una FK directa desde Empresa para la lógica de uso actual.
     """
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Plan")
     limite_equipos = models.IntegerField(default=0, verbose_name="Límite de Equipos")
@@ -163,14 +150,14 @@ class CustomUser(AbstractUser):
     # Asegúrate de que estos related_name sean ÚNICOS a nivel de la aplicación
     groups = models.ManyToManyField(
         'auth.Group',
-        related_name='customuser_groups', # related_name único para evitar conflictos
+        related_name='customuser_groups',
         blank=True,
         help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
         verbose_name='groups',
     )
     user_permissions = models.ManyToManyField(
         'auth.Permission',
-        related_name='customuser_user_permissions', # related_name único para evitar conflictos
+        related_name='customuser_user_permissions',
         blank=True,
         help_text='Specific permissions for this user.',
         verbose_name='user permissions',
@@ -193,82 +180,32 @@ class CustomUser(AbstractUser):
 # ==============================================================================
 # FUNCIONES PARA RUTAS DE SUBIDA DE ARCHIVOS (AJUSTADAS)
 # ==============================================================================
-
 def get_upload_path(instance, filename):
     """Define la ruta de subida para los archivos de equipo y sus actividades."""
-    import re
-    import os
-    
     # Sanitizar el nombre del archivo
     filename = os.path.basename(filename)
     filename = re.sub(r'[^\w\-_\.]', '_', filename)
     
-    base_code = None
-    if isinstance(instance, Equipo):
-        base_code = instance.codigo_interno
-    elif hasattr(instance, 'equipo') and hasattr(instance.equipo, 'codigo_interno'):
-        base_code = instance.equipo.codigo_interno
-    elif isinstance(instance, Procedimiento):
-        base_code = instance.codigo
-    elif isinstance(instance, Documento):
-        if instance.pk:
-            base_code = f"doc_{instance.pk}"
-        else:
-            base_code = f"temp_doc_{uuid.uuid4()}"
-
-    if not base_code:
-        raise AttributeError(f"No se pudo determinar el código interno del equipo/procedimiento/documento para la instancia de tipo {type(instance).__name__}. Asegúrese de que tiene un código definido.")
-
-    # Sanitizar el código base
-    safe_base_code = re.sub(r'[^\w\-_]', '_', str(base_code))
-
-    # Construir la ruta base dentro de MEDIA_ROOT
-    base_path = f"documentos/{safe_base_code}/"
-
-    # Determinar subcarpeta específica para el tipo de documento
-    subfolder = ""
-    if isinstance(instance, Calibracion):
-        if 'confirmacion' in filename.lower():
-            subfolder = "calibraciones/confirmaciones/"
-        elif 'intervalos' in filename.lower():
-            subfolder = "calibraciones/intervalos/"
-        else: # Por defecto, si no es confirmación o intervalos, es certificado
-            subfolder = "calibraciones/certificados/"
-    elif isinstance(instance, Mantenimiento):
-        subfolder = "mantenimientos/"
-    elif isinstance(instance, Comprobacion):
-        subfolder = "comprobaciones/"
-    elif isinstance(instance, BajaEquipo):
-        subfolder = "bajas_equipo/"
+    # Lógica para determinar la subcarpeta
+    if isinstance(instance, (Calibracion, Mantenimiento, Comprobacion, BajaEquipo, Procedimiento, Documento)):
+        # Todos estos documentos van a la carpeta 'pdfs'
+        subfolder = "pdfs/"
     elif isinstance(instance, Equipo):
-        # Para los documentos directos del equipo, usar subcarpetas más específicas
-        if 'compra' in filename.lower():
-            subfolder = "equipos/compra/"
-        elif 'ficha_tecnica' in filename.lower() or 'ficha-tecnica' in filename.lower():
-            subfolder = "equipos/ficha_tecnica/"
-        elif 'manual' in filename.lower():
-            subfolder = "equipos/manuales/"
-        elif filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            subfolder = "equipos/imagenes/"
+        # Los documentos directos de equipo van a subcarpetas
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            subfolder = "imagenes_equipos/"
         else:
-            subfolder = "equipos/otros_documentos/"
-    elif isinstance(instance, Procedimiento):
-        subfolder = "procedimientos/" # Subcarpeta para documentos de procedimiento
-    elif isinstance(instance, Documento): # Nueva subcarpeta para documentos genéricos
-        subfolder = "generales/"
-    
-    # Asegurarse de que el nombre del archivo es seguro
-    safe_filename = filename # Por simplicidad, se mantiene el nombre original, pero es un punto de mejora
-
-    return os.path.join(base_path, subfolder, safe_filename)
+            subfolder = "documentos_equipos/"
+    else:
+        # Ruta por defecto para otros tipos
+        subfolder = "otros_documentos/"
+        
+    return os.path.join(subfolder, filename)
 
 
 # ==============================================================================
 # MODELOS PRINCIPALES DEL SISTEMA (AJUSTADOS)
 # ==============================================================================
-
-
-# Modelo para las unidades de medida que se pueden usar en los equipos
 class Unidad(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     simbolo = models.CharField(max_length=10, blank=True, null=True)
@@ -303,7 +240,7 @@ class Ubicacion(models.Model):
             ("can_change_ubicacion", "Can change ubicacion"),
             ("can_delete_ubicacion", "Can delete ubicacion"),
         ]
-        unique_together = ('nombre', 'empresa') # Unicidad por empresa
+        unique_together = ('nombre', 'empresa')
 
     def __str__(self):
         return f"{self.nombre} ({self.empresa.nombre})"
@@ -316,7 +253,6 @@ class Procedimiento(models.Model):
     fecha_emision = models.DateField(blank=True, null=True)
     documento_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
-    # NUEVO CAMPO: Relación con Empresa
     empresa = models.ForeignKey(
         Empresa,
         on_delete=models.CASCADE,
@@ -333,7 +269,6 @@ class Procedimiento(models.Model):
             ("can_change_procedimiento", "Can change procedimiento"),
             ("can_delete_procedimiento", "Can delete procedimiento"),
         ]
-        # Asegurar que el código sea único por empresa
         unique_together = ('codigo', 'empresa')
 
     def __str__(self):
@@ -363,7 +298,7 @@ class Proveedor(models.Model):
         verbose_name = "Proveedor"
         verbose_name_plural = "Proveedores"
         ordering = ['nombre_empresa']
-        unique_together = ('nombre_empresa', 'empresa',) # La combinación nombre_empresa y empresa debe ser única
+        unique_together = ('nombre_empresa', 'empresa',)
         permissions = [
             ("can_view_proveedor", "Can view proveedor"),
             ("can_add_proveedor", "Can add proveedor"),
@@ -376,7 +311,6 @@ class Proveedor(models.Model):
 
 
 class Equipo(models.Model):
-    """Modelo para representar un equipo o instrumento de metrología."""
     TIPO_EQUIPO_CHOICES = [
         ('Equipo de Medición', 'Equipo de Medición'),
         ('Equipo de Referencia', 'Equipo de Referencia'),
@@ -389,21 +323,18 @@ class Equipo(models.Model):
         ('En Mantenimiento', 'En Mantenimiento'),
         ('En Calibración', 'En Calibración'),
         ('En Comprobación', 'En Comprobación'),
-        ('Inactivo', 'Inactivo'), # NUEVO ESTADO: Equipo que no se usa temporalmente
-        ('De Baja', 'De Baja'), # Equipo dado de baja, no vuelve a operar
+        ('Inactivo', 'Inactivo'),
+        ('De Baja', 'De Baja'),
     ]
 
-    codigo_interno = models.CharField(max_length=100, unique=False, help_text="Código interno único por empresa.") # Se valida la unicidad a nivel de formulario/vista
+    codigo_interno = models.CharField(max_length=100, unique=False, help_text="Código interno único por empresa.")
     nombre = models.CharField(max_length=200, verbose_name="Nombre del Equipo")
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='equipos', verbose_name="Empresa")
     tipo_equipo = models.CharField(max_length=50, choices=TIPO_EQUIPO_CHOICES, verbose_name="Tipo de Equipo")
     marca = models.CharField(max_length=100, blank=True, null=True, verbose_name="Marca")
     modelo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
     numero_serie = models.CharField(max_length=100, unique=True, blank=True, null=True, verbose_name="Número de Serie")
-    
-    # Campo para la ubicación - ahora como TextField
-    ubicacion = models.CharField(max_length=255, blank=True, null=True, verbose_name="Ubicación") # Ahora CharField
-
+    ubicacion = models.CharField(max_length=255, blank=True, null=True, verbose_name="Ubicación")
     responsable = models.CharField(max_length=100, blank=True, null=True, verbose_name="Responsable")
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='Activo', verbose_name="Estado")
     fecha_adquisicion = models.DateField(blank=True, null=True, verbose_name="Fecha de Adquisición")
@@ -411,7 +342,7 @@ class Equipo(models.Model):
     
     rango_medida = models.CharField(max_length=100, blank=True, null=True, verbose_name="Rango de Medida")
     resolucion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Resolución")
-    error_maximo_permisible = models.CharField(max_length=100, blank=True, null=True, verbose_name="Error Máximo Permisible") # Ahora CharField
+    error_maximo_permisible = models.CharField(max_length=100, blank=True, null=True, verbose_name="Error Máximo Permisible")
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
 
     # Documentos del Equipo (usando get_upload_path)
@@ -419,7 +350,7 @@ class Equipo(models.Model):
     ficha_tecnica_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Ficha Técnica (PDF)")
     manual_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Manual (PDF)")
     otros_documentos_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Otros Documentos (PDF)")
-    imagen_equipo = models.ImageField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Imagen del Equipo") # Un solo campo para imagen
+    imagen_equipo = models.ImageField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Imagen del Equipo")
 
     # Campos de formato (para hoja de vida)
     version_formato = models.CharField(max_length=50, blank=True, null=True, verbose_name="Versión del Formato")
@@ -448,37 +379,22 @@ class Equipo(models.Model):
             ("can_add_equipo", "Can add equipo"),
             ("can_change_equipo", "Can change equipo"),
             ("can_delete_equipo", "Can delete equipo"),
-            ("can_export_reports", "Can export reports (PDF, Excel, ZIP)"), # NUEVO PERMISO
+            ("can_export_reports", "Can export reports (PDF, Excel, ZIP)"),
         ]
-        # Restricción de unicidad a nivel de base de datos para 'codigo_interno' por 'empresa'
         unique_together = ('codigo_interno', 'empresa')
-
 
     def __str__(self):
         return f"{self.nombre} ({self.codigo_interno})"
 
     def save(self, *args, **kwargs):
-        """
-        Sobreescribe save para calcular las próximas fechas antes de guardar
-        y para asegurar que solo se llame a super().save() una vez.
-        """
         is_new = self.pk is None
-        
-        # Calcular las próximas fechas ANTES de guardar, para que estén disponibles en el primer save
-        # y para que los signals no tengan que recalcular desde cero.
         self.calcular_proxima_calibracion()
         self.calcular_proximo_mantenimiento()
         self.calcular_proxima_comprobacion()
-
-        # Llamar al método save original.
-        # Los signals post_save se encargarán de guardar de nuevo con update_fields
-        # si se actualizan las fechas de última actividad.
         super().save(*args, **kwargs)
 
-
     def calcular_proxima_calibracion(self):
-        """Calcula la próxima fecha de calibración."""
-        if self.estado in ['De Baja', 'Inactivo']: # Si está de baja o inactivo, no hay próxima actividad
+        if self.estado in ['De Baja', 'Inactivo']:
             self.proxima_calibracion = None
             return
 
@@ -488,13 +404,10 @@ class Equipo(models.Model):
 
         latest_calibracion = self.calibraciones.order_by('-fecha_calibracion').first()
 
-        # Si hay una última calibración, calcular a partir de ella
         if latest_calibracion and latest_calibracion.fecha_calibracion:
-            # Convertir Decimal a int para relativedelta si es un número entero
             freq = int(self.frecuencia_calibracion_meses)
             self.proxima_calibracion = latest_calibracion.fecha_calibracion + relativedelta(months=freq)
         else:
-            # Si no hay calibraciones previas, proyectar desde la fecha de adquisición o registro del equipo
             base_date = self.fecha_adquisicion if self.fecha_adquisicion else self.fecha_registro.date()
             if base_date:
                 freq = int(self.frecuencia_calibracion_meses)
@@ -503,8 +416,7 @@ class Equipo(models.Model):
                 self.proxima_calibracion = None
 
     def calcular_proximo_mantenimiento(self):
-        """Calcula la próxima fecha de mantenimiento."""
-        if self.estado in ['De Baja', 'Inactivo']: # Si está de baja o inactivo, no hay próxima actividad
+        if self.estado in ['De Baja', 'Inactivo']:
             self.proximo_mantenimiento = None
             return
 
@@ -526,8 +438,7 @@ class Equipo(models.Model):
                 self.proximo_mantenimiento = None
 
     def calcular_proxima_comprobacion(self):
-        """Calcula la próxima fecha de comprobación."""
-        if self.estado in ['De Baja', 'Inactivo']: # Si está de baja o inactivo, no hay próxima actividad
+        if self.estado in ['De Baja', 'Inactivo']:
             self.proxima_comprobacion = None
             return
 
@@ -550,17 +461,15 @@ class Equipo(models.Model):
 
 
 class Calibracion(models.Model):
-    """Modelo para registrar las calibraciones de un equipo."""
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='calibraciones')
     fecha_calibracion = models.DateField(verbose_name="Fecha de Calibración")
-    # Para vincular al proveedor general:
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='calibraciones_realizadas', limit_choices_to={'tipo_servicio__in': ['Calibración', 'Otro']}) # Ajuste en limit_choices_to
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='calibraciones_realizadas', limit_choices_to={'tipo_servicio__in': ['Calibración', 'Otro']})
     nombre_proveedor = models.CharField(max_length=255, blank=True, null=True, help_text="Nombre del proveedor si no está en la lista.")
     resultado = models.CharField(max_length=100, choices=[('Aprobado', 'Aprobado'), ('No Aprobado', 'No Aprobado')])
     numero_certificado = models.CharField(max_length=100, blank=True, null=True)
     documento_calibracion = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento de Calibración (PDF)")
     confirmacion_metrologica_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Confirmación Metrológica (PDF)")
-    intervalos_calibracion_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Intervalos de Calibración (PDF)") # Nuevo campo
+    intervalos_calibracion_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Intervalos de Calibración (PDF)")
     observaciones = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
@@ -578,7 +487,6 @@ class Calibracion(models.Model):
         return f"Calibración de {self.equipo.nombre} ({self.fecha_calibracion})"
 
 class Mantenimiento(models.Model):
-    """Modelo para registrar los mantenimientos de un equipo."""
     TIPO_MANTENIMIENTO_CHOICES = [
         ('Preventivo', 'Preventivo'),
         ('Correctivo', 'Correctivo'),
@@ -589,8 +497,7 @@ class Mantenimiento(models.Model):
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='mantenimientos')
     fecha_mantenimiento = models.DateField(verbose_name="Fecha de Mantenimiento")
     tipo_mantenimiento = models.CharField(max_length=50, choices=TIPO_MANTENIMIENTO_CHOICES)
-    # Para vincular al proveedor general:
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='mantenimientos_realizados', limit_choices_to={'tipo_servicio__in': ['Mantenimiento', 'Otro']}) # Ajuste en limit_choices_to
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='mantenimientos_realizados', limit_choices_to={'tipo_servicio__in': ['Mantenimiento', 'Otro']})
     nombre_proveedor = models.CharField(max_length=255, blank=True, null=True, help_text="Nombre del proveedor si no está en la lista.")
     responsable = models.CharField(max_length=255, blank=True, null=True, help_text="Persona o entidad que realizó el mantenimiento.")
     costo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -613,11 +520,9 @@ class Mantenimiento(models.Model):
         return f"Mantenimiento de {self.equipo.nombre} ({self.fecha_mantenimiento})"
 
 class Comprobacion(models.Model):
-    """Modelo para registrar las comprobaciones (verificaciones intermedias) de un equipo."""
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='comprobaciones')
     fecha_comprobacion = models.DateField(verbose_name="Fecha de Comprobación")
-    # Para vincular al proveedor general:
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='comprobaciones_realizadas', limit_choices_to={'tipo_servicio__in': ['Comprobación', 'Otro']}) # Ajuste en limit_choices_to
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='comprobaciones_realizadas', limit_choices_to={'tipo_servicio__in': ['Comprobación', 'Otro']})
     nombre_proveedor = models.CharField(max_length=255, blank=True, null=True, help_text="Nombre del proveedor si no está en la lista.")
     responsable = models.CharField(max_length=255, blank=True, null=True, help_text="Persona que realizó la comprobación.")
     resultado = models.CharField(max_length=100, choices=[('Aprobado', 'Aprobado'), ('No Aprobado', 'No Aprobado')])
@@ -640,9 +545,8 @@ class Comprobacion(models.Model):
 
 
 class BajaEquipo(models.Model):
-    """Modelo para registrar la baja definitiva de un equipo."""
     equipo = models.OneToOneField(Equipo, on_delete=models.CASCADE, related_name='baja_registro')
-    fecha_baja = models.DateField(default=timezone.now, verbose_name="Fecha de Baja") # Ahora con default
+    fecha_baja = models.DateField(default=timezone.now, verbose_name="Fecha de Baja")
     razon_baja = models.TextField(verbose_name="Razón de Baja")
     observaciones = models.TextField(blank=True, null=True)
     documento_baja = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento de Baja (PDF)")
@@ -662,18 +566,9 @@ class BajaEquipo(models.Model):
     def __str__(self):
         return f"Baja de {self.equipo.nombre} ({self.fecha_baja})"
 
-# ==============================================================================
-# MODELO PARA DOCUMENTOS GENÉRICOS (NUEVO)
-# ==============================================================================
-
 class Documento(models.Model):
-    """
-    Modelo para almacenar información sobre documentos genéricos subidos.
-    Puede ser usado para PDFs u otros archivos no directamente asociados a un equipo/actividad específica.
-    """
     nombre_archivo = models.CharField(max_length=255, verbose_name="Nombre del Archivo")
     descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
-    # Este campo almacenará la ruta relativa o clave del objeto en S3
     archivo_s3_path = models.CharField(max_length=500, blank=True, null=True, verbose_name="Ruta en S3")
     subido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -684,11 +579,11 @@ class Documento(models.Model):
     )
     fecha_subida = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Subida")
     empresa = models.ForeignKey(
-        'Empresa', # Usa 'Empresa' como cadena si Empresa está definida más arriba o abajo
+        'Empresa',
         on_delete=models.CASCADE,
         related_name='documentos_generales',
         verbose_name="Empresa Asociada",
-        null=True, # Puede ser null si es un documento global o si el usuario no tiene empresa
+        null=True,
         blank=True
     )
 
@@ -708,18 +603,15 @@ class Documento(models.Model):
 
     def get_absolute_s3_url(self):
         """Devuelve la URL pública del archivo en S3 si existe."""
-        if self.nombre_archivo:
-            ruta_s3 = f'pdfs/{self.nombre_archivo}'
-            from django.core.files.storage import default_storage # Importar aquí para evitar dependencia circular
-            return default_storage.url(ruta_s3)
+        if self.archivo_s3_path:
+            from django.core.files.storage import default_storage
+            return default_storage.url(self.archivo_s3_path)
         return None
-
 
 # --- Signals para actualizar el estado del equipo y las próximas fechas ---
 
 @receiver(post_save, sender=Calibracion)
 def update_equipo_calibracion_info(sender, instance, **kwargs):
-    """Actualiza la fecha de la última y próxima calibración del equipo al guardar una calibración."""
     equipo = instance.equipo
     latest_calibracion = Calibracion.objects.filter(equipo=equipo).order_by('-fecha_calibracion').first()
 
@@ -728,36 +620,32 @@ def update_equipo_calibracion_info(sender, instance, **kwargs):
     else:
         equipo.fecha_ultima_calibracion = None
     
-    # Recalcular la próxima calibración, respetando el estado del equipo
-    if equipo.estado not in ['De Baja', 'Inactivo']: # SOLO calcular si está Activo, En Mantenimiento, etc.
-        equipo.calcular_proxima_calibracion()
-    else:
-        equipo.proxima_calibracion = None # Si está de baja o inactivo, no hay próxima programación
-
-    equipo.save(update_fields=['fecha_ultima_calibracion', 'proxima_calibracion'])
-
-@receiver(post_delete, sender=Calibracion)
-def update_equipo_calibracion_info_on_delete(sender, instance, **kwargs):
-    """Actualiza la fecha de la última y próxima calibración del equipo al eliminar una calibración."""
-    equipo = instance.equipo
-    latest_calibracion = Calibracion.objects.filter(equipo=equipo).order_by('-fecha_calibracion').first()
-
-    if latest_calibracion:
-        equipo.fecha_ultima_calibracion = latest_calibracion.fecha_calibracion
-    else:
-        equipo.fecha_ultima_calibracion = None
-    
-    if equipo.estado not in ['De Baja', 'Inactivo']: # Recalcular solo si está activo
+    if equipo.estado not in ['De Baja', 'Inactivo']:
         equipo.calcular_proxima_calibracion()
     else:
         equipo.proxima_calibracion = None
 
     equipo.save(update_fields=['fecha_ultima_calibracion', 'proxima_calibracion'])
 
+@receiver(post_delete, sender=Calibracion)
+def update_equipo_calibracion_info_on_delete(sender, instance, **kwargs):
+    equipo = instance.equipo
+    latest_calibracion = Calibracion.objects.filter(equipo=equipo).order_by('-fecha_calibracion').first()
+
+    if latest_calibracion:
+        equipo.fecha_ultima_calibracion = latest_calibracion.fecha_calibracion
+    else:
+        equipo.fecha_ultima_calibracion = None
+    
+    if equipo.estado not in ['De Baja', 'Inactivo']:
+        equipo.calcular_proxima_calibracion()
+    else:
+        equipo.proxima_calibracion = None
+
+    equipo.save(update_fields=['fecha_ultima_calibracion', 'proxima_calibracion'])
 
 @receiver(post_save, sender=Mantenimiento)
 def update_equipo_mantenimiento_info(sender, instance, **kwargs):
-    """Actualiza la fecha del último y próximo mantenimiento del equipo al guardar un mantenimiento."""
     equipo = instance.equipo
     latest_mantenimiento = Mantenimiento.objects.filter(equipo=equipo).order_by('-fecha_mantenimiento').first()
 
@@ -766,7 +654,7 @@ def update_equipo_mantenimiento_info(sender, instance, **kwargs):
     else:
         equipo.fecha_ultimo_mantenimiento = None
 
-    if equipo.estado not in ['De Baja', 'Inactivo']: # Recalcular solo si está activo
+    if equipo.estado not in ['De Baja', 'Inactivo']:
         equipo.calcular_proximo_mantenimiento()
     else:
         equipo.proximo_mantenimiento = None
@@ -776,7 +664,6 @@ def update_equipo_mantenimiento_info(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=Mantenimiento)
 def update_equipo_mantenimiento_info_on_delete(sender, instance, **kwargs):
-    """Actualiza la fecha del último y próximo mantenimiento del equipo al eliminar un mantenimiento."""
     equipo = instance.equipo
     latest_mantenimiento = Mantenimiento.objects.filter(equipo=equipo).order_by('-fecha_mantenimiento').first()
 
@@ -785,7 +672,7 @@ def update_equipo_mantenimiento_info_on_delete(sender, instance, **kwargs):
     else:
         equipo.fecha_ultimo_mantenimiento = None
     
-    if equipo.estado not in ['De Baja', 'Inactivo']: # Recalcular solo si está activo
+    if equipo.estado not in ['De Baja', 'Inactivo']:
         equipo.calcular_proximo_mantenimiento()
     else:
         equipo.proximo_mantenimiento = None
@@ -795,7 +682,6 @@ def update_equipo_mantenimiento_info_on_delete(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Comprobacion)
 def update_equipo_comprobacion_info(sender, instance, **kwargs):
-    """Actualiza la fecha de la última y próxima comprobación del equipo al guardar una comprobación."""
     equipo = instance.equipo
     latest_comprobacion = Comprobacion.objects.filter(equipo=equipo).order_by('-fecha_comprobacion').first()
 
@@ -804,7 +690,7 @@ def update_equipo_comprobacion_info(sender, instance, **kwargs):
     else:
         equipo.fecha_ultima_comprobacion = None
     
-    if equipo.estado not in ['De Baja', 'Inactivo']: # Recalcular solo si está activo
+    if equipo.estado not in ['De Baja', 'Inactivo']:
         equipo.calcular_proxima_comprobacion()
     else:
         equipo.proxima_comprobacion = None
@@ -813,7 +699,6 @@ def update_equipo_comprobacion_info(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=Comprobacion)
 def update_equipo_comprobacion_info_on_delete(sender, instance, **kwargs):
-    """Actualiza la fecha de la última y próxima comprobación del equipo al eliminar una comprobación."""
     equipo = instance.equipo
     latest_comprobacion = Comprobacion.objects.filter(equipo=equipo).order_by('-fecha_comprobacion').first()
 
@@ -822,7 +707,7 @@ def update_equipo_comprobacion_info_on_delete(sender, instance, **kwargs):
     else:
         equipo.fecha_ultima_comprobacion = None
     
-    if equipo.estado not in ['De Baja', 'Inactivo']: # Recalcular solo si está activo
+    if equipo.estado not in ['De Baja', 'Inactivo']:
         equipo.calcular_proxima_comprobacion()
     else:
         equipo.proxima_comprobacion = None
@@ -832,12 +717,10 @@ def update_equipo_comprobacion_info_on_delete(sender, instance, **kwargs):
 
 @receiver(post_save, sender=BajaEquipo)
 def set_equipo_de_baja(sender, instance, created, **kwargs):
-    if created: # Solo actuar cuando se crea un nuevo registro de baja
+    if created:
         equipo = instance.equipo
-        # Si el equipo no está ya 'De Baja', se cambia el estado
         if equipo.estado != 'De Baja':
             equipo.estado = 'De Baja'
-            # Poner a None las próximas fechas si está de baja
             equipo.proxima_calibracion = None
             equipo.proximo_mantenimiento = None
             equipo.proxima_comprobacion = None
@@ -846,11 +729,9 @@ def set_equipo_de_baja(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=BajaEquipo)
 def set_equipo_activo_on_delete_baja(sender, instance, **kwargs):
     equipo = instance.equipo
-    # Solo cambiar a 'Activo' si NO quedan otros registros de baja para este equipo
     if not BajaEquipo.objects.filter(equipo=equipo).exists():
-        if equipo.estado == 'De Baja': # Solo cambiar si estaba en estado 'De Baja' por este registro
-            equipo.estado = 'Activo' # O el estado por defecto que desees
-            # Recalcular las próximas fechas después de reactivar
+        if equipo.estado == 'De Baja':
+            equipo.estado = 'Activo'
             equipo.calcular_proxima_calibracion()
             equipo.calcular_proximo_mantenimiento()
             equipo.calcular_proxima_comprobacion()
