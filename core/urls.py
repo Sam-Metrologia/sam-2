@@ -2,6 +2,7 @@
 
 from django.urls import path
 from . import views
+from . import views_debug  # Importar vistas de diagnóstico temporal
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
 app_name = 'core'
@@ -98,4 +99,8 @@ urlpatterns = [
 
     # Acceso Denegado
     path('access_denied/', views.access_denied, name='access_denied'),
+
+    # === VISTAS DE DIAGNÓSTICO TEMPORAL (ELIMINAR DESPUÉS DEL DEBUG) ===
+    path('debug/s3-diagnostics/', views_debug.s3_diagnostics, name='s3_diagnostics'),
+    path('debug/file-upload-test/', views_debug.file_upload_test, name='file_upload_test'),
 ]
