@@ -5,8 +5,9 @@ import os
 import re
 import uuid
 import mimetypes
-import magic
 from datetime import datetime
+
+# Sin dependencia de python-magic para mejor compatibilidad
 from pathlib import Path
 from django.core.exceptions import ValidationError
 from django.conf import settings
