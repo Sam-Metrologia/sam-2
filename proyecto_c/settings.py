@@ -344,7 +344,17 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     AWS_LOCATION = 'media'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
 
-    # Usar storage personalizado para archivos media
+    # Usar storage personalizado para archivos media (Django 5.2+ style)
+    STORAGES = {
+        "default": {
+            "BACKEND": "proyecto_c.storages.S3MediaStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "proyecto_c.storages.S3StaticStorage" if RENDER_EXTERNAL_HOSTNAME else "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+
+    # Backward compatibility
     DEFAULT_FILE_STORAGE = 'proyecto_c.storages.S3MediaStorage'
     
     # Para archivos estáticos, usar S3 solo en producción
@@ -363,7 +373,17 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     }
     
 else:
-    # Configuración local
+    # Configuración local (Django 5.2+ style)
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+
+    # Backward compatibility
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
