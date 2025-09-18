@@ -73,6 +73,7 @@ from django import forms
 
 from .services_new import file_upload_service, equipment_service, cache_manager
 from .security import StorageQuotaManager
+from .templatetags.file_tags import secure_file_url, pdf_image_url
 
 # Configurar logger
 import logging
@@ -434,19 +435,19 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         documento_baja_url = get_pdf_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
         for cal in calibraciones:
-            cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
-            cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
-            cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
+            cal.documento_calibracion_url = pdf_image_url(cal.documento_calibracion)
+            cal.confirmacion_metrologica_pdf_url = pdf_image_url(cal.confirmacion_metrologica_pdf)
+            cal.intervalos_calibracion_pdf_url = pdf_image_url(cal.intervalos_calibracion_pdf)
 
         for mant in mantenimientos:
-            mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
+            mant.documento_mantenimiento_url = pdf_image_url(mant.documento_mantenimiento)
         for comp in comprobaciones:
-            comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
+            comp.documento_comprobacion_url = pdf_image_url(comp.documento_comprobacion)
 
-        archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
-        ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
-        manual_pdf_url = get_file_url(equipo.manual_pdf)
-        otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
+        archivo_compra_pdf_url = pdf_image_url(equipo.archivo_compra_pdf)
+        ficha_tecnica_pdf_url = pdf_image_url(equipo.ficha_tecnica_pdf)
+        manual_pdf_url = pdf_image_url(equipo.manual_pdf)
+        otros_documentos_pdf_url = pdf_image_url(equipo.otros_documentos_pdf)
 
         context = {
             'equipo': equipo,
@@ -1972,26 +1973,26 @@ def detalle_equipo(request, pk):
                 print(f"DEBUG: Error al obtener URL para {file_field.name}: {e}")
         return None
 
-    # Archivos asociados
-    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa, "empresas_logos") if equipo.empresa and equipo.empresa.logo_empresa else None
-    imagen_equipo_url = get_file_url(equipo.imagen_equipo, "imagenes_equipos")
-    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
+    # Archivos asociados - usar template tags seguros
+    logo_empresa_url = secure_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+    imagen_equipo_url = secure_file_url(equipo.imagen_equipo)
+    documento_baja_url = pdf_image_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
     for cal in calibraciones:
-        cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
-        cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
-        cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
+        cal.documento_calibracion_url = pdf_image_url(cal.documento_calibracion)
+        cal.confirmacion_metrologica_pdf_url = pdf_image_url(cal.confirmacion_metrologica_pdf)
+        cal.intervalos_calibracion_pdf_url = pdf_image_url(cal.intervalos_calibracion_pdf)
 
     for mant in mantenimientos:
-        mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
+        mant.documento_mantenimiento_url = pdf_image_url(mant.documento_mantenimiento)
 
     for comp in comprobaciones:
-        comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
+        comp.documento_comprobacion_url = pdf_image_url(comp.documento_comprobacion)
 
-    archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
-    ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
-    manual_pdf_url = get_file_url(equipo.manual_pdf)
-    otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
+    archivo_compra_pdf_url = pdf_image_url(equipo.archivo_compra_pdf)
+    ficha_tecnica_pdf_url = pdf_image_url(equipo.ficha_tecnica_pdf)
+    manual_pdf_url = pdf_image_url(equipo.manual_pdf)
+    otros_documentos_pdf_url = pdf_image_url(equipo.otros_documentos_pdf)
 
     return render(request, 'core/detalle_equipo.html', {
         'equipo': equipo,
@@ -2401,7 +2402,7 @@ def detalle_mantenimiento(request, equipo_pk, pk):
                 print(f"DEBUG: Error al obtener URL para {file_field.name}: {e}")
         return None
 
-    documento_mantenimiento_url = get_file_url(mantenimiento.documento_mantenimiento)
+    documento_mantenimiento_url = pdf_image_url(mantenimiento.documento_mantenimiento)
 
     context = {
         'equipo': equipo,

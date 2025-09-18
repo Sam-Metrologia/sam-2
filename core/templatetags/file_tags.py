@@ -25,9 +25,13 @@ def secure_file_url(file_field, expire_seconds=3600):
 
             if 'S3' in storage_name or hasattr(default_storage, 'bucket'):
                 # Para S3 - generar URL firmada
-                return default_storage.url(file_field.name, expire=expire_seconds)
+                try:
+                    return default_storage.url(file_field.name, expire=expire_seconds)
+                except TypeError:
+                    # Fallback si el storage no soporta expire
+                    return default_storage.url(file_field.name)
             else:
-                # Para almacenamiento local - usar URL normal
+                # Para almacenamiento local - usar URL normal (no soporta expire)
                 return file_field.url if hasattr(file_field, 'url') else default_storage.url(file_field.name)
         return ''
     except Exception as e:
@@ -73,7 +77,11 @@ def pdf_image_url(file_field):
 
             if 'S3' in storage_name or hasattr(default_storage, 'bucket'):
                 # Para S3, usar URL con mayor tiempo de expiración para PDFs
-                url = default_storage.url(file_field.name, expire=7200)  # 2 horas
+                try:
+                    url = default_storage.url(file_field.name, expire=7200)  # 2 horas
+                except TypeError:
+                    # Fallback si el storage no soporta expire
+                    url = default_storage.url(file_field.name)
                 # Asegurar que sea URL absoluta
                 if url.startswith('//'):
                     url = 'https:' + url
