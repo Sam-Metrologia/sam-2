@@ -98,7 +98,8 @@ def s3_diagnostics(request):
                 'message': str(e)
             }
 
-    return JsonResponse(diagnostics, indent=2)
+    import json
+    return JsonResponse(diagnostics, json_dumps_params={'indent': 2})
 
 @staff_member_required
 def file_upload_test(request):

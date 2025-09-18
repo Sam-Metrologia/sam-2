@@ -312,10 +312,17 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # ==============================================================================
 
 # Obtiene las credenciales de AWS desde las variables de entorno
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '').strip()
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '').strip()
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '').strip()
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2').strip()
+
+# Debug: Imprimir estado de las variables AWS (temporal)
+print(f"DEBUG AWS CONFIG:")
+print(f"- AWS_ACCESS_KEY_ID: {'SET' if AWS_ACCESS_KEY_ID else 'NOT SET'}")
+print(f"- AWS_SECRET_ACCESS_KEY: {'SET' if AWS_SECRET_ACCESS_KEY else 'NOT SET'}")
+print(f"- AWS_STORAGE_BUCKET_NAME: {AWS_STORAGE_BUCKET_NAME}")
+print(f"- AWS_S3_REGION_NAME: {AWS_S3_REGION_NAME}")
 
 # Configuración S3 mejorada con seguridad
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
@@ -544,3 +551,4 @@ if DEBUG:
     }
 
 print(f"Configuración cargada - Debug: {DEBUG}, Host: {RENDER_EXTERNAL_HOSTNAME or 'local'}")
+print(f"Storage configurado: {globals().get('DEFAULT_FILE_STORAGE', 'NO CONFIGURADO')}")
