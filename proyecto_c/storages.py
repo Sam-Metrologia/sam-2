@@ -13,7 +13,7 @@ class S3MediaStorage(S3Boto3Storage):
     """
     bucket_name = settings.AWS_STORAGE_BUCKET_NAME
     location = settings.AWS_LOCATION if hasattr(settings, 'AWS_LOCATION') else 'media'
-    default_acl = 'private'  # Archivos privados por defecto
+    default_acl = None  # No usar ACL (bucket ACL disabled)
     file_overwrite = False
     custom_domain = False  # Usar URLs firmadas en lugar del dominio personalizado
 
@@ -46,7 +46,7 @@ class S3StaticStorage(S3Boto3Storage):
     """
     bucket_name = settings.AWS_STORAGE_BUCKET_NAME
     location = settings.AWS_STATIC_LOCATION if hasattr(settings, 'AWS_STATIC_LOCATION') else 'static'
-    default_acl = 'public-read'  # Archivos estáticos públicos
+    default_acl = None  # No usar ACL (bucket ACL disabled)
     file_overwrite = True
     querystring_auth = False
     custom_domain = getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)
