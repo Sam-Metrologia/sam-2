@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load file_tags %}
 
 {# Título para la pestaña del navegador #}
 {% block title %}Detalle del Equipo - {{ equipo.nombre }}{% endblock %}
@@ -112,10 +113,16 @@
                 <p><strong>Frecuencia Comprobación:</strong> {{ equipo.frecuencia_comprobacion_meses|default:"N/A" }} meses</p>
             </div>
 
-            {% if equipo.imagen_equipo %}
+            {% equipo_imagen_url equipo as imagen_url %}
+            {% if imagen_url %}
             <div class="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
                 <h2 class="text-xl font-semibold text-gray-800 mb-3">Imagen del Equipo</h2>
-                <img src="{{ equipo.imagen_equipo.url }}" alt="Imagen de {{ equipo.nombre }}" class="max-w-full h-auto rounded-md shadow-md mx-auto">
+                <img src="{{ imagen_url }}" alt="Imagen de {{ equipo.nombre }}" class="max-w-full h-auto rounded-md shadow-md mx-auto"
+                     loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="bg-gray-200 p-8 rounded-md text-center text-gray-500 mx-auto" style="display: none; max-width: 300px;">
+                    <i class="fas fa-tools text-3xl mb-3"></i>
+                    <p class="text-sm">Imagen del equipo no disponible</p>
+                </div>
             </div>
             {% endif %}
 

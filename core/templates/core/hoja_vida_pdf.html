@@ -1,3 +1,4 @@
+{% load file_tags %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -151,7 +152,8 @@
     <table class="header-table">
         <tr>
             <td class="header-logo-cell">
-                {% if logo_empresa_url %}<img src="{{ logo_empresa_url }}" class="header-logo" alt="Logo Empresa">{% endif %}
+                {% pdf_image_url empresa.logo_empresa as pdf_logo_url %}
+                {% if pdf_logo_url %}<img src="{{ pdf_logo_url }}" class="header-logo" alt="Logo Empresa">{% endif %}
             </td>
             <td class="header-title-cell">
                 HOJA DE VIDA DE EQUIPOS
@@ -268,8 +270,9 @@
 
     <h2 class="section-title">Imagen del Equipo</h2>
     <div class="equipment-image-container">
-        {% if imagen_equipo_url %}
-            <img src="{{ imagen_equipo_url }}" class="equipment-image" alt="Imagen del Equipo">
+        {% pdf_image_url equipo.imagen_equipo as pdf_imagen_url %}
+        {% if pdf_imagen_url %}
+            <img src="{{ pdf_imagen_url }}" class="equipment-image" alt="Imagen del Equipo">
         {% else %}
             <p class="no-records">Sin imagen disponible.</p>
         {% endif %}

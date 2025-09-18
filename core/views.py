@@ -67,6 +67,52 @@ from storages.backends.s3boto3 import S3Boto3Storage
 # Importar el módulo forms de Django para las excepciones
 from django import forms
 
+# =============================================================================
+# IMPORTAR SERVICIOS MEJORADOS Y UTILIDADES DE SEGURIDAD
+# =============================================================================
+
+from .services_new import file_upload_service, equipment_service, cache_manager
+from .security import StorageQuotaManager
+
+# Configurar logger
+import logging
+logger = logging.getLogger('core')
+
+# =============================================================================
+# UTILIDADES MEJORADAS PARA GESTIÓN DE ARCHIVOS E IMÁGENES
+# =============================================================================
+
+def get_secure_file_url(file_field, expire_seconds=3600):
+    """Obtiene URL segura para archivos, manejando tanto local como S3"""
+    if not file_field:
+        return None
+
+    try:
+        # Si es un campo de archivo de Django
+        if hasattr(file_field, 'url'):
+            if hasattr(default_storage, 'url'):
+                # Para S3 o storage personalizado
+                return default_storage.url(file_field.name, expire=expire_seconds)
+            else:
+                # Para almacenamiento local
+                return file_field.url
+        return None
+    except Exception as e:
+        logger.error(f"Error obteniendo URL de archivo: {str(e)}")
+        return None
+
+def get_empresa_logo_url(empresa, expire_seconds=3600):
+    """Obtiene URL del logo de empresa de forma segura"""
+    if not empresa or not empresa.logo_empresa:
+        return None
+    return get_secure_file_url(empresa.logo_empresa, expire_seconds)
+
+def get_equipo_imagen_url(equipo, expire_seconds=3600):
+    """Obtiene URL de imagen de equipo de forma segura"""
+    if not equipo or not equipo.imagen_equipo:
+        return None
+    return get_secure_file_url(equipo.imagen_equipo, expire_seconds)
+
 
 # =============================================================================
 # Decoradores personalizados
@@ -342,66 +388,95 @@ def _generate_pdf_content(request, template_path, context):
 
 def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     """
-    Generates the PDF content for an equipment's "Hoja de Vida".
+    Genera el contenido PDF para la "Hoja de Vida" de un equipo con URLs seguras.
     """
-    calibraciones = equipo.calibraciones.all().order_by('-fecha_calibracion')
-    mantenimientos = equipo.mantenimientos.all().order_by('-fecha_mantenimiento')
-    comprobaciones = equipo.comprobaciones.all().order_by('-fecha_comprobacion')
-    baja_registro = None
     try:
-        baja_registro = equipo.baja_registro
-    except BajaEquipo.DoesNotExist:
-        pass
+        # Optimizar consultas con select_related y prefetch_related
+        calibraciones = equipo.calibraciones.select_related('proveedor').order_by('-fecha_calibracion')
+        mantenimientos = equipo.mantenimientos.select_related('proveedor').order_by('-fecha_mantenimiento')
+        comprobaciones = equipo.comprobaciones.select_related('proveedor').order_by('-fecha_comprobacion')
 
-    # Utilizar default_storage para acceder a las URLs de los archivos
-    # Helper para obtener URL segura desde default_storage
-    def get_file_url(file_field):
-        # Asegúrate de que el campo de archivo no sea None y que tenga un nombre de archivo
-        if file_field and file_field.name:
+        baja_registro = None
+        try:
+            baja_registro = equipo.baja_registro
+        except BajaEquipo.DoesNotExist:
+            pass
+
+        # Función helper mejorada para obtener URLs de archivos para PDF
+        def get_pdf_file_url(file_field):
+            """Obtiene URL absoluta para archivos en PDF"""
+            if not file_field or not file_field.name:
+                return None
+
             try:
-                if default_storage.exists(file_field.name):
+                if hasattr(default_storage, 'url'):
+                    # Para S3, usar URL con mayor tiempo de expiración para PDFs
+                    url = default_storage.url(file_field.name, expire=7200)  # 2 horas
+
+                    # Asegurar que sea URL absoluta
+                    if url.startswith('//'):
+                        url = 'https:' + url
+                    elif url.startswith('/'):
+                        # Para URLs locales, construir URL absoluta
+                        url = request.build_absolute_uri(url)
+
+                    return url
+                else:
+                    # Para almacenamiento local
                     return request.build_absolute_uri(file_field.url)
             except Exception as e:
-                print(f"DEBUG: Error checking existence or getting URL for {file_field.name}: {e}")
-        return None
+                logger.error(f"Error obteniendo URL para PDF: {file_field.name}, error: {str(e)}")
+                return None
 
-    # Obtener URLs de los archivos para pasarlos al contexto
-    logo_empresa_url = get_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
-    imagen_equipo_url = get_file_url(equipo.imagen_equipo)
-    documento_baja_url = get_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
+        # Obtener URLs de archivos con el nuevo sistema seguro
+        logo_empresa_url = get_empresa_logo_url(equipo.empresa, expire_seconds=7200) if equipo.empresa else None
+        imagen_equipo_url = get_equipo_imagen_url(equipo, expire_seconds=7200)
+        documento_baja_url = get_pdf_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
-    for cal in calibraciones:
-        cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
-        cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
-        cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
+        for cal in calibraciones:
+            cal.documento_calibracion_url = get_file_url(cal.documento_calibracion)
+            cal.confirmacion_metrologica_pdf_url = get_file_url(cal.confirmacion_metrologica_pdf)
+            cal.intervalos_calibracion_pdf_url = get_file_url(cal.intervalos_calibracion_pdf)
 
-    for mant in mantenimientos:
-        mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
-    for comp in comprobaciones:
-        comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
+        for mant in mantenimientos:
+            mant.documento_mantenimiento_url = get_file_url(mant.documento_mantenimiento)
+        for comp in comprobaciones:
+            comp.documento_comprobacion_url = get_file_url(comp.documento_comprobacion)
 
-    archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
-    ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
-    manual_pdf_url = get_file_url(equipo.manual_pdf)
-    otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
+        archivo_compra_pdf_url = get_file_url(equipo.archivo_compra_pdf)
+        ficha_tecnica_pdf_url = get_file_url(equipo.ficha_tecnica_pdf)
+        manual_pdf_url = get_file_url(equipo.manual_pdf)
+        otros_documentos_pdf_url = get_file_url(equipo.otros_documentos_pdf)
 
+        context = {
+            'equipo': equipo,
+            'calibraciones': calibraciones,
+            'mantenimientos': mantenimientos,
+            'comprobaciones': comprobaciones,
+            'baja_registro': baja_registro,
+            'logo_empresa_url': logo_empresa_url,
+            'imagen_equipo_url': imagen_equipo_url,
+            'documento_baja_url': documento_baja_url,
+            'archivo_compra_pdf_url': archivo_compra_pdf_url,
+            'ficha_tecnica_pdf_url': ficha_tecnica_pdf_url,
+            'manual_pdf_url': manual_pdf_url,
+            'otros_documentos_pdf_url': otros_documentos_pdf_url,
+            'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
+        }
+        return _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
 
-    context = {
-        'equipo': equipo,
-        'calibraciones': calibraciones,
-        'mantenimientos': mantenimientos,
-        'comprobaciones': comprobaciones,
-        'baja_registro': baja_registro,
-        'logo_empresa_url': logo_empresa_url,
-        'imagen_equipo_url': imagen_equipo_url,
-        'documento_baja_url': documento_baja_url,
-        'archivo_compra_pdf_url': archivo_compra_pdf_url,
-        'ficha_tecnica_pdf_url': ficha_tecnica_pdf_url,
-        'manual_pdf_url': manual_pdf_url,
-        'otros_documentos_pdf_url': otros_documentos_pdf_url,
-        'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
-    }
-    return _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
+    except Exception as e:
+        logger.error(f"Error generando contenido PDF para hoja de vida del equipo {equipo.codigo_interno}: {str(e)}")
+        # Return minimal context in case of error
+        context = {
+            'equipo': equipo,
+            'calibraciones': [],
+            'mantenimientos': [],
+            'comprobaciones': [],
+            'baja_registro': None,
+            'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
+        }
+        return _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
 
 
 # --- Funciones Auxiliares para Generación de Excel ---
@@ -870,7 +945,7 @@ def perfil_usuario(request):
 # Vistas de Dashboard y Estadísticas
 # =============================================================================
 
-@access_check # APLICAR ESTE DECORADOR
+@access_check
 @login_required
 def dashboard(request):
     """
@@ -2642,15 +2717,8 @@ def listar_empresas(request):
             Q(email__icontains=query)
         )
 
-    # CAMBIO: Calcular fecha_fin_plan_display para cada empresa
-    today = timezone.localdate()
-    for empresa in empresas_list:
-        empresa.fecha_fin_plan_display = empresa.get_fecha_fin_plan()
-        # Lógica para el estado visual de la fecha
-        if empresa.fecha_fin_plan_display and empresa.fecha_fin_plan_display < today:
-            empresa.fecha_fin_plan_status = 'text-red-600 font-bold'
-        else:
-            empresa.fecha_fin_plan_status = 'text-gray-900'
+    # Las propiedades fecha_fin_plan_display y fecha_fin_plan_status
+    # ya están implementadas como @property en el modelo Empresa
 
 
     paginator = Paginator(empresas_list, 10)

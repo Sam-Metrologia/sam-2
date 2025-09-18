@@ -1,0 +1,21 @@
+{% comment %}
+Template snippet para mostrar imágenes de forma segura con fallback
+{% endcomment %}
+
+{% if has_image and image_url %}
+    <img src="{{ image_url }}"
+         alt="{{ alt_text }}"
+         class="{{ css_class }}"
+         style="max-width: {{ max_width }}; height: auto;"
+         loading="lazy"
+         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+    <div class="image-fallback bg-gray-200 p-4 rounded text-center text-gray-500" style="display: none; max-width: {{ max_width }};">
+        <i class="fas fa-image text-2xl mb-2"></i>
+        <p class="text-sm">Imagen no disponible</p>
+    </div>
+{% else %}
+    <div class="image-placeholder bg-gray-200 p-4 rounded text-center text-gray-500" style="max-width: {{ max_width }};">
+        <i class="fas fa-image text-2xl mb-2"></i>
+        <p class="text-sm">Sin imagen</p>
+    </div>
+{% endif %}

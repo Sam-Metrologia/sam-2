@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load file_tags %}
 
 {% block title %}Editar Empresa: {{ empresa.nombre }}{% endblock %}
 {% block page_title %}Editar Empresa: {{ empresa.nombre }}{% endblock %}
@@ -34,10 +35,18 @@
                 {% endfor %}
 
                 {# Mostrar logo actual si existe #}
-                {% if field.name == 'logo_empresa' and empresa.logo_empresa %}
-                    <p class="text-sm text-gray-500 mt-1">Logo actual:</p>
-                    <img src="{{ empresa.logo_empresa.url }}" alt="Logo de {{ empresa.nombre }}" class="mt-2 max-w-xs h-auto rounded-md shadow-sm">
-                    <p class="text-sm text-gray-500 mt-1"><a href="{{ empresa.logo_empresa.url }}" target="_blank" class="text-blue-500 hover:underline">Ver Logo Original</a></p>
+                {% if field.name == 'logo_empresa' %}
+                    {% empresa_logo_url empresa as logo_url %}
+                    {% if logo_url %}
+                        <p class="text-sm text-gray-500 mt-1">Logo actual:</p>
+                        <img src="{{ logo_url }}" alt="Logo de {{ empresa.nombre }}" class="mt-2 max-w-xs h-auto rounded-md shadow-sm"
+                             loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="mt-2 max-w-xs bg-gray-200 p-4 rounded-md text-center text-gray-500" style="display: none;">
+                            <i class="fas fa-building text-2xl mb-2"></i>
+                            <p class="text-sm">Logo no disponible</p>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1"><a href="{{ logo_url }}" target="_blank" class="text-blue-500 hover:underline">Ver Logo Original</a></p>
+                    {% endif %}
                 {% endif %}
             </div>
         {% endfor %}

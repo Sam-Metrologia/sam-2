@@ -63,6 +63,13 @@ class Empresa(models.Model):
     # Campo para el límite de equipos (ahora el único y principal)
     limite_equipos_empresa = models.IntegerField(default=5, verbose_name="Límite Máximo de Equipos")
     duracion_suscripcion_meses = models.IntegerField(default=12, blank=True, null=True, verbose_name="Duración Suscripción (meses)")
+
+    # Campos para límites de almacenamiento
+    limite_almacenamiento_mb = models.IntegerField(
+        default=1024,  # 1GB por defecto
+        verbose_name="Límite de Almacenamiento (MB)",
+        help_text="Límite máximo de almacenamiento en megabytes para archivos de la empresa"
+    )
     
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
@@ -125,6 +132,39 @@ class Empresa(models.Model):
         elif self.fecha_inicio_plan and self.duracion_suscripcion_meses:
             return self.fecha_inicio_plan + relativedelta(months=self.duracion_suscripcion_meses)
         return None # No hay fecha de fin si no hay plan ni prueba
+
+    @property
+    def fecha_fin_plan_display(self):
+        """Devuelve la fecha de fin del plan para mostrar en templates."""
+        return self.get_fecha_fin_plan()
+
+    @property
+    def fecha_fin_plan_status(self):
+        """
+        Devuelve el CSS class basado en el estado de la fecha de fin del plan.
+        - Verde: falta más de 1 mes
+        - Amarillo: faltan 15 días o menos
+        - Rojo: plan vencido
+        """
+        fecha_fin = self.get_fecha_fin_plan()
+        if not fecha_fin:
+            return 'text-gray-500'  # Sin plan definido
+
+        current_date = timezone.localdate()
+        dias_restantes = (fecha_fin - current_date).days
+
+        if dias_restantes < 0:
+            # Plan vencido
+            return 'text-red-600 font-bold bg-red-100 px-2 py-1 rounded'
+        elif dias_restantes <= 15:
+            # Faltan 15 días o menos
+            return 'text-yellow-600 font-bold bg-yellow-100 px-2 py-1 rounded'
+        elif dias_restantes <= 30:
+            # Falta 1 mes o menos
+            return 'text-green-600 font-bold bg-green-100 px-2 py-1 rounded'
+        else:
+            # Falta más de 1 mes
+            return 'text-green-700'
 
 
 class PlanSuscripcion(models.Model):
@@ -459,21 +499,30 @@ class Equipo(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Sobreescribe save para calcular las próximas fechas antes de guardar
-        y para asegurar que solo se llame a super().save() una vez.
+        Sobreescribe save para calcular las próximas fechas.
+        Para equipos nuevos, primero se guarda y luego se calculan las fechas.
         """
         is_new = self.pk is None
-        
-        # Calcular las próximas fechas ANTES de guardar, para que estén disponibles en el primer save
-        # y para que los signals no tengan que recalcular desde cero.
-        self.calcular_proxima_calibracion()
-        self.calcular_proximo_mantenimiento()
-        self.calcular_proxima_comprobacion()
 
-        # Llamar al método save original.
-        # Los signals post_save se encargarán de guardar de nuevo con update_fields
-        # si se actualizan las fechas de última actividad.
+        # Primero guardar el objeto
         super().save(*args, **kwargs)
+
+        # Después calcular las próximas fechas (solo si el objeto ya tiene pk)
+        if self.pk:
+            # Inicializar fechas si es nuevo equipo
+            if is_new:
+                # Para equipos nuevos, usar las fechas proporcionadas como base
+                self.calcular_proxima_calibracion_from_date(self.fecha_ultima_calibracion)
+                self.calcular_proximo_mantenimiento_from_date(self.fecha_ultimo_mantenimiento)
+                self.calcular_proxima_comprobacion_from_date(self.fecha_ultima_comprobacion)
+            else:
+                # Para equipos existentes, usar el historial
+                self.calcular_proxima_calibracion()
+                self.calcular_proximo_mantenimiento()
+                self.calcular_proxima_comprobacion()
+
+            # Guardar nuevamente solo las fechas calculadas
+            super().save(update_fields=['proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion'])
 
 
     def calcular_proxima_calibracion(self):
@@ -547,6 +596,72 @@ class Equipo(models.Model):
                 self.proxima_comprobacion = base_date + relativedelta(months=freq)
             else:
                 self.proxima_comprobacion = None
+
+    def calcular_proxima_calibracion_from_date(self, fecha_base):
+        """Calcula la próxima fecha de calibración desde una fecha base específica."""
+        if self.estado in ['De Baja', 'Inactivo']:
+            self.proxima_calibracion = None
+            return
+
+        if self.frecuencia_calibracion_meses is None or self.frecuencia_calibracion_meses <= 0:
+            self.proxima_calibracion = None
+            return
+
+        if fecha_base:
+            freq = int(self.frecuencia_calibracion_meses)
+            self.proxima_calibracion = fecha_base + relativedelta(months=freq)
+        elif self.fecha_adquisicion:
+            freq = int(self.frecuencia_calibracion_meses)
+            self.proxima_calibracion = self.fecha_adquisicion + relativedelta(months=freq)
+        elif self.fecha_registro:
+            freq = int(self.frecuencia_calibracion_meses)
+            self.proxima_calibracion = self.fecha_registro.date() + relativedelta(months=freq)
+        else:
+            self.proxima_calibracion = None
+
+    def calcular_proximo_mantenimiento_from_date(self, fecha_base):
+        """Calcula la próxima fecha de mantenimiento desde una fecha base específica."""
+        if self.estado in ['De Baja', 'Inactivo']:
+            self.proximo_mantenimiento = None
+            return
+
+        if self.frecuencia_mantenimiento_meses is None or self.frecuencia_mantenimiento_meses <= 0:
+            self.proximo_mantenimiento = None
+            return
+
+        if fecha_base:
+            freq = int(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = fecha_base + relativedelta(months=freq)
+        elif self.fecha_adquisicion:
+            freq = int(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = self.fecha_adquisicion + relativedelta(months=freq)
+        elif self.fecha_registro:
+            freq = int(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = self.fecha_registro.date() + relativedelta(months=freq)
+        else:
+            self.proximo_mantenimiento = None
+
+    def calcular_proxima_comprobacion_from_date(self, fecha_base):
+        """Calcula la próxima fecha de comprobación desde una fecha base específica."""
+        if self.estado in ['De Baja', 'Inactivo']:
+            self.proxima_comprobacion = None
+            return
+
+        if self.frecuencia_comprobacion_meses is None or self.frecuencia_comprobacion_meses <= 0:
+            self.proxima_comprobacion = None
+            return
+
+        if fecha_base:
+            freq = int(self.frecuencia_comprobacion_meses)
+            self.proxima_comprobacion = fecha_base + relativedelta(months=freq)
+        elif self.fecha_adquisicion:
+            freq = int(self.frecuencia_comprobacion_meses)
+            self.proxima_comprobacion = self.fecha_adquisicion + relativedelta(months=freq)
+        elif self.fecha_registro:
+            freq = int(self.frecuencia_comprobacion_meses)
+            self.proxima_comprobacion = self.fecha_registro.date() + relativedelta(months=freq)
+        else:
+            self.proxima_comprobacion = None
 
 
 class Calibracion(models.Model):
@@ -675,6 +790,11 @@ class Documento(models.Model):
     descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
     # Este campo almacenará la ruta relativa o clave del objeto en S3
     archivo_s3_path = models.CharField(max_length=500, blank=True, null=True, verbose_name="Ruta en S3")
+
+    # Campos para control de almacenamiento
+    tamaño_archivo = models.BigIntegerField(default=0, verbose_name="Tamaño del Archivo (bytes)")
+    tipo_mime = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tipo MIME")
+    checksum_md5 = models.CharField(max_length=32, blank=True, null=True, verbose_name="Checksum MD5")
     subido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

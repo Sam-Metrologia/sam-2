@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load file_tags %}
 
 {% block extra_head %}
 <style>
@@ -45,10 +46,16 @@
             <p class="mb-2"><strong>Teléfono:</strong> {{ empresa.telefono|default:"N/A" }}</p>
             <p class="mb-2"><strong>Email:</strong> {{ empresa.email|default:"N/A" }}</p>
             <p class="mb-2"><strong>Fecha de Registro:</strong> {{ empresa.fecha_registro|date:"d/m/Y H:i" }}</p>
-            {% if empresa.logo_empresa %}
+            {% empresa_logo_url empresa as logo_url %}
+            {% if logo_url %}
                 <div class="mt-4">
                     <strong>Logo:</strong>
-                    <img src="{{ empresa.logo_empresa.url }}" alt="Logo de {{ empresa.nombre }}" class="mt-2 max-w-xs h-auto rounded-md shadow-md">
+                    <img src="{{ logo_url }}" alt="Logo de {{ empresa.nombre }}" class="mt-2 max-w-xs h-auto rounded-md shadow-md"
+                         loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="mt-2 max-w-xs bg-gray-200 p-4 rounded-md text-center text-gray-500" style="display: none;">
+                        <i class="fas fa-building text-2xl mb-2"></i>
+                        <p class="text-sm">Logo no disponible</p>
+                    </div>
                 </div>
             {% endif %}
         </div>
