@@ -98,7 +98,7 @@ if DATABASE_URL:
     DATABASES['default']['OPTIONS'] = {
         'sslmode': 'require',
         'connect_timeout': 10,
-        'options': '-c default_transaction_isolation=read_committed'
+        'options': '-c default_transaction_isolation="read committed"'
     }
     # Pool de conexiones para mejor performance
     DATABASES['default']['CONN_MAX_AGE'] = 600  # 10 minutos
