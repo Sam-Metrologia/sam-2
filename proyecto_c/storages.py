@@ -26,13 +26,23 @@ class S3MediaStorage(S3Boto3Storage):
         Genera URLs firmadas para acceso seguro a archivos privados
         """
         try:
+            # Asegurar que la key incluya el location prefix
+            if not name.startswith(self.location + '/'):
+                # Si no incluye el prefix, agregarlo
+                full_key = f"{self.location}/{name}"
+            else:
+                # Ya incluye el prefix
+                full_key = name
+
+            logger.info(f"Generating URL for key: {full_key}")
+
             # Para archivos privados, generar URL firmada
             url = self.connection.meta.client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': self.bucket_name, 'Key': name},
+                Params={'Bucket': self.bucket_name, 'Key': full_key},
                 ExpiresIn=expire
             )
-            logger.debug(f"Generated presigned URL for {name}: {url[:50]}...")
+            logger.debug(f"Generated presigned URL for {full_key}: {url[:100]}...")
             return url
         except Exception as e:
             logger.error(f"Error generating presigned URL for {name}: {str(e)}")
