@@ -1757,6 +1757,19 @@ def añadir_equipo(request):
 
             except forms.ValidationError as e:
                 messages.error(request, str(e))
+            except Exception as e:
+                print(f"DEBUG: Error general al guardar equipo: {str(e)}")
+                messages.error(request, f'Error al guardar el equipo: {str(e)}')
+        else:
+            # Mostrar errores del formulario
+            print(f"DEBUG: Errores del formulario: {form.errors}")
+            print(f"DEBUG: Errores no de campo: {form.non_field_errors()}")
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+            if form.non_field_errors():
+                for error in form.non_field_errors():
+                    messages.error(request, str(error))
 
     else:
         form = EquipoForm(request=request)
