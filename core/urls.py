@@ -84,7 +84,10 @@ urlpatterns = [
     path('usuarios/<int:pk>/eliminar/', views.eliminar_usuario, name='eliminar_usuario'),
     path('usuarios/<int:pk>/', views.detalle_usuario, name='detalle_usuario'),
     path('usuarios/<int:pk>/cambiar_password/', views.change_user_password, name='change_user_password'),
+    # URL de redirección temporal para compatibilidad con URLs antiguas
+    path('usuarios/<int:pk>/password/', views.redirect_to_change_password, name='redirect_to_change_password'),
     path('usuarios/toggle_active/', views.toggle_user_active_status, name='toggle_user_active_status'), # <--- AÑADIR ESTA LÍNEA
+    path('usuarios/toggle_download_permission/', views.toggle_download_permission, name='toggle_download_permission'),
 
     # Informes
     path('informes/', views.informes, name='informes'),

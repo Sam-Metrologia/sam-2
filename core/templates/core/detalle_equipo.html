@@ -177,10 +177,10 @@
                     <p class="font-semibold">Observaciones Adicionales:</p>
                     <p>{{ baja_registro.observaciones|default:"N/A" }}</p>
                 </div>
-                {% if baja_registro.documento_baja %}
+                {% if documento_baja_url %}
                 <div class="md:col-span-2">
                     <p class="font-semibold">Documento de Baja:</p>
-                    <a href="{{ baja_registro.documento_baja.url }}" target="_blank" class="text-blue-600 hover:underline flex items-center">
+                    <a href="{{ documento_baja_url }}" target="_blank" class="text-blue-600 hover:underline flex items-center">
                         <i class="fas fa-file-pdf mr-2"></i> Ver Documento de Baja
                     </a>
                 </div>

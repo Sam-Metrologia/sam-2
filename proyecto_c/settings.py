@@ -14,11 +14,9 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'un_valor_por_defecto_muy_largo_y_alea
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 
 # DEBUG se activa si no hay RENDER_EXTERNAL_HOSTNAME, o si DEBUG_VALUE es 'True'
-# Temporal: Forzar DEBUG = True para diagnóstico de errores 500
-DEBUG = True
-# DEBUG = os.environ.get('DEBUG_VALUE', 'False') == 'True'
-# if not RENDER_EXTERNAL_HOSTNAME:
-#     DEBUG = True
+DEBUG = os.environ.get('DEBUG_VALUE', 'False') == 'True'
+if not RENDER_EXTERNAL_HOSTNAME:
+    DEBUG = True
 
 ALLOWED_HOSTS = []
 

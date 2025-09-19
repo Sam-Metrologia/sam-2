@@ -58,7 +58,7 @@ from .models import (
 # Importar para autenticación y grupos
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
-from django.contrib.auth.models import Group # Importar el modelo Group
+from django.contrib.auth.models import Group, Permission # Importar los modelos Group y Permission
 from django.core.exceptions import ValidationError
 
 # Importar para default_storage (manejo de archivos S3/local)
@@ -410,44 +410,52 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
                 return None
 
             try:
-                if hasattr(default_storage, 'url'):
+                storage_name = default_storage.__class__.__name__
+
+                if 'S3' in storage_name or hasattr(default_storage, 'bucket'):
                     # Para S3, usar URL con mayor tiempo de expiración para PDFs
-                    url = default_storage.url(file_field.name, expire=7200)  # 2 horas
+                    try:
+                        url = default_storage.url(file_field.name, expire=7200)  # 2 horas
+                    except TypeError:
+                        # Fallback si el storage no soporta expire
+                        url = default_storage.url(file_field.name)
 
                     # Asegurar que sea URL absoluta
                     if url.startswith('//'):
                         url = 'https:' + url
-                    elif url.startswith('/'):
-                        # Para URLs locales, construir URL absoluta
-                        url = request.build_absolute_uri(url)
 
                     return url
                 else:
-                    # Para almacenamiento local
-                    return request.build_absolute_uri(file_field.url)
+                    # Para almacenamiento local (FileSystemStorage)
+                    url = default_storage.url(file_field.name)
+                    # Convertir a URL absoluta
+                    if url.startswith('/'):
+                        url = request.build_absolute_uri(url)
+
+                    return url
             except Exception as e:
                 logger.error(f"Error obteniendo URL para PDF: {file_field.name}, error: {str(e)}")
                 return None
 
         # Obtener URLs de archivos con el nuevo sistema seguro
-        logo_empresa_url = get_empresa_logo_url(equipo.empresa, expire_seconds=7200) if equipo.empresa else None
-        imagen_equipo_url = get_equipo_imagen_url(equipo, expire_seconds=7200)
+        logo_empresa_url = get_pdf_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+        imagen_equipo_url = get_pdf_file_url(equipo.imagen_equipo) if equipo.imagen_equipo else None
         documento_baja_url = get_pdf_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
         for cal in calibraciones:
-            cal.documento_calibracion_url = pdf_image_url(cal.documento_calibracion)
-            cal.confirmacion_metrologica_pdf_url = pdf_image_url(cal.confirmacion_metrologica_pdf)
-            cal.intervalos_calibracion_pdf_url = pdf_image_url(cal.intervalos_calibracion_pdf)
+            cal.documento_calibracion_url = get_pdf_file_url(cal.documento_calibracion)
+            cal.confirmacion_metrologica_pdf_url = get_pdf_file_url(cal.confirmacion_metrologica_pdf)
+            cal.intervalos_calibracion_pdf_url = get_pdf_file_url(cal.intervalos_calibracion_pdf)
 
         for mant in mantenimientos:
-            mant.documento_mantenimiento_url = pdf_image_url(mant.documento_mantenimiento)
+            mant.documento_mantenimiento_url = get_pdf_file_url(mant.documento_mantenimiento)
         for comp in comprobaciones:
-            comp.documento_comprobacion_url = pdf_image_url(comp.documento_comprobacion)
+            comp.documento_comprobacion_url = get_pdf_file_url(comp.documento_comprobacion)
 
-        archivo_compra_pdf_url = pdf_image_url(equipo.archivo_compra_pdf)
-        ficha_tecnica_pdf_url = pdf_image_url(equipo.ficha_tecnica_pdf)
-        manual_pdf_url = pdf_image_url(equipo.manual_pdf)
-        otros_documentos_pdf_url = pdf_image_url(equipo.otros_documentos_pdf)
+        archivo_compra_pdf_url = get_pdf_file_url(equipo.archivo_compra_pdf)
+        ficha_tecnica_pdf_url = get_pdf_file_url(equipo.ficha_tecnica_pdf)
+        manual_pdf_url = get_pdf_file_url(equipo.manual_pdf)
+        otros_documentos_pdf_url = get_pdf_file_url(equipo.otros_documentos_pdf)
 
         context = {
             'equipo': equipo,
@@ -3366,6 +3374,13 @@ def listar_usuarios(request):
     except EmptyPage:
         usuarios = paginator.page(paginator.num_pages)
 
+    # Agregar información de permisos de exportación a cada usuario
+    for user_obj in usuarios:
+        user_obj.has_export_permission = user_obj.user_permissions.filter(
+            codename='can_export_reports',
+            content_type__app_label='core'
+        ).exists()
+
     return render(request, 'core/listar_usuarios.html', {'usuarios': usuarios, 'query': query, 'titulo_pagina': 'Listado de Usuarios'})
 
 
@@ -4134,6 +4149,63 @@ def toggle_user_active_status(request):
     except Exception as e:
         print(f"DEBUG: Error al alternar estado de usuario: {e}")
         return JsonResponse({'status': 'error', 'message': f'Error interno del servidor: {str(e)}'}, status=500)
+
+@access_check
+@login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
+@require_POST
+@csrf_exempt
+def toggle_download_permission(request):
+    """
+    Grants or revokes download permissions for a user via AJAX POST.
+    Expected JSON: {'user_id': <id>, 'grant_permission': <true/false>}.
+    Only superusers can manage permissions.
+    """
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        grant_permission = data.get('grant_permission')
+
+        if user_id is None or grant_permission is None:
+            return JsonResponse({'status': 'error', 'message': 'ID de usuario o estado de permiso no proporcionado.'}, status=400)
+
+        user_to_modify = get_object_or_404(CustomUser, pk=user_id)
+
+        # Get the export permission
+        export_permission = Permission.objects.get(codename='can_export_reports', content_type__app_label='core')
+
+        if grant_permission:
+            # Grant permission
+            user_to_modify.user_permissions.add(export_permission)
+            action_message = f'Permiso de descarga otorgado a {user_to_modify.username}'
+        else:
+            # Revoke permission
+            user_to_modify.user_permissions.remove(export_permission)
+            action_message = f'Permiso de descarga revocado para {user_to_modify.username}'
+
+        return JsonResponse({
+            'status': 'success',
+            'message': action_message
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Formato JSON inválido.'}, status=400)
+    except CustomUser.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Usuario no encontrado.'}, status=404)
+    except Permission.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Permiso no encontrado.'}, status=404)
+    except Exception as e:
+        print(f"DEBUG: Error al alternar permisos de descarga: {e}")
+        return JsonResponse({'status': 'error', 'message': f'Error interno del servidor: {str(e)}'}, status=500)
+
+@access_check
+@login_required
+def redirect_to_change_password(request, pk):
+    """
+    Redirección temporal para URLs antiguas de cambio de contraseña.
+    Redirige /usuarios/<pk>/password/ a /usuarios/<pk>/cambiar_password/
+    """
+    return redirect('core:change_user_password', pk=pk)
 
 @access_check # APLICAR ESTE DECORADOR
 @require_POST

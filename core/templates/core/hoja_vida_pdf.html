@@ -152,8 +152,7 @@
     <table class="header-table">
         <tr>
             <td class="header-logo-cell">
-                {% pdf_image_url empresa.logo_empresa as pdf_logo_url %}
-                {% if pdf_logo_url %}<img src="{{ pdf_logo_url }}" class="header-logo" alt="Logo Empresa">{% endif %}
+                {% if logo_empresa_url %}<img src="{{ logo_empresa_url }}" class="header-logo" alt="Logo Empresa">{% endif %}
             </td>
             <td class="header-title-cell">
                 HOJA DE VIDA DE EQUIPOS
@@ -268,11 +267,29 @@
     </table>
     {% else %}<p class="no-records">No hay comprobaciones registradas.</p>{% endif %}
 
+    <h2 class="section-title">Información de Baja</h2>
+    {% if baja_registro %}
+    <table>
+        <tr>
+            <td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"d/m/Y"|default:"N/A" }}</td>
+            <td><strong>Dado de Baja por:</strong> {{ baja_registro.dado_de_baja_por.get_full_name|default:baja_registro.dado_de_baja_por.username|default:"N/A" }}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Razón de Baja:</strong> {{ baja_registro.razon_baja|default:"N/A" }}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Observaciones:</strong> {{ baja_registro.observaciones|default:"N/A" }}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Documento de Baja:</strong> {% if documento_baja_url %}<a href="{{ documento_baja_url }}">Ver Documento</a>{% else %}N/A{% endif %}</td>
+        </tr>
+    </table>
+    {% else %}<p class="no-records">El equipo no ha sido dado de baja.</p>{% endif %}
+
     <h2 class="section-title">Imagen del Equipo</h2>
     <div class="equipment-image-container">
-        {% pdf_image_url equipo.imagen_equipo as pdf_imagen_url %}
-        {% if pdf_imagen_url %}
-            <img src="{{ pdf_imagen_url }}" class="equipment-image" alt="Imagen del Equipo">
+        {% if imagen_equipo_url %}
+            <img src="{{ imagen_equipo_url }}" class="equipment-image" alt="Imagen del Equipo">
         {% else %}
             <p class="no-records">Sin imagen disponible.</p>
         {% endif %}
