@@ -2606,7 +2606,8 @@ def dar_baja_equipo(request, equipo_pk):
                     archivo_subido = request.FILES['documento_baja']
                     nombre_archivo = sanitize_filename(archivo_subido.name)
                     subir_archivo(nombre_archivo, archivo_subido)
-                    baja_registro.documento_baja = nombre_archivo
+                    # Guardar la ruta completa que coincida con donde se sube el archivo
+                    baja_registro.documento_baja = f"pdfs/{nombre_archivo}"
 
                 # Guardar en DB
                 baja_registro.save()

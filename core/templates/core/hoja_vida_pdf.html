@@ -212,7 +212,7 @@
     {% if baja_registro %}
     <h2 class="section-title">Información de Baja del Equipo</h2>
     <table>
-        <tr><td><strong>Razón de Baja:</strong> {{ baja_registro.razon_baja|default:"N/A" }}</td><td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"d/m/Y H:i"|default:"N/A" }}</td></tr>
+        <tr><td><strong>Razón de Baja:</strong> {{ baja_registro.razon_baja|default:"N/A" }}</td><td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"d/m/Y"|default:"N/A" }}</td></tr>
         <tr><td><strong>Dado de Baja Por:</strong> {{ baja_registro.dado_de_baja_por.get_full_name|default:baja_registro.dado_de_baja_por.username|default:"N/A" }}</td><td><strong>Observaciones:</strong> {{ baja_registro.observaciones|default:"N/A" }}</td></tr>
     </table>
     {% else %}
