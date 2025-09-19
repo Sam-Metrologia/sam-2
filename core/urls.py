@@ -4,6 +4,7 @@ from django.urls import path
 from . import views
 from . import views_debug  # Importar vistas de diagnóstico temporal
 from . import views_debug_logo  # Importar vistas de diagnóstico de logos
+from . import views_fix_logos  # Importar vistas para corregir logos
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
 app_name = 'core'
@@ -106,4 +107,8 @@ urlpatterns = [
     path('debug/file-upload-test/', views_debug.file_upload_test, name='file_upload_test'),
     path('debug/logo-diagnostics/<int:empresa_id>/', views_debug_logo.logo_diagnostics, name='logo_diagnostics'),
     path('debug/test-logo-upload/', views_debug_logo.test_logo_upload, name='test_logo_upload'),
+
+    # === VISTAS PARA CORREGIR LOGOS ===
+    path('fix-mi-logo/', views_fix_logos.fix_mi_logo_empresa, name='fix_mi_logo'),
+    path('empresas-sin-logo/', views_fix_logos.lista_empresas_sin_logo, name='lista_empresas_sin_logo'),
 ]

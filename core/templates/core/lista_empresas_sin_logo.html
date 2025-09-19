@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<style>
+    .empresa-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 10px 0;
+        background: white;
+    }
+    .problema-perdido { border-left: 4px solid #ef4444; }
+    .problema-sin-logo { border-left: 4px solid #f59e0b; }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">
+        <i class="fas fa-exclamation-triangle text-orange-500 mr-2"></i>
+        Empresas con Problemas de Logo
+    </h1>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="stats-card">
+            <div class="text-3xl font-bold">{{ total_problemas }}</div>
+            <div class="text-sm opacity-90">Empresas con problemas</div>
+        </div>
+        <div class="stats-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+            <div class="text-3xl font-bold">{{ empresas_sin_logo|length }}</div>
+            <div class="text-sm opacity-90">Sin logo configurado</div>
+        </div>
+        <div class="stats-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+            <div class="text-3xl font-bold">{{ empresas_logo_perdido|length }}</div>
+            <div class="text-sm opacity-90">Logo perdido en S3</div>
+        </div>
+    </div>
+
+    <!-- Empresas con logos perdidos -->
+    {% if empresas_logo_perdido %}
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-red-600 mb-4">
+            <i class="fas fa-times-circle mr-2"></i>
+            Logos Perdidos en S3 ({{ empresas_logo_perdido|length }})
+        </h2>
+        <div class="text-sm text-gray-600 mb-4">
+            Estas empresas tenían logos configurados pero los archivos se perdieron durante la migración a S3.
+        </div>
+
+        {% for empresa in empresas_logo_perdido %}
+        <div class="empresa-card problema-perdido">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-medium">{{ empresa.nombre }}</h3>
+                    <p class="text-sm text-gray-500">
+                        Archivo perdido: {{ empresa.logo_empresa.name|default:"N/A" }}
+                    </p>
+                    <p class="text-sm text-gray-500">
+                        Fecha registro: {{ empresa.fecha_registro|date:"d/m/Y" }}
+                    </p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{% url 'core:detalle_empresa' pk=empresa.pk %}"
+                       class="bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-eye mr-1"></i> Ver
+                    </a>
+                    <a href="{% url 'core:editar_empresa' pk=empresa.pk %}"
+                       class="bg-yellow-500 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-edit mr-1"></i> Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Empresas sin logo -->
+    {% if empresas_sin_logo %}
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-orange-600 mb-4">
+            <i class="fas fa-image mr-2"></i>
+            Sin Logo Configurado ({{ empresas_sin_logo|length }})
+        </h2>
+        <div class="text-sm text-gray-600 mb-4">
+            Estas empresas nunca han tenido un logo configurado.
+        </div>
+
+        {% for empresa in empresas_sin_logo %}
+        <div class="empresa-card problema-sin-logo">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-medium">{{ empresa.nombre }}</h3>
+                    <p class="text-sm text-gray-500">
+                        NIT: {{ empresa.nit|default:"N/A" }}
+                    </p>
+                    <p class="text-sm text-gray-500">
+                        Fecha registro: {{ empresa.fecha_registro|date:"d/m/Y" }}
+                    </p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{% url 'core:detalle_empresa' pk=empresa.pk %}"
+                       class="bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-eye mr-1"></i> Ver
+                    </a>
+                    <a href="{% url 'core:editar_empresa' pk=empresa.pk %}"
+                       class="bg-yellow-500 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-edit mr-1"></i> Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if total_problemas == 0 %}
+    <div class="text-center py-12">
+        <i class="fas fa-check-circle text-green-500 text-6xl mb-4"></i>
+        <h2 class="text-2xl font-semibold text-green-600 mb-2">¡Todo perfecto!</h2>
+        <p class="text-gray-600">Todas las empresas tienen sus logos configurados correctamente.</p>
+    </div>
+    {% endif %}
+
+    <div class="mt-8 text-center">
+        <a href="{% url 'core:listar_empresas' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Volver al Listado de Empresas
+        </a>
+    </div>
+</div>
+{% endblock %}
