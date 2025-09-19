@@ -70,6 +70,25 @@
             font-size: 14pt;
             font-weight: bold;
         }
+        .baja-watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 72pt;
+            font-weight: bold;
+            color: rgba(255, 0, 0, 0.1);
+            z-index: -1;
+            pointer-events: none;
+        }
+        .equipo-dado-baja {
+            background-color: #ffebee;
+            border-left: 5px solid #f44336;
+            padding: 10px;
+            margin: 10px 0;
+            font-weight: bold;
+            color: #d32f2f;
+        }
         .header-info-cell {
             width: 25%;
             font-size: 8pt;
@@ -147,6 +166,9 @@
     </style>
 </head>
 <body>
+{% if baja_registro %}
+<div class="baja-watermark">EQUIPO DADO DE BAJA</div>
+{% endif %}
 
 <div id="header_content">
     <table class="header-table">
@@ -156,6 +178,11 @@
             </td>
             <td class="header-title-cell">
                 HOJA DE VIDA DE EQUIPOS
+                {% if baja_registro %}
+                <div class="equipo-dado-baja" style="margin-top: 5px; font-size: 10pt;">
+                    ⚠️ EQUIPO DADO DE BAJA
+                </div>
+                {% endif %}
             </td>
             <td class="header-info-cell">
                 <strong>CÓDIGO:</strong> {{ equipo.codificacion_formato|default:"N/A" }}<br>
