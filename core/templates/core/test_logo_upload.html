@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test de Logos de Empresa</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; }
+        .form-group { margin: 20px 0; }
+        select, input[type="file"] { padding: 10px; margin: 5px; }
+        button { background: #007cba; color: white; padding: 10px 20px; border: none; cursor: pointer; margin: 5px; }
+        .result { background: #f0f0f0; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .empresa-item { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test de Logos de Empresa</h1>
+
+        <div class="form-group">
+            <h3>1. Diagnóstico de Logo Específico</h3>
+            <p>Selecciona una empresa para diagnosticar su logo:</p>
+            {% for empresa in empresas %}
+                <div class="empresa-item">
+                    <strong>{{ empresa.nombre }}</strong> (ID: {{ empresa.id }})
+                    <br>
+                    <a href="/core/debug/logo-diagnostics/{{ empresa.id }}/" target="_blank">
+                        🔍 Diagnosticar Logo
+                    </a>
+                    |
+                    <a href="/core/empresas/{{ empresa.id }}/" target="_blank">
+                        👁️ Ver Detalle Empresa
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="form-group">
+            <h3>2. Test de Subida de Logo</h3>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <select name="empresa_id" required>
+                    <option value="">Seleccionar empresa...</option>
+                    {% for empresa in empresas %}
+                        <option value="{{ empresa.id }}">{{ empresa.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <br>
+                <input type="file" name="logo_file" accept="image/*" required>
+                <br>
+                <button type="submit">📤 Subir Logo de Prueba</button>
+            </form>
+        </div>
+
+        <div class="form-group">
+            <h3>3. Instrucciones</h3>
+            <ol>
+                <li>Usa el diagnóstico para identificar problemas específicos</li>
+                <li>Sube un logo de prueba si es necesario</li>
+                <li>Verifica que aparezca en el detalle de empresa</li>
+                <li>Copia los resultados para debugging</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>
