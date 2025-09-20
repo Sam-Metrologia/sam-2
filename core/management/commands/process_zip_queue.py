@@ -182,10 +182,28 @@ class Command(BaseCommand):
                 try:
                     from core.views import _generate_equipment_hoja_vida_pdf_content
                     hoja_vida_pdf_content = _generate_equipment_hoja_vida_pdf_content(mock_request, equipo)
-                    zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content)
+
+                    # Verificar que el contenido sea válido (bytes de PDF)
+                    if isinstance(hoja_vida_pdf_content, bytes) and len(hoja_vida_pdf_content) > 0:
+                        zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content)
+                        self.stdout.write(f'[PDF] Hoja de vida generada exitosamente para {equipo.codigo_interno}')
+                    else:
+                        raise ValueError(f"Contenido PDF inválido o vacío para {equipo.codigo_interno}")
+
                 except Exception as e:
-                    logger.error(f"Error generating PDF for {equipo.codigo_interno}: {e}")
-                    zf.writestr(f"{equipo_folder}/Hoja_de_vida_ERROR.txt", f"Error: {e}")
+                    error_msg = f"Error generando PDF para {equipo.codigo_interno}: {str(e)}"
+                    logger.error(error_msg, exc_info=True)
+                    self.stdout.write(self.style.ERROR(f'[PDF ERROR] {error_msg}'))
+
+                    # Crear archivo de error con información detallada
+                    error_content = f"""Error generando Hoja de Vida PDF:
+Equipo: {equipo.codigo_interno} - {equipo.nombre}
+Error: {str(e)}
+Timestamp: {timezone.now().isoformat()}
+
+Por favor reporte este error al administrador del sistema.
+"""
+                    zf.writestr(f"{equipo_folder}/Hoja_de_vida_ERROR.txt", error_content)
 
                 # Agregar documentos de calibraciones
                 cal_idx = 1
@@ -282,6 +300,8 @@ class Command(BaseCommand):
         mock_request = HttpRequest()
         mock_request.user = user
         mock_request.method = 'GET'
+        mock_request.path = '/'
+        mock_request.path_info = '/'
 
         # Configurar META para evitar errores de SERVER_NAME
         mock_request.META = {
@@ -289,6 +309,11 @@ class Command(BaseCommand):
             'SERVER_PORT': '443',
             'wsgi.url_scheme': 'https',
             'HTTP_HOST': 'sam-9o6o.onrender.com',
+            'SCRIPT_NAME': '',
+            'PATH_INFO': '/',
+            'QUERY_STRING': '',
+            'CONTENT_TYPE': '',
+            'CONTENT_LENGTH': '',
         }
 
         return mock_request

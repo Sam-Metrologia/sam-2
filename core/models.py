@@ -6,7 +6,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from django.utils import timezone # Importar timezone para obtener la fecha actual con zona horaria
 import decimal # Importar el módulo decimal (mantener por si otros campos lo usan o se necesita para importación/exportación de otros numéricos)
 import os
@@ -21,6 +21,13 @@ import uuid # Importar uuid para generar nombres únicos temporales
 # ==============================================================================
 
 class Empresa(models.Model):
+    # Constantes para planes
+    PLAN_GRATUITO_EQUIPOS = 5
+    PLAN_GRATUITO_ALMACENAMIENTO_MB = 500  # 500MB para plan gratuito
+    TRIAL_EQUIPOS = 50
+    TRIAL_ALMACENAMIENTO_MB = 2048  # 2GB para trial
+    TRIAL_DURACION_DIAS = 7
+
     nombre = models.CharField(max_length=200, unique=True)
     nit = models.CharField(max_length=50, unique=True, blank=True, null=True)
     direccion = models.CharField(max_length=255, blank=True, null=True)
@@ -55,9 +62,11 @@ class Empresa(models.Model):
         null=True,
         verbose_name="Codificación del Formato (Empresa)"
     )
-    # Campos para la lógica de suscripción (Simplificados)
-    es_periodo_prueba = models.BooleanField(default=False, verbose_name="¿Es Período de Prueba?")
-    duracion_prueba_dias = models.IntegerField(default=30, verbose_name="Duración Prueba (días)")
+
+
+    # Campos para la lógica de suscripción (Simplificados - DEPRECADOS)
+    es_periodo_prueba = models.BooleanField(default=False, verbose_name="¿Es Período de Prueba? (Deprecado)")
+    duracion_prueba_dias = models.IntegerField(default=7, verbose_name="Duración Prueba (días)")
     fecha_inicio_plan = models.DateField(blank=True, null=True, verbose_name="Fecha Inicio Plan")
     
     # Campo para el límite de equipos (ahora el único y principal)
@@ -79,6 +88,7 @@ class Empresa(models.Model):
         verbose_name="Estado de Suscripción"
     )
 
+
     class Meta:
         verbose_name = "Empresa"
         verbose_name_plural = "Empresas"
@@ -94,18 +104,160 @@ class Empresa(models.Model):
         return self.nombre
 
     def get_limite_equipos(self):
-        """Retorna el límite de equipos basado en el plan o si es prueba/acceso manual."""
+        """Retorna el límite de equipos basado en el sistema de planes existente."""
         if self.acceso_manual_activo:
-            # Si el acceso es manual, el límite es infinito (o un número muy grande)
-            return float('inf') 
-        elif self.es_periodo_prueba:
-            # Durante el período de prueba, el límite es un valor predefinido (ej. 5 equipos)
-            # Podrías usar self.duracion_prueba_dias como límite si así lo deseas,
-            # o un valor fijo como 5, 10, etc.
-            return 5 # Ejemplo: un límite fijo de 5 equipos durante la prueba
-        elif self.limite_equipos_empresa is not None:
+            # Acceso manual: sin límites
+            return float('inf')
+
+        # Usar la lógica existente para determinar el estado del plan
+        estado_plan = self.get_estado_suscripcion_display()
+
+        if estado_plan == "Período de Prueba Activo":
+            # Durante el trial, usar límite expandido
+            return self.TRIAL_EQUIPOS
+        elif estado_plan in ["Plan Expirado", "Período de Prueba Expirado"]:
+            # Plan expirado: reducir a plan gratuito
+            return self.PLAN_GRATUITO_EQUIPOS
+        else:
+            # Plan activo: usar el límite configurado en la empresa
             return self.limite_equipos_empresa
-        return 0 # Si no hay plan ni prueba activa, el límite es 0
+
+    def get_limite_almacenamiento(self):
+        """Retorna el límite de almacenamiento basado en el sistema de planes existente."""
+        if self.acceso_manual_activo:
+            # Acceso manual: sin límites
+            return float('inf')
+
+        # Usar la lógica existente para determinar el estado del plan
+        estado_plan = self.get_estado_suscripcion_display()
+
+        if estado_plan == "Período de Prueba Activo":
+            # Durante el trial, usar límite expandido
+            return self.TRIAL_ALMACENAMIENTO_MB
+        elif estado_plan in ["Plan Expirado", "Período de Prueba Expirado"]:
+            # Plan expirado: reducir a plan gratuito
+            return self.PLAN_GRATUITO_ALMACENAMIENTO_MB
+        else:
+            # Plan activo: usar el límite configurado en la empresa
+            return self.limite_almacenamiento_mb
+
+    def get_plan_actual(self):
+        """Determina el tipo de plan actual basado en la lógica existente."""
+        estado_plan = self.get_estado_suscripcion_display()
+
+        if estado_plan == "Período de Prueba Activo":
+            return 'trial'
+        elif estado_plan in ["Plan Expirado", "Período de Prueba Expirado"]:
+            return 'free'
+        elif self.fecha_inicio_plan and self.duracion_suscripcion_meses:
+            return 'paid'
+        else:
+            return 'free'
+
+    def activar_plan_pagado(self, limite_equipos, limite_almacenamiento_mb, duracion_meses=12):
+        """
+        Activa un plan pagado inmediatamente, usando el sistema de campos existente.
+
+        Args:
+            limite_equipos (int): Límite de equipos del nuevo plan
+            limite_almacenamiento_mb (int): Límite de almacenamiento en MB
+            duracion_meses (int): Duración del plan en meses (default: 12)
+        """
+        # Detener trial si está activo
+        if self.es_periodo_prueba:
+            self.es_periodo_prueba = False
+
+        # Configurar plan pagado usando campos existentes
+        self.fecha_inicio_plan = timezone.now().date()
+        self.duracion_suscripcion_meses = duracion_meses
+        self.limite_equipos_empresa = limite_equipos
+        self.limite_almacenamiento_mb = limite_almacenamiento_mb
+
+        # Actualizar estados relacionados
+        self.estado_suscripcion = 'Activo'
+        self.subscription_status = 'active'
+
+        self.save()
+
+        # Log de la transición
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Plan pagado activado para empresa {self.nombre}: {limite_equipos} equipos, {limite_almacenamiento_mb}MB, {duracion_meses} meses")
+
+    def activar_periodo_prueba(self, duracion_dias=7):
+        """
+        Activa un período de prueba usando el sistema existente.
+        """
+        # Configurar período de prueba usando campos existentes
+        self.es_periodo_prueba = True
+        self.duracion_prueba_dias = duracion_dias
+        self.fecha_inicio_plan = timezone.now().date()
+
+        # Aplicar límites expandidos del trial
+        self.limite_equipos_empresa = self.TRIAL_EQUIPOS
+        self.limite_almacenamiento_mb = self.TRIAL_ALMACENAMIENTO_MB
+
+        # Actualizar estados
+        self.estado_suscripcion = 'Activo'
+
+        self.save()
+
+        # Log de la transición
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Período de prueba activado para empresa {self.nombre}: {duracion_dias} días")
+
+    def transicion_a_plan_gratuito(self):
+        """
+        Transiciona la empresa al plan gratuito usando campos existentes.
+        Se usa cuando expira el trial o plan pagado.
+        """
+        # Limpiar configuración de planes
+        self.es_periodo_prueba = False
+        self.fecha_inicio_plan = None
+        self.duracion_suscripcion_meses = None
+
+        # Aplicar límites del plan gratuito
+        self.limite_equipos_empresa = self.PLAN_GRATUITO_EQUIPOS
+        self.limite_almacenamiento_mb = self.PLAN_GRATUITO_ALMACENAMIENTO_MB
+
+        # Actualizar estados
+        self.estado_suscripcion = 'Expirado'
+        self.subscription_status = 'expired'
+
+        self.save()
+
+        # Log de la transición
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Empresa {self.nombre} transicionada a plan gratuito")
+
+    def verificar_y_procesar_expiraciones(self):
+        """
+        Verifica y procesa automáticamente las expiraciones usando la lógica existente.
+        Este método debe ser llamado periódicamente por un comando de mantenimiento.
+        """
+        estado_plan = self.get_estado_suscripcion_display()
+        cambio_realizado = False
+
+        # Si el plan está expirado, transicionar a plan gratuito
+        if estado_plan in ["Plan Expirado", "Período de Prueba Expirado"]:
+            # Solo transicionar si no está ya en plan gratuito
+            if self.limite_equipos_empresa != self.PLAN_GRATUITO_EQUIPOS:
+                self.transicion_a_plan_gratuito()
+                cambio_realizado = True
+
+        return cambio_realizado
+
+    def get_dias_restantes_plan(self):
+        """Retorna los días restantes del plan actual usando fecha de fin existente."""
+        fecha_fin = self.get_fecha_fin_plan()
+
+        if fecha_fin:
+            remaining = fecha_fin - timezone.localdate()
+            return max(0, remaining.days)
+        else:
+            return float('inf')  # Plan gratuito o sin límite de tiempo
 
     def get_estado_suscripcion_display(self):
         """Devuelve el estado de la suscripción, considerando el periodo de prueba y la duración del plan."""
@@ -296,6 +448,27 @@ class Empresa(models.Model):
         else:
             # Falta más de 1 mes
             return 'text-green-700'
+
+
+    def save(self, *args, **kwargs):
+        """Override save para configurar plan gratuito por defecto en empresas nuevas."""
+        # Si es una empresa nueva, configurar plan gratuito por defecto
+        if not self.pk:
+            # Solo configurar si no se han establecido manualmente
+            if not hasattr(self, '_plan_set_manually'):
+                # Plan gratuito por defecto - no period de prueba automático
+                self.es_periodo_prueba = False
+                self.fecha_inicio_plan = None
+                self.duracion_suscripcion_meses = None
+
+                # Límites del plan gratuito
+                if self.limite_equipos_empresa is None:
+                    self.limite_equipos_empresa = self.PLAN_GRATUITO_EQUIPOS
+
+                if self.limite_almacenamiento_mb is None:
+                    self.limite_almacenamiento_mb = self.PLAN_GRATUITO_ALMACENAMIENTO_MB
+
+        super().save(*args, **kwargs)
 
 
 class PlanSuscripcion(models.Model):

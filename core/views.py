@@ -126,6 +126,39 @@ def get_equipo_imagen_url(equipo, expire_seconds=3600):
 # Decoradores personalizados
 # =============================================================================
 
+def trial_check(view_func):
+    """
+    Decorador que verifica si la empresa del usuario tiene un trial activo
+    y bloquea ciertas acciones si el trial ha expirado.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if request.user.is_authenticated and hasattr(request.user, 'empresa'):
+            empresa = request.user.empresa
+
+            # Si la empresa tiene trial expirado, bloquear ciertas acciones
+            if empresa and not empresa.is_trial_active() and empresa.subscription_status == 'expired':
+                # Lista de vistas que requieren suscripción activa
+                protected_views = [
+                    'añadir_equipo', 'editar_equipo', 'añadir_calibracion', 'añadir_mantenimiento',
+                    'añadir_comprobacion', 'generar_informe_zip', 'solicitar_zip',
+                    'importar_equipos_excel', 'exportar_equipos_excel'
+                ]
+
+                # Verificar si es una vista protegida
+                view_name = view_func.__name__
+                if view_name in protected_views:
+                    messages.error(
+                        request,
+                        f'Su período de prueba de 7 días ha expirado. Para continuar usando SAM Metrología, '
+                        f'contacte con soporte para activar su suscripción. '
+                        f'Tiempo restante de trial: {empresa.get_trial_days_remaining()} días.'
+                    )
+                    return redirect('core:dashboard')
+
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
 def access_check(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
@@ -384,15 +417,35 @@ def _generate_pdf_content(request, template_path, context):
     Generates PDF content (bytes) from a template and context using WeasyPrint.
     """
     from django.template.loader import get_template
+    import logging
+    logger = logging.getLogger(__name__)
 
-    template = get_template(template_path)
-    html_string = template.render(context)
-    
-    # base_url es crucial para que WeasyPrint resuelva rutas de CSS e imágenes
-    # Si las imágenes están en S3, request.build_absolute_uri('/') generará URLs HTTPS completas.
-    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
-    
-    return pdf_file
+    try:
+        template = get_template(template_path)
+        html_string = template.render(context)
+
+        # base_url es crucial para que WeasyPrint resuelva rutas de CSS e imágenes
+        # Mejorar el manejo del base_url para mock requests
+        try:
+            base_url = request.build_absolute_uri('/')
+        except Exception as e:
+            logger.warning(f"Error building absolute URI: {e}, using fallback")
+            # Fallback para mock requests
+            if hasattr(request, 'META') and 'HTTP_HOST' in request.META:
+                scheme = request.META.get('wsgi.url_scheme', 'https')
+                host = request.META.get('HTTP_HOST', 'sam-9o6o.onrender.com')
+                base_url = f"{scheme}://{host}/"
+            else:
+                base_url = "https://sam-9o6o.onrender.com/"
+
+        logger.info(f"Generating PDF with base_url: {base_url}")
+        pdf_file = HTML(string=html_string, base_url=base_url).write_pdf()
+
+        return pdf_file
+
+    except Exception as e:
+        logger.error(f"Error generating PDF: {str(e)}", exc_info=True)
+        raise
 
 def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     """
@@ -452,9 +505,45 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
                 logger.error(f"Error obteniendo URL para PDF: {file_field.name}, error: {str(e)}")
                 return None
 
+        # Función especial para imágenes en PDF - convierte a base64 si es necesario
+        def get_pdf_image_data(file_field):
+            """Obtiene datos de imagen para PDF, convirtiendo a base64 si es necesario"""
+            if not file_field or not file_field.name:
+                return None
+
+            try:
+                # Verificar si es una imagen
+                file_extension = file_field.name.lower().split('.')[-1]
+                if file_extension not in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
+                    return None
+
+                # Intentar obtener el contenido del archivo
+                try:
+                    file_content = default_storage.open(file_field.name).read()
+
+                    # Convertir a base64
+                    import base64
+                    base64_encoded = base64.b64encode(file_content).decode('utf-8')
+
+                    # Determinar el tipo MIME
+                    mime_type = f"image/{file_extension}" if file_extension != 'jpg' else 'image/jpeg'
+
+                    # Retornar como data URL
+                    return f"data:{mime_type};base64,{base64_encoded}"
+
+                except Exception as e:
+                    logger.warning(f"No se pudo convertir imagen a base64: {file_field.name}, error: {str(e)}")
+                    # Fallback a URL normal
+                    return get_pdf_file_url(file_field)
+
+            except Exception as e:
+                logger.error(f"Error procesando imagen para PDF: {file_field.name}, error: {str(e)}")
+                return None
+
         # Obtener URLs de archivos con el nuevo sistema seguro
-        logo_empresa_url = get_pdf_file_url(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
-        imagen_equipo_url = get_pdf_file_url(equipo.imagen_equipo) if equipo.imagen_equipo else None
+        # Para imágenes, usar la función especializada que convierte a base64
+        logo_empresa_url = get_pdf_image_data(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+        imagen_equipo_url = get_pdf_image_data(equipo.imagen_equipo) if equipo.imagen_equipo else None
         documento_baja_url = get_pdf_file_url(baja_registro.documento_baja) if baja_registro and baja_registro.documento_baja else None
 
         for cal in calibraciones:
@@ -1876,9 +1965,61 @@ def dashboard(request):
         'equipos_limite_percentage': equipos_limite_percentage,
         'equipos_limite_warning': equipos_limite_warning,
         'equipos_limite_critical': equipos_limite_critical,
+
+        # Información de plan actual (usando sistema unificado)
+        'plan_info': {
+            'plan_actual': user.empresa.get_plan_actual() if user.empresa else 'unknown',
+            'estado_plan': user.empresa.get_estado_suscripcion_display() if user.empresa else 'Sin plan',
+            'dias_restantes': user.empresa.get_dias_restantes_plan() if user.empresa else 0,
+            'fecha_inicio': user.empresa.fecha_inicio_plan if user.empresa else None,
+            'fecha_fin': user.empresa.get_fecha_fin_plan() if user.empresa else None,
+            'limite_equipos_actual': user.empresa.get_limite_equipos() if user.empresa else 0,
+            'limite_almacenamiento_actual': user.empresa.get_limite_almacenamiento() if user.empresa else 0,
+        } if user.empresa else {},
     }
     return render(request, 'core/dashboard.html', context)
 
+
+@access_check # APLICAR ESTE DECORADOR
+@login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
+def activar_plan_pagado(request, empresa_id):
+    """Vista para que superusuarios activen planes pagados."""
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+
+    if request.method == 'POST':
+        try:
+            limite_equipos = int(request.POST.get('limite_equipos', 0))
+            limite_almacenamiento_mb = int(request.POST.get('limite_almacenamiento_mb', 0))
+            duracion_meses = request.POST.get('duracion_meses')
+            duracion_meses = int(duracion_meses) if duracion_meses else None
+
+            if limite_equipos <= 0 or limite_almacenamiento_mb <= 0:
+                messages.error(request, 'Los límites deben ser mayores a 0')
+                return redirect('core:detalle_empresa', pk=empresa_id)
+
+            # Activar plan pagado
+            empresa.activar_plan_pagado(
+                limite_equipos=limite_equipos,
+                limite_almacenamiento_mb=limite_almacenamiento_mb,
+                duracion_meses=duracion_meses
+            )
+
+            messages.success(
+                request,
+                f'Plan pagado activado exitosamente para {empresa.nombre}. '
+                f'Límites: {limite_equipos} equipos, {limite_almacenamiento_mb}MB. '
+                f'{"Duración: " + str(duracion_meses) + " meses" if duracion_meses else "Sin límite de tiempo"}'
+            )
+
+        except ValueError as e:
+            messages.error(request, f'Error en los datos proporcionados: {str(e)}')
+        except Exception as e:
+            messages.error(request, f'Error activando plan pagado: {str(e)}')
+
+        return redirect('core:detalle_empresa', pk=empresa_id)
+
+    return redirect('core:detalle_empresa', pk=empresa_id)
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
@@ -2175,6 +2316,7 @@ def editar_empresa_formato(request, pk):
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
+@trial_check
 def añadir_equipo(request):
     empresa_actual = None
     if request.user.is_authenticated and not request.user.is_superuser:
@@ -2526,6 +2668,7 @@ def detalle_equipo(request, pk):
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.change_equipo', raise_exception=True)
+@trial_check
 def editar_equipo(request, pk):
     """
     Handles editing an existing equipment.
@@ -5199,6 +5342,7 @@ def manual_process_zip(request):
 @access_check
 @login_required
 @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
+@trial_check
 def solicitar_zip(request):
     """Vista para solicitar un ZIP. Agrega usuario a la cola."""
 
