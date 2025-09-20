@@ -629,38 +629,38 @@ def _generate_equipment_general_info_excel_content(equipo):
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
-    for equipo in equipos_queryset:
-        row_data = [
-            equipo.codigo_interno,
-            equipo.nombre,
-            equipo.empresa.nombre if equipo.empresa else "N/A",
-            equipo.get_tipo_equipo_display(),
-            equipo.marca,
-            equipo.modelo,
-            equipo.numero_serie,
-            equipo.ubicacion,
-            equipo.responsable,
-            equipo.estado,
-            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-            equipo.rango_medida,
-            equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
-            equipo.observaciones,
-            equipo.version_formato,
-            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-            equipo.codificacion_formato,
-            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '', # CORREGIDO
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-        ]
-        sheet.append(row_data)
+    # Procesar el equipo individual (parámetro de la función) - CORREGIDO
+    row_data = [
+        equipo.codigo_interno,
+        equipo.nombre,
+        equipo.empresa.nombre if equipo.empresa else "N/A",
+        equipo.get_tipo_equipo_display(),
+        equipo.marca,
+        equipo.modelo,
+        equipo.numero_serie,
+        equipo.ubicacion,
+        equipo.responsable,
+        equipo.estado,
+        equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
+        equipo.rango_medida,
+        equipo.resolucion,
+        equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+        equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
+        equipo.observaciones,
+        equipo.version_formato,
+        equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
+        equipo.codificacion_formato,
+        equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
+        equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
+        float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
+        equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
+        equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
+        float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
+        equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
+        equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
+        float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
+    ]
+    sheet.append(row_data)
 
     for col in sheet.columns:
         max_length = 0
