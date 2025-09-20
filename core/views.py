@@ -40,6 +40,13 @@ from django.utils.html import mark_safe
 from django.template.loader import get_template
 from weasyprint import HTML
 
+# Logging para reemplazar prints de debug
+import logging
+logger = logging.getLogger(__name__)
+
+# Importar validadores de almacenamiento
+from .storage_validators import StorageLimitValidator
+
 # Importar los formularios de tu aplicación (asegúrate de que todos estos existan en .forms)
 from .forms import (
     AuthenticationForm,
@@ -208,7 +215,7 @@ def subir_archivo(nombre_archivo, contenido):
     storage = default_storage
     ruta_s3 = f'pdfs/{nombre_archivo_seguro}'
     storage.save(ruta_s3, contenido)
-    print(f'Archivo subido a: {ruta_s3}')
+    logger.info(f'Archivo subido a: {ruta_s3}')
 
 # --- Función auxiliar para proyectar actividades y categorizarlas (para las gráficas de torta) ---
 def get_projected_activities_for_year(equipment_queryset, activity_type, current_year, today):
@@ -1000,6 +1007,56 @@ def dashboard(request):
     equipos_inactivos = equipos_queryset.filter(estado='Inactivo').count()
     equipos_de_baja = equipos_queryset.filter(estado='De Baja').count()
 
+    # --- Datos de Almacenamiento ---
+    storage_usage_mb = 0
+    storage_limit_mb = 0
+    storage_percentage = 0
+    storage_status_class = 'text-gray-700 bg-gray-100'
+    storage_empresa_nombre = 'N/A'
+
+    # --- Datos de Límites de Equipos ---
+    equipos_limite = 0
+    equipos_actuales_count = 0
+    equipos_disponibles = 0
+    equipos_limite_percentage = 0
+    equipos_limite_warning = False
+    equipos_limite_critical = False
+
+    if user.is_superuser and selected_company_id:
+        try:
+            empresa_seleccionada = Empresa.objects.get(id=selected_company_id)
+            storage_usage_mb = empresa_seleccionada.get_total_storage_used_mb()
+            storage_limit_mb = empresa_seleccionada.limite_almacenamiento_mb
+            storage_percentage = empresa_seleccionada.get_storage_usage_percentage()
+            storage_status_class = empresa_seleccionada.get_storage_status_class()
+            storage_empresa_nombre = empresa_seleccionada.nombre
+
+            # Datos de límite de equipos
+            equipos_limite = empresa_seleccionada.get_limite_equipos()
+            equipos_actuales_count = Equipo.objects.filter(empresa=empresa_seleccionada).count()
+            if equipos_limite != float('inf'):
+                equipos_disponibles = max(0, equipos_limite - equipos_actuales_count)
+                equipos_limite_percentage = (equipos_actuales_count / equipos_limite) * 100 if equipos_limite > 0 else 0
+                equipos_limite_warning = equipos_limite_percentage >= 80
+                equipos_limite_critical = equipos_actuales_count >= equipos_limite
+        except Empresa.DoesNotExist:
+            pass
+    elif user.empresa:
+        storage_usage_mb = user.empresa.get_total_storage_used_mb()
+        storage_limit_mb = user.empresa.limite_almacenamiento_mb
+        storage_percentage = user.empresa.get_storage_usage_percentage()
+        storage_status_class = user.empresa.get_storage_status_class()
+        storage_empresa_nombre = user.empresa.nombre
+
+        # Datos de límite de equipos
+        equipos_limite = user.empresa.get_limite_equipos()
+        equipos_actuales_count = Equipo.objects.filter(empresa=user.empresa).count()
+        if equipos_limite != float('inf'):
+            equipos_disponibles = max(0, equipos_limite - equipos_actuales_count)
+            equipos_limite_percentage = (equipos_actuales_count / equipos_limite) * 100 if equipos_limite > 0 else 0
+            equipos_limite_warning = equipos_limite_percentage >= 80
+            equipos_limite_critical = equipos_actuales_count >= equipos_limite
+
     # Detección de actividades vencidas y próximas
     # Se basan directamente en los campos proxima_X del modelo Equipo, excluyendo Inactivos y De Baja
     calibraciones_vencidas = equipos_para_dashboard.filter(
@@ -1421,6 +1478,21 @@ def dashboard(request):
 
         # Datos para el cuadro de mantenimientos correctivos
         'latest_corrective_maintenances': latest_corrective_maintenances,
+
+        # Datos de almacenamiento
+        'storage_usage_mb': storage_usage_mb,
+        'storage_limit_mb': storage_limit_mb,
+        'storage_percentage': storage_percentage,
+        'storage_status_class': storage_status_class,
+        'storage_empresa_nombre': storage_empresa_nombre,
+
+        # Datos de límites de equipos
+        'equipos_limite': equipos_limite,
+        'equipos_actuales_count': equipos_actuales_count,
+        'equipos_disponibles': equipos_disponibles,
+        'equipos_limite_percentage': equipos_limite_percentage,
+        'equipos_limite_warning': equipos_limite_warning,
+        'equipos_limite_critical': equipos_limite_critical,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -1466,7 +1538,7 @@ def subir_pdf(request):
                 return redirect('core:home') # O a una lista de documentos si creas una
             except Exception as e:
                 messages.error(request, f'Error al subir o registrar el archivo: {e}')
-                print(f'DEBUG: Error al subir archivo {nombre_archivo}: {e}')
+                logger.error(f'Error al subir archivo {nombre_archivo}: {e}')
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario y asegúrate de seleccionar un archivo.')
     else:
@@ -1740,6 +1812,35 @@ def añadir_equipo(request):
             try:
                 equipo = form.save(commit=False)
 
+                # Validar límite de equipos antes de crear
+                try:
+                    StorageLimitValidator.validate_equipment_limit(equipo.empresa)
+                except ValidationError as e:
+                    messages.error(request, str(e))
+                    return render(request, 'core/añadir_equipo.html', {
+                        'form': form,
+                        'titulo_pagina': 'Añadir Nuevo Equipo',
+                        'limite_alcanzado': True,
+                    })
+
+                # Calcular tamaño total de archivos a subir
+                total_file_size = 0
+                for campo_form in ['manual_pdf', 'archivo_compra_pdf', 'ficha_tecnica_pdf', 'otros_documentos_pdf', 'imagen_equipo']:
+                    if campo_form in request.FILES:
+                        archivo = request.FILES[campo_form]
+                        total_file_size += archivo.size
+
+                # Validar límite de almacenamiento
+                try:
+                    StorageLimitValidator.validate_storage_limit(equipo.empresa, total_file_size)
+                except ValidationError as e:
+                    messages.error(request, str(e))
+                    return render(request, 'core/añadir_equipo.html', {
+                        'form': form,
+                        'titulo_pagina': 'Añadir Nuevo Equipo',
+                        'limite_alcanzado': limite_alcanzado,
+                    })
+
                 # --- Subida manual de archivos ---
                 archivos = {
                     'manual_pdf': 'pdfs',
@@ -1766,12 +1867,12 @@ def añadir_equipo(request):
             except forms.ValidationError as e:
                 messages.error(request, str(e))
             except Exception as e:
-                print(f"DEBUG: Error general al guardar equipo: {str(e)}")
+                logger.error(f"Error general al guardar equipo: {str(e)}")
                 messages.error(request, f'Error al guardar el equipo: {str(e)}')
         else:
             # Mostrar errores del formulario
-            print(f"DEBUG: Errores del formulario: {form.errors}")
-            print(f"DEBUG: Errores no de campo: {form.non_field_errors()}")
+            logger.warning(f"Errores del formulario: {form.errors}")
+            logger.warning(f"Errores no de campo: {form.non_field_errors()}")
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f'{field}: {error}')
@@ -1940,7 +2041,7 @@ def importar_equipos_excel(request):
             
             except Exception as e: # Este catch capturará la excepción relanzada si hay un error atómico
                 messages.error(request, f'Ocurrió un error inesperado al procesar el archivo o la transacción: {e}')
-                print(f"DEBUG: Error en importar_equipos_excel: {e}") # Para depuración
+                logger.error(f"Error en importar_equipos_excel: {e}")
                 return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
         else:
             messages.error(request, 'Por favor, corrige los errores del formulario de subida.')
@@ -1999,7 +2100,7 @@ def detalle_equipo(request, pk):
                 if default_storage.exists(ruta):
                     return default_storage.url(ruta)
             except Exception as e:
-                print(f"DEBUG: Error al obtener URL para {file_field.name}: {e}")
+                logger.error(f"Error al obtener URL para {file_field.name}: {e}")
         return None
 
     # Archivos asociados - usar template tags seguros
@@ -2057,6 +2158,26 @@ def editar_equipo(request, pk):
         if form.is_valid():
             try:
                 equipo = form.save(commit=False)
+
+                # Calcular tamaño de archivos nuevos a subir
+                total_new_file_size = 0
+                for campo_form in ['manual_pdf', 'archivo_compra_pdf', 'ficha_tecnica_pdf', 'otros_documentos_pdf', 'imagen_equipo']:
+                    if campo_form in request.FILES:
+                        archivo = request.FILES[campo_form]
+                        total_new_file_size += archivo.size
+
+                # Validar límite de almacenamiento para archivos nuevos
+                if total_new_file_size > 0:
+                    try:
+                        StorageLimitValidator.validate_storage_limit(equipo.empresa, total_new_file_size)
+                    except ValidationError as e:
+                        messages.error(request, str(e))
+                        form = EquipoForm(instance=equipo, request=request)
+                        return render(request, 'core/editar_equipo.html', {
+                            'form': form,
+                            'equipo': equipo,
+                            'titulo_pagina': f'Editar {equipo.nombre}',
+                        })
 
                 # --- Subida manual de archivos ---
                 archivos = {
@@ -2117,7 +2238,7 @@ def eliminar_equipo(request, pk):
             return redirect('core:home') 
         except Exception as e:
             messages.error(request, f'Error al eliminar el equipo: {e}')
-            print(f"DEBUG: Error al eliminar equipo {equipo.pk}: {e}") # Para depuración
+            logger.error(f"Error al eliminar equipo {equipo.pk}: {e}") 
             # Si hay un error, redirige a home, ya que detalle_equipo podría no ser válido
             return redirect('core:home') 
     
@@ -2145,6 +2266,27 @@ def añadir_calibracion(request, equipo_pk):
         form = CalibracionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
+                # Calcular tamaño de archivos de calibración
+                total_file_size = 0
+                archivos_calibracion = ['documento_calibracion', 'confirmacion_metrologica_pdf', 'intervalos_calibracion_pdf']
+                for campo in archivos_calibracion:
+                    if campo in request.FILES:
+                        archivo = request.FILES[campo]
+                        total_file_size += archivo.size
+
+                # Validar límite de almacenamiento
+                if total_file_size > 0:
+                    try:
+                        StorageLimitValidator.validate_storage_limit(equipo.empresa, total_file_size)
+                    except ValidationError as e:
+                        messages.error(request, str(e))
+                        form = CalibracionForm()
+                        return render(request, 'core/añadir_calibracion.html', {
+                            'form': form,
+                            'equipo': equipo,
+                            'titulo_pagina': f'Añadir Calibración a {equipo.nombre}',
+                        })
+
                 calibracion = Calibracion(
                     equipo=equipo,
                     fecha_calibracion=form.cleaned_data['fecha_calibracion'],
@@ -2176,7 +2318,7 @@ def añadir_calibracion(request, equipo_pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except Exception as e:
-                print(f"ERROR al guardar calibración o archivo: {e}")
+                logger.error(f"ERROR al guardar calibración o archivo: {e}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
 
     else:
@@ -2229,7 +2371,7 @@ def editar_calibracion(request, equipo_pk, pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except Exception as e:
-                print(f"ERROR al actualizar calibración o archivo: {e}")
+                logger.error(f"ERROR al actualizar calibración o archivo: {e}")
                 messages.error(request, f'Hubo un error al actualizar la calibración: {e}')
     else:
         form = CalibracionForm(instance=calibracion)
@@ -2261,7 +2403,7 @@ def eliminar_calibracion(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al eliminar la calibración: {e}')
-            print(f"DEBUG: Error al eliminar calibración {calibracion.pk}: {e}") # Para depuración
+            logger.error(f"Error al eliminar calibración {calibracion.pk}: {e}") 
             return redirect('core:detalle_equipo', pk=equipo.pk)
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -2289,6 +2431,20 @@ def añadir_mantenimiento(request, equipo_pk):
         form = MantenimientoForm(request.POST, request.FILES)
         if form.is_valid():
             try:
+                # Validar límite de almacenamiento para archivos de mantenimiento
+                if 'documento_mantenimiento' in request.FILES:
+                    archivo = request.FILES['documento_mantenimiento']
+                    try:
+                        StorageLimitValidator.validate_storage_limit(equipo.empresa, archivo.size)
+                    except ValidationError as e:
+                        messages.error(request, str(e))
+                        form = MantenimientoForm()
+                        return render(request, 'core/añadir_mantenimiento.html', {
+                            'form': form,
+                            'equipo': equipo,
+                            'titulo_pagina': f'Añadir Mantenimiento a {equipo.nombre}',
+                        })
+
                 mantenimiento = Mantenimiento(
                     equipo=equipo,
                     fecha_mantenimiento=form.cleaned_data['fecha_mantenimiento'],
@@ -2315,7 +2471,7 @@ def añadir_mantenimiento(request, equipo_pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except Exception as e:
-                print(f"ERROR al guardar mantenimiento o archivo: {e}")
+                logger.error(f"ERROR al guardar mantenimiento o archivo: {e}")
                 messages.error(request, f'Hubo un error al guardar el mantenimiento: {e}')
 
     else:
@@ -2361,7 +2517,7 @@ def editar_mantenimiento(request, equipo_pk, pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except Exception as e:
-                print(f"ERROR al actualizar mantenimiento o archivo: {e}")
+                logger.error(f"ERROR al actualizar mantenimiento o archivo: {e}")
                 messages.error(request, f'Hubo un error al actualizar el mantenimiento: {e}')
     else:
         form = MantenimientoForm(instance=mantenimiento)
@@ -2393,7 +2549,7 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al eliminar el mantenimiento: {e}')
-            print(f"DEBUG: Error al eliminar mantenimiento {mantenimiento.pk}: {e}") # Para depuración
+            logger.error(f"Error al eliminar mantenimiento {mantenimiento.pk}: {e}") 
             return redirect('core:detalle_equipo', pk=equipo.pk)
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -2428,7 +2584,7 @@ def detalle_mantenimiento(request, equipo_pk, pk):
                 if default_storage.exists(ruta):
                     return default_storage.url(ruta)
             except Exception as e:
-                print(f"DEBUG: Error al obtener URL para {file_field.name}: {e}")
+                logger.error(f"Error al obtener URL para {file_field.name}: {e}")
         return None
 
     documento_mantenimiento_url = pdf_image_url(mantenimiento.documento_mantenimiento)
@@ -2456,6 +2612,20 @@ def añadir_comprobacion(request, equipo_pk):
         form = ComprobacionForm(request.POST, request.FILES)
         if form.is_valid():
             try:
+                # Validar límite de almacenamiento para archivos de comprobación
+                if 'documento_comprobacion' in request.FILES:
+                    archivo = request.FILES['documento_comprobacion']
+                    try:
+                        StorageLimitValidator.validate_storage_limit(equipo.empresa, archivo.size)
+                    except ValidationError as e:
+                        messages.error(request, str(e))
+                        form = ComprobacionForm()
+                        return render(request, 'core/añadir_comprobacion.html', {
+                            'form': form,
+                            'equipo': equipo,
+                            'titulo_pagina': f'Añadir Comprobación a {equipo.nombre}',
+                        })
+
                 comprobacion = Comprobacion(
                     equipo=equipo,
                     fecha_comprobacion=form.cleaned_data['fecha_comprobacion'],
@@ -2480,7 +2650,7 @@ def añadir_comprobacion(request, equipo_pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except Exception as e:
-                print(f"ERROR al guardar comprobación o archivo: {e}")
+                logger.error(f"ERROR al guardar comprobación o archivo: {e}")
                 messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
 
     else:
@@ -2526,7 +2696,7 @@ def editar_comprobacion(request, equipo_pk, pk):
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except Exception as e:
-                print(f"ERROR al actualizar comprobación o archivo: {e}")
+                logger.error(f"ERROR al actualizar comprobación o archivo: {e}")
                 messages.error(request, f'Hubo un error al actualizar la comprobación: {e}')
     else:
         form = ComprobacionForm(instance=comprobacion)
@@ -2558,7 +2728,7 @@ def eliminar_comprobacion(request, equipo_pk, pk):
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
             messages.error(request, f'Error al eliminar la comprobación: {e}')
-            print(f"DEBUG: Error al eliminar comprobación {comprobacion.pk}: {e}") # Para depuración
+            logger.error(f"Error al eliminar comprobación {comprobacion.pk}: {e}") 
             return redirect('core:detalle_equipo', pk=equipo.pk)
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -2617,7 +2787,7 @@ def dar_baja_equipo(request, equipo_pk):
 
             except Exception as e:
                 messages.error(request, f'Hubo un error al dar de baja el equipo: {e}')
-                print(f"DEBUG: Error al dar de baja equipo {equipo.pk}: {e}")
+                logger.error(f"Error al dar de baja equipo {equipo.pk}: {e}")
                 return render(request, 'core/dar_baja_equipo.html', {
                     'form': form,
                     'equipo': equipo,
@@ -2704,7 +2874,7 @@ def activar_equipo(request, equipo_pk):
                 messages.warning(request, f'Equipo "{equipo.nombre}" activado. No se encontró registro de baja asociado.')
             except Exception as e:
                 messages.error(request, f'Error al activar el equipo y eliminar el registro de baja: {e}')
-                print(f"DEBUG: Error al activar equipo {equipo.pk} (De Baja): {e}")
+                logger.error(f"Error al activar equipo {equipo.pk} (De Baja): {e}")
                 return redirect('core:detalle_equipo', pk=equipo.pk)
         
         elif equipo.estado == 'Inactivo':
@@ -2786,7 +2956,7 @@ def añadir_empresa(request):
                 return redirect('core:listar_empresas')
             except Exception as e:
                 messages.error(request, f'Hubo un error al añadir la empresa: {e}. Revisa el log para más detalles.')
-                print(f"DEBUG: Error al añadir empresa: {e}")
+                logger.error(f"Error al añadir empresa: {e}")
         else:
             messages.error(request, 'Hubo un error al añadir la empresa. Por favor, revisa los datos.')
     else:
@@ -2846,14 +3016,14 @@ def editar_empresa(request, pk):
                     ruta_s3 = f'empresas_logos/{nombre_archivo}'
                     default_storage.save(ruta_s3, archivo_subido)
                     empresa.logo_empresa = ruta_s3
-                    print(f'Archivo subido a: {ruta_s3}')
+                    logger.info(f'Archivo subido a: {ruta_s3}')
                 
                 empresa.save()
                 messages.success(request, 'Empresa actualizada exitosamente.')
                 return redirect('core:detalle_empresa', pk=empresa.pk)
             except Exception as e:
                 messages.error(request, f'Error al actualizar la empresa: {e}')
-                print(f"DEBUG: Error al editar empresa: {e}")
+                logger.error(f"Error al editar empresa: {e}")
         else:
             messages.error(request, 'Hubo un error al actualizar la empresa. Por favor, revisa los datos.')
     else:
@@ -2876,7 +3046,7 @@ def eliminar_empresa(request, pk):
             return redirect('core:listar_empresas')
         except Exception as e:
             messages.error(request, f'Error al eliminar la empresa: {e}')
-            print(f"DEBUG: Error al eliminar empresa {empresa.pk}: {e}")
+            logger.error(f"Error al eliminar empresa {empresa.pk}: {e}")
             return redirect('core:listar_empresas')
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -2921,7 +3091,7 @@ def añadir_usuario_a_empresa(request, empresa_pk):
                 messages.error(request, "El usuario seleccionado no existe.")
             except Exception as e:
                 messages.error(request, f"Error al añadir usuario: {e}")
-                print(f"DEBUG: Error en añadir_usuario_a_empresa: {e}")
+                logger.debug(f" Error en añadir_usuario_a_empresa: {e}")
         else:
             messages.error(request, "Por favor, selecciona un usuario.")
     
@@ -3024,7 +3194,7 @@ def eliminar_ubicacion(request, pk):
             return redirect('core:listar_ubicaciones')
         except Exception as e:
             messages.error(request, f'Error al eliminar la ubicación: {e}')
-            print(f"DEBUG: Error al eliminar ubicación {ubicacion.pk}: {e}")
+            logger.error(f"Error al eliminar ubicación {ubicacion.pk}: {e}")
             return redirect('core:listar_ubicaciones')
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -3110,6 +3280,21 @@ def añadir_procedimiento(request):
         form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
+                # Validar límite de almacenamiento antes de subir archivo
+                archivo_subido = request.FILES.get("documento_pdf")
+                if archivo_subido:
+                    # Obtener empresa del procedimiento
+                    procedimiento_temp = form.save(commit=False)
+                    empresa = procedimiento_temp.empresa
+
+                    # Validar límite de almacenamiento
+                    try:
+                        StorageLimitValidator.validate_storage_limit(empresa, archivo_subido.size)
+                    except ValidationError as e:
+                        messages.error(request, str(e))
+                        return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
+
+                # Solo continuar si pasó la validación de límites
                 # 1. obtener el archivo desde request.FILES
                 archivo_subido = request.FILES["documento_pdf"]
 
@@ -3123,9 +3308,13 @@ def añadir_procedimiento(request):
                 procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
                 return redirect('core:listar_procedimientos')
+            except ValidationError as ve:
+                # Manejar específicamente errores de validación (límites)
+                messages.error(request, str(ve))
+                return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
             except Exception as e:
                 messages.error(request, f'Hubo un error al añadir el procedimiento: {e}. Revisa el log para más detalles.')
-                print(f"DEBUG: Error al añadir procedimiento: {e}")
+                logger.error(f"Error al añadir procedimiento: {e}")
                 return render(request, 'core/añadir_procedimiento.html', {'form': form, 'titulo_pagina': 'Añadir Nuevo Procedimiento'})
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
@@ -3152,13 +3341,27 @@ def editar_procedimiento(request, pk):
         form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
             try:
+                # Validar límite de almacenamiento si se sube un nuevo archivo
+                nuevo_archivo = request.FILES.get("documento_pdf")
+                if nuevo_archivo:
+                    # Validar límite de almacenamiento
+                    try:
+                        StorageLimitValidator.validate_storage_limit(procedimiento.empresa, nuevo_archivo.size)
+                    except ValidationError as e:
+                        messages.error(request, str(e))
+                        return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
+
                 # La lógica de empresa ya se maneja en el formulario, solo guardar
                 form.save()
                 messages.success(request, 'Procedimiento actualizado exitosamente.')
                 return redirect('core:listar_procedimientos')
+            except ValidationError as ve:
+                # Manejar específicamente errores de validación (límites)
+                messages.error(request, str(ve))
+                return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
             except Exception as e:
                 messages.error(request, f'Hubo un error al actualizar el procedimiento: {e}. Revisa el log para más detalles.')
-                print(f"DEBUG: Error al actualizar procedimiento: {e}")
+                logger.error(f"Error al actualizar procedimiento: {e}")
                 return render(request, 'core/editar_procedimiento.html', {'form': form, 'procedimiento': procedimiento, 'titulo_pagina': f'Editar Procedimiento: {procedimiento.nombre}'})
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
@@ -3189,7 +3392,7 @@ def eliminar_procedimiento(request, pk):
             return redirect('core:listar_procedimientos')
         except Exception as e:
             messages.error(request, f'Error al eliminar el procedimiento: {e}. Revisa el log para más detalles.')
-            print(f"DEBUG: Error al eliminar procedimiento {procedimiento.pk}: {e}")
+            logger.error(f"Error al eliminar procedimiento {procedimiento.pk}: {e}")
             return redirect('core:listar_procedimientos')
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -3327,7 +3530,7 @@ def eliminar_proveedor(request, pk):
             return redirect('core:listar_proveedores')
         except Exception as e:
             messages.error(request, f'Error al eliminar el proveedor: {e}')
-            print(f"DEBUG: Error al eliminar proveedor {proveedor.pk}: {e}")
+            logger.error(f"Error al eliminar proveedor {proveedor.pk}: {e}")
             return redirect('core:listar_proveedores')
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -3396,12 +3599,8 @@ def listar_usuarios(request):
     except EmptyPage:
         usuarios = paginator.page(paginator.num_pages)
 
-    # Agregar información de permisos de exportación a cada usuario
-    for user_obj in usuarios:
-        user_obj.has_export_permission = user_obj.user_permissions.filter(
-            codename='can_export_reports',
-            content_type__app_label='core'
-        ).exists()
+    # Los permisos de exportación ahora se obtienen automáticamente
+    # a través de la propiedad has_export_permission del modelo CustomUser
 
     return render(request, 'core/listar_usuarios.html', {'usuarios': usuarios, 'query': query, 'titulo_pagina': 'Listado de Usuarios'})
 
@@ -3533,7 +3732,7 @@ def eliminar_usuario(request, pk):
             return redirect('core:listar_usuarios')
         except Exception as e:
             messages.error(request, f'Error al eliminar el usuario: {e}')
-            print(f"DEBUG: Error al eliminar usuario {usuario.pk}: {e}")
+            logger.error(f"Error al eliminar usuario {usuario.pk}: {e}")
             return redirect('core:detalle_usuario', pk=usuario.pk)
     
     # CAMBIO: Contexto para la plantilla genérica de confirmación
@@ -3733,18 +3932,33 @@ def generar_informe_zip(request):
     └── Listado_de_procedimientos.xlsx
     """
     selected_company_id = request.GET.get('empresa_id')
-    
+
+    # Para usuarios normales, usar su empresa asignada
+    if not selected_company_id and not request.user.is_superuser:
+        if request.user.empresa:
+            selected_company_id = str(request.user.empresa.id)
+        else:
+            messages.error(request, "No tiene una empresa asignada para generar el informe ZIP.")
+            return redirect('core:informes')
+
+    # Para superusuarios, empresa_id es obligatorio
     if not selected_company_id:
         messages.error(request, "Por favor, selecciona una empresa para generar el informe ZIP.")
         return redirect('core:informes')
 
     empresa = get_object_or_404(Empresa, pk=selected_company_id)
-    equipos_empresa = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
-    proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
-    procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo') # Filtrar procedimientos por empresa
 
+    # OPTIMIZACIÓN: Prefetch relacionados para evitar consultas N+1
+    equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
+        'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
+    ).order_by('codigo_interno')
+
+    proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
+    procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
+
+    # OPTIMIZACIÓN: Configurar compresión más eficiente
     zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         # 1. Add Listado_de_equipos.xlsx (General equipment report for that company)
         excel_buffer_general_equipos = _generate_general_equipment_list_excel_content(equipos_empresa)
         zf.writestr(f"{empresa.nombre}/Listado_de_equipos.xlsx", excel_buffer_general_equipos)
@@ -3768,115 +3982,141 @@ def generar_informe_zip(request):
                 hoja_vida_pdf_content = _generate_equipment_hoja_vida_pdf_content(request, equipo)
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content)
             except Exception as e:
-                print(f"Error generating Hoja de Vida PDF for {equipo.codigo_interno}: {e}")
+                logger.error(f"Error generating Hoja de Vida PDF for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_PDF_ERROR.txt", f"Error generating Hoja de Vida PDF: {e}")
 
             try:
                 hoja_vida_general_excel_content = _generate_equipment_general_info_excel_content(equipo)
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_Excel.xlsx", hoja_vida_general_excel_content)
             except Exception as e:
-                print(f"Error generating Hoja de Vida General Excel for {equipo.codigo_interno}: {e}")
+                logger.error(f"Error generating Hoja de Vida General Excel for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_EXCEL_ERROR.txt", f"Error generating Hoja de Vida General Excel: {e}")
 
             try:
                 hoja_vida_activities_excel_content = _generate_equipment_activities_excel_content(equipo)
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_Excel.xlsx", hoja_vida_activities_excel_content)
             except Exception as e:
-                print(f"Error generating Hoja de Vida Activities Excel for {equipo.codigo_interno}: {e}")
+                logger.error(f"Error generating Hoja de Vida Activities Excel for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Actividades Excel: {e}")
 
             # --- Añadir Documento de Baja si existe ---
             try:
-                baja_registro = BajaEquipo.objects.filter(equipo=equipo).first()
+                # OPTIMIZACIÓN: Usar prefetch de baja_registro en lugar de consulta individual
+                try:
+                    baja_registro = equipo.baja_registro
+                except BajaEquipo.DoesNotExist:
+                    baja_registro = None
                 if baja_registro and baja_registro.documento_baja and default_storage.exists(baja_registro.documento_baja.name):
                     baja_folder = f"{equipo_folder}/Baja"
                     with default_storage.open(baja_registro.documento_baja.name, 'rb') as f:
                         file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
                         zf.writestr(f"{baja_folder}/{file_name_in_zip}", f.read())
-                    print(f"DEBUG: Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
+                    logger.debug(f" Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
                 else:
-                    print(f"DEBUG: No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
+                    logger.debug(f" No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
             except Exception as e:
-                print(f"Error adding decommission document for {equipo.codigo_interno} to zip: {e}")
+                logger.error(f"Error adding decommission document for {equipo.codigo_interno} to zip: {e}")
                 zf.writestr(f"{equipo_folder}/Baja/Documento_Baja_ERROR.txt", f"Error adding decommission document: {e}")
 
 
             # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
-            calibraciones = Calibracion.objects.filter(equipo=equipo)
+            # OPTIMIZACIÓN: Usar prefetch en lugar de consulta individual
+            calibraciones = equipo.calibraciones.all()
             for cal in calibraciones:
+                # Generar nombre descriptivo para calibración: código-calibración-número_certificado
+                cert_numero = cal.numero_certificado or f"cert_{cal.id}"
+                fecha_cal = cal.fecha_calibracion.strftime("%Y-%m-%d")
+
                 if cal.documento_calibracion:
                     try:
                         if default_storage.exists(cal.documento_calibracion.name):
                             with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
-                                zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{os.path.basename(cal.documento_calibracion.name)}", f.read())
+                                # Nombre descriptivo: código_interno-calibración-número_certificado.pdf
+                                nombre_descriptivo = f"{safe_equipo_codigo}-calibracion-{cert_numero}-{fecha_cal}.pdf"
+                                zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{nombre_descriptivo}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
+                            logger.debug(f" Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
                     except Exception as e:
-                        print(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
+                        logger.error(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
 
                 if cal.confirmacion_metrologica_pdf:
                     try:
                         if default_storage.exists(cal.confirmacion_metrologica_pdf.name):
                             with default_storage.open(cal.confirmacion_metrologica_pdf.name, 'rb') as f:
-                                zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{os.path.basename(cal.confirmacion_metrologica_pdf.name)}", f.read())
+                                # Nombre descriptivo: código_interno-confirmacion-número_certificado.pdf
+                                nombre_descriptivo = f"{safe_equipo_codigo}-confirmacion-{cert_numero}-{fecha_cal}.pdf"
+                                zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{nombre_descriptivo}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}")
+                            logger.debug(f" Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}")
                     except Exception as e:
-                        print(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
+                        logger.error(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
 
                 if cal.intervalos_calibracion_pdf:
                     try:
                         if default_storage.exists(cal.intervalos_calibracion_pdf.name):
                             with default_storage.open(cal.intervalos_calibracion_pdf.name, 'rb') as f:
-                                zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{os.path.basename(cal.intervalos_calibracion_pdf.name)}", f.read())
+                                # Nombre descriptivo: código_interno-intervalos-número_certificado.pdf
+                                nombre_descriptivo = f"{safe_equipo_codigo}-intervalos-{cert_numero}-{fecha_cal}.pdf"
+                                zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{nombre_descriptivo}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}")
+                            logger.debug(f" Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}")
                     except Exception as e:
-                        print(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
+                        logger.error(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
 
             # Add existing Maintenance PDFs
-            mantenimientos = Mantenimiento.objects.filter(equipo=equipo)
+            # OPTIMIZACIÓN: Usar prefetch en lugar de consulta individual
+            mantenimientos = equipo.mantenimientos.all()
             for mant in mantenimientos:
                 if mant.documento_mantenimiento:
                     try:
                         if default_storage.exists(mant.documento_mantenimiento.name):
                             with default_storage.open(mant.documento_mantenimiento.name, 'rb') as f:
-                                zf.writestr(f"{equipo_folder}/Mantenimientos/{os.path.basename(mant.documento_mantenimiento.name)}", f.read())
+                                # Nombre descriptivo: código_interno-mantenimiento-fecha
+                                fecha_mant = mant.fecha_mantenimiento.strftime("%Y-%m-%d")
+                                tipo_mant = mant.tipo_mantenimiento.lower().replace(' ', '_')
+                                nombre_descriptivo = f"{safe_equipo_codigo}-mantenimiento-{tipo_mant}-{fecha_mant}.pdf"
+                                zf.writestr(f"{equipo_folder}/Mantenimientos/{nombre_descriptivo}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}")
+                            logger.debug(f" Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}")
                     except Exception as e:
-                        print(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
+                        logger.error(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
 
             # Add existing Verification PDFs
-            comprobaciones = Comprobacion.objects.filter(equipo=equipo)
+            # OPTIMIZACIÓN: Usar prefetch en lugar de consulta individual
+            comprobaciones = equipo.comprobaciones.all()
             for comp in comprobaciones:
                 if comp.documento_comprobacion:
                     try:
                         if default_storage.exists(comp.documento_comprobacion.name):
                             with default_storage.open(comp.documento_comprobacion.name, 'rb') as f:
-                                zf.writestr(f"{equipo_folder}/Comprobaciones/{os.path.basename(comp.documento_comprobacion.name)}", f.read())
+                                # Nombre descriptivo: código_interno-comprobacion-fecha
+                                fecha_comp = comp.fecha_comprobacion.strftime("%Y-%m-%d")
+                                nombre_descriptivo = f"{safe_equipo_codigo}-comprobacion-{fecha_comp}.pdf"
+                                zf.writestr(f"{equipo_folder}/Comprobaciones/{nombre_descriptivo}", f.read())
                         else:
-                            print(f"DEBUG: Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}")
+                            logger.debug(f" Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}")
                     except Exception as e:
-                        print(f"Error adding comprobacion document {comp.documento_comprobacion.name} to zip: {e}")
+                        logger.error(f"Error adding comprobacion document {comp.documento_comprobacion.name} to zip: {e}")
             
             # Add other equipment documents (if they exist and are PDF)
             equipment_docs = [
-                equipo.archivo_compra_pdf,
-                equipo.ficha_tecnica_pdf,
-                equipo.manual_pdf,
-                equipo.otros_documentos_pdf
+                (equipo.archivo_compra_pdf, 'compra'),
+                (equipo.ficha_tecnica_pdf, 'ficha_tecnica'),
+                (equipo.manual_pdf, 'manual'),
+                (equipo.otros_documentos_pdf, 'otros_documentos')
             ]
-            for doc_field in equipment_docs:
+            for doc_field, doc_type in equipment_docs:
                 if doc_field:
                     try:
                         if default_storage.exists(doc_field.name) and doc_field.name.lower().endswith('.pdf'):
                             with default_storage.open(doc_field.name, 'rb') as f:
-                                zf.writestr(f"{equipo_folder}/{os.path.basename(doc_field.name)}", f.read())
+                                # Nombre descriptivo: código_interno_tipo_documento.pdf
+                                nombre_descriptivo = f"{safe_equipo_codigo}_{doc_type}.pdf"
+                                zf.writestr(f"{equipo_folder}/{nombre_descriptivo}", f.read())
                         else:
-                             print(f"DEBUG: Archivo no encontrado en storage (doc. equipo): {doc_field.name}")
+                             logger.debug(f" Archivo no encontrado en storage (doc. equipo): {doc_field.name}")
                     except Exception as e:
-                        print(f"Error adding equipment document {doc_field.name} to zip: {e}")
+                        logger.error(f"Error adding equipment document {doc_field.name} to zip: {e}")
 
         # Add existing Procedure PDFs (NEW)
         for proc in procedimientos_empresa:
@@ -3890,17 +4130,30 @@ def generar_informe_zip(request):
                             # Usar código del procedimiento como prefijo para el nombre del archivo en el zip
                             zip_path = f"{proc_folder}/{safe_proc_code}_{file_name_in_zip}"
                             zf.writestr(zip_path, f.read())
-                        print(f"DEBUG: Documento de procedimiento '{file_name_in_zip}' añadido para procedimiento {proc.codigo}")
+                        logger.debug(f" Documento de procedimiento '{file_name_in_zip}' añadido para procedimiento {proc.codigo}")
                     else:
-                        print(f"DEBUG: Archivo de procedimiento no encontrado en storage: {proc.documento_pdf.name}")
+                        logger.debug(f" Archivo de procedimiento no encontrado en storage: {proc.documento_pdf.name}")
                 except Exception as e:
-                    print(f"Error adding procedure document {proc.documento_pdf.name} to zip: {e}")
+                    logger.error(f"Error adding procedure document {proc.documento_pdf.name} to zip: {e}")
                     zf.writestr(f"{empresa.nombre}/Procedimientos/Documento_Procedimiento_{proc.codigo}_ERROR.txt", f"Error adding procedure document: {e}")
 
 
+    # OPTIMIZACIÓN: Mejorar respuesta HTTP para transferencia eficiente
     zip_buffer.seek(0)
-    response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
-    response['Content-Disposition'] = f'attachment; filename="Informes_{empresa.nombre}.zip"'
+    zip_content = zip_buffer.getvalue()
+
+    # Crear respuesta optimizada
+    response = HttpResponse(zip_content, content_type='application/zip')
+
+    # Headers optimizados para descarga
+    filename_safe = empresa.nombre.replace(' ', '_').replace('/', '_').replace('\\', '_')
+    response['Content-Disposition'] = f'attachment; filename="Informes_{filename_safe}.zip"'
+    response['Content-Length'] = len(zip_content)
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+
+    logger.info(f"ZIP generado exitosamente para empresa {empresa.nombre}: {len(zip_content)} bytes")
     return response
 
 
@@ -3988,7 +4241,7 @@ def informe_vencimientos_pdf(request):
         return response
     except Exception as e:
         messages.error(request, f'Tuvimos algunos errores al generar el PDF de vencimientos: {e}. Revisa los logs para más detalles.')
-        print(f"DEBUG: Error al generar informe_vencimientos_pdf: {e}")
+        logger.error(f"Error al generar informe_vencimientos_pdf: {e}")
         return redirect('core:informes')
 
 
@@ -4110,7 +4363,7 @@ def generar_hoja_vida_pdf(request, pk):
         return response
     except Exception as e:
         messages.error(request, f'Tuvimos algunos errores al generar el PDF: {e}. Revisa los logs para más detalles.')
-        print(f"DEBUG: Error al generar hoja_vida_pdf para equipo {equipo.pk}: {e}")
+        logger.error(f"Error al generar hoja_vida_pdf para equipo {equipo.pk}: {e}")
         return redirect('core:detalle_equipo', pk=equipo.pk)
         
 @access_check # APLICAR ESTE DECORADOR
@@ -4169,7 +4422,7 @@ def toggle_user_active_status(request):
     except CustomUser.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Usuario no encontrado.'}, status=404)
     except Exception as e:
-        print(f"DEBUG: Error al alternar estado de usuario: {e}")
+        logger.error(f"Error al alternar estado de usuario: {e}")
         return JsonResponse({'status': 'error', 'message': f'Error interno del servidor: {str(e)}'}, status=500)
 
 @access_check
@@ -4194,7 +4447,9 @@ def toggle_download_permission(request):
         user_to_modify = get_object_or_404(CustomUser, pk=user_id)
 
         # Get the export permission
-        export_permission = Permission.objects.get(codename='can_export_reports', content_type__app_label='core')
+        from django.contrib.contenttypes.models import ContentType
+        content_type = ContentType.objects.get_for_model(Equipo)
+        export_permission = Permission.objects.get(codename='can_export_reports', content_type=content_type)
 
         if grant_permission:
             # Grant permission
@@ -4217,7 +4472,7 @@ def toggle_download_permission(request):
     except Permission.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Permiso no encontrado.'}, status=404)
     except Exception as e:
-        print(f"DEBUG: Error al alternar permisos de descarga: {e}")
+        logger.error(f"Error al alternar permisos de descarga: {e}")
         return JsonResponse({'status': 'error', 'message': f'Error interno del servidor: {str(e)}'}, status=500)
 
 @access_check

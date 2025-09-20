@@ -8,16 +8,8 @@
 <div class="container mx-auto p-4">
     <h1 class="text-3xl font-bold text-gray-800 mb-6">Añadir Nuevo Procedimiento</h1>
 
-    {# Django Messages #}
-    {% if messages %}
-        <div class="mb-4">
-            {% for message in messages %}
-                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} p-3 rounded-md shadow-sm mb-2" role="alert">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+    {# Django Messages con soporte para límites #}
+    {% include 'core/includes/messages_display.html' %}
 
     <div class="bg-white p-6 rounded-lg shadow-md">
         <form method="post" enctype="multipart/form-data"> {# IMPORANTE: Añadir enctype para subida de archivos #}

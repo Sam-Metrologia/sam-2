@@ -357,13 +357,27 @@ class EquipoForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        if self.request and not self.request.user.is_superuser:
-            self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk:
-                self.fields['empresa'].initial = self.request.user.empresa
+        # Configurar campo empresa para requerir selección manual
+        if self.request:
+            if self.request.user.is_superuser:
+                # Superusuarios pueden ver todas las empresas
+                self.fields['empresa'].queryset = Empresa.objects.all().order_by('nombre')
+                self.fields['empresa'].empty_label = "-- Seleccione una empresa --"
             else:
-                self.fields['empresa'].initial = self.instance.empresa
-        elif self.request and self.request.user.is_superuser:
+                # Usuarios normales solo pueden ver/seleccionar su propia empresa
+                if self.request.user.empresa:
+                    self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                    # Para nuevos equipos, mantener vacío para requerir selección manual
+                    if not self.instance.pk:
+                        self.fields['empresa'].empty_label = "-- Seleccione su empresa --"
+                    else:
+                        # Para editar, mostrar la empresa actual como seleccionada
+                        self.fields['empresa'].empty_label = None
+                else:
+                    # Usuario sin empresa asignada no puede crear equipos
+                    self.fields['empresa'].queryset = Empresa.objects.none()
+                    self.fields['empresa'].empty_label = "-- Sin empresa asignada --"
+
             self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select w-full'})
             self.fields['empresa'].required = True
 
@@ -374,6 +388,19 @@ class EquipoForm(forms.ModelForm):
                 date_value = getattr(self.instance, field_name, None)
                 if date_value:
                     self.fields[field_name].initial = date_value.strftime('%d/%m/%Y')
+
+    def clean_empresa(self):
+        empresa = self.cleaned_data.get('empresa')
+        if not empresa:
+            raise ValidationError("Debe seleccionar una empresa.")
+
+        # Verificar que el usuario tenga permiso para asignar equipos a esta empresa
+        if self.request:
+            if not self.request.user.is_superuser:
+                if not self.request.user.empresa or self.request.user.empresa != empresa:
+                    raise ValidationError("No tiene permisos para asignar equipos a esta empresa.")
+
+        return empresa
 
     def clean_codigo_interno(self):
         codigo = self.cleaned_data.get('codigo_interno')

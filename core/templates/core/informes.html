@@ -219,6 +219,9 @@
                 const companyId = companyFilter ? companyFilter.value : ''; // Obtiene el ID de la empresa seleccionada
 
                 let url = baseUrl;
+
+                // Si es superusuario y no ha seleccionado empresa, mostrar error
+                {% if user.is_superuser %}
                 if (companyId) {
                     url += `?empresa_id=${companyId}`;
                     // Abre la URL en una nueva ventana/pestaña para iniciar la descarga
@@ -243,6 +246,11 @@
                     });
                     return; // No procede si no hay empresa seleccionada
                 }
+                {% else %}
+                // Usuario normal: puede descargar directamente sin filtro de empresa
+                // Abre la URL en una nueva ventana/pestaña para iniciar la descarga
+                window.open(url, '_blank');
+                {% endif %}
             });
         }
     });

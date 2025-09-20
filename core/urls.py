@@ -2,9 +2,7 @@
 
 from django.urls import path
 from . import views
-from . import views_debug  # Importar vistas de diagnóstico temporal
-from . import views_debug_logo  # Importar vistas de diagnóstico de logos
-from . import views_fix_logos  # Importar vistas para corregir logos
+# Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
 app_name = 'core'
@@ -105,13 +103,7 @@ urlpatterns = [
     # Acceso Denegado
     path('access_denied/', views.access_denied, name='access_denied'),
 
-    # === VISTAS DE DIAGNÓSTICO TEMPORAL (ELIMINAR DESPUÉS DEL DEBUG) ===
-    path('debug/s3-diagnostics/', views_debug.s3_diagnostics, name='s3_diagnostics'),
-    path('debug/file-upload-test/', views_debug.file_upload_test, name='file_upload_test'),
-    path('debug/logo-diagnostics/<int:empresa_id>/', views_debug_logo.logo_diagnostics, name='logo_diagnostics'),
-    path('debug/test-logo-upload/', views_debug_logo.test_logo_upload, name='test_logo_upload'),
-
-    # === VISTAS PARA CORREGIR LOGOS ===
-    path('fix-mi-logo/', views_fix_logos.fix_mi_logo_empresa, name='fix_mi_logo'),
-    path('empresas-sin-logo/', views_fix_logos.lista_empresas_sin_logo, name='lista_empresas_sin_logo'),
+    # === URLs DE DEBUG ELIMINADAS ===
+    # Eliminadas rutas de debug: s3_diagnostics, file_upload_test, logo_diagnostics,
+    # test_logo_upload, fix_mi_logo, lista_empresas_sin_logo
 ]

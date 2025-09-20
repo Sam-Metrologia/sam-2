@@ -294,12 +294,12 @@
                     if (data.status === 'success') {
                         // Si la operación fue exitosa, actualiza el texto del estado
                         statusSpan.textContent = data.new_status ? 'Activo' : 'Inactivo';
-                        addDjangoMessage(data.message, 'success'); // Muestra un mensaje de éxito
+                        showMessage(data.message, 'success'); // Muestra un mensaje de éxito
                     } else {
                         // Si el servidor reporta un error, revierte el checkbox y el texto
                         this.checked = originalCheckedState;
                         statusSpan.textContent = originalStatusText;
-                        addDjangoMessage(data.message || 'Error desconocido al actualizar.', 'error'); // Muestra el mensaje de error del servidor
+                        showMessage(data.message || 'Error desconocido al actualizar.', 'error'); // Muestra el mensaje de error del servidor
                     }
                 })
                 .catch(error => {
@@ -308,7 +308,7 @@
                     // Revierte el checkbox y el texto
                     this.checked = originalCheckedState;
                     statusSpan.textContent = originalStatusText;
-                    addDjangoMessage(`Error: ${error.message || 'Problema de conexión con el servidor.'}`, 'error'); // Muestra un mensaje de error genérico
+                    showMessage(`Error: ${error.message || 'Problema de conexión con el servidor.'}`, 'error'); // Muestra un mensaje de error genérico
                 });
             });
         });
@@ -329,6 +329,15 @@
 
     // Función para alternar permisos de descarga
     function toggleDownloadPermission(userId, grantPermission) {
+        const button = event.target.closest('button');
+        const row = button.closest('tr');
+        const permissionCell = row.querySelector('td:nth-child(6)'); // Columna de permisos de descarga
+
+        // Deshabilitar el botón durante la petición
+        button.disabled = true;
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
         fetch('{% url "core:toggle_download_permission" %}', {
             method: 'POST',
             headers: {
@@ -345,17 +354,40 @@
             if (data.status === 'success') {
                 // Mostrar mensaje de éxito
                 showMessage(data.message, 'success');
-                // Recargar la página para reflejar los cambios
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
+
+                // Actualizar el estado visual del permiso
+                if (grantPermission) {
+                    // Usuario ahora tiene permisos
+                    permissionCell.innerHTML = '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Sí</span>';
+                    // Cambiar el botón a "revocar"
+                    button.className = 'w-8 h-8 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition duration-300 ease-in-out';
+                    button.innerHTML = '<i class="fas fa-user-times"></i>';
+                    button.title = 'Revocar permiso de descarga';
+                    button.onclick = () => toggleDownloadPermission(userId, false);
+                } else {
+                    // Usuario ya no tiene permisos
+                    permissionCell.innerHTML = '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">No</span>';
+                    // Cambiar el botón a "otorgar"
+                    button.className = 'w-8 h-8 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition duration-300 ease-in-out';
+                    button.innerHTML = '<i class="fas fa-user-check"></i>';
+                    button.title = 'Otorgar permiso de descarga';
+                    button.onclick = () => toggleDownloadPermission(userId, true);
+                }
             } else {
                 showMessage(data.message || 'Error al actualizar permisos', 'error');
+                // Restaurar el botón
+                button.innerHTML = originalContent;
             }
         })
         .catch(error => {
             console.error('Error:', error);
             showMessage('Error de conexión al actualizar permisos', 'error');
+            // Restaurar el botón
+            button.innerHTML = originalContent;
+        })
+        .finally(() => {
+            // Rehabilitar el botón
+            button.disabled = false;
         });
     }
 </script>

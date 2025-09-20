@@ -138,6 +138,91 @@ class Empresa(models.Model):
         """Devuelve la fecha de fin del plan para mostrar en templates."""
         return self.get_fecha_fin_plan()
 
+    def get_total_storage_used_mb(self):
+        """Calcula el uso total de almacenamiento en MB para todos los archivos de la empresa."""
+        from django.core.files.storage import default_storage
+
+        total_size_bytes = 0
+
+        # Calcular storage del logo de la empresa
+        if self.logo_empresa and hasattr(self.logo_empresa, 'path'):
+            try:
+                if default_storage.exists(self.logo_empresa.name):
+                    total_size_bytes += default_storage.size(self.logo_empresa.name)
+            except Exception:
+                pass
+
+        # Calcular storage de equipos y sus archivos
+        for equipo in self.equipos.all():
+            # Archivos principales del equipo
+            campos_archivo_equipo = ['archivo_compra_pdf', 'ficha_tecnica_pdf', 'manual_pdf', 'otros_documentos_pdf', 'imagen_equipo']
+            for campo_archivo in campos_archivo_equipo:
+                archivo = getattr(equipo, campo_archivo, None)
+                if archivo and hasattr(archivo, 'name'):
+                    try:
+                        if default_storage.exists(archivo.name):
+                            total_size_bytes += default_storage.size(archivo.name)
+                    except Exception:
+                        pass
+
+            # Archivos de calibraciones
+            for calibracion in equipo.calibraciones.all():
+                # Verificar múltiples campos de archivos en calibraciones
+                for campo_archivo in ['documento_calibracion', 'confirmacion_metrologica_pdf', 'intervalos_calibracion_pdf']:
+                    archivo = getattr(calibracion, campo_archivo, None)
+                    if archivo and hasattr(archivo, 'name'):
+                        try:
+                            if default_storage.exists(archivo.name):
+                                total_size_bytes += default_storage.size(archivo.name)
+                        except Exception:
+                            pass
+
+            # Archivos de mantenimientos
+            for mantenimiento in equipo.mantenimientos.all():
+                # Verificar múltiples campos de archivos en mantenimientos
+                for campo_archivo in ['documento_mantenimiento', 'archivo_mantenimiento']:
+                    archivo = getattr(mantenimiento, campo_archivo, None)
+                    if archivo and hasattr(archivo, 'name'):
+                        try:
+                            if default_storage.exists(archivo.name):
+                                total_size_bytes += default_storage.size(archivo.name)
+                        except Exception:
+                            pass
+
+            # Archivos de comprobaciones
+            for comprobacion in equipo.comprobaciones.all():
+                if comprobacion.documento_comprobacion and hasattr(comprobacion.documento_comprobacion, 'name'):
+                    try:
+                        if default_storage.exists(comprobacion.documento_comprobacion.name):
+                            total_size_bytes += default_storage.size(comprobacion.documento_comprobacion.name)
+                    except Exception:
+                        pass
+
+        # Convertir bytes a MB
+        return round(total_size_bytes / (1024 * 1024), 2)
+
+    def get_storage_usage_percentage(self):
+        """Calcula el porcentaje de uso de almacenamiento."""
+        if self.limite_almacenamiento_mb <= 0:
+            return 0
+
+        used_mb = self.get_total_storage_used_mb()
+        percentage = (used_mb / self.limite_almacenamiento_mb) * 100
+        return min(round(percentage, 1), 100)  # Máximo 100%
+
+    def get_storage_status_class(self):
+        """Retorna la clase CSS basada en el porcentaje de uso de almacenamiento."""
+        percentage = self.get_storage_usage_percentage()
+
+        if percentage >= 90:
+            return 'text-red-700 bg-red-100'
+        elif percentage >= 75:
+            return 'text-yellow-700 bg-yellow-100'
+        elif percentage >= 50:
+            return 'text-orange-700 bg-orange-100'
+        else:
+            return 'text-green-700 bg-green-100'
+
     @property
     def fecha_fin_plan_status(self):
         """
@@ -228,6 +313,11 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    @property
+    def has_export_permission(self):
+        """Verifica si el usuario tiene permiso para exportar informes."""
+        return self.has_perm('core.can_export_reports')
 
 
 # ==============================================================================
