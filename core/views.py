@@ -4389,12 +4389,9 @@ def generar_informe_zip(request):
     # Calcular offset para paginación
     offset = (parte_numero - 1) * EQUIPOS_POR_ZIP
 
-    # OPTIMIZACIÓN: Prefetch más específico para reducir memoria
+    # OPTIMIZACIÓN: Prefetch simple sin slice para evitar QuerySet conflicts
     equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
-        Prefetch('calibraciones', queryset=Calibracion.objects.select_related().order_by('-fecha_calibracion')[:5]),  # Solo últimas 5 calibraciones
-        Prefetch('mantenimientos', queryset=Mantenimiento.objects.select_related().order_by('-fecha_mantenimiento')[:5]),  # Solo últimos 5 mantenimientos
-        Prefetch('comprobaciones', queryset=Comprobacion.objects.select_related().order_by('-fecha_comprobacion')[:5]),  # Solo últimas 5 comprobaciones
-        'baja_registro'
+        'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
     ).order_by('codigo_interno')[offset:offset + EQUIPOS_POR_ZIP]
 
     # Calcular información de paginación
