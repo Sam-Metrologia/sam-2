@@ -5102,6 +5102,55 @@ import os
 from .models import ZipRequest
 
 @access_check
+def trigger_zip_processing(request):
+    """
+    Endpoint para activar procesamiento de ZIP desde frontend.
+    Diseñado para Render - procesa una solicitud y termina.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+
+        # Capturar output del comando
+        output = StringIO()
+
+        # Ejecutar procesamiento de una sola solicitud
+        call_command('process_single_zip', '--cleanup-expired', stdout=output)
+
+        result = output.getvalue()
+
+        # Determinar si se procesó algo
+        if '[PROCESANDO]' in result:
+            return JsonResponse({
+                'status': 'processing_started',
+                'message': 'Solicitud en procesamiento',
+                'output': result
+            })
+        elif '[COLA-VACÍA]' in result:
+            return JsonResponse({
+                'status': 'queue_empty',
+                'message': 'No hay solicitudes pendientes',
+                'output': result
+            })
+        else:
+            return JsonResponse({
+                'status': 'completed',
+                'message': 'Procesamiento completado',
+                'output': result
+            })
+
+    except Exception as e:
+        logger.error(f'Error en trigger_zip_processing: {e}', exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error procesando: {str(e)}'
+        }, status=500)
+
+
+@access_check
 @login_required
 @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def solicitar_zip(request):

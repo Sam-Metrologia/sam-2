@@ -601,7 +601,40 @@
                 if (checkInterval) clearInterval(checkInterval);
                 checkInterval = setInterval(checkZipStatus, 15000);
                 checkZipStatus(); // Check immediately
+
+                // NUEVO: Activar procesamiento automáticamente (compatible con Render)
+                triggerZipProcessing();
             };
+
+            // Función para activar procesamiento en Render
+            function triggerZipProcessing() {
+                console.log('ZIP Trigger: Activando procesamiento en Render...');
+
+                fetch('/core/trigger_zip_processing/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('ZIP Trigger: Respuesta del procesador:', data);
+
+                    if (data.status === 'processing_started') {
+                        console.log('ZIP Trigger: ¡Procesamiento iniciado exitosamente!');
+                        // Verificar estado más frecuentemente cuando se está procesando
+                        if (checkInterval) clearInterval(checkInterval);
+                        checkInterval = setInterval(checkZipStatus, 5000); // Cada 5 segundos
+                    } else if (data.status === 'completed') {
+                        console.log('ZIP Trigger: Procesamiento completado');
+                        checkZipStatus(); // Verificar estado inmediatamente
+                    }
+                })
+                .catch(error => {
+                    console.error('ZIP Trigger: Error activando procesamiento:', error);
+                });
+            }
 
             // Función global para descargar ZIP
             window.downloadZip = function(requestId) {
