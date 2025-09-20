@@ -316,8 +316,8 @@
                 {% if user.is_superuser %}
                 if (companyId) {
                     url += `?empresa_id=${companyId}`;
-                    // Abre la URL en una nueva ventana/pestaña para iniciar la descarga
-                    window.open(url, '_blank');
+                    // Usar location.href para forzar descarga directa
+                    window.location.href = url;
                 } else {
                     // Usar la función add_message para mostrar un mensaje de error
                     fetch('{% url "core:add_message" %}', {
@@ -340,8 +340,8 @@
                 }
                 {% else %}
                 // Usuario normal: puede descargar directamente sin filtro de empresa
-                // Abre la URL en una nueva ventana/pestaña para iniciar la descarga
-                window.open(url, '_blank');
+                // Usar location.href para forzar descarga directa
+                window.location.href = url;
                 {% endif %}
             });
         }

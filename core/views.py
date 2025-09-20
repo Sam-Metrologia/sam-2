@@ -3351,17 +3351,16 @@ def añadir_empresa(request):
 
 @access_check # APLICAR ESTE DECORADOR
 @login_required
-@user_passes_test(lambda u: u.is_superuser or (u.empresa and u.empresa.pk == pk), login_url='/core/access_denied/') # Restringe a superusuario o propia empresa
 def detalle_empresa(request, pk):
     """
     Displays the details of a specific company and its associated equipment.
     """
     empresa = get_object_or_404(Empresa, pk=pk)
 
-    # Permission check: superusers can see any company; regular users can only see their own.
-    if not request.user.is_superuser and (not request.user.empresa or request.user.empresa != empresa):
-        messages.error(request, 'No tienes permiso para ver los detalles de esta empresa.')
-        return redirect('core:listar_empresas') # Redirect to list if not permitted
+    # Verificar permisos: solo superusuario o usuario de la misma empresa
+    if not request.user.is_superuser and (not request.user.empresa or request.user.empresa.pk != empresa.pk):
+        messages.error(request, 'No tienes permisos para ver esta empresa.')
+        return redirect('core:access_denied')
 
     # Obtener los equipos asociados a esta empresa
     equipos_asociados = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
@@ -4400,7 +4399,7 @@ def generar_informe_zip(request):
 
     # Calcular información de paginación
     total_partes = (equipos_empresa_total + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP  # Redondeo hacia arriba
-    equipos_en_esta_parte = equipos_empresa.count()
+    equipos_en_esta_parte = len(equipos_empresa)  # Usar len() en lugar de count() para QuerySet con slice
 
     # Información para logs y filename con optimizaciones aplicadas
     if total_partes > 1:
