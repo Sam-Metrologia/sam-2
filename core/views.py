@@ -3916,6 +3916,16 @@ def informes(request):
     comprobaciones_proximos_15 = [act for act in scheduled_activities if act['tipo'] == 'Comprobación' and act['estado_vencimiento'] == 'Próxima' and act['dias_restantes'] <= 15 and act['dias_restantes'] >= 0]
     comprobaciones_vencidas = [act for act in scheduled_activities if act['tipo'] == 'Comprobación' and act['estado_vencimiento'] == 'Vencida']
 
+    # Información de paginación para ZIPs
+    zip_info = None
+    if selected_company_id:
+        total_equipos, total_partes, equipos_por_zip = calcular_info_paginacion_zip(selected_company_id)
+        zip_info = {
+            'total_equipos': total_equipos,
+            'total_partes': total_partes,
+            'equipos_por_zip': equipos_por_zip,
+            'requiere_paginacion': total_partes > 1
+        }
 
     context = {
         'titulo_pagina': 'Informes y Actividades',
@@ -3923,6 +3933,7 @@ def informes(request):
         'empresas_disponibles': empresas_disponibles,
         'selected_company_id': selected_company_id,
         'today': today,
+        'zip_info': zip_info,  # Nueva información de paginación
 
         'calibraciones_proximas_30': calibraciones_proximas_30,
         'calibraciones_proximas_15': calibraciones_proximas_15,
@@ -3939,12 +3950,28 @@ def informes(request):
     return render(request, 'core/informes.html', context)
 
 
+def calcular_info_paginacion_zip(empresa_id):
+    """
+    Calcula información de paginación para ZIPs basado en número de equipos.
+    Returns: (total_equipos, total_partes, equipos_por_zip)
+    """
+    EQUIPOS_POR_ZIP = 50
+    total_equipos = Equipo.objects.filter(empresa_id=empresa_id).count()
+    total_partes = (total_equipos + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP if total_equipos > 0 else 1
+    return total_equipos, total_partes, EQUIPOS_POR_ZIP
+
+
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
 def generar_informe_zip(request):
     """
     Generates a ZIP file containing equipment reports and associated documents, including procedures.
+    For companies with more than 50 equipments, it generates paginated ZIPs.
+
+    Parameters:
+    - parte (optional): Part number for paginated downloads (1, 2, 3, etc.)
+
     The ZIP structure includes:
     [Company Name]/
     ├── Equipos/
@@ -3974,6 +4001,7 @@ def generar_informe_zip(request):
     └── Listado_de_procedimientos.xlsx
     """
     selected_company_id = request.GET.get('empresa_id')
+    parte_param = request.GET.get('parte', '1')  # Parámetro para paginación (por defecto parte 1)
 
     # Para usuarios normales, usar su empresa asignada
     if not selected_company_id and not request.user.is_superuser:
@@ -3990,27 +4018,60 @@ def generar_informe_zip(request):
 
     empresa = get_object_or_404(Empresa, pk=selected_company_id)
 
+    # Validar parámetro de parte
+    try:
+        parte_numero = int(parte_param)
+        if parte_numero < 1:
+            parte_numero = 1
+    except (ValueError, TypeError):
+        parte_numero = 1
+
     # OPTIMIZACIÓN: Prefetch relacionados para evitar consultas N+1
+    # PAGINACIÓN: Limitar equipos para evitar problemas de memoria en servidor (512MB)
+    EQUIPOS_POR_ZIP = 50
+    equipos_empresa_total = Equipo.objects.filter(empresa=empresa).count()
+
+    # Calcular offset para paginación
+    offset = (parte_numero - 1) * EQUIPOS_POR_ZIP
+
     equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
         'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
-    ).order_by('codigo_interno')
+    ).order_by('codigo_interno')[offset:offset + EQUIPOS_POR_ZIP]
+
+    # Calcular información de paginación
+    total_partes = (equipos_empresa_total + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP  # Redondeo hacia arriba
+    equipos_en_esta_parte = equipos_empresa.count()
+
+    # Información para logs y filename
+    if total_partes > 1:
+        logger.info(f"Generando ZIP parte {parte_numero}/{total_partes} para empresa {empresa.nombre}: equipos {offset + 1}-{offset + equipos_en_esta_parte} de {equipos_empresa_total}")
+    else:
+        logger.info(f"Generando ZIP completo para empresa {empresa.nombre}: {equipos_en_esta_parte} equipos")
 
     proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
     procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
 
-    # OPTIMIZACIÓN: Configurar compresión más eficiente y helper para archivos
-    def download_file_safely(file_path):
-        """Helper optimizada para descargar archivos de S3 con manejo de errores."""
+    # OPTIMIZACIÓN: Configurar compresión más eficiente y streaming de archivos
+    def stream_file_to_zip(zip_file, file_path, zip_path):
+        """Helper que hace streaming directo de archivo a ZIP sin cargar en memoria."""
         try:
             if default_storage.exists(file_path):
                 with default_storage.open(file_path, 'rb') as f:
-                    return f.read()
+                    # Usar streaming con chunks pequeños para reducir memoria
+                    with zip_file.open(zip_path, 'w') as zip_entry:
+                        while True:
+                            chunk = f.read(8192)  # 8KB chunks
+                            if not chunk:
+                                break
+                            zip_entry.write(chunk)
+                return True
         except Exception as e:
-            logger.warning(f"Error descargando archivo {file_path}: {e}")
-        return None
+            logger.warning(f"Error streaming archivo {file_path}: {e}")
+        return False
 
     zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+    # Reducir compresión para usar menos memoria (2 en lugar de 6)
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=2) as zf:
         # 1. Add Listado_de_equipos.xlsx (General equipment report for that company)
         excel_buffer_general_equipos = _generate_general_equipment_list_excel_content(equipos_empresa)
         zf.writestr(f"{empresa.nombre}/Listado_de_equipos.xlsx", excel_buffer_general_equipos)
@@ -4060,11 +4121,11 @@ def generar_informe_zip(request):
                     baja_registro = None
                 if baja_registro and baja_registro.documento_baja:
                     baja_folder = f"{equipo_folder}/Baja"
-                    file_content = download_file_safely(baja_registro.documento_baja.name)
-                    if file_content:
-                        file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
-                        zf.writestr(f"{baja_folder}/{file_name_in_zip}", file_content)
+                    file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
+                    if stream_file_to_zip(zf, baja_registro.documento_baja.name, f"{baja_folder}/{file_name_in_zip}"):
                         logger.debug(f" Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
+                    else:
+                        logger.debug(f" No se pudo agregar documento de baja para equipo {equipo.codigo_interno}")
                 else:
                     logger.debug(f" No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
             except Exception as e:
@@ -4082,11 +4143,10 @@ def generar_informe_zip(request):
 
                 if cal.documento_calibracion:
                     try:
-                        file_content = download_file_safely(cal.documento_calibracion.name)
-                        if file_content:
-                            # Nombre descriptivo: código_interno-calibración-número_certificado.pdf
-                            nombre_descriptivo = f"{safe_equipo_codigo}-calibracion-{cert_numero}-{fecha_cal}.pdf"
-                            zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{nombre_descriptivo}", file_content)
+                        # Nombre descriptivo: código_interno-calibración-número_certificado.pdf
+                        nombre_descriptivo = f"{safe_equipo_codigo}-calibracion-{cert_numero}-{fecha_cal}.pdf"
+                        if stream_file_to_zip(zf, cal.documento_calibracion.name, f"{equipo_folder}/Calibraciones/Certificados/{nombre_descriptivo}"):
+                            logger.debug(f" Certificado de calibración '{nombre_descriptivo}' añadido")
                         else:
                             logger.debug(f" Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
                     except Exception as e:
@@ -4094,11 +4154,10 @@ def generar_informe_zip(request):
 
                 if cal.confirmacion_metrologica_pdf:
                     try:
-                        if default_storage.exists(cal.confirmacion_metrologica_pdf.name):
-                            with default_storage.open(cal.confirmacion_metrologica_pdf.name, 'rb') as f:
-                                # Nombre descriptivo: código_interno-confirmacion-número_certificado.pdf
-                                nombre_descriptivo = f"{safe_equipo_codigo}-confirmacion-{cert_numero}-{fecha_cal}.pdf"
-                                zf.writestr(f"{equipo_folder}/Calibraciones/Confirmaciones/{nombre_descriptivo}", f.read())
+                        # Nombre descriptivo: código_interno-confirmacion-número_certificado.pdf
+                        nombre_descriptivo = f"{safe_equipo_codigo}-confirmacion-{cert_numero}-{fecha_cal}.pdf"
+                        if stream_file_to_zip(zf, cal.confirmacion_metrologica_pdf.name, f"{equipo_folder}/Calibraciones/Confirmaciones/{nombre_descriptivo}"):
+                            logger.debug(f" Confirmación de calibración '{nombre_descriptivo}' añadida")
                         else:
                             logger.debug(f" Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}")
                     except Exception as e:
@@ -4106,11 +4165,10 @@ def generar_informe_zip(request):
 
                 if cal.intervalos_calibracion_pdf:
                     try:
-                        if default_storage.exists(cal.intervalos_calibracion_pdf.name):
-                            with default_storage.open(cal.intervalos_calibracion_pdf.name, 'rb') as f:
-                                # Nombre descriptivo: código_interno-intervalos-número_certificado.pdf
-                                nombre_descriptivo = f"{safe_equipo_codigo}-intervalos-{cert_numero}-{fecha_cal}.pdf"
-                                zf.writestr(f"{equipo_folder}/Calibraciones/Intervalos/{nombre_descriptivo}", f.read())
+                        # Nombre descriptivo: código_interno-intervalos-número_certificado.pdf
+                        nombre_descriptivo = f"{safe_equipo_codigo}-intervalos-{cert_numero}-{fecha_cal}.pdf"
+                        if stream_file_to_zip(zf, cal.intervalos_calibracion_pdf.name, f"{equipo_folder}/Calibraciones/Intervalos/{nombre_descriptivo}"):
+                            logger.debug(f" Intervalos de calibración '{nombre_descriptivo}' añadido")
                         else:
                             logger.debug(f" Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}")
                     except Exception as e:
@@ -4122,13 +4180,12 @@ def generar_informe_zip(request):
             for mant in mantenimientos:
                 if mant.documento_mantenimiento:
                     try:
-                        if default_storage.exists(mant.documento_mantenimiento.name):
-                            with default_storage.open(mant.documento_mantenimiento.name, 'rb') as f:
-                                # Nombre descriptivo: código_interno-mantenimiento-fecha
-                                fecha_mant = mant.fecha_mantenimiento.strftime("%Y-%m-%d")
-                                tipo_mant = mant.tipo_mantenimiento.lower().replace(' ', '_')
-                                nombre_descriptivo = f"{safe_equipo_codigo}-mantenimiento-{tipo_mant}-{fecha_mant}.pdf"
-                                zf.writestr(f"{equipo_folder}/Mantenimientos/{nombre_descriptivo}", f.read())
+                        # Nombre descriptivo: código_interno-mantenimiento-fecha
+                        fecha_mant = mant.fecha_mantenimiento.strftime("%Y-%m-%d")
+                        tipo_mant = mant.tipo_mantenimiento.lower().replace(' ', '_')
+                        nombre_descriptivo = f"{safe_equipo_codigo}-mantenimiento-{tipo_mant}-{fecha_mant}.pdf"
+                        if stream_file_to_zip(zf, mant.documento_mantenimiento.name, f"{equipo_folder}/Mantenimientos/{nombre_descriptivo}"):
+                            logger.debug(f" Documento de mantenimiento '{nombre_descriptivo}' añadido")
                         else:
                             logger.debug(f" Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}")
                     except Exception as e:
@@ -4140,12 +4197,11 @@ def generar_informe_zip(request):
             for comp in comprobaciones:
                 if comp.documento_comprobacion:
                     try:
-                        if default_storage.exists(comp.documento_comprobacion.name):
-                            with default_storage.open(comp.documento_comprobacion.name, 'rb') as f:
-                                # Nombre descriptivo: código_interno-comprobacion-fecha
-                                fecha_comp = comp.fecha_comprobacion.strftime("%Y-%m-%d")
-                                nombre_descriptivo = f"{safe_equipo_codigo}-comprobacion-{fecha_comp}.pdf"
-                                zf.writestr(f"{equipo_folder}/Comprobaciones/{nombre_descriptivo}", f.read())
+                        # Nombre descriptivo: código_interno-comprobacion-fecha
+                        fecha_comp = comp.fecha_comprobacion.strftime("%Y-%m-%d")
+                        nombre_descriptivo = f"{safe_equipo_codigo}-comprobacion-{fecha_comp}.pdf"
+                        if stream_file_to_zip(zf, comp.documento_comprobacion.name, f"{equipo_folder}/Comprobaciones/{nombre_descriptivo}"):
+                            logger.debug(f" Documento de comprobación '{nombre_descriptivo}' añadido")
                         else:
                             logger.debug(f" Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}")
                     except Exception as e:
@@ -4161,13 +4217,15 @@ def generar_informe_zip(request):
             for doc_field, doc_type in equipment_docs:
                 if doc_field:
                     try:
-                        if default_storage.exists(doc_field.name) and doc_field.name.lower().endswith('.pdf'):
-                            with default_storage.open(doc_field.name, 'rb') as f:
-                                # Nombre descriptivo: código_interno_tipo_documento.pdf
-                                nombre_descriptivo = f"{safe_equipo_codigo}_{doc_type}.pdf"
-                                zf.writestr(f"{equipo_folder}/{nombre_descriptivo}", f.read())
+                        if doc_field.name.lower().endswith('.pdf'):
+                            # Nombre descriptivo: código_interno_tipo_documento.pdf
+                            nombre_descriptivo = f"{safe_equipo_codigo}_{doc_type}.pdf"
+                            if stream_file_to_zip(zf, doc_field.name, f"{equipo_folder}/{nombre_descriptivo}"):
+                                logger.debug(f" Documento de equipo '{nombre_descriptivo}' añadido")
+                            else:
+                                logger.debug(f" Archivo no encontrado en storage (doc. equipo): {doc_field.name}")
                         else:
-                             logger.debug(f" Archivo no encontrado en storage (doc. equipo): {doc_field.name}")
+                            logger.debug(f" Archivo no es PDF o no encontrado: {doc_field.name}")
                     except Exception as e:
                         logger.error(f"Error adding equipment document {doc_field.name} to zip: {e}")
 
@@ -4175,14 +4233,12 @@ def generar_informe_zip(request):
         for proc in procedimientos_empresa:
             if proc.documento_pdf:
                 try:
-                    if default_storage.exists(proc.documento_pdf.name):
-                        safe_proc_code = proc.codigo.replace('/', '_').replace('\\', '_').replace(':', '_')
-                        proc_folder = f"{empresa.nombre}/Procedimientos"
-                        with default_storage.open(proc.documento_pdf.name, 'rb') as f:
-                            file_name_in_zip = os.path.basename(proc.documento_pdf.name)
-                            # Usar código del procedimiento como prefijo para el nombre del archivo en el zip
-                            zip_path = f"{proc_folder}/{safe_proc_code}_{file_name_in_zip}"
-                            zf.writestr(zip_path, f.read())
+                    safe_proc_code = proc.codigo.replace('/', '_').replace('\\', '_').replace(':', '_')
+                    proc_folder = f"{empresa.nombre}/Procedimientos"
+                    file_name_in_zip = os.path.basename(proc.documento_pdf.name)
+                    # Usar código del procedimiento como prefijo para el nombre del archivo en el zip
+                    zip_path = f"{proc_folder}/{safe_proc_code}_{file_name_in_zip}"
+                    if stream_file_to_zip(zf, proc.documento_pdf.name, zip_path):
                         logger.debug(f" Documento de procedimiento '{file_name_in_zip}' añadido para procedimiento {proc.codigo}")
                     else:
                         logger.debug(f" Archivo de procedimiento no encontrado en storage: {proc.documento_pdf.name}")
@@ -4191,22 +4247,36 @@ def generar_informe_zip(request):
                     zf.writestr(f"{empresa.nombre}/Procedimientos/Documento_Procedimiento_{proc.codigo}_ERROR.txt", f"Error adding procedure document: {e}")
 
 
-    # OPTIMIZACIÓN: Mejorar respuesta HTTP para transferencia eficiente
+    # OPTIMIZACIÓN: Mejorar respuesta HTTP para transferencia eficiente y reducir memoria
     zip_buffer.seek(0)
     zip_content = zip_buffer.getvalue()
+    zip_size = len(zip_content)
 
     # Crear respuesta optimizada
     response = HttpResponse(zip_content, content_type='application/zip')
 
     # Headers optimizados para descarga
     filename_safe = empresa.nombre.replace(' ', '_').replace('/', '_').replace('\\', '_')
-    response['Content-Disposition'] = f'attachment; filename="Informes_{filename_safe}.zip"'
-    response['Content-Length'] = len(zip_content)
+    if total_partes > 1:
+        filename = f"Informes_{filename_safe}_Parte_{parte_numero}_de_{total_partes}.zip"
+    else:
+        filename = f"Informes_{filename_safe}.zip"
+
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Content-Length'] = zip_size
     response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response['Pragma'] = 'no-cache'
     response['Expires'] = '0'
 
-    logger.info(f"ZIP generado exitosamente para empresa {empresa.nombre}: {len(zip_content)} bytes")
+    # Limpiar buffer para liberar memoria inmediatamente
+    zip_buffer.close()
+    del zip_buffer
+
+    if total_partes > 1:
+        logger.info(f"ZIP parte {parte_numero}/{total_partes} generado exitosamente para empresa {empresa.nombre}: {zip_size} bytes ({equipos_en_esta_parte} equipos)")
+    else:
+        logger.info(f"ZIP generado exitosamente para empresa {empresa.nombre}: {zip_size} bytes ({equipos_en_esta_parte} equipos)")
+
     return response
 
 
