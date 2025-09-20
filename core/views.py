@@ -3,7 +3,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test, permission_required
 from django.contrib import messages
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Prefetch
 from django.db import models
 from datetime import date, timedelta, datetime
 import calendar
@@ -504,6 +504,346 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
 
 
 # --- Funciones Auxiliares para Generación de Excel ---
+
+def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset):
+    """
+    Genera un Excel consolidado con 3 hojas: Equipos, Proveedores y Procedimientos.
+    """
+    workbook = Workbook()
+
+    # === HOJA 1: EQUIPOS ===
+    sheet_equipos = workbook.active
+    sheet_equipos.title = "Equipos"
+
+    headers_equipos = [
+        "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
+        "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Observaciones", "Fecha Última Calibración", "Próxima Calibración",
+        "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
+        "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
+        "Próxima Comprobación", "Frecuencia Comprobación (meses)"
+    ]
+    sheet_equipos.append(headers_equipos)
+
+    # Estilos para headers
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    for cell in sheet_equipos[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    # Datos de equipos
+    for equipo in equipos_queryset:
+        row_data = [
+            equipo.codigo_interno, equipo.nombre, equipo.empresa.nombre, equipo.tipo_equipo,
+            equipo.marca, equipo.modelo, equipo.numero_serie,
+            equipo.ubicacion.nombre if equipo.ubicacion else "", equipo.responsable, equipo.estado,
+            equipo.fecha_adquisicion, equipo.rango_medida, equipo.resolucion,
+            equipo.error_maximo_permisible, equipo.fecha_registro, equipo.observaciones,
+            equipo.fecha_ultima_calibracion, equipo.proxima_calibracion, equipo.frecuencia_calibracion,
+            equipo.fecha_ultimo_mantenimiento, equipo.proximo_mantenimiento, equipo.frecuencia_mantenimiento,
+            equipo.fecha_ultima_comprobacion, equipo.proxima_comprobacion, equipo.frecuencia_comprobacion
+        ]
+        sheet_equipos.append(row_data)
+
+    # === HOJA 2: PROVEEDORES ===
+    sheet_proveedores = workbook.create_sheet(title="Proveedores")
+    headers_proveedores = [
+        "Nombre Empresa", "Contacto Principal", "Email", "Teléfono", "Dirección",
+        "Ciudad", "País", "Servicios Ofrecidos", "Fecha de Registro"
+    ]
+    sheet_proveedores.append(headers_proveedores)
+
+    for cell in sheet_proveedores[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    for proveedor in proveedores_queryset:
+        row_data = [
+            proveedor.nombre_empresa, proveedor.contacto_principal, proveedor.email,
+            proveedor.telefono, proveedor.direccion, proveedor.ciudad, proveedor.pais,
+            proveedor.servicios_ofrecidos, proveedor.fecha_registro
+        ]
+        sheet_proveedores.append(row_data)
+
+    # === HOJA 3: PROCEDIMIENTOS ===
+    sheet_procedimientos = workbook.create_sheet(title="Procedimientos")
+    headers_procedimientos = [
+        "Código", "Título", "Descripción", "Versión", "Fecha de Emisión",
+        "Fecha de Revisión", "Responsable", "Estado"
+    ]
+    sheet_procedimientos.append(headers_procedimientos)
+
+    for cell in sheet_procedimientos[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    for procedimiento in procedimientos_queryset:
+        row_data = [
+            procedimiento.codigo, procedimiento.titulo, procedimiento.descripcion,
+            procedimiento.version, procedimiento.fecha_emision, procedimiento.fecha_revision,
+            procedimiento.responsable, procedimiento.estado
+        ]
+        sheet_procedimientos.append(row_data)
+
+    # === HOJA 4: DASHBOARD DETALLADO ===
+    sheet_dashboard = workbook.create_sheet(title="Dashboard")
+
+    from datetime import date, timedelta
+    today = date.today()
+
+    # Configurar estilos
+    title_font = Font(bold=True, size=14, color="FFFFFF")
+    title_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+
+    row = 1
+
+    # === ESTADÍSTICAS GENERALES ===
+    sheet_dashboard.merge_cells(f'A{row}:F{row}')
+    cell = sheet_dashboard[f'A{row}']
+    cell.value = "📊 ESTADÍSTICAS GENERALES"
+    cell.font = title_font
+    cell.fill = title_fill
+    row += 2
+
+    # Estadísticas de equipos por estado
+    stats = {}
+    for equipo in equipos_queryset:
+        estado = equipo.estado
+        stats[estado] = stats.get(estado, 0) + 1
+
+    sheet_dashboard[f'A{row}'] = "Estado"
+    sheet_dashboard[f'B{row}'] = "Cantidad"
+    for cell in [sheet_dashboard[f'A{row}'], sheet_dashboard[f'B{row}']]:
+        cell.font = header_font
+        cell.fill = header_fill
+    row += 1
+
+    for estado, cantidad in stats.items():
+        sheet_dashboard[f'A{row}'] = estado
+        sheet_dashboard[f'B{row}'] = cantidad
+        row += 1
+
+    row += 2
+
+    # === EQUIPOS INACTIVOS ===
+    equipos_inactivos = [e for e in equipos_queryset if e.estado == 'Inactivo']
+    sheet_dashboard.merge_cells(f'A{row}:D{row}')
+    cell = sheet_dashboard[f'A{row}']
+    cell.value = f"⚠️ EQUIPOS INACTIVOS ({len(equipos_inactivos)})"
+    cell.font = title_font
+    cell.fill = title_fill
+    row += 2
+
+    if equipos_inactivos:
+        headers = ["Código Interno", "Nombre", "Ubicación", "Responsable"]
+        for i, header in enumerate(headers):
+            cell = sheet_dashboard.cell(row=row, column=i+1, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        row += 1
+
+        for equipo in equipos_inactivos:
+            sheet_dashboard[f'A{row}'] = equipo.codigo_interno
+            sheet_dashboard[f'B{row}'] = equipo.nombre
+            sheet_dashboard[f'C{row}'] = equipo.ubicacion.nombre if equipo.ubicacion else ""
+            sheet_dashboard[f'D{row}'] = equipo.responsable
+            row += 1
+    else:
+        sheet_dashboard[f'A{row}'] = "✅ No hay equipos inactivos"
+        row += 1
+
+    row += 2
+
+    # === EQUIPOS DADOS DE BAJA ===
+    equipos_baja = [e for e in equipos_queryset if e.estado == 'De Baja']
+    sheet_dashboard.merge_cells(f'A{row}:E{row}')
+    cell = sheet_dashboard[f'A{row}']
+    cell.value = f"🔴 EQUIPOS DADOS DE BAJA ({len(equipos_baja)})"
+    cell.font = title_font
+    cell.fill = title_fill
+    row += 2
+
+    if equipos_baja:
+        headers = ["Código Interno", "Nombre", "Ubicación", "Responsable", "Fecha Baja"]
+        for i, header in enumerate(headers):
+            cell = sheet_dashboard.cell(row=row, column=i+1, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        row += 1
+
+        for equipo in equipos_baja:
+            sheet_dashboard[f'A{row}'] = equipo.codigo_interno
+            sheet_dashboard[f'B{row}'] = equipo.nombre
+            sheet_dashboard[f'C{row}'] = equipo.ubicacion.nombre if equipo.ubicacion else ""
+            sheet_dashboard[f'D{row}'] = equipo.responsable
+            # Buscar fecha de baja
+            try:
+                baja_registro = equipo.baja_registro
+                fecha_baja = baja_registro.fecha_baja if baja_registro else "N/A"
+            except:
+                fecha_baja = "N/A"
+            sheet_dashboard[f'E{row}'] = fecha_baja
+            row += 1
+    else:
+        sheet_dashboard[f'A{row}'] = "✅ No hay equipos dados de baja"
+        row += 1
+
+    row += 3
+
+    # === PRÓXIMAS CALIBRACIONES ===
+    sheet_dashboard.merge_cells(f'A{row}:E{row}')
+    cell = sheet_dashboard[f'A{row}']
+    cell.value = "🔧 PRÓXIMAS CALIBRACIONES"
+    cell.font = title_font
+    cell.fill = title_fill
+    row += 2
+
+    calibraciones_proximas = []
+    for equipo in equipos_queryset:
+        if equipo.proxima_calibracion:
+            dias_restantes = (equipo.proxima_calibracion - today).days
+            mes = equipo.proxima_calibracion.strftime("%B %Y")
+            calibraciones_proximas.append({
+                'codigo': equipo.codigo_interno,
+                'fecha': equipo.proxima_calibracion,
+                'mes': mes,
+                'dias_restantes': dias_restantes,
+                'estado': 'Vencida' if dias_restantes < 0 else 'Próxima'
+            })
+
+    calibraciones_proximas.sort(key=lambda x: x['fecha'])
+
+    if calibraciones_proximas:
+        headers = ["Fecha", "Actividad", "Mes", "Código Equipo", "Estado"]
+        for i, header in enumerate(headers):
+            cell = sheet_dashboard.cell(row=row, column=i+1, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        row += 1
+
+        for cal in calibraciones_proximas:
+            sheet_dashboard[f'A{row}'] = cal['fecha'].strftime("%d/%m/%Y")
+            sheet_dashboard[f'B{row}'] = "Calibración"
+            sheet_dashboard[f'C{row}'] = cal['mes']
+            sheet_dashboard[f'D{row}'] = cal['codigo']
+            sheet_dashboard[f'E{row}'] = cal['estado']
+            row += 1
+    else:
+        sheet_dashboard[f'A{row}'] = "✅ No hay calibraciones programadas"
+        row += 1
+
+    row += 3
+
+    # === PRÓXIMOS MANTENIMIENTOS ===
+    sheet_dashboard.merge_cells(f'A{row}:E{row}')
+    cell = sheet_dashboard[f'A{row}']
+    cell.value = "🔨 PRÓXIMOS MANTENIMIENTOS"
+    cell.font = title_font
+    cell.fill = title_fill
+    row += 2
+
+    mantenimientos_proximos = []
+    for equipo in equipos_queryset:
+        if equipo.proximo_mantenimiento:
+            dias_restantes = (equipo.proximo_mantenimiento - today).days
+            mes = equipo.proximo_mantenimiento.strftime("%B %Y")
+            mantenimientos_proximos.append({
+                'codigo': equipo.codigo_interno,
+                'fecha': equipo.proximo_mantenimiento,
+                'mes': mes,
+                'dias_restantes': dias_restantes,
+                'estado': 'Vencido' if dias_restantes < 0 else 'Próximo'
+            })
+
+    mantenimientos_proximos.sort(key=lambda x: x['fecha'])
+
+    if mantenimientos_proximos:
+        headers = ["Fecha", "Actividad", "Mes", "Código Equipo", "Estado"]
+        for i, header in enumerate(headers):
+            cell = sheet_dashboard.cell(row=row, column=i+1, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        row += 1
+
+        for mant in mantenimientos_proximos:
+            sheet_dashboard[f'A{row}'] = mant['fecha'].strftime("%d/%m/%Y")
+            sheet_dashboard[f'B{row}'] = "Mantenimiento"
+            sheet_dashboard[f'C{row}'] = mant['mes']
+            sheet_dashboard[f'D{row}'] = mant['codigo']
+            sheet_dashboard[f'E{row}'] = mant['estado']
+            row += 1
+    else:
+        sheet_dashboard[f'A{row}'] = "✅ No hay mantenimientos programados"
+        row += 1
+
+    row += 3
+
+    # === PRÓXIMAS COMPROBACIONES ===
+    sheet_dashboard.merge_cells(f'A{row}:E{row}')
+    cell = sheet_dashboard[f'A{row}']
+    cell.value = "✅ PRÓXIMAS COMPROBACIONES"
+    cell.font = title_font
+    cell.fill = title_fill
+    row += 2
+
+    comprobaciones_proximas = []
+    for equipo in equipos_queryset:
+        if equipo.proxima_comprobacion:
+            dias_restantes = (equipo.proxima_comprobacion - today).days
+            mes = equipo.proxima_comprobacion.strftime("%B %Y")
+            comprobaciones_proximas.append({
+                'codigo': equipo.codigo_interno,
+                'fecha': equipo.proxima_comprobacion,
+                'mes': mes,
+                'dias_restantes': dias_restantes,
+                'estado': 'Vencida' if dias_restantes < 0 else 'Próxima'
+            })
+
+    comprobaciones_proximas.sort(key=lambda x: x['fecha'])
+
+    if comprobaciones_proximas:
+        headers = ["Fecha", "Actividad", "Mes", "Código Equipo", "Estado"]
+        for i, header in enumerate(headers):
+            cell = sheet_dashboard.cell(row=row, column=i+1, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        row += 1
+
+        for comp in comprobaciones_proximas:
+            sheet_dashboard[f'A{row}'] = comp['fecha'].strftime("%d/%m/%Y")
+            sheet_dashboard[f'B{row}'] = "Comprobación"
+            sheet_dashboard[f'C{row}'] = comp['mes']
+            sheet_dashboard[f'D{row}'] = comp['codigo']
+            sheet_dashboard[f'E{row}'] = comp['estado']
+            row += 1
+    else:
+        sheet_dashboard[f'A{row}'] = "✅ No hay comprobaciones programadas"
+        row += 1
+
+    # Ajustar ancho de columnas en todas las hojas
+    for sheet in [sheet_equipos, sheet_proveedores, sheet_procedimientos, sheet_dashboard]:
+        for column in sheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            sheet.column_dimensions[column_letter].width = adjusted_width
+
+    # Guardar y retornar contenido
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
 
 def _generate_general_equipment_list_excel_content(equipos_queryset):
     """
@@ -3919,7 +4259,7 @@ def informes(request):
     # Información de paginación para ZIPs
     zip_info = None
     if selected_company_id:
-        total_equipos, total_partes, equipos_por_zip = calcular_info_paginacion_zip(selected_company_id)
+        total_equipos, total_partes, equipos_por_zip = calcular_info_paginacion_zip(selected_company_id, user.is_superuser)
 
         # Crear lista de partes con información detallada
         partes_info = []
@@ -3963,12 +4303,14 @@ def informes(request):
     return render(request, 'core/informes.html', context)
 
 
-def calcular_info_paginacion_zip(empresa_id):
+def calcular_info_paginacion_zip(empresa_id, is_superuser=False):
     """
     Calcula información de paginación para ZIPs basado en número de equipos.
     Returns: (total_equipos, total_partes, equipos_por_zip)
     """
+    # OPTIMIZACIÓN: 50 equipos por ZIP para todos los usuarios (sin Excel individuales)
     EQUIPOS_POR_ZIP = 50
+
     total_equipos = Equipo.objects.filter(empresa_id=empresa_id).count()
     total_partes = (total_equipos + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP if total_equipos > 0 else 1
     return total_equipos, total_partes, EQUIPOS_POR_ZIP
@@ -4041,25 +4383,30 @@ def generar_informe_zip(request):
 
     # OPTIMIZACIÓN: Prefetch relacionados para evitar consultas N+1
     # PAGINACIÓN: Limitar equipos para evitar problemas de memoria en servidor (512MB)
-    EQUIPOS_POR_ZIP = 50
+    EQUIPOS_POR_ZIP = 50  # 50 equipos por ZIP para todos los usuarios (sin Excel individuales)
+
     equipos_empresa_total = Equipo.objects.filter(empresa=empresa).count()
 
     # Calcular offset para paginación
     offset = (parte_numero - 1) * EQUIPOS_POR_ZIP
 
+    # OPTIMIZACIÓN: Prefetch más específico para reducir memoria
     equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
-        'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
+        Prefetch('calibraciones', queryset=Calibracion.objects.select_related().order_by('-fecha_calibracion')[:5]),  # Solo últimas 5 calibraciones
+        Prefetch('mantenimientos', queryset=Mantenimiento.objects.select_related().order_by('-fecha_mantenimiento')[:5]),  # Solo últimos 5 mantenimientos
+        Prefetch('comprobaciones', queryset=Comprobacion.objects.select_related().order_by('-fecha_comprobacion')[:5]),  # Solo últimas 5 comprobaciones
+        'baja_registro'
     ).order_by('codigo_interno')[offset:offset + EQUIPOS_POR_ZIP]
 
     # Calcular información de paginación
     total_partes = (equipos_empresa_total + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP  # Redondeo hacia arriba
     equipos_en_esta_parte = equipos_empresa.count()
 
-    # Información para logs y filename
+    # Información para logs y filename con optimizaciones aplicadas
     if total_partes > 1:
-        logger.info(f"Generando ZIP parte {parte_numero}/{total_partes} para empresa {empresa.nombre}: equipos {offset + 1}-{offset + equipos_en_esta_parte} de {equipos_empresa_total}")
+        logger.info(f"Generando ZIP OPTIMIZADO parte {parte_numero}/{total_partes} para empresa {empresa.nombre}: equipos {offset + 1}-{offset + equipos_en_esta_parte} de {equipos_empresa_total} (sin Excel individuales)")
     else:
-        logger.info(f"Generando ZIP completo para empresa {empresa.nombre}: {equipos_en_esta_parte} equipos")
+        logger.info(f"Generando ZIP OPTIMIZADO completo para empresa {empresa.nombre}: {equipos_en_esta_parte} equipos (sin Excel individuales)")
 
     proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
     procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
@@ -4083,19 +4430,13 @@ def generar_informe_zip(request):
         return False
 
     zip_buffer = io.BytesIO()
-    # Reducir compresión para usar menos memoria (2 en lugar de 6)
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=2) as zf:
-        # 1. Add Listado_de_equipos.xlsx (General equipment report for that company)
-        excel_buffer_general_equipos = _generate_general_equipment_list_excel_content(equipos_empresa)
-        zf.writestr(f"{empresa.nombre}/Listado_de_equipos.xlsx", excel_buffer_general_equipos)
+    # OPTIMIZACIÓN: Compresión eficiente sin Excel individuales
+    compresslevel = 2  # Compresión balanceada para todos los usuarios
 
-        # 2. Add Listado_de_proveedores.xlsx
-        excel_buffer_general_proveedores = _generate_general_proveedor_list_excel_content(proveedores_empresa)
-        zf.writestr(f"{empresa.nombre}/Listado_de_Proveedores.xlsx", excel_buffer_general_proveedores)
-
-        # 3. Add Listado_de_procedimientos.xlsx (NEW)
-        excel_buffer_procedimientos = _generate_procedimiento_info_excel_content(procedimientos_empresa)
-        zf.writestr(f"{empresa.nombre}/Listado_de_procedimientos.xlsx", excel_buffer_procedimientos)
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=compresslevel) as zf:
+        # OPTIMIZACIÓN: Un solo Excel consolidado con 3 hojas (Equipos, Proveedores, Procedimientos)
+        excel_consolidado = _generate_consolidated_excel_content(equipos_empresa, proveedores_empresa, procedimientos_empresa)
+        zf.writestr(f"{empresa.nombre}/Informe_Consolidado.xlsx", excel_consolidado)
 
 
         # 4. For each equipment, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
@@ -4104,6 +4445,7 @@ def generar_informe_zip(request):
             safe_equipo_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(':', '_')
             equipo_folder = f"{empresa.nombre}/Equipos/{safe_equipo_codigo}"
 
+            # OPTIMIZACIÓN CRÍTICA: PDF siempre se incluye
             try:
                 hoja_vida_pdf_content = _generate_equipment_hoja_vida_pdf_content(request, equipo)
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content)
@@ -4111,19 +4453,8 @@ def generar_informe_zip(request):
                 logger.error(f"Error generating Hoja de Vida PDF for {equipo.codigo_interno}: {e}")
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida_PDF_ERROR.txt", f"Error generating Hoja de Vida PDF: {e}")
 
-            try:
-                hoja_vida_general_excel_content = _generate_equipment_general_info_excel_content(equipo)
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_Excel.xlsx", hoja_vida_general_excel_content)
-            except Exception as e:
-                logger.error(f"Error generating Hoja de Vida General Excel for {equipo.codigo_interno}: {e}")
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_General_EXCEL_ERROR.txt", f"Error generating Hoja de Vida General Excel: {e}")
-
-            try:
-                hoja_vida_activities_excel_content = _generate_equipment_activities_excel_content(equipo)
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_Excel.xlsx", hoja_vida_activities_excel_content)
-            except Exception as e:
-                logger.error(f"Error generating Hoja de Vida Activities Excel for {equipo.codigo_interno}: {e}")
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_Actividades_EXCEL_ERROR.txt", f"Error generating Hoja de Vida Actividades Excel: {e}")
+            # OPTIMIZACIÓN: Excel individuales eliminados para optimizar memoria y velocidad
+            # Toda la información está disponible en el archivo Informe_Consolidado.xlsx
 
             # --- Añadir Documento de Baja si existe ---
             try:
@@ -4291,6 +4622,65 @@ def generar_informe_zip(request):
         logger.info(f"ZIP generado exitosamente para empresa {empresa.nombre}: {zip_size} bytes ({equipos_en_esta_parte} equipos)")
 
     return response
+
+
+@access_check # APLICAR ESTE DECORADOR
+@login_required
+@user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
+def generar_informe_dashboard_excel(request):
+    """
+    Genera un Excel consolidado con Dashboard (4 hojas: Equipos, Proveedores, Procedimientos, Dashboard).
+    Versión independiente del ZIP para informes mensuales o consultas rápidas.
+    """
+    selected_company_id = request.GET.get('empresa_id')
+
+    # Para usuarios normales, usar su empresa asignada
+    if not selected_company_id and not request.user.is_superuser:
+        if request.user.empresa:
+            selected_company_id = str(request.user.empresa.id)
+        else:
+            messages.error(request, "No tiene una empresa asignada para generar el informe Excel.")
+            return redirect('core:informes')
+
+    # Para superusuarios, empresa_id es obligatorio
+    if not selected_company_id:
+        messages.error(request, "Por favor, selecciona una empresa para generar el informe Excel.")
+        return redirect('core:informes')
+
+    empresa = get_object_or_404(Empresa, pk=selected_company_id)
+
+    # OPTIMIZACIÓN: Cargar todos los equipos para el dashboard completo
+    equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
+        'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
+    ).order_by('codigo_interno')
+
+    proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
+    procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
+
+    logger.info(f"Generando Excel Dashboard para empresa {empresa.nombre}: {equipos_empresa.count()} equipos")
+
+    try:
+        # Generar Excel consolidado con las 4 hojas
+        excel_content = _generate_consolidated_excel_content(equipos_empresa, proveedores_empresa, procedimientos_empresa)
+
+        # Crear respuesta HTTP
+        response = HttpResponse(excel_content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+        # Headers para descarga
+        filename_safe = empresa.nombre.replace(' ', '_').replace('/', '_').replace('\\', '_')
+        response['Content-Disposition'] = f'attachment; filename="Dashboard_{filename_safe}.xlsx"'
+        response['Content-Length'] = len(excel_content)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+
+        logger.info(f"Excel Dashboard generado exitosamente para empresa {empresa.nombre}: {len(excel_content)} bytes")
+        return response
+
+    except Exception as e:
+        logger.error(f"Error generando Excel Dashboard para empresa {empresa.nombre}: {e}")
+        messages.error(request, f'Error al generar el informe Dashboard: {e}')
+        return redirect('core:informes')
 
 
 @access_check # APLICAR ESTE DECORADOR

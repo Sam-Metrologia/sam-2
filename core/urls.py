@@ -90,6 +90,7 @@ urlpatterns = [
     # Informes
     path('informes/', views.informes, name='informes'),
     path('informes/generar_zip/', views.generar_informe_zip, name='generar_informe_zip'),
+    path('informes/dashboard_excel/', views.generar_informe_dashboard_excel, name='generar_informe_dashboard_excel'),
     path('informes/vencimientos_pdf/', views.informe_vencimientos_pdf, name='informe_vencimientos_pdf'),
     path('informes/actividades_programadas/', views.programmed_activities_list, name='programmed_activities_list'),
     path('informes/exportar_excel/', views.exportar_equipos_excel, name='exportar_equipos_excel'),
