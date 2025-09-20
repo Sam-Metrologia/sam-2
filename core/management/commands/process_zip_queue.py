@@ -282,6 +282,15 @@ class Command(BaseCommand):
         mock_request = HttpRequest()
         mock_request.user = user
         mock_request.method = 'GET'
+
+        # Configurar META para evitar errores de SERVER_NAME
+        mock_request.META = {
+            'SERVER_NAME': 'sam-9o6o.onrender.com',
+            'SERVER_PORT': '443',
+            'wsgi.url_scheme': 'https',
+            'HTTP_HOST': 'sam-9o6o.onrender.com',
+        }
+
         return mock_request
 
     def cleanup_expired_requests(self):
