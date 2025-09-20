@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnóstico de Cache</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-error { color: red; font-weight: bold; }
+        .status-warning { color: orange; font-weight: bold; }
+        .info-box {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Diagnóstico del Sistema de Cache</h1>
+
+    <div class="info-box">
+        <h3>📊 Estado de la Base de Datos</h3>
+        <p><strong>Tabla de cache existe:</strong>
+            <span class="{% if table_exists %}status-ok{% else %}status-error{% endif %}">
+                {% if table_exists %}✅ SÍ{% else %}❌ NO{% endif %}
+            </span>
+        </p>
+    </div>
+
+    <div class="info-box">
+        <h3>⚡ Test de Cache</h3>
+        <p><strong>Cache funciona:</strong>
+            <span class="{% if cache_works %}status-ok{% else %}status-error{% endif %}">
+                {% if cache_works %}✅ SÍ{% else %}❌ NO{% endif %}
+            </span>
+        </p>
+        {% if cache_error %}
+            <p><strong>Error de cache:</strong> <span class="status-error">{{ cache_error }}</span></p>
+        {% endif %}
+    </div>
+
+    <div class="info-box">
+        <h3>🎯 Configuración de Cache</h3>
+        <p><strong>Backend configurado:</strong> {{ cache_backend }}</p>
+        <p><strong>Ubicación:</strong> {{ cache_location }}</p>
+    </div>
+
+    <div class="info-box">
+        <h3>🚀 Estado del Sistema</h3>
+        {% if table_exists and cache_works %}
+            <p class="status-ok">🎉 ¡Sistema de cache completamente funcional!</p>
+        {% elif not table_exists and cache_works %}
+            <p class="status-warning">⚠️ Cache funciona pero puede que use fallback</p>
+        {% else %}
+            <p class="status-error">❌ Sistema de cache necesita configuración</p>
+        {% endif %}
+    </div>
+
+    <div class="info-box">
+        <h3>🛠️ Acciones</h3>
+        {% if not table_exists %}
+            <p>Para crear la tabla de cache manualmente, ejecuta:</p>
+            <code>python manage.py setup_cache</code> o <code>python manage.py check_cache</code>
+        {% endif %}
+
+        <p><a href="{% url 'core:dashboard' %}">← Volver al Dashboard</a></p>
+    </div>
+
+    <div class="info-box">
+        <h3>📋 Información Técnica</h3>
+        <p><strong>Timestamp:</strong> {{ timestamp }}</p>
+        <p><strong>Usuario:</strong> {{ user.username }} ({{ user.email }})</p>
+        <p><strong>Empresa:</strong> {{ user.empresa.nombre|default:"N/A" }}</p>
+    </div>
+</body>
+</html>

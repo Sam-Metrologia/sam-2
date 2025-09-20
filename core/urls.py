@@ -103,6 +103,9 @@ urlpatterns = [
     # Acceso Denegado
     path('access_denied/', views.access_denied, name='access_denied'),
 
+    # Diagnóstico temporal de cache
+    path('cache_diagnostics/', views.cache_diagnostics, name='cache_diagnostics'),
+
     # === URLs DE DEBUG ELIMINADAS ===
     # Eliminadas rutas de debug: s3_diagnostics, file_upload_test, logo_diagnostics,
     # test_logo_upload, fix_mi_logo, lista_empresas_sin_logo

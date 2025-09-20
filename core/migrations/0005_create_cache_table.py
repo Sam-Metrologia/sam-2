@@ -1,27 +1,63 @@
 # Generated manually for cache table creation
 
-from django.db import migrations
+from django.db import migrations, connection
 from django.core.management import call_command
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_cache_table(apps, schema_editor):
-    """Crear tabla de cache de Django."""
+    """Crear tabla de cache de Django con verificación."""
     try:
-        call_command('createcachetable', 'sam_cache_table', verbosity=0)
+        # Verificar si la tabla ya existe
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'sam_cache_table'
+                );
+            """)
+            table_exists = cursor.fetchone()[0]
+
+        if table_exists:
+            print("ℹ️  Tabla de cache 'sam_cache_table' ya existe - saltando creación")
+            return
+
+        # Crear la tabla si no existe
+        call_command('createcachetable', 'sam_cache_table', verbosity=1)
         print("✅ Tabla de cache 'sam_cache_table' creada exitosamente")
+
+        # Verificar que se creó correctamente
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'sam_cache_table'
+                );
+            """)
+            table_created = cursor.fetchone()[0]
+
+        if table_created:
+            print("✅ Verificación: Tabla de cache creada y confirmada")
+        else:
+            print("❌ Error: Tabla de cache no se pudo verificar después de creación")
+
     except Exception as e:
-        print(f"⚠️  Error creando tabla de cache (puede que ya exista): {e}")
+        logger.error(f"Error en migración de cache: {e}")
+        print(f"⚠️  Error creando tabla de cache: {e}")
+        # No fallar la migración por esto
+        pass
 
 
 def delete_cache_table(apps, schema_editor):
     """Eliminar tabla de cache (rollback)."""
-    from django.db import connection
-
     try:
         with connection.cursor() as cursor:
             cursor.execute("DROP TABLE IF EXISTS sam_cache_table;")
         print("🗑️  Tabla de cache 'sam_cache_table' eliminada")
     except Exception as e:
+        logger.warning(f"Error eliminando tabla de cache: {e}")
         print(f"⚠️  Error eliminando tabla de cache: {e}")
 
 

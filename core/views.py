@@ -4572,3 +4572,55 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
+
+@login_required
+def cache_diagnostics(request):
+    """Vista de diagnóstico temporal para verificar el estado del cache."""
+    from django.db import connection
+    from django.core.cache import cache
+    from django.conf import settings
+    from datetime import datetime
+
+    # Verificar si la tabla existe
+    table_exists = False
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'sam_cache_table'
+                );
+            """)
+            table_exists = cursor.fetchone()[0]
+    except Exception:
+        table_exists = False
+
+    # Test de cache
+    cache_works = False
+    cache_error = None
+    try:
+        test_key = 'diagnostics_test_key'
+        test_value = 'diagnostics_test_value_123'
+        cache.set(test_key, test_value, 60)
+        retrieved = cache.get(test_key)
+        cache_works = (retrieved == test_value)
+        if cache_works:
+            cache.delete(test_key)
+    except Exception as e:
+        cache_error = str(e)
+
+    # Información de configuración
+    cache_config = settings.CACHES.get('default', {})
+    cache_backend = cache_config.get('BACKEND', 'Unknown')
+    cache_location = cache_config.get('LOCATION', 'Unknown')
+
+    context = {
+        'table_exists': table_exists,
+        'cache_works': cache_works,
+        'cache_error': cache_error,
+        'cache_backend': cache_backend,
+        'cache_location': cache_location,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+
+    return render(request, 'core/cache_diagnostics.html', context)
