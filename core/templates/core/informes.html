@@ -2,9 +2,6 @@
 {% load static %}
 {% load math_filters %}
 
-{# Crear filtros personalizados para templates #}
-{% load custom_filters %}
-
 {% block content %}
 <div class="container mx-auto p-4">
     <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
@@ -55,12 +52,12 @@
                     <p class="text-orange-600 mb-4 text-sm">Por limitaciones de memoria, se generarán {{ zip_info.total_partes }} archivos ZIP de {{ zip_info.equipos_por_zip }} equipos cada uno.</p>
 
                     <div class="space-y-2">
-                        {% for parte in zip_info.total_partes|make_list %}
+                        {% for parte_info in zip_info.partes_info %}
                             <button class="downloadZipBtn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out w-full"
                                     data-url="{% url 'core:generar_informe_zip' %}"
-                                    data-parte="{{ forloop.counter }}">
-                                <i class="fas fa-file-archive mr-2"></i> Descargar Parte {{ forloop.counter }} de {{ zip_info.total_partes }}
-                                <br><small class="text-xs">(Equipos {{ forloop.counter0|mul:zip_info.equipos_por_zip|add:1 }}-{{ forloop.counter|mul:zip_info.equipos_por_zip|min:zip_info.total_equipos }})</small>
+                                    data-parte="{{ parte_info.numero }}">
+                                <i class="fas fa-file-archive mr-2"></i> Descargar Parte {{ parte_info.numero }} de {{ zip_info.total_partes }}
+                                <br><small class="text-xs">(Equipos {{ parte_info.inicio_equipo }}-{{ parte_info.fin_equipo }})</small>
                             </button>
                         {% endfor %}
                     </div>

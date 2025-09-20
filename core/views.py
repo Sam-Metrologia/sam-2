@@ -3920,11 +3920,24 @@ def informes(request):
     zip_info = None
     if selected_company_id:
         total_equipos, total_partes, equipos_por_zip = calcular_info_paginacion_zip(selected_company_id)
+
+        # Crear lista de partes con información detallada
+        partes_info = []
+        for parte_num in range(1, total_partes + 1):
+            inicio_equipo = (parte_num - 1) * equipos_por_zip + 1
+            fin_equipo = min(parte_num * equipos_por_zip, total_equipos)
+            partes_info.append({
+                'numero': parte_num,
+                'inicio_equipo': inicio_equipo,
+                'fin_equipo': fin_equipo
+            })
+
         zip_info = {
             'total_equipos': total_equipos,
             'total_partes': total_partes,
             'equipos_por_zip': equipos_por_zip,
-            'requiere_paginacion': total_partes > 1
+            'requiere_paginacion': total_partes > 1,
+            'partes_info': partes_info
         }
 
     context = {
