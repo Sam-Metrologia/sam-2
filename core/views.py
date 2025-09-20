@@ -1001,11 +1001,20 @@ def dashboard(request):
     # Excluir equipos "De Baja" de los cálculos del dashboard
     equipos_para_dashboard = equipos_queryset.exclude(estado='De Baja').exclude(estado='Inactivo') # Se añadió exclusión de 'Inactivo'
 
-    # --- Indicadores Clave ---
-    total_equipos = equipos_queryset.count()
-    equipos_activos = equipos_queryset.filter(estado='Activo').count()
-    equipos_inactivos = equipos_queryset.filter(estado='Inactivo').count()
-    equipos_de_baja = equipos_queryset.filter(estado='De Baja').count()
+    # --- Indicadores Clave (Optimizado con una sola consulta) ---
+    from django.db.models import Count, Case, When, IntegerField
+
+    estadisticas_equipos = equipos_queryset.aggregate(
+        total_equipos=Count('id'),
+        equipos_activos=Count(Case(When(estado='Activo', then=1), output_field=IntegerField())),
+        equipos_inactivos=Count(Case(When(estado='Inactivo', then=1), output_field=IntegerField())),
+        equipos_de_baja=Count(Case(When(estado='De Baja', then=1), output_field=IntegerField()))
+    )
+
+    total_equipos = estadisticas_equipos['total_equipos']
+    equipos_activos = estadisticas_equipos['equipos_activos']
+    equipos_inactivos = estadisticas_equipos['equipos_inactivos']
+    equipos_de_baja = estadisticas_equipos['equipos_de_baja']
 
     # --- Datos de Almacenamiento ---
     storage_usage_mb = 0
@@ -1057,45 +1066,78 @@ def dashboard(request):
             equipos_limite_warning = equipos_limite_percentage >= 80
             equipos_limite_critical = equipos_actuales_count >= equipos_limite
 
-    # Detección de actividades vencidas y próximas
+    # Detección de actividades vencidas y próximas (Optimizado con una sola consulta)
     # Se basan directamente en los campos proxima_X del modelo Equipo, excluyendo Inactivos y De Baja
-    calibraciones_vencidas = equipos_para_dashboard.filter(
-        proxima_calibracion__isnull=False,
+    from datetime import timedelta
+    fecha_limite_proximas = today + timedelta(days=30)
+
+    estadisticas_actividades = equipos_para_dashboard.aggregate(
+        calibraciones_vencidas=Count(
+            Case(When(
+                proxima_calibracion__isnull=False,
+                proxima_calibracion__lt=today,
+                then=1
+            ), output_field=IntegerField())
+        ),
+        calibraciones_proximas=Count(
+            Case(When(
+                proxima_calibracion__isnull=False,
+                proxima_calibracion__gte=today,
+                proxima_calibracion__lte=fecha_limite_proximas,
+                then=1
+            ), output_field=IntegerField())
+        ),
+        mantenimientos_vencidos=Count(
+            Case(When(
+                proximo_mantenimiento__isnull=False,
+                proximo_mantenimiento__lt=today,
+                then=1
+            ), output_field=IntegerField())
+        ),
+        mantenimientos_proximas=Count(
+            Case(When(
+                proximo_mantenimiento__isnull=False,
+                proximo_mantenimiento__gte=today,
+                proximo_mantenimiento__lte=fecha_limite_proximas,
+                then=1
+            ), output_field=IntegerField())
+        ),
+        comprobaciones_vencidas=Count(
+            Case(When(
+                proxima_comprobacion__isnull=False,
+                proxima_comprobacion__lt=today,
+                then=1
+            ), output_field=IntegerField())
+        ),
+        comprobaciones_proximas=Count(
+            Case(When(
+                proxima_comprobacion__isnull=False,
+                proxima_comprobacion__gte=today,
+                proxima_comprobacion__lte=fecha_limite_proximas,
+                then=1
+            ), output_field=IntegerField())
+        )
+    )
+
+    calibraciones_vencidas = estadisticas_actividades['calibraciones_vencidas']
+    calibraciones_proximas = estadisticas_actividades['calibraciones_proximas']
+    mantenimientos_vencidos = estadisticas_actividades['mantenimientos_vencidos']
+    mantenimientos_proximas = estadisticas_actividades['mantenimientos_proximas']
+    comprobaciones_vencidas = estadisticas_actividades['comprobaciones_vencidas']
+    comprobaciones_proximas = estadisticas_actividades['comprobaciones_proximas']
+
+    # Obtener los códigos de equipos vencidos para mostrar en el dashboard (Optimizado)
+    vencidos_calibracion_codigos = list(equipos_para_dashboard.filter(
         proxima_calibracion__lt=today
-    ).count()
+    ).values_list('codigo_interno', flat=True))
 
-    calibraciones_proximas = equipos_para_dashboard.filter(
-        proxima_calibracion__isnull=False,
-        proxima_calibracion__gte=today,
-        proxima_calibracion__lte=today + timedelta(days=30)
-    ).count()
-
-    mantenimientos_vencidos = equipos_para_dashboard.filter(
-        proximo_mantenimiento__isnull=False,
+    vencidos_mantenimiento_codigos = list(equipos_para_dashboard.filter(
         proximo_mantenimiento__lt=today
-    ).count()
+    ).values_list('codigo_interno', flat=True))
 
-    mantenimientos_proximas = equipos_para_dashboard.filter(
-        proximo_mantenimiento__isnull=False,
-        proximo_mantenimiento__gte=today,
-        proximo_mantenimiento__lte=today + timedelta(days=30)
-    ).count()
-
-    comprobaciones_vencidas = equipos_para_dashboard.filter(
-        proxima_comprobacion__isnull=False,
+    vencidos_comprobacion_codigos = list(equipos_para_dashboard.filter(
         proxima_comprobacion__lt=today
-    ).count()
-
-    comprobaciones_proximas = equipos_para_dashboard.filter(
-        proxima_comprobacion__isnull=False,
-        proxima_comprobacion__gte=today,
-        proxima_comprobacion__lte=today + timedelta(days=30)
-    ).count()
-
-    # Obtener los códigos de equipos vencidos para mostrar en el dashboard
-    vencidos_calibracion_codigos = [e.codigo_interno for e in equipos_para_dashboard.filter(proxima_calibracion__lt=today)]
-    vencidos_mantenimiento_codigos = [e.codigo_interno for e in equipos_para_dashboard.filter(proximo_mantenimiento__lt=today)]
-    vencidos_comprobacion_codigos = [e.codigo_interno for e in equipos_para_dashboard.filter(proxima_comprobacion__lt=today)]
+    ).values_list('codigo_interno', flat=True))
 
 
     # --- Datos para Gráficas de Línea (Programadas vs Realizadas por Mes) ---
@@ -3956,7 +3998,17 @@ def generar_informe_zip(request):
     proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
     procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
 
-    # OPTIMIZACIÓN: Configurar compresión más eficiente
+    # OPTIMIZACIÓN: Configurar compresión más eficiente y helper para archivos
+    def download_file_safely(file_path):
+        """Helper optimizada para descargar archivos de S3 con manejo de errores."""
+        try:
+            if default_storage.exists(file_path):
+                with default_storage.open(file_path, 'rb') as f:
+                    return f.read()
+        except Exception as e:
+            logger.warning(f"Error descargando archivo {file_path}: {e}")
+        return None
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         # 1. Add Listado_de_equipos.xlsx (General equipment report for that company)
@@ -4006,12 +4058,13 @@ def generar_informe_zip(request):
                     baja_registro = equipo.baja_registro
                 except BajaEquipo.DoesNotExist:
                     baja_registro = None
-                if baja_registro and baja_registro.documento_baja and default_storage.exists(baja_registro.documento_baja.name):
+                if baja_registro and baja_registro.documento_baja:
                     baja_folder = f"{equipo_folder}/Baja"
-                    with default_storage.open(baja_registro.documento_baja.name, 'rb') as f:
+                    file_content = download_file_safely(baja_registro.documento_baja.name)
+                    if file_content:
                         file_name_in_zip = os.path.basename(baja_registro.documento_baja.name)
-                        zf.writestr(f"{baja_folder}/{file_name_in_zip}", f.read())
-                    logger.debug(f" Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
+                        zf.writestr(f"{baja_folder}/{file_name_in_zip}", file_content)
+                        logger.debug(f" Documento de baja '{file_name_in_zip}' añadido para equipo {equipo.codigo_interno}")
                 else:
                     logger.debug(f" No se encontró documento de baja para equipo {equipo.codigo_interno} o no existe en storage.")
             except Exception as e:
@@ -4029,11 +4082,11 @@ def generar_informe_zip(request):
 
                 if cal.documento_calibracion:
                     try:
-                        if default_storage.exists(cal.documento_calibracion.name):
-                            with default_storage.open(cal.documento_calibracion.name, 'rb') as f:
-                                # Nombre descriptivo: código_interno-calibración-número_certificado.pdf
-                                nombre_descriptivo = f"{safe_equipo_codigo}-calibracion-{cert_numero}-{fecha_cal}.pdf"
-                                zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{nombre_descriptivo}", f.read())
+                        file_content = download_file_safely(cal.documento_calibracion.name)
+                        if file_content:
+                            # Nombre descriptivo: código_interno-calibración-número_certificado.pdf
+                            nombre_descriptivo = f"{safe_equipo_codigo}-calibracion-{cert_numero}-{fecha_cal}.pdf"
+                            zf.writestr(f"{equipo_folder}/Calibraciones/Certificados/{nombre_descriptivo}", file_content)
                         else:
                             logger.debug(f" Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
                     except Exception as e:

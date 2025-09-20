@@ -141,6 +141,17 @@ class Empresa(models.Model):
     def get_total_storage_used_mb(self):
         """Calcula el uso total de almacenamiento en MB para todos los archivos de la empresa."""
         from django.core.files.storage import default_storage
+        from django.core.cache import cache
+        import hashlib
+        import time
+
+        # Crear clave de cache única para esta empresa
+        cache_key = f"storage_usage_empresa_{self.id}_v2"
+
+        # Intentar obtener del cache (válido por 10 minutos)
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
 
         total_size_bytes = 0
 
@@ -152,8 +163,12 @@ class Empresa(models.Model):
             except Exception:
                 pass
 
-        # Calcular storage de equipos y sus archivos
-        for equipo in self.equipos.all():
+        # Calcular storage de equipos y sus archivos (Optimizado con prefetch)
+        equipos_con_relaciones = self.equipos.prefetch_related(
+            'calibraciones', 'mantenimientos', 'comprobaciones'
+        ).all()
+
+        for equipo in equipos_con_relaciones:
             # Archivos principales del equipo
             campos_archivo_equipo = ['archivo_compra_pdf', 'ficha_tecnica_pdf', 'manual_pdf', 'otros_documentos_pdf', 'imagen_equipo']
             for campo_archivo in campos_archivo_equipo:
@@ -199,7 +214,18 @@ class Empresa(models.Model):
                         pass
 
         # Convertir bytes a MB
-        return round(total_size_bytes / (1024 * 1024), 2)
+        total_size_mb = round(total_size_bytes / (1024 * 1024), 2)
+
+        # Guardar en cache por 10 minutos (600 segundos)
+        cache.set(cache_key, total_size_mb, 600)
+
+        return total_size_mb
+
+    def invalidate_storage_cache(self):
+        """Invalida el cache de almacenamiento cuando se modifican archivos."""
+        from django.core.cache import cache
+        cache_key = f"storage_usage_empresa_{self.id}_v2"
+        cache.delete(cache_key)
 
     def get_storage_usage_percentage(self):
         """Calcula el porcentaje de uso de almacenamiento."""
