@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _ # Importar para las traducciones de fieldsets
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
-    BajaEquipo, Ubicacion, Procedimiento, Proveedor # Solo importar el modelo Proveedor general
+    BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest # Solo importar el modelo Proveedor general
 )
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
@@ -226,3 +226,72 @@ class ProveedorAdmin(admin.ModelAdmin):
         if not request.user.is_superuser:
             obj.empresa = request.user.empresa # Asegurar que se asigne la empresa del usuario actual
         super().save_model(request, obj, form, change)
+
+
+# ================================
+# ADMIN PARA SISTEMA DE COLA ZIP
+# ================================
+
+@admin.register(ZipRequest)
+class ZipRequestAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'empresa', 'status', 'position_in_queue', 'parte_numero', 'created_at', 'file_size_mb')
+    list_filter = ('status', 'empresa', 'created_at', 'parte_numero')
+    search_fields = ('user__username', 'user__email', 'empresa__nombre')
+    readonly_fields = ('created_at', 'started_at', 'completed_at', 'file_size_mb', 'current_position', 'estimated_wait_time')
+    ordering = ('-created_at',)
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('user', 'empresa', 'status', 'parte_numero')
+        }),
+        ('Cola y Timing', {
+            'fields': ('position_in_queue', 'current_position', 'estimated_wait_time', 'created_at', 'started_at', 'completed_at')
+        }),
+        ('Archivo Generado', {
+            'fields': ('file_path', 'file_size', 'file_size_mb', 'expires_at'),
+            'classes': ('collapse',)
+        }),
+        ('Error Info', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def file_size_mb(self, obj):
+        """Mostrar tamaño del archivo en MB."""
+        if obj.file_size:
+            return f"{obj.file_size / (1024 * 1024):.2f} MB"
+        return "-"
+    file_size_mb.short_description = "Tamaño (MB)"
+
+    def current_position(self, obj):
+        """Mostrar posición actual en la cola."""
+        return obj.get_current_position()
+    current_position.short_description = "Posición Actual"
+
+    def estimated_wait_time(self, obj):
+        """Mostrar tiempo estimado de espera."""
+        wait_time = obj.get_estimated_wait_time()
+        if wait_time > 0:
+            return f"{wait_time} minutos"
+        return "-"
+    estimated_wait_time.short_description = "Tiempo Estimado"
+
+    def get_queryset(self, request):
+        """Filtrar por empresa para usuarios no superuser."""
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser and hasattr(request.user, 'empresa') and request.user.empresa:
+            return qs.filter(empresa=request.user.empresa)
+        return qs
+
+    def has_add_permission(self, request):
+        """Solo superusuarios pueden agregar solicitudes manualmente."""
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        """Solo superusuarios pueden modificar solicitudes."""
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusuarios pueden eliminar solicitudes."""
+        return request.user.is_superuser

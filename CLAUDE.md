@@ -51,6 +51,16 @@ python manage.py createcachetable sam_cache_table
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 gunicorn proyecto_c.wsgi:application
+
+# Sistema de Cola ZIP (NUEVO - Optimización de Memoria)
+./start_zip_processor.sh     # Iniciar procesador de cola
+./stop_zip_processor.sh      # Detener procesador de cola
+./monitor_zip_system.sh      # Monitorear sistema de cola
+
+# Limpieza de archivos ZIP
+python manage.py cleanup_zip_files --dry-run          # Simular limpieza
+python manage.py cleanup_zip_files --older-than-hours 6  # Limpiar archivos antiguos
+python manage.py cleanup_zip_files --force-all        # Eliminar TODOS (cuidado!)
 ```
 
 ## Architecture Overview
@@ -98,6 +108,15 @@ Structured logging with multiple handlers:
   - `logs/sam_info.log`: General application logs
   - `logs/sam_errors.log`: Error logs with extended retention
   - `logs/sam_security.log`: Security-related events
+  - `logs/zip_processor.log`: Procesador de cola ZIP (NUEVO)
+
+### Sistema de Cola ZIP (Optimización de Memoria)
+Sistema implementado para optimizar el uso de memoria en generación de ZIPs:
+- **Procesamiento en Cola**: Las solicitudes ZIP se procesan una por una en orden FIFO
+- **Optimización de RAM**: Máximo 35 equipos por ZIP para mantener <50% uso de RAM
+- **Persistencia entre Páginas**: Notificaciones globales que persisten al navegar
+- **Limpieza Automática**: Archivos ZIP expiran automáticamente en 6 horas
+- **Monitoreo**: Scripts incluidos para monitorear estado y uso de recursos
 
 ## Environment Variables
 

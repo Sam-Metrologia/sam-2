@@ -538,20 +538,20 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
         row_data = [
             equipo.codigo_interno, equipo.nombre, equipo.empresa.nombre, equipo.tipo_equipo,
             equipo.marca, equipo.modelo, equipo.numero_serie,
-            equipo.ubicacion.nombre if equipo.ubicacion else "", equipo.responsable, equipo.estado,
+            equipo.ubicacion or "", equipo.responsable, equipo.estado,
             equipo.fecha_adquisicion, equipo.rango_medida, equipo.resolucion,
-            equipo.error_maximo_permisible, equipo.fecha_registro, equipo.observaciones,
-            equipo.fecha_ultima_calibracion, equipo.proxima_calibracion, equipo.frecuencia_calibracion,
-            equipo.fecha_ultimo_mantenimiento, equipo.proximo_mantenimiento, equipo.frecuencia_mantenimiento,
-            equipo.fecha_ultima_comprobacion, equipo.proxima_comprobacion, equipo.frecuencia_comprobacion
+            equipo.error_maximo_permisible, equipo.fecha_registro.replace(tzinfo=None) if equipo.fecha_registro else None, equipo.observaciones,
+            equipo.fecha_ultima_calibracion, equipo.proxima_calibracion, equipo.frecuencia_calibracion_meses,
+            equipo.fecha_ultimo_mantenimiento, equipo.proximo_mantenimiento, equipo.frecuencia_mantenimiento_meses,
+            equipo.fecha_ultima_comprobacion, equipo.proxima_comprobacion, equipo.frecuencia_comprobacion_meses
         ]
         sheet_equipos.append(row_data)
 
     # === HOJA 2: PROVEEDORES ===
     sheet_proveedores = workbook.create_sheet(title="Proveedores")
     headers_proveedores = [
-        "Nombre Empresa", "Contacto Principal", "Email", "Teléfono", "Dirección",
-        "Ciudad", "País", "Servicios Ofrecidos", "Fecha de Registro"
+        "Nombre Empresa", "Nombre Contacto", "Correo Electrónico", "Número Contacto",
+        "Tipo Servicio", "Alcance", "Servicio Prestado", "Página Web"
     ]
     sheet_proveedores.append(headers_proveedores)
 
@@ -561,17 +561,16 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
 
     for proveedor in proveedores_queryset:
         row_data = [
-            proveedor.nombre_empresa, proveedor.contacto_principal, proveedor.email,
-            proveedor.telefono, proveedor.direccion, proveedor.ciudad, proveedor.pais,
-            proveedor.servicios_ofrecidos, proveedor.fecha_registro
+            proveedor.nombre_empresa, proveedor.nombre_contacto, proveedor.correo_electronico,
+            proveedor.numero_contacto, proveedor.tipo_servicio, proveedor.alcance, proveedor.servicio_prestado,
+            proveedor.pagina_web
         ]
         sheet_proveedores.append(row_data)
 
     # === HOJA 3: PROCEDIMIENTOS ===
     sheet_procedimientos = workbook.create_sheet(title="Procedimientos")
     headers_procedimientos = [
-        "Código", "Título", "Descripción", "Versión", "Fecha de Emisión",
-        "Fecha de Revisión", "Responsable", "Estado"
+        "Código", "Nombre", "Observaciones", "Versión", "Fecha de Emisión"
     ]
     sheet_procedimientos.append(headers_procedimientos)
 
@@ -581,9 +580,8 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
 
     for procedimiento in procedimientos_queryset:
         row_data = [
-            procedimiento.codigo, procedimiento.titulo, procedimiento.descripcion,
-            procedimiento.version, procedimiento.fecha_emision, procedimiento.fecha_revision,
-            procedimiento.responsable, procedimiento.estado
+            procedimiento.codigo, procedimiento.nombre, procedimiento.observaciones,
+            procedimiento.version, procedimiento.fecha_emision
         ]
         sheet_procedimientos.append(row_data)
 
@@ -649,7 +647,7 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
         for equipo in equipos_inactivos:
             sheet_dashboard[f'A{row}'] = equipo.codigo_interno
             sheet_dashboard[f'B{row}'] = equipo.nombre
-            sheet_dashboard[f'C{row}'] = equipo.ubicacion.nombre if equipo.ubicacion else ""
+            sheet_dashboard[f'C{row}'] = equipo.ubicacion or ""
             sheet_dashboard[f'D{row}'] = equipo.responsable
             row += 1
     else:
@@ -678,7 +676,7 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
         for equipo in equipos_baja:
             sheet_dashboard[f'A{row}'] = equipo.codigo_interno
             sheet_dashboard[f'B{row}'] = equipo.nombre
-            sheet_dashboard[f'C{row}'] = equipo.ubicacion.nombre if equipo.ubicacion else ""
+            sheet_dashboard[f'C{row}'] = equipo.ubicacion or ""
             sheet_dashboard[f'D{row}'] = equipo.responsable
             # Buscar fecha de baja
             try:
@@ -828,15 +826,18 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
     for sheet in [sheet_equipos, sheet_proveedores, sheet_procedimientos, sheet_dashboard]:
         for column in sheet.columns:
             max_length = 0
-            column_letter = column[0].column_letter
+            column_letter = None
             for cell in column:
                 try:
-                    if len(str(cell.value)) > max_length:
+                    if hasattr(cell, 'column_letter'):
+                        column_letter = cell.column_letter
+                    if cell.value and len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
                     pass
-            adjusted_width = min(max_length + 2, 50)
-            sheet.column_dimensions[column_letter].width = adjusted_width
+            if column_letter:
+                adjusted_width = min(max_length + 2, 50)
+                sheet.column_dimensions[column_letter].width = adjusted_width
 
     # Guardar y retornar contenido
     excel_buffer = io.BytesIO()
@@ -4302,13 +4303,31 @@ def informes(request):
     return render(request, 'core/informes.html', context)
 
 
+def stream_file_to_zip(zip_file, file_path, zip_path):
+    """Helper que hace streaming directo de archivo a ZIP sin cargar en memoria."""
+    try:
+        if default_storage.exists(file_path):
+            with default_storage.open(file_path, 'rb') as f:
+                # Usar streaming con chunks pequeños para reducir memoria
+                with zip_file.open(zip_path, 'w') as zip_entry:
+                    while True:
+                        chunk = f.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        zip_entry.write(chunk)
+            return True
+    except Exception as e:
+        logger.warning(f"Error streaming archivo {file_path}: {e}")
+    return False
+
+
 def calcular_info_paginacion_zip(empresa_id, is_superuser=False):
     """
     Calcula información de paginación para ZIPs basado en número de equipos.
     Returns: (total_equipos, total_partes, equipos_por_zip)
     """
-    # OPTIMIZACIÓN: 50 equipos por ZIP para todos los usuarios (sin Excel individuales)
-    EQUIPOS_POR_ZIP = 50
+    # OPTIMIZACIÓN: 35 equipos por ZIP (con hoja de vida PDF, nombres optimizados)
+    EQUIPOS_POR_ZIP = 35
 
     total_equipos = Equipo.objects.filter(empresa_id=empresa_id).count()
     total_partes = (total_equipos + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP if total_equipos > 0 else 1
@@ -4382,7 +4401,7 @@ def generar_informe_zip(request):
 
     # OPTIMIZACIÓN: Prefetch relacionados para evitar consultas N+1
     # PAGINACIÓN: Limitar equipos para evitar problemas de memoria en servidor (512MB)
-    EQUIPOS_POR_ZIP = 50  # 50 equipos por ZIP para todos los usuarios (sin Excel individuales)
+    EQUIPOS_POR_ZIP = 35  # 35 equipos por ZIP (con hoja de vida PDF, nombres optimizados)
 
     equipos_empresa_total = Equipo.objects.filter(empresa=empresa).count()
 
@@ -4408,46 +4427,32 @@ def generar_informe_zip(request):
     procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
 
     # OPTIMIZACIÓN: Configurar compresión más eficiente y streaming de archivos
-    def stream_file_to_zip(zip_file, file_path, zip_path):
-        """Helper que hace streaming directo de archivo a ZIP sin cargar en memoria."""
-        try:
-            if default_storage.exists(file_path):
-                with default_storage.open(file_path, 'rb') as f:
-                    # Usar streaming con chunks pequeños para reducir memoria
-                    with zip_file.open(zip_path, 'w') as zip_entry:
-                        while True:
-                            chunk = f.read(8192)  # 8KB chunks
-                            if not chunk:
-                                break
-                            zip_entry.write(chunk)
-                return True
-        except Exception as e:
-            logger.warning(f"Error streaming archivo {file_path}: {e}")
-        return False
 
     zip_buffer = io.BytesIO()
     # OPTIMIZACIÓN: Compresión eficiente sin Excel individuales
     compresslevel = 2  # Compresión balanceada para todos los usuarios
 
+    # OPTIMIZACIÓN: Cache nombre empresa para evitar accesos repetidos
+    empresa_nombre = empresa.nombre
+
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=compresslevel) as zf:
-        # OPTIMIZACIÓN: Un solo Excel consolidado con 3 hojas (Equipos, Proveedores, Procedimientos)
+        # OPTIMIZACIÓN: Un solo Excel consolidado con 4 hojas (Equipos, Proveedores, Procedimientos, Dashboard)
         excel_consolidado = _generate_consolidated_excel_content(equipos_empresa, proveedores_empresa, procedimientos_empresa)
-        zf.writestr(f"{empresa.nombre}/Informe_Consolidado.xlsx", excel_consolidado)
+        zf.writestr(f"{empresa_nombre}/Informe_Consolidado.xlsx", excel_consolidado)
 
-
-        # 4. For each equipment, add its "Hoja de Vida" (PDF and Excel) and existing activity PDFs
+        # 4. For each equipment, add its "Hoja de Vida" (PDF) and existing activity PDFs
         for equipo in equipos_empresa:
-            # Asegura que el código interno no contenga caracteres que puedan causar problemas en nombres de archivo/ruta
-            safe_equipo_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_').replace(':', '_')
-            equipo_folder = f"{empresa.nombre}/Equipos/{safe_equipo_codigo}"
+            # OPTIMIZACIÓN: Código interno con procesamiento mínimo pero necesario para identificación
+            safe_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_')
+            equipo_folder = f"{empresa_nombre}/Equipos/{safe_codigo}"
 
-            # OPTIMIZACIÓN CRÍTICA: PDF siempre se incluye
+            # HOJA DE VIDA PDF (requerida por usuario)
             try:
                 hoja_vida_pdf_content = _generate_equipment_hoja_vida_pdf_content(request, equipo)
                 zf.writestr(f"{equipo_folder}/Hoja_de_vida.pdf", hoja_vida_pdf_content)
             except Exception as e:
                 logger.error(f"Error generating Hoja de Vida PDF for {equipo.codigo_interno}: {e}")
-                zf.writestr(f"{equipo_folder}/Hoja_de_vida_PDF_ERROR.txt", f"Error generating Hoja de Vida PDF: {e}")
+                zf.writestr(f"{equipo_folder}/Hoja_de_vida_ERROR.txt", f"Error: {e}")
 
             # OPTIMIZACIÓN: Excel individuales eliminados para optimizar memoria y velocidad
             # Toda la información está disponible en el archivo Informe_Consolidado.xlsx
@@ -4474,78 +4479,67 @@ def generar_informe_zip(request):
 
 
             # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
-            # OPTIMIZACIÓN: Usar datos de prefetch (sin .all() para evitar QuerySet slice error)
-            calibraciones = equipo.calibraciones
+            # OPTIMIZACIÓN: TODAS las calibraciones con nombres simples
+            calibraciones = equipo.calibraciones.all()
+            # OPTIMIZACIÓN: Nombres simples sin formateo complejo
+            cal_idx = 1
             for cal in calibraciones:
-                # Generar nombre descriptivo para calibración: código-calibración-número_certificado
-                cert_numero = cal.numero_certificado or f"cert_{cal.id}"
-                fecha_cal = cal.fecha_calibracion.strftime("%Y-%m-%d")
-
                 if cal.documento_calibracion:
                     try:
-                        # Nombre descriptivo: código_interno-calibración-número_certificado.pdf
-                        nombre_descriptivo = f"{safe_equipo_codigo}-calibracion-{cert_numero}-{fecha_cal}.pdf"
-                        if stream_file_to_zip(zf, cal.documento_calibracion.name, f"{equipo_folder}/Calibraciones/Certificados/{nombre_descriptivo}"):
-                            logger.debug(f" Certificado de calibración '{nombre_descriptivo}' añadido")
-                        else:
-                            logger.debug(f" Archivo no encontrado en storage (certificado): {cal.documento_calibracion.name}")
+                        # Nombre simple: cal_1.pdf, cal_2.pdf, etc.
+                        simple_name = f"cal_{cal_idx}.pdf"
+                        if stream_file_to_zip(zf, cal.documento_calibracion.name, f"{equipo_folder}/Calibraciones/{simple_name}"):
+                            cal_idx += 1
                     except Exception as e:
-                        logger.error(f"Error adding calibration certificate {cal.documento_calibracion.name} to zip: {e}")
+                        logger.error(f"Error adding calibration file to zip: {e}")
 
                 if cal.confirmacion_metrologica_pdf:
                     try:
-                        # Nombre descriptivo: código_interno-confirmacion-número_certificado.pdf
-                        nombre_descriptivo = f"{safe_equipo_codigo}-confirmacion-{cert_numero}-{fecha_cal}.pdf"
-                        if stream_file_to_zip(zf, cal.confirmacion_metrologica_pdf.name, f"{equipo_folder}/Calibraciones/Confirmaciones/{nombre_descriptivo}"):
-                            logger.debug(f" Confirmación de calibración '{nombre_descriptivo}' añadida")
-                        else:
-                            logger.debug(f" Archivo no encontrado en storage (confirmación): {cal.confirmacion_metrologica_pdf.name}")
+                        # Nombre simple: conf_1.pdf, conf_2.pdf, etc.
+                        simple_name = f"conf_{cal_idx}.pdf"
+                        if stream_file_to_zip(zf, cal.confirmacion_metrologica_pdf.name, f"{equipo_folder}/Calibraciones/{simple_name}"):
+                            cal_idx += 1
                     except Exception as e:
-                        logger.error(f"Error adding confirmation document {cal.confirmacion_metrologica_pdf.name} to zip: {e}")
+                        logger.error(f"Error adding confirmation file to zip: {e}")
 
                 if cal.intervalos_calibracion_pdf:
                     try:
-                        # Nombre descriptivo: código_interno-intervalos-número_certificado.pdf
-                        nombre_descriptivo = f"{safe_equipo_codigo}-intervalos-{cert_numero}-{fecha_cal}.pdf"
-                        if stream_file_to_zip(zf, cal.intervalos_calibracion_pdf.name, f"{equipo_folder}/Calibraciones/Intervalos/{nombre_descriptivo}"):
-                            logger.debug(f" Intervalos de calibración '{nombre_descriptivo}' añadido")
-                        else:
-                            logger.debug(f" Archivo no encontrado en storage (intervalos): {cal.intervalos_calibracion_pdf.name}")
+                        # Nombre simple: int_1.pdf, int_2.pdf, etc.
+                        simple_name = f"int_{cal_idx}.pdf"
+                        if stream_file_to_zip(zf, cal.intervalos_calibracion_pdf.name, f"{equipo_folder}/Calibraciones/{simple_name}"):
+                            cal_idx += 1
                     except Exception as e:
-                        logger.error(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
+                        logger.error(f"Error adding intervals file to zip: {e}")
 
             # Add existing Maintenance PDFs
-            # OPTIMIZACIÓN: Usar datos de prefetch (sin .all() para evitar QuerySet slice error)
-            mantenimientos = equipo.mantenimientos
+            # OPTIMIZACIÓN: TODOS los mantenimientos con nombres simples
+            mantenimientos = equipo.mantenimientos.all()
+            # OPTIMIZACIÓN: Nombres simples sin formateo complejo
+            mant_idx = 1
             for mant in mantenimientos:
                 if mant.documento_mantenimiento:
                     try:
-                        # Nombre descriptivo: código_interno-mantenimiento-fecha
-                        fecha_mant = mant.fecha_mantenimiento.strftime("%Y-%m-%d")
-                        tipo_mant = mant.tipo_mantenimiento.lower().replace(' ', '_')
-                        nombre_descriptivo = f"{safe_equipo_codigo}-mantenimiento-{tipo_mant}-{fecha_mant}.pdf"
-                        if stream_file_to_zip(zf, mant.documento_mantenimiento.name, f"{equipo_folder}/Mantenimientos/{nombre_descriptivo}"):
-                            logger.debug(f" Documento de mantenimiento '{nombre_descriptivo}' añadido")
-                        else:
-                            logger.debug(f" Archivo no encontrado en storage (mantenimiento): {mant.documento_mantenimiento.name}")
+                        # Nombre simple: mant_1.pdf, mant_2.pdf, etc.
+                        simple_name = f"mant_{mant_idx}.pdf"
+                        if stream_file_to_zip(zf, mant.documento_mantenimiento.name, f"{equipo_folder}/Mantenimientos/{simple_name}"):
+                            mant_idx += 1
                     except Exception as e:
-                        logger.error(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
+                        logger.error(f"Error adding maintenance file to zip: {e}")
 
             # Add existing Verification PDFs
-            # OPTIMIZACIÓN: Usar datos de prefetch (sin .all() para evitar QuerySet slice error)
-            comprobaciones = equipo.comprobaciones
+            # OPTIMIZACIÓN: TODAS las comprobaciones con nombres simples
+            comprobaciones = equipo.comprobaciones.all()
+            # OPTIMIZACIÓN: Nombres simples sin formateo complejo
+            comp_idx = 1
             for comp in comprobaciones:
                 if comp.documento_comprobacion:
                     try:
-                        # Nombre descriptivo: código_interno-comprobacion-fecha
-                        fecha_comp = comp.fecha_comprobacion.strftime("%Y-%m-%d")
-                        nombre_descriptivo = f"{safe_equipo_codigo}-comprobacion-{fecha_comp}.pdf"
-                        if stream_file_to_zip(zf, comp.documento_comprobacion.name, f"{equipo_folder}/Comprobaciones/{nombre_descriptivo}"):
-                            logger.debug(f" Documento de comprobación '{nombre_descriptivo}' añadido")
-                        else:
-                            logger.debug(f" Archivo no encontrado en storage (comprobación): {comp.documento_comprobacion.name}")
+                        # Nombre simple: comp_1.pdf, comp_2.pdf, etc.
+                        simple_name = f"comp_{comp_idx}.pdf"
+                        if stream_file_to_zip(zf, comp.documento_comprobacion.name, f"{equipo_folder}/Comprobaciones/{simple_name}"):
+                            comp_idx += 1
                     except Exception as e:
-                        logger.error(f"Error adding comprobacion document {comp.documento_comprobacion.name} to zip: {e}")
+                        logger.error(f"Error adding verification file to zip: {e}")
             
             # Add other equipment documents (if they exist and are PDF)
             equipment_docs = [
@@ -4558,8 +4552,8 @@ def generar_informe_zip(request):
                 if doc_field:
                     try:
                         if doc_field.name.lower().endswith('.pdf'):
-                            # Nombre descriptivo: código_interno_tipo_documento.pdf
-                            nombre_descriptivo = f"{safe_equipo_codigo}_{doc_type}.pdf"
+                            # Nombre simple: tipo_documento.pdf
+                            nombre_descriptivo = f"{doc_type}.pdf"
                             if stream_file_to_zip(zf, doc_field.name, f"{equipo_folder}/{nombre_descriptivo}"):
                                 logger.debug(f" Documento de equipo '{nombre_descriptivo}' añadido")
                             else:
@@ -5093,3 +5087,214 @@ def cache_diagnostics(request):
     }
 
     return render(request, 'core/cache_diagnostics.html', context)
+
+
+# ================================
+# SISTEMA DE COLA PARA ZIP
+# ================================
+
+from django.http import JsonResponse
+from django.db.models import Max
+from django.core.files.storage import default_storage
+from django.utils import timezone
+from datetime import timedelta
+import os
+from .models import ZipRequest
+
+@access_check
+@login_required
+@user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
+def solicitar_zip(request):
+    """Vista para solicitar un ZIP. Agrega usuario a la cola."""
+
+    # Verificar si ya tiene una solicitud pendiente o procesándose
+    existing = ZipRequest.objects.filter(
+        user=request.user,
+        status__in=['pending', 'processing']
+    ).first()
+
+    if existing:
+        return JsonResponse({
+            'status': 'already_pending',
+            'request_id': existing.id,
+            'position': existing.get_current_position(),
+            'estimated_time': existing.get_estimated_wait_time(),
+            'message': f'Ya tienes una solicitud en posición #{existing.get_current_position()}'
+        })
+
+    # Obtener número de parte desde parámetros
+    parte_numero = int(request.GET.get('parte', 1))
+    empresa_id = request.GET.get('empresa_id') if request.user.is_superuser else None
+
+    # Determinar empresa
+    if request.user.is_superuser and empresa_id:
+        try:
+            empresa = Empresa.objects.get(id=empresa_id)
+        except Empresa.DoesNotExist:
+            return JsonResponse({'error': 'Empresa no encontrada'}, status=400)
+    else:
+        empresa = request.user.empresa
+        if not empresa:
+            return JsonResponse({'error': 'Usuario sin empresa asignada'}, status=400)
+
+    # Obtener próxima posición en cola
+    max_position = ZipRequest.objects.aggregate(
+        max_pos=Max('position_in_queue')
+    )['max_pos'] or 0
+
+    # Crear nueva solicitud
+    zip_request = ZipRequest.objects.create(
+        user=request.user,
+        empresa=empresa,
+        status='pending',
+        position_in_queue=max_position + 1,
+        parte_numero=parte_numero,
+        expires_at=timezone.now() + timedelta(hours=6)  # Expira en 6 horas
+    )
+
+    return JsonResponse({
+        'status': 'queued',
+        'request_id': zip_request.id,
+        'position': zip_request.get_current_position(),
+        'estimated_time': zip_request.get_estimated_wait_time(),
+        'message': f'Solicitud agregada a la cola en posición #{zip_request.get_current_position()}'
+    })
+
+
+@access_check
+@login_required
+def zip_status(request, request_id):
+    """Vista para consultar el estado de una solicitud ZIP."""
+
+    try:
+        zip_req = ZipRequest.objects.get(id=request_id, user=request.user)
+
+        # Verificar si expiró
+        if zip_req.status == 'completed' and zip_req.expires_at and timezone.now() > zip_req.expires_at:
+            zip_req.status = 'expired'
+            zip_req.save()
+
+        response_data = {
+            'status': zip_req.status,
+            'position': zip_req.get_current_position(),
+            'estimated_time': zip_req.get_estimated_wait_time(),
+            'created_at': zip_req.created_at.isoformat(),
+            'parte_numero': zip_req.parte_numero,
+            'request_id': zip_req.id,
+            'empresa_nombre': zip_req.empresa.nombre if zip_req.empresa else 'Sin empresa'
+        }
+
+        if zip_req.status == 'completed' and zip_req.file_path:
+            response_data['download_url'] = f'/core/download_zip/{zip_req.id}/'
+            response_data['file_size'] = zip_req.file_size
+
+        elif zip_req.status == 'failed':
+            response_data['error_message'] = zip_req.error_message
+
+        elif zip_req.status == 'processing':
+            response_data['started_at'] = zip_req.started_at.isoformat() if zip_req.started_at else None
+
+        return JsonResponse(response_data)
+
+    except ZipRequest.DoesNotExist:
+        return JsonResponse({'error': 'Solicitud no encontrada'}, status=404)
+
+
+@access_check
+@login_required
+def download_zip(request, request_id):
+    """Vista para descargar un ZIP completado."""
+
+    try:
+        zip_req = ZipRequest.objects.get(id=request_id, user=request.user)
+
+        if zip_req.status != 'completed' or not zip_req.file_path:
+            return JsonResponse({'error': 'Archivo no disponible'}, status=404)
+
+        # Verificar si expiró
+        if zip_req.expires_at and timezone.now() > zip_req.expires_at:
+            zip_req.status = 'expired'
+            zip_req.save()
+            return JsonResponse({'error': 'Archivo expirado'}, status=410)
+
+        # Verificar si el archivo existe
+        if not default_storage.exists(zip_req.file_path):
+            zip_req.status = 'expired'
+            zip_req.save()
+            return JsonResponse({'error': 'Archivo no encontrado'}, status=404)
+
+        # Generar respuesta de descarga
+        file_data = default_storage.open(zip_req.file_path).read()
+        filename = f"Informe_{zip_req.empresa.nombre}_parte_{zip_req.parte_numero}.zip"
+
+        response = HttpResponse(file_data, content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = len(file_data)
+
+        return response
+
+    except ZipRequest.DoesNotExist:
+        return JsonResponse({'error': 'Solicitud no encontrada'}, status=404)
+
+
+@access_check
+@login_required
+def cancel_zip_request(request, request_id):
+    """Vista para cancelar una solicitud ZIP pendiente."""
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    try:
+        zip_req = ZipRequest.objects.get(id=request_id, user=request.user)
+
+        if zip_req.status == 'pending':
+            zip_req.delete()
+            return JsonResponse({'status': 'cancelled', 'message': 'Solicitud cancelada'})
+        else:
+            return JsonResponse({'error': 'No se puede cancelar, solicitud en proceso o completada'}, status=400)
+
+    except ZipRequest.DoesNotExist:
+        return JsonResponse({'error': 'Solicitud no encontrada'}, status=404)
+
+
+@access_check
+@login_required
+def my_zip_requests(request):
+    """Vista para mostrar las solicitudes ZIP del usuario."""
+
+    # Obtener solicitudes del usuario (últimas 10)
+    requests = ZipRequest.objects.filter(user=request.user).order_by('-created_at')[:10]
+
+    # Limpiar solicitudes expiradas
+    expired_ids = []
+    for zip_req in requests:
+        if (zip_req.status == 'completed' and zip_req.expires_at and
+            timezone.now() > zip_req.expires_at):
+            zip_req.status = 'expired'
+            zip_req.save()
+            expired_ids.append(zip_req.id)
+
+    requests_data = []
+    for zip_req in requests:
+        data = {
+            'id': zip_req.id,
+            'status': zip_req.status,
+            'status_display': zip_req.get_status_display(),
+            'created_at': zip_req.created_at.strftime('%d/%m/%Y %H:%M'),
+            'parte_numero': zip_req.parte_numero,
+            'empresa': zip_req.empresa.nombre,
+        }
+
+        if zip_req.status == 'pending':
+            data['position'] = zip_req.get_current_position()
+            data['estimated_time'] = zip_req.get_estimated_wait_time()
+        elif zip_req.status == 'completed':
+            data['download_url'] = f'/core/download_zip/{zip_req.id}/'
+            data['expires_at'] = zip_req.expires_at.strftime('%d/%m/%Y %H:%M') if zip_req.expires_at else None
+        elif zip_req.status == 'failed':
+            data['error_message'] = zip_req.error_message
+
+        requests_data.append(data)
+
+    return JsonResponse({'requests': requests_data})

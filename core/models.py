@@ -1111,3 +1111,75 @@ def set_equipo_activo_on_delete_baja(sender, instance, **kwargs):
             equipo.calcular_proximo_mantenimiento()
             equipo.calcular_proxima_comprobacion()
             equipo.save(update_fields=['estado', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion'])
+
+
+# ================================
+# SISTEMA DE COLA PARA ZIP
+# ================================
+
+class ZipRequest(models.Model):
+    """Modelo para manejar cola de generación de archivos ZIP."""
+
+    STATUS_CHOICES = [
+        ('pending', 'En Cola'),
+        ('processing', 'Procesando'),
+        ('completed', 'Completado'),
+        ('failed', 'Error'),
+        ('expired', 'Expirado'),
+    ]
+
+    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE, verbose_name="Usuario")
+    empresa = models.ForeignKey('Empresa', on_delete=models.CASCADE, verbose_name="Empresa")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Estado")
+    position_in_queue = models.IntegerField(verbose_name="Posición en Cola")
+    parte_numero = models.IntegerField(default=1, verbose_name="Número de Parte")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado en")
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name="Iniciado en")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Completado en")
+
+    # Archivo generado
+    file_path = models.CharField(max_length=500, null=True, blank=True, verbose_name="Ruta del Archivo")
+    file_size = models.BigIntegerField(null=True, blank=True, verbose_name="Tamaño del Archivo (bytes)")
+
+    # Información adicional
+    error_message = models.TextField(null=True, blank=True, verbose_name="Mensaje de Error")
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Expira en")
+
+    class Meta:
+        verbose_name = "Solicitud de ZIP"
+        verbose_name_plural = "Solicitudes de ZIP"
+        ordering = ['position_in_queue', 'created_at']
+        indexes = [
+            models.Index(fields=['status', 'position_in_queue']),
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['empresa', 'status']),
+        ]
+
+    def __str__(self):
+        return f"ZIP {self.id} - {self.user.username} - {self.get_status_display()}"
+
+    def get_estimated_wait_time(self):
+        """Calcula tiempo estimado de espera en minutos."""
+        if self.status != 'pending':
+            return 0
+
+        # Contar solicitudes pendientes antes de esta
+        pending_before = ZipRequest.objects.filter(
+            status='pending',
+            position_in_queue__lt=self.position_in_queue
+        ).count()
+
+        # Estimar 4 minutos por ZIP
+        return pending_before * 4
+
+    def get_current_position(self):
+        """Obtiene la posición actual en la cola."""
+        if self.status != 'pending':
+            return 0
+
+        return ZipRequest.objects.filter(
+            status='pending',
+            position_in_queue__lt=self.position_in_queue
+        ).count() + 1

@@ -107,6 +107,13 @@ urlpatterns = [
     # Diagnóstico temporal de cache
     path('cache_diagnostics/', views.cache_diagnostics, name='cache_diagnostics'),
 
+    # Sistema de Cola para ZIP
+    path('solicitar_zip/', views.solicitar_zip, name='solicitar_zip'),
+    path('zip_status/<int:request_id>/', views.zip_status, name='zip_status'),
+    path('download_zip/<int:request_id>/', views.download_zip, name='download_zip'),
+    path('cancel_zip/<int:request_id>/', views.cancel_zip_request, name='cancel_zip_request'),
+    path('my_zip_requests/', views.my_zip_requests, name='my_zip_requests'),
+
     # === URLs DE DEBUG ELIMINADAS ===
     # Eliminadas rutas de debug: s3_diagnostics, file_upload_test, logo_diagnostics,
     # test_logo_upload, fix_mi_logo, lista_empresas_sin_logo

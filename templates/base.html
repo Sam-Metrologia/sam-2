@@ -355,6 +355,33 @@
             </div>
         </div>
 
+        <!-- Notificación global para ZIP requests -->
+        <div id="zipNotificationContainer" class="hidden fixed top-20 right-4 z-50 max-w-sm">
+            <div class="bg-blue-600 text-white p-4 rounded-lg shadow-lg border-l-4 border-blue-800">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-file-archive mr-2"></i>
+                        <div>
+                            <h4 class="font-semibold text-sm">Generando ZIP</h4>
+                            <p id="zipNotificationText" class="text-xs opacity-90"></p>
+                        </div>
+                    </div>
+                    <button id="closeZipNotification" class="ml-2 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <div class="bg-blue-800 rounded-full h-2">
+                        <div id="zipProgressBar" class="bg-blue-300 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs">
+                    <span id="zipPositionText"></span>
+                    <span id="zipTimeText" class="float-right"></span>
+                </div>
+            </div>
+        </div>
+
         <main class="flex-grow p-4 md:p-6 lg:p-8"> {# Añadido flex-grow y padding responsivo #}
             {% block content %}
             <!-- Contenido específico de cada página irá aquí -->
@@ -439,7 +466,159 @@
 
             // Adjust on resize
             window.addEventListener('resize', adjustLayout);
+
+            // Sistema global de notificaciones ZIP
+            initGlobalZipNotifications();
         });
+
+        // Sistema global para monitorear solicitudes ZIP
+        function initGlobalZipNotifications() {
+            const container = document.getElementById('zipNotificationContainer');
+            const closeBtn = document.getElementById('closeZipNotification');
+            const notificationText = document.getElementById('zipNotificationText');
+            const progressBar = document.getElementById('zipProgressBar');
+            const positionText = document.getElementById('zipPositionText');
+            const timeText = document.getElementById('zipTimeText');
+
+            let currentRequestId = localStorage.getItem('activeZipRequestId');
+            let checkInterval = null;
+            let isManuallyHidden = localStorage.getItem('zipNotificationHidden') === 'true';
+
+            // Función para mostrar notificación
+            function showNotification(data) {
+                if (isManuallyHidden) return;
+
+                notificationText.textContent = `Parte ${data.parte_numero} - ${data.empresa_nombre}`;
+                positionText.textContent = `Posición: ${data.position}`;
+                timeText.textContent = data.estimated_time > 0 ? `~${data.estimated_time}min` : '';
+
+                // Calcular progreso estimado basado en posición
+                const maxPosition = 10; // Asumiendo máximo 10 en cola
+                const progress = Math.max(0, Math.min(100, ((maxPosition - data.position + 1) / maxPosition) * 100));
+                progressBar.style.width = progress + '%';
+
+                container.classList.remove('hidden');
+
+                // Actualizar color según estado
+                const bgColor = data.status === 'processing' ? 'bg-green-600' : 'bg-blue-600';
+                const borderColor = data.status === 'processing' ? 'border-green-800' : 'border-blue-800';
+                container.querySelector('div').className = `${bgColor} text-white p-4 rounded-lg shadow-lg border-l-4 ${borderColor}`;
+            }
+
+            // Función para ocultar notificación
+            function hideNotification() {
+                container.classList.add('hidden');
+                if (checkInterval) {
+                    clearInterval(checkInterval);
+                    checkInterval = null;
+                }
+                localStorage.removeItem('activeZipRequestId');
+            }
+
+            // Función para verificar estado
+            function checkZipStatus() {
+                if (!currentRequestId) {
+                    console.log('ZIP Check: No hay currentRequestId');
+                    return;
+                }
+
+                console.log(`ZIP Check: Verificando estado de solicitud ${currentRequestId}`);
+                fetch(`/core/zip_status/${currentRequestId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('ZIP Check: Respuesta recibida:', data);
+
+                        if (data.status === 'completed') {
+                            console.log('ZIP Check: ¡ZIP completado! Mostrando notificación de descarga');
+                            // ZIP listo para descarga
+                            showCompletedNotification(data);
+                            hideNotification();
+                        } else if (data.status === 'failed' || data.status === 'expired') {
+                            console.log('ZIP Check: ZIP falló o expiró, ocultando notificación');
+                            // Error o expirado
+                            hideNotification();
+                        } else if (data.status === 'pending' || data.status === 'processing') {
+                            console.log(`ZIP Check: ZIP en estado ${data.status}, posición ${data.position}`);
+                            // Continuar mostrando progreso
+                            showNotification(data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking ZIP status:', error);
+                    });
+            }
+
+            // Función para mostrar notificación de ZIP completado
+            function showCompletedNotification(data) {
+                // Crear notificación temporal de descarga
+                const completedNotification = document.createElement('div');
+                completedNotification.className = 'fixed top-20 right-4 z-50 max-w-sm';
+                completedNotification.innerHTML = `
+                    <div class="bg-green-600 text-white p-4 rounded-lg shadow-lg border-l-4 border-green-800">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-check-circle mr-2"></i>
+                                <div>
+                                    <h4 class="font-semibold text-sm">ZIP Listo</h4>
+                                    <p class="text-xs opacity-90">Parte ${data.parte_numero} completada</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2 flex space-x-2">
+                            <button onclick="downloadZip(${data.request_id})" class="bg-green-800 hover:bg-green-700 px-3 py-1 rounded text-xs">
+                                <i class="fas fa-download mr-1"></i> Descargar
+                            </button>
+                            <button onclick="this.parentElement.parentElement.parentElement.remove()" class="bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-xs">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(completedNotification);
+
+                // Auto-remover después de 30 segundos
+                setTimeout(() => {
+                    if (completedNotification.parentElement) {
+                        completedNotification.remove();
+                    }
+                }, 30000);
+            }
+
+            // Event listener para cerrar notificación
+            closeBtn.addEventListener('click', function() {
+                isManuallyHidden = true;
+                localStorage.setItem('zipNotificationHidden', 'true');
+                hideNotification();
+            });
+
+            // Función global para iniciar monitoreo (llamada desde informes.html)
+            window.startZipMonitoring = function(requestId) {
+                currentRequestId = requestId;
+                localStorage.setItem('activeZipRequestId', requestId);
+                localStorage.removeItem('zipNotificationHidden');
+                isManuallyHidden = false;
+
+                if (checkInterval) clearInterval(checkInterval);
+                checkInterval = setInterval(checkZipStatus, 15000);
+                checkZipStatus(); // Check immediately
+            };
+
+            // Función global para descargar ZIP
+            window.downloadZip = function(requestId) {
+                window.location.href = `/core/download_zip/${requestId}/`;
+            };
+
+            // Verificar si hay una solicitud activa al cargar la página
+            if (currentRequestId && !isManuallyHidden) {
+                console.log(`ZIP Init: Iniciando monitoreo para solicitud ${currentRequestId}`);
+                checkInterval = setInterval(checkZipStatus, 15000);
+                checkZipStatus();
+            } else {
+                console.log('ZIP Init: No hay solicitud activa para monitorear');
+                console.log('currentRequestId:', currentRequestId);
+                console.log('isManuallyHidden:', isManuallyHidden);
+            }
+        }
     </script>
     {% block extra_js %}{% endblock %}
 </body>

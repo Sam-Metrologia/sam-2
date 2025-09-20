@@ -33,3 +33,11 @@ def add(value, arg):
         return int(value) + int(arg)
     except (ValueError, TypeError):
         return value
+
+@register.filter
+def abs_value(value):
+    """Retorna el valor absoluto de un número"""
+    try:
+        return abs(int(value))
+    except (ValueError, TypeError):
+        return value
