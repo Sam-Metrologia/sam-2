@@ -128,16 +128,19 @@ def get_equipo_imagen_url(equipo, expire_seconds=3600):
 
 def trial_check(view_func):
     """
-    Decorador que verifica si la empresa del usuario tiene un trial activo
-    y bloquea ciertas acciones si el trial ha expirado.
+    Decorador que verifica si la empresa del usuario tiene acceso a funciones avanzadas
+    y bloquea ciertas acciones si no tiene un plan activo.
     """
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if request.user.is_authenticated and hasattr(request.user, 'empresa'):
             empresa = request.user.empresa
 
-            # Si la empresa tiene trial expirado, bloquear ciertas acciones
-            if empresa and not empresa.is_trial_active() and empresa.subscription_status == 'expired':
+            # Verificar estado de la suscripción usando el sistema unificado
+            estado_plan = empresa.get_estado_suscripcion_display()
+
+            # Si el plan está expirado, bloquear ciertas acciones
+            if empresa and estado_plan in ["Plan Expirado", "Período de Prueba Expirado"]:
                 # Lista de vistas que requieren suscripción activa
                 protected_views = [
                     'añadir_equipo', 'editar_equipo', 'añadir_calibracion', 'añadir_mantenimiento',
@@ -148,12 +151,14 @@ def trial_check(view_func):
                 # Verificar si es una vista protegida
                 view_name = view_func.__name__
                 if view_name in protected_views:
-                    messages.error(
-                        request,
-                        f'Su período de prueba de 7 días ha expirado. Para continuar usando SAM Metrología, '
-                        f'contacte con soporte para activar su suscripción. '
-                        f'Tiempo restante de trial: {empresa.get_trial_days_remaining()} días.'
-                    )
+                    dias_restantes = empresa.get_dias_restantes_plan()
+
+                    if estado_plan == "Período de Prueba Expirado":
+                        mensaje = f'Su período de prueba ha expirado. Para continuar usando SAM Metrología, contacte con soporte para activar su suscripción.'
+                    else:
+                        mensaje = f'Su plan ha expirado. Para continuar usando estas funciones, contacte con soporte para renovar su suscripción.'
+
+                    messages.error(request, mensaje)
                     return redirect('core:dashboard')
 
         return view_func(request, *args, **kwargs)
