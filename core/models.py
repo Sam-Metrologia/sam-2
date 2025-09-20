@@ -145,7 +145,7 @@ class Empresa(models.Model):
         total_size_bytes = 0
 
         # Calcular storage del logo de la empresa
-        if self.logo_empresa and hasattr(self.logo_empresa, 'path'):
+        if self.logo_empresa and hasattr(self.logo_empresa, 'name') and self.logo_empresa.name:
             try:
                 if default_storage.exists(self.logo_empresa.name):
                     total_size_bytes += default_storage.size(self.logo_empresa.name)
