@@ -5101,7 +5101,10 @@ from datetime import timedelta
 import os
 from .models import ZipRequest
 
+from django.views.decorators.csrf import csrf_exempt
+
 @access_check
+@csrf_exempt  # Temporalmente para debugging
 def trigger_zip_processing(request):
     """
     Endpoint para activar procesamiento de ZIP desde frontend.
@@ -5148,6 +5151,49 @@ def trigger_zip_processing(request):
             'status': 'error',
             'message': f'Error procesando: {str(e)}'
         }, status=500)
+
+
+@access_check
+@login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/core/access_denied/')
+def manual_process_zip(request):
+    """Vista manual para procesar ZIPs cuando el automático falla."""
+    if request.method == 'POST':
+        try:
+            from django.core.management import call_command
+            from io import StringIO
+
+            # Capturar output del comando
+            output = StringIO()
+
+            # Ejecutar procesamiento de una sola solicitud
+            call_command('process_single_zip', '--cleanup-expired', stdout=output)
+
+            result = output.getvalue()
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Procesamiento ejecutado',
+                'output': result
+            })
+
+        except Exception as e:
+            logger.error(f'Error en manual_process_zip: {e}', exc_info=True)
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Error: {str(e)}'
+            }, status=500)
+
+    # GET request - mostrar interfaz
+    pending_requests = ZipRequest.objects.filter(status='pending').order_by('position_in_queue')
+    processing_requests = ZipRequest.objects.filter(status='processing')
+
+    context = {
+        'pending_requests': pending_requests,
+        'processing_requests': processing_requests,
+    }
+
+    return render(request, 'core/manual_zip_processor.html', context)
 
 
 @access_check

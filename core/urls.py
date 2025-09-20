@@ -115,6 +115,8 @@ urlpatterns = [
     path('my_zip_requests/', views.my_zip_requests, name='my_zip_requests'),
     # Endpoint para procesamiento compatible con Render
     path('trigger_zip_processing/', views.trigger_zip_processing, name='trigger_zip_processing'),
+    # Procesamiento manual para superusuarios
+    path('manual_process_zip/', views.manual_process_zip, name='manual_process_zip'),
 
     # === URLs DE DEBUG ELIMINADAS ===
     # Eliminadas rutas de debug: s3_diagnostics, file_upload_test, logo_diagnostics,
