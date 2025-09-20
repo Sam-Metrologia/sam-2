@@ -2150,14 +2150,14 @@ def editar_empresa_formato(request, pk):
     # Permiso: Superusuario o usuario asociado a la empresa
     if not request.user.is_superuser and request.user.empresa != empresa:
         messages.error(request, 'No tienes permiso para editar la información de formato de esta empresa.')
-        return redirect('core:dashboard') # O a la lista de empresas si aplica
+        return redirect('core:home') # Volver al home si no tiene permisos
 
     if request.method == 'POST':
         form = EmpresaFormatoForm(request.POST, instance=empresa)
         if form.is_valid():
             form.save()
             messages.success(request, f'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
-            return redirect('core:detalle_empresa', pk=empresa.pk) # O a listar_empresas si prefieres
+            return redirect('core:home') # Volver al home después de editar formato
         else:
             messages.error(request, 'Hubo un error al actualizar el formato. Por favor, revisa los datos.')
     else:
@@ -4477,8 +4477,8 @@ def generar_informe_zip(request):
 
 
             # Add existing Calibration PDFs (Certificado, Confirmación, Intervalos)
-            # OPTIMIZACIÓN: Usar prefetch en lugar de consulta individual
-            calibraciones = equipo.calibraciones.all()
+            # OPTIMIZACIÓN: Usar datos de prefetch (sin .all() para evitar QuerySet slice error)
+            calibraciones = equipo.calibraciones
             for cal in calibraciones:
                 # Generar nombre descriptivo para calibración: código-calibración-número_certificado
                 cert_numero = cal.numero_certificado or f"cert_{cal.id}"
@@ -4518,8 +4518,8 @@ def generar_informe_zip(request):
                         logger.error(f"Error adding intervals document {cal.intervalos_calibracion_pdf.name} to zip: {e}")
 
             # Add existing Maintenance PDFs
-            # OPTIMIZACIÓN: Usar prefetch en lugar de consulta individual
-            mantenimientos = equipo.mantenimientos.all()
+            # OPTIMIZACIÓN: Usar datos de prefetch (sin .all() para evitar QuerySet slice error)
+            mantenimientos = equipo.mantenimientos
             for mant in mantenimientos:
                 if mant.documento_mantenimiento:
                     try:
@@ -4535,8 +4535,8 @@ def generar_informe_zip(request):
                         logger.error(f"Error adding maintenance document {mant.documento_mantenimiento.name} to zip: {e}")
 
             # Add existing Verification PDFs
-            # OPTIMIZACIÓN: Usar prefetch en lugar de consulta individual
-            comprobaciones = equipo.comprobaciones.all()
+            # OPTIMIZACIÓN: Usar datos de prefetch (sin .all() para evitar QuerySet slice error)
+            comprobaciones = equipo.comprobaciones
             for comp in comprobaciones:
                 if comp.documento_comprobacion:
                     try:
