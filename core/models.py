@@ -142,16 +142,24 @@ class Empresa(models.Model):
         """Calcula el uso total de almacenamiento en MB para todos los archivos de la empresa."""
         from django.core.files.storage import default_storage
         from django.core.cache import cache
+        from django.core.cache.backends.base import InvalidCacheBackendError
         import hashlib
         import time
 
         # Crear clave de cache única para esta empresa
         cache_key = f"storage_usage_empresa_{self.id}_v2"
 
-        # Intentar obtener del cache (válido por 10 minutos)
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            return cached_result
+        # Intentar obtener del cache (válido por 10 minutos) con fallback graceful
+        try:
+            cached_result = cache.get(cache_key)
+            if cached_result is not None:
+                return cached_result
+        except Exception as e:
+            # Si hay error con el cache (ej. tabla no existe), continuar sin cache
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Cache no disponible para storage calculation: {e}")
+            cached_result = None
 
         total_size_bytes = 0
 
@@ -216,8 +224,14 @@ class Empresa(models.Model):
         # Convertir bytes a MB
         total_size_mb = round(total_size_bytes / (1024 * 1024), 2)
 
-        # Guardar en cache por 10 minutos (600 segundos)
-        cache.set(cache_key, total_size_mb, 600)
+        # Guardar en cache por 10 minutos (600 segundos) con fallback graceful
+        try:
+            cache.set(cache_key, total_size_mb, 600)
+        except Exception as e:
+            # Si hay error con el cache, continuar sin guardarlo
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"No se pudo guardar en cache storage calculation: {e}")
 
         return total_size_mb
 
@@ -225,7 +239,13 @@ class Empresa(models.Model):
         """Invalida el cache de almacenamiento cuando se modifican archivos."""
         from django.core.cache import cache
         cache_key = f"storage_usage_empresa_{self.id}_v2"
-        cache.delete(cache_key)
+        try:
+            cache.delete(cache_key)
+        except Exception as e:
+            # Si hay error con el cache, simplemente continuar
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"No se pudo invalidar cache storage: {e}")
 
     def get_storage_usage_percentage(self):
         """Calcula el porcentaje de uso de almacenamiento."""
