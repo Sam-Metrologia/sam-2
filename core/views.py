@@ -605,13 +605,11 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
 
 def _generate_dashboard_excel_content(equipos_queryset, empresa):
     """
-    Genera un Excel profesional para el dashboard con formato mejorado, gráficos y secciones completas.
+    Genera un Excel profesional para el dashboard con formato mejorado y secciones completas.
     Usado cuando se descarga desde el botón del dashboard.
     """
     from collections import Counter
     from datetime import datetime, timedelta
-    from openpyxl.chart import PieChart, BarChart, Reference
-    from openpyxl.drawing.image import Image
     from openpyxl.styles import Alignment
 
     workbook = Workbook()
@@ -781,14 +779,12 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         ('Comprobaciones', comp_programadas, comp_vencidas, comp_proximas)
     ]
 
-    chart_data_row_start = row
     for tipo, realizadas, vencidas, proximas in actividades_data:
         sheet.cell(row=row, column=1, value=tipo)
         sheet.cell(row=row, column=2, value=realizadas)
         sheet.cell(row=row, column=3, value=vencidas)
         sheet.cell(row=row, column=4, value=proximas)
         row += 1
-    chart_data_row_end = row - 1
 
     # ==============================================
     # SECCIÓN: ACTIVIDADES NO PROGRAMADAS
@@ -828,39 +824,6 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         sheet[f'A{row}'].font = Font(bold=True, color="27AE60")
         row += 1
 
-    # ==============================================
-    # GRÁFICO DE EXCEL NATIVO
-    # ==============================================
-
-    row += 2
-    sheet[f'A{row}'] = '📈 GRÁFICO DE ACTIVIDADES'
-    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
-    row += 1
-
-    # Crear gráfico de barras
-    chart = BarChart()
-    chart.title = "Comparativa de Actividades por Tipo"
-    chart.x_axis.title = "Tipo de Actividad"
-    chart.y_axis.title = "Cantidad"
-
-    # Referencias a los datos
-    categories = Reference(sheet, min_col=1, min_row=chart_data_row_start, max_row=chart_data_row_end)
-    realizadas_data = Reference(sheet, min_col=2, min_row=chart_data_row_start-1, max_row=chart_data_row_end)
-    vencidas_data = Reference(sheet, min_col=3, min_row=chart_data_row_start-1, max_row=chart_data_row_end)
-
-    chart.add_data(realizadas_data, titles_from_data=True)
-    chart.add_data(vencidas_data, titles_from_data=True)
-    chart.set_categories(categories)
-
-    # Configurar colores del gráfico
-    chart.series[0].graphicalProperties.solidFill = "27AE60"  # Verde para realizadas
-    chart.series[1].graphicalProperties.solidFill = "E74C3C"  # Rojo para vencidas
-
-    # Posicionar gráfico
-    chart.width = 15
-    chart.height = 10
-    sheet.add_chart(chart, f"A{row}")
-
     # Ajustar anchos de columnas
     for col in ['A', 'B', 'C', 'D', 'E', 'F']:
         sheet.column_dimensions[col].width = 20
@@ -880,11 +843,26 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
     Genera un Excel consolidado con 4 hojas: Equipos, Proveedores, Procedimientos y Reporte Dashboard.
     Usado para el ZIP completo con todas las funcionalidades.
     """
+    from django.utils import timezone
+    from openpyxl.styles import Alignment
     workbook = Workbook()
 
     # === HOJA 1: EQUIPOS ===
     sheet_equipos = workbook.active
     sheet_equipos.title = "Equipos"
+
+    # Agregar título profesional a hoja de Equipos
+    sheet_equipos.merge_cells('A1:AB2')
+    title_cell = sheet_equipos['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información de generación
+    sheet_equipos['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_equipos['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_equipos['A3'].alignment = Alignment(horizontal="left")
 
     headers_equipos = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
@@ -895,16 +873,18 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
         "Próxima Comprobación", "Frecuencia Comprobación (meses)"
     ]
-    sheet_equipos.append(headers_equipos)
 
-    # Estilos para headers
+    # Agregar headers en fila 5
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    for cell in sheet_equipos[1]:
+    for col_num, header_text in enumerate(headers_equipos, 1):
+        cell = sheet_equipos.cell(row=5, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Datos de equipos
+    # Agregar datos de equipos empezando desde la fila 6
+    current_row = 6
     for equipo in equipos_queryset:
         row_data = [
             equipo.codigo_interno, equipo.nombre, equipo.empresa.nombre, equipo.tipo_equipo,
@@ -916,48 +896,103 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
             equipo.fecha_ultimo_mantenimiento, equipo.proximo_mantenimiento, equipo.frecuencia_mantenimiento_meses,
             equipo.fecha_ultima_comprobacion, equipo.proxima_comprobacion, equipo.frecuencia_comprobacion_meses
         ]
-        sheet_equipos.append(row_data)
+        for col_num, value in enumerate(row_data, 1):
+            sheet_equipos.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
 
     # === HOJA 2: PROVEEDORES ===
     sheet_proveedores = workbook.create_sheet(title="Proveedores")
+
+    # Agregar título profesional a hoja de Proveedores
+    sheet_proveedores.merge_cells('A1:H2')
+    title_cell = sheet_proveedores['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información de generación
+    sheet_proveedores['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_proveedores['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_proveedores['A3'].alignment = Alignment(horizontal="left")
+
     headers_proveedores = [
         "Nombre Empresa", "Nombre Contacto", "Correo Electrónico", "Número Contacto",
         "Tipo Servicio", "Alcance", "Servicio Prestado", "Página Web"
     ]
-    sheet_proveedores.append(headers_proveedores)
 
-    for cell in sheet_proveedores[1]:
+    # Agregar headers en fila 5
+    for col_num, header_text in enumerate(headers_proveedores, 1):
+        cell = sheet_proveedores.cell(row=5, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
+    # Agregar datos de proveedores empezando desde la fila 6
+    current_row = 6
     for proveedor in proveedores_queryset:
         row_data = [
             proveedor.nombre_empresa, proveedor.nombre_contacto, proveedor.correo_electronico,
             proveedor.numero_contacto, proveedor.tipo_servicio, proveedor.alcance, proveedor.servicio_prestado,
             proveedor.pagina_web
         ]
-        sheet_proveedores.append(row_data)
+        for col_num, value in enumerate(row_data, 1):
+            sheet_proveedores.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
 
     # === HOJA 3: PROCEDIMIENTOS ===
     sheet_procedimientos = workbook.create_sheet(title="Procedimientos")
+
+    # Agregar título profesional a hoja de Procedimientos
+    sheet_procedimientos.merge_cells('A1:E2')
+    title_cell = sheet_procedimientos['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información de generación
+    sheet_procedimientos['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_procedimientos['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_procedimientos['A3'].alignment = Alignment(horizontal="left")
+
     headers_procedimientos = [
         "Código", "Nombre", "Observaciones", "Versión", "Fecha de Emisión"
     ]
-    sheet_procedimientos.append(headers_procedimientos)
 
-    for cell in sheet_procedimientos[1]:
+    # Agregar headers en fila 5
+    for col_num, header_text in enumerate(headers_procedimientos, 1):
+        cell = sheet_procedimientos.cell(row=5, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
+    # Agregar datos de procedimientos empezando desde la fila 6
+    current_row = 6
     for procedimiento in procedimientos_queryset:
         row_data = [
             procedimiento.codigo, procedimiento.nombre, procedimiento.observaciones,
             procedimiento.version, procedimiento.fecha_emision
         ]
-        sheet_procedimientos.append(row_data)
+        for col_num, value in enumerate(row_data, 1):
+            sheet_procedimientos.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
 
     # === HOJA 4: DASHBOARD DETALLADO ===
     sheet_dashboard = workbook.create_sheet(title="Dashboard")
+
+    # Agregar título profesional a hoja de Dashboard
+    sheet_dashboard.merge_cells('A1:F2')
+    title_cell = sheet_dashboard['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información de generación
+    sheet_dashboard['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_dashboard['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_dashboard['A3'].alignment = Alignment(horizontal="left")
 
     from datetime import date, timedelta
     today = date.today()
@@ -968,7 +1003,7 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
 
-    row = 1
+    row = 5
 
     # === ESTADÍSTICAS GENERALES ===
     sheet_dashboard.merge_cells(f'A{row}:F{row}')
@@ -1210,17 +1245,16 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
                 adjusted_width = min(max_length + 2, 50)
                 sheet.column_dimensions[column_letter].width = adjusted_width
 
-    # === HOJA 4: REPORTE DASHBOARD ===
-    # Agregar la hoja de reporte dashboard al Excel del ZIP
-    empresa = equipos_queryset.first().empresa if equipos_queryset.exists() else None
+    # === HOJA 4: REPORTE DASHBOARD (DESHABILITADA PARA OPTIMIZAR RENDIMIENTO) ===
+    # Hoja de dashboard temporalmente deshabilitada para optimizar memoria
+    # empresa = equipos_queryset.first().empresa if equipos_queryset.exists() else None
 
-    if empresa:
+    if False:  # Deshabilitado temporalmente
         sheet_dashboard = workbook.create_sheet(title="Reporte Dashboard")
 
         # Reutilizar la lógica del dashboard pero adaptada para hoja adicional
         from collections import Counter
         from datetime import datetime, timedelta
-        from openpyxl.chart import BarChart, Reference
         from openpyxl.styles import Alignment
 
         # Configurar datos
@@ -1332,13 +1366,35 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
     """
     Generates an Excel file with the general list of equipment including visual charts.
     """
-    from openpyxl.chart import PieChart, BarChart, Reference
     from openpyxl.chart.series import DataPoint
     from collections import Counter
+    from openpyxl.styles import Alignment
+    from datetime import datetime
 
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Listado de Equipos"
+
+    # ==============================================
+    # ENCABEZADO PROFESIONAL SAM METROLOGÍA
+    # ==============================================
+
+    # Título principal profesional
+    sheet.merge_cells('A1:AB2')
+    sheet['A1'] = 'INFORMES GENERADOS POR SAM METROLOGÍA SAS'
+    sheet['A1'].font = Font(bold=True, size=20, color="FFFFFF")
+    sheet['A1'].fill = PatternFill(start_color="1f4e79", end_color="1f4e79", fill_type="solid")
+    sheet['A1'].alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información de generación
+    hoy = datetime.now()
+    sheet.merge_cells('A3:AB3')
+    sheet['A3'] = f'LISTADO GENERAL DE EQUIPOS - Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
+    sheet['A3'].font = Font(bold=True, size=12, color="1f4e79")
+    sheet['A3'].alignment = Alignment(horizontal="center")
+
+    # Espacio antes de headers (filas 4 y 5 vacías)
+    # No usamos append() para evitar conflictos con celdas fusionadas
 
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
@@ -1350,8 +1406,8 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
         "Próxima Comprobación", "Frecuencia Comprobación (meses)"
     ]
-    sheet.append(headers)
 
+    # Colocar headers en la fila 6 (después del título y espacios)
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
@@ -1361,13 +1417,15 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
                            bottom=Side(style='thin'))
 
     for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell = sheet.cell(row=6, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_alignment
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
+    # Agregar datos de equipos empezando desde la fila 7
+    current_row = 7
     for equipo in equipos_queryset:
         row_data = [
             equipo.codigo_interno,
@@ -1399,94 +1457,63 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
             float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
         ]
-        sheet.append(row_data)
+        for col_num, value in enumerate(row_data, 1):
+            sheet.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
 
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
+    # Ajustar anchos de columna evitando problemas con celdas fusionadas
+    from openpyxl.utils import get_column_letter
+    for col_num in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet.column_dimensions[column_letter].width = 25
 
-    # Crear hoja de gráficas
-    chart_sheet = workbook.create_sheet("Estadísticas")
+    # Crear hoja de estadísticas simple (sin gráficas para optimizar memoria)
+    stats_sheet = workbook.create_sheet("Estadísticas")
 
-    # Recopilar datos para gráficas
+    # Recopilar datos para estadísticas
     equipos_list = list(equipos_queryset)
 
     if equipos_list:
-        # 1. Gráfica de equipos por empresa
+        # 1. Estadísticas por empresa
         empresas_count = Counter(eq.empresa.nombre if eq.empresa else "Sin empresa" for eq in equipos_list)
 
-        # Crear datos para gráfica de empresas
-        chart_sheet['A1'] = 'Empresa'
-        chart_sheet['B1'] = 'Cantidad de Equipos'
+        stats_sheet['A1'] = 'DISTRIBUCIÓN POR EMPRESA'
+        stats_sheet['A2'] = 'Empresa'
+        stats_sheet['B2'] = 'Cantidad de Equipos'
 
-        row = 2
+        row = 3
         for empresa, count in empresas_count.items():
-            chart_sheet[f'A{row}'] = empresa
-            chart_sheet[f'B{row}'] = count
+            stats_sheet[f'A{row}'] = empresa
+            stats_sheet[f'B{row}'] = count
             row += 1
 
-        # Crear gráfica de torta para empresas
-        pie_chart = PieChart()
-        pie_chart.title = "Distribución de Equipos por Empresa"
-        labels = Reference(chart_sheet, min_col=1, min_row=2, max_row=row-1)
-        data = Reference(chart_sheet, min_col=2, min_row=1, max_row=row-1)
-        pie_chart.add_data(data, titles_from_data=True)
-        pie_chart.set_categories(labels)
-        chart_sheet.add_chart(pie_chart, "D2")
-
-        # 2. Gráfica de equipos por tipo
+        # 2. Estadísticas por tipo
         tipos_count = Counter(eq.get_tipo_equipo_display() for eq in equipos_list)
 
-        # Crear datos para gráfica de tipos
-        chart_sheet['A12'] = 'Tipo de Equipo'
-        chart_sheet['B12'] = 'Cantidad'
+        start_row = row + 2
+        stats_sheet[f'A{start_row}'] = 'DISTRIBUCIÓN POR TIPO'
+        stats_sheet[f'A{start_row+1}'] = 'Tipo de Equipo'
+        stats_sheet[f'B{start_row+1}'] = 'Cantidad'
 
-        row = 13
+        row = start_row + 2
         for tipo, count in tipos_count.items():
-            chart_sheet[f'A{row}'] = tipo
-            chart_sheet[f'B{row}'] = count
+            stats_sheet[f'A{row}'] = tipo
+            stats_sheet[f'B{row}'] = count
             row += 1
 
-        # Crear gráfica de barras para tipos
-        bar_chart = BarChart()
-        bar_chart.title = "Equipos por Tipo"
-        bar_chart.x_axis.title = "Tipo de Equipo"
-        bar_chart.y_axis.title = "Cantidad"
-        labels = Reference(chart_sheet, min_col=1, min_row=13, max_row=row-1)
-        data = Reference(chart_sheet, min_col=2, min_row=12, max_row=row-1)
-        bar_chart.add_data(data, titles_from_data=True)
-        bar_chart.set_categories(labels)
-        chart_sheet.add_chart(bar_chart, "D13")
-
-        # 3. Gráfica de estados de equipos
+        # 3. Estadísticas por estado
         estados_count = Counter(eq.estado for eq in equipos_list)
 
-        # Crear datos para gráfica de estados
-        chart_sheet['A25'] = 'Estado'
-        chart_sheet['B25'] = 'Cantidad'
+        start_row = row + 2
+        stats_sheet[f'A{start_row}'] = 'DISTRIBUCIÓN POR ESTADO'
+        stats_sheet[f'A{start_row+1}'] = 'Estado'
+        stats_sheet[f'B{start_row+1}'] = 'Cantidad'
 
-        row = 26
+        row = start_row + 2
         for estado, count in estados_count.items():
-            chart_sheet[f'A{row}'] = estado
-            chart_sheet[f'B{row}'] = count
+            stats_sheet[f'A{row}'] = estado
+            stats_sheet[f'B{row}'] = count
             row += 1
-
-        # Crear gráfica de torta para estados
-        status_pie = PieChart()
-        status_pie.title = "Distribución por Estado de Equipos"
-        labels = Reference(chart_sheet, min_col=1, min_row=26, max_row=row-1)
-        data = Reference(chart_sheet, min_col=2, min_row=25, max_row=row-1)
-        status_pie.add_data(data, titles_from_data=True)
-        status_pie.set_categories(labels)
-        chart_sheet.add_chart(status_pie, "D26")
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
@@ -1503,6 +1530,23 @@ def _generate_equipment_general_info_excel_content(equipo):
     sheet = workbook.active
     sheet.title = "Información General"
 
+    # Add professional title header
+    sheet.merge_cells('A1:AB2')
+    title_cell = sheet['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add generation timestamp
+    sheet['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet['A3'].alignment = Alignment(horizontal="left")
+
+    # Add spacing
+    for row in range(4, 6):
+        sheet.row_dimensions[row].height = 8
+
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
@@ -1513,8 +1557,8 @@ def _generate_equipment_general_info_excel_content(equipo):
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
         "Próxima Comprobación", "Frecuencia Comprobación (meses)"
     ]
-    sheet.append(headers)
 
+    # Add headers starting from row 6
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
@@ -1524,7 +1568,7 @@ def _generate_equipment_general_info_excel_content(equipo):
                            bottom=Side(style='thin'))
 
     for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell = sheet.cell(row=6, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_alignment
@@ -1562,19 +1606,16 @@ def _generate_equipment_general_info_excel_content(equipo):
         equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
         float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
     ]
-    sheet.append(row_data)
 
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
+    # Add data row starting from row 7
+    for col_num, value in enumerate(row_data, 1):
+        sheet.cell(row=7, column=col_num, value=value)
+
+    # Ajustar anchos de columna evitando problemas con celdas fusionadas
+    from openpyxl.utils import get_column_letter
+    for col_num in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet.column_dimensions[column_letter].width = 25
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
@@ -1590,77 +1631,150 @@ def _generate_equipment_activities_excel_content(equipo):
 
     sheet_cal = workbook.active
     sheet_cal.title = "Calibraciones"
+
+    # Add professional title header to Calibraciones sheet
+    sheet_cal.merge_cells('A1:E2')
+    title_cell = sheet_cal['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add generation timestamp
+    sheet_cal['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_cal['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_cal['A3'].alignment = Alignment(horizontal="left")
+
+    # Add spacing
+    for row in range(4, 6):
+        sheet_cal.row_dimensions[row].height = 8
+
     headers_cal = ["Fecha Calibración", "Proveedor", "Resultado", "Número Certificado", "Observaciones"]
-    sheet_cal.append(headers_cal)
+
+    # Add headers starting from row 6
+    for col_num, header_text in enumerate(headers_cal, 1):
+        cell = sheet_cal.cell(row=6, column=col_num, value=header_text)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add calibration data starting from row 7
+    current_row = 7
     for cal in equipo.calibraciones.all().order_by('fecha_calibracion'):
         proveedor_nombre = cal.nombre_proveedor if cal.nombre_proveedor else ''
-        sheet_cal.append([
+        row_data = [
             cal.fecha_calibracion.strftime('%Y-%m-%d') if cal.fecha_calibracion else '',
-            proveedor_nombre, 
+            proveedor_nombre,
             cal.resultado,
             cal.numero_certificado,
             cal.observaciones
-        ])
-    for col in sheet_cal.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet_cal.column_dimensions[column].width = adjusted_width
+        ]
+        for col_num, value in enumerate(row_data, 1):
+            sheet_cal.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
+    # Ajustar anchos de columna para Calibraciones
+    from openpyxl.utils import get_column_letter
+    headers_cal = ["Fecha Calibración", "Proveedor", "Resultado", "Número Certificado", "Observaciones"]
+    for col_num in range(1, len(headers_cal) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet_cal.column_dimensions[column_letter].width = 25
 
     sheet_mant = workbook.create_sheet("Mantenimientos")
+
+    # Add professional title header to Mantenimientos sheet
+    sheet_mant.merge_cells('A1:F2')
+    title_cell = sheet_mant['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add generation timestamp
+    sheet_mant['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_mant['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_mant['A3'].alignment = Alignment(horizontal="left")
+
+    # Add spacing
+    for row in range(4, 6):
+        sheet_mant.row_dimensions[row].height = 8
+
     headers_mant = ["Fecha Mantenimiento", "Tipo", "Proveedor", "Responsable", "Costo", "Descripción"]
-    sheet_mant.append(headers_mant)
+
+    # Add headers starting from row 6
+    for col_num, header_text in enumerate(headers_mant, 1):
+        cell = sheet_mant.cell(row=6, column=col_num, value=header_text)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add maintenance data starting from row 7
+    current_row = 7
     for mant in equipo.mantenimientos.all().order_by('fecha_mantenimiento'):
         proveedor_nombre = mant.nombre_proveedor if mant.nombre_proveedor else ''
-        sheet_mant.append([
+        row_data = [
             mant.fecha_mantenimiento.strftime('%Y-%m-%d') if mant.fecha_mantenimiento else '',
             mant.get_tipo_mantenimiento_display(),
-            proveedor_nombre, 
+            proveedor_nombre,
             mant.responsable,
             float(mant.costo) if mant.costo is not None else '',
             mant.descripcion
-        ])
-    for col in sheet_mant.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet_mant.column_dimensions[column].width = adjusted_width
+        ]
+        for col_num, value in enumerate(row_data, 1):
+            sheet_mant.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
+    # Ajustar anchos de columna para Mantenimientos
+    headers_mant = ["Fecha Mantenimiento", "Tipo", "Proveedor", "Responsable", "Costo", "Descripción"]
+    for col_num in range(1, len(headers_mant) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet_mant.column_dimensions[column_letter].width = 25
 
     sheet_comp = workbook.create_sheet("Comprobaciones")
+
+    # Add professional title header to Comprobaciones sheet
+    sheet_comp.merge_cells('A1:E2')
+    title_cell = sheet_comp['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add generation timestamp
+    sheet_comp['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet_comp['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet_comp['A3'].alignment = Alignment(horizontal="left")
+
+    # Add spacing
+    for row in range(4, 6):
+        sheet_comp.row_dimensions[row].height = 8
+
     headers_comp = ["Fecha Comprobación", "Proveedor", "Responsable", "Resultado", "Observaciones"]
-    sheet_comp.append(headers_comp)
+
+    # Add headers starting from row 6
+    for col_num, header_text in enumerate(headers_comp, 1):
+        cell = sheet_comp.cell(row=6, column=col_num, value=header_text)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add comprobacion data starting from row 7
+    current_row = 7
     for comp in equipo.comprobaciones.all().order_by('fecha_comprobacion'):
         proveedor_nombre = comp.nombre_proveedor if comp.nombre_proveedor else ''
-        sheet_comp.append([
+        row_data = [
             comp.fecha_comprobacion.strftime('%Y-%m-%d') if comp.fecha_comprobacion else '',
-            proveedor_nombre, 
+            proveedor_nombre,
             comp.responsable,
             comp.resultado,
             comp.observaciones
-        ])
-    for col in sheet_comp.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet_comp.column_dimensions[column].width = adjusted_width
+        ]
+        for col_num, value in enumerate(row_data, 1):
+            sheet_comp.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
+    # Ajustar anchos de columna para Comprobaciones
+    headers_comp = ["Fecha Comprobación", "Proveedor", "Responsable", "Resultado", "Observaciones"]
+    for col_num in range(1, len(headers_comp) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet_comp.column_dimensions[column_letter].width = 25
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
@@ -1676,12 +1790,28 @@ def _generate_general_proveedor_list_excel_content(proveedores_queryset):
     sheet = workbook.active
     sheet.title = "Listado de Proveedores"
 
+    # Add professional title header
+    sheet.merge_cells('A1:I2')
+    title_cell = sheet['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add generation timestamp
+    sheet['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet['A3'].alignment = Alignment(horizontal="left")
+
+    # Add spacing
+    for row in range(4, 6):
+        sheet.row_dimensions[row].height = 8
+
     headers = [
         "Nombre de la Empresa Proveedora", "Empresa Cliente", "Tipo de Servicio", "Nombre de Contacto",
         "Número de Contacto", "Correo Electrónico", "Página Web",
         "Alcance", "Servicio Prestado"
     ]
-    sheet.append(headers)
 
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
@@ -1692,13 +1822,15 @@ def _generate_general_proveedor_list_excel_content(proveedores_queryset):
                            bottom=Side(style='thin'))
 
     for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell = sheet.cell(row=6, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_alignment
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
+    # Add provider data starting from row 7
+    current_row = 7
     for proveedor in proveedores_queryset:
         row_data = [
             proveedor.nombre_empresa,
@@ -1711,19 +1843,20 @@ def _generate_general_proveedor_list_excel_content(proveedores_queryset):
             proveedor.alcance,
             proveedor.servicio_prestado,
         ]
-        sheet.append(row_data)
+        for col_num, value in enumerate(row_data, 1):
+            sheet.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
 
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
+    # Ajustar anchos de columna evitando problemas con celdas fusionadas
+    from openpyxl.utils import get_column_letter
+    headers = [
+        "Nombre de la Empresa Proveedora", "Empresa Cliente", "Tipo de Servicio", "Nombre de Contacto",
+        "Número de Contacto", "Correo Electrónico", "Página Web",
+        "Alcance", "Servicio Prestado"
+    ]
+    for col_num in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet.column_dimensions[column_letter].width = 25
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
@@ -1738,10 +1871,26 @@ def _generate_procedimiento_info_excel_content(procedimientos_queryset):
     sheet = workbook.active
     sheet.title = "Listado de Procedimientos"
 
+    # Add professional title header
+    sheet.merge_cells('A1:G2')
+    title_cell = sheet['A1']
+    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Add generation timestamp
+    sheet['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet['A3'].alignment = Alignment(horizontal="left")
+
+    # Add spacing
+    for row in range(4, 6):
+        sheet.row_dimensions[row].height = 8
+
     headers = [
         "Nombre", "Código", "Versión", "Fecha de Emisión", "Empresa", "Observaciones", "Documento PDF"
     ]
-    sheet.append(headers)
 
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
@@ -1752,13 +1901,15 @@ def _generate_procedimiento_info_excel_content(procedimientos_queryset):
                            bottom=Side(style='thin'))
 
     for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=1, column=col_num, value=header_text)
+        cell = sheet.cell(row=6, column=col_num, value=header_text)
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_alignment
         cell.border = header_border
         sheet.column_dimensions[cell.column_letter].width = 25
 
+    # Add procedure data starting from row 7
+    current_row = 7
     for proc in procedimientos_queryset:
         row_data = [
             proc.nombre,
@@ -1769,19 +1920,18 @@ def _generate_procedimiento_info_excel_content(procedimientos_queryset):
             proc.observaciones,
             proc.documento_pdf.url if proc.documento_pdf else 'N/A',
         ]
-        sheet.append(row_data)
+        for col_num, value in enumerate(row_data, 1):
+            sheet.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
 
-    for col in sheet.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        sheet.column_dimensions[column].width = adjusted_width
+    # Ajustar anchos de columna evitando problemas con celdas fusionadas
+    from openpyxl.utils import get_column_letter
+    headers = [
+        "Nombre", "Código", "Versión", "Fecha de Emisión", "Empresa", "Observaciones", "Documento PDF"
+    ]
+    for col_num in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col_num)
+        sheet.column_dimensions[column_letter].width = 25
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
