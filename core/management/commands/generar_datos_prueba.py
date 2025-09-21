@@ -195,9 +195,9 @@ class Command(BaseCommand):
 
             calibracion = Calibracion.objects.create(
                 equipo=equipo,
-                fecha_programada=fecha_calibracion,
-                proveedor_externo='Laboratorio de Calibración Certificado',
-                estado='Programada',
+                fecha_calibracion=fecha_calibracion,
+                nombre_proveedor='Laboratorio de Calibración Certificado',
+                resultado='Aprobado',
                 observaciones=f'Calibración programada para {fecha_calibracion.strftime("%d/%m/%Y")}'
             )
 
@@ -212,11 +212,11 @@ class Command(BaseCommand):
 
             mantenimiento = Mantenimiento.objects.create(
                 equipo=equipo,
-                fecha_programada=fecha_mantenimiento,
+                fecha_mantenimiento=fecha_mantenimiento,
                 tipo_mantenimiento=random.choice(['Preventivo', 'Correctivo']),
-                descripcion_trabajo='Mantenimiento programado de rutina',
-                tecnico_responsable='Técnico de Mantenimiento',
-                estado='Programado'
+                descripcion='Mantenimiento programado de rutina',
+                responsable='Técnico de Mantenimiento',
+                observaciones='Mantenimiento generado para pruebas'
             )
 
             # Actualizar fecha en el equipo
@@ -230,11 +230,10 @@ class Command(BaseCommand):
 
             comprobacion = Comprobacion.objects.create(
                 equipo=equipo,
-                fecha_programada=fecha_comprobacion,
-                tipo_comprobacion='Comprobación intermedia',
-                descripcion_procedimiento='Verificación de funcionamiento básico',
-                tecnico_responsable='Técnico de Calidad',
-                estado='Programada'
+                fecha_comprobacion=fecha_comprobacion,
+                responsable='Técnico de Calidad',
+                resultado='Aprobado',
+                observaciones='Verificación de funcionamiento básico programada'
             )
 
             # Actualizar fecha en el equipo

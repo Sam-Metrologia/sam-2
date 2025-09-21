@@ -605,17 +605,46 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
 
 def _generate_dashboard_excel_content(equipos_queryset, empresa):
     """
-    Genera un Excel simplificado para el dashboard con solo hoja de estadísticas/reporte detallado.
+    Genera un Excel profesional para el dashboard con formato mejorado, gráficos y secciones completas.
     Usado cuando se descarga desde el botón del dashboard.
     """
     from collections import Counter
     from datetime import datetime, timedelta
+    from openpyxl.chart import PieChart, BarChart, Reference
+    from openpyxl.drawing.image import Image
+    from openpyxl.styles import Alignment
 
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Reporte Dashboard"
 
-    # Configurar datos estadísticos
+    # ==============================================
+    # ENCABEZADO PROFESIONAL SAM METROLOGÍA
+    # ==============================================
+
+    # Título principal profesional
+    sheet.merge_cells('A1:F2')
+    sheet['A1'] = 'INFORMES GENERADOS POR SAM METROLOGÍA SAS'
+    sheet['A1'].font = Font(bold=True, size=20, color="FFFFFF")
+    sheet['A1'].fill = PatternFill(start_color="1f4e79", end_color="1f4e79", fill_type="solid")
+    sheet['A1'].alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información de la empresa y fecha
+    sheet.merge_cells('A3:F3')
+    sheet['A3'] = f'EMPRESA: {empresa.nombre.upper()}'
+    sheet['A3'].font = Font(bold=True, size=14, color="1f4e79")
+    sheet['A3'].alignment = Alignment(horizontal="center")
+
+    sheet.merge_cells('A4:F4')
+    hoy = datetime.now()
+    sheet['A4'] = f'Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
+    sheet['A4'].font = Font(bold=True, size=12)
+    sheet['A4'].alignment = Alignment(horizontal="center")
+
+    # ==============================================
+    # DATOS ESTADÍSTICOS
+    # ==============================================
+
     equipos_list = list(equipos_queryset)
     total_equipos = len(equipos_list)
     equipos_activos = sum(1 for eq in equipos_list if eq.estado == 'Activo')
@@ -625,92 +654,220 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     # Estadísticas por tipo
     tipos_count = Counter(eq.get_tipo_equipo_display() for eq in equipos_list)
 
-    # Estadísticas de calibraciones, mantenimientos y comprobaciones
-    hoy = datetime.now().date()
-    treinta_dias = hoy + timedelta(days=30)
+    # Fechas para análisis
+    hoy_date = hoy.date()
+    treinta_dias = hoy_date + timedelta(days=30)
+    ano_actual = hoy_date.year
 
-    # Crear encabezado del reporte
-    sheet['A1'] = f'REPORTE DASHBOARD - {empresa.nombre}'
-    sheet['A1'].font = Font(bold=True, size=16)
-    sheet['A2'] = f'Generado el: {hoy.strftime("%d/%m/%Y")}'
-    sheet['A2'].font = Font(bold=True)
+    # ==============================================
+    # SECCIÓN: RESUMEN GENERAL
+    # ==============================================
 
-    # Estadísticas generales
-    sheet['A4'] = 'RESUMEN GENERAL'
-    sheet['A4'].font = Font(bold=True, size=14)
+    row = 6
+    sheet[f'A{row}'] = '📊 RESUMEN GENERAL DE EQUIPOS'
+    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+    sheet.merge_cells(f'A{row}:F{row}')
+    row += 2
 
-    sheet['A5'] = 'Total de Equipos:'
-    sheet['B5'] = total_equipos
-    sheet['A6'] = 'Equipos Activos:'
-    sheet['B6'] = equipos_activos
-    sheet['A7'] = 'Equipos Inactivos:'
-    sheet['B7'] = equipos_inactivos
-    sheet['A8'] = 'Equipos de Baja:'
-    sheet['B8'] = equipos_baja
-
-    # Estadísticas por tipo
-    row = 10
-    sheet[f'A{row}'] = 'EQUIPOS POR TIPO'
-    sheet[f'A{row}'].font = Font(bold=True, size=14)
+    # Tabla de resumen con formato profesional
+    headers = ['Categoría', 'Cantidad', 'Porcentaje']
+    for col, header in enumerate(headers, 1):
+        cell = sheet.cell(row=row, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
     row += 1
 
-    for tipo, cantidad in tipos_count.items():
-        sheet[f'A{row}'] = tipo
-        sheet[f'B{row}'] = cantidad
+    resumen_data = [
+        ('Total de Equipos', total_equipos, '100%'),
+        ('Equipos Activos', equipos_activos, f'{(equipos_activos/total_equipos*100):.1f}%' if total_equipos > 0 else '0%'),
+        ('Equipos Inactivos', equipos_inactivos, f'{(equipos_inactivos/total_equipos*100):.1f}%' if total_equipos > 0 else '0%'),
+        ('Equipos de Baja', equipos_baja, f'{(equipos_baja/total_equipos*100):.1f}%' if total_equipos > 0 else '0%')
+    ]
+
+    for categoria, cantidad, porcentaje in resumen_data:
+        sheet.cell(row=row, column=1, value=categoria)
+        sheet.cell(row=row, column=2, value=cantidad)
+        sheet.cell(row=row, column=3, value=porcentaje)
         row += 1
 
-    # Estadísticas de actividades
+    # ==============================================
+    # SECCIÓN: CÓDIGOS INTERNOS DE EQUIPOS
+    # ==============================================
+
     row += 2
-    sheet[f'A{row}'] = 'ACTIVIDADES PROGRAMADAS'
-    sheet[f'A{row}'].font = Font(bold=True, size=14)
+    sheet[f'A{row}'] = '🔧 CÓDIGOS INTERNOS DE EQUIPOS'
+    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+    sheet.merge_cells(f'A{row}:F{row}')
+    row += 2
+
+    # Headers para códigos
+    codigo_headers = ['Código Interno', 'Nombre del Equipo', 'Estado', 'Tipo']
+    for col, header in enumerate(codigo_headers, 1):
+        cell = sheet.cell(row=row, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
     row += 1
 
-    # Contar calibraciones vencidas y próximas
+    # Datos de equipos (limitado a primeros 15 para no sobrecargar)
+    for equipo in equipos_list[:15]:
+        sheet.cell(row=row, column=1, value=equipo.codigo_interno)
+        sheet.cell(row=row, column=2, value=equipo.nombre)
+        sheet.cell(row=row, column=3, value=equipo.estado)
+        sheet.cell(row=row, column=4, value=equipo.get_tipo_equipo_display())
+        row += 1
+
+    if len(equipos_list) > 15:
+        sheet.cell(row=row, column=1, value=f"... y {len(equipos_list) - 15} equipos más")
+        sheet[f'A{row}'].font = Font(italic=True, color="666666")
+        row += 1
+
+    # ==============================================
+    # SECCIÓN: ACTIVIDADES PROGRAMADAS
+    # ==============================================
+
+    row += 2
+    sheet[f'A{row}'] = '📅 ACTIVIDADES PROGRAMADAS Y REALIZADAS'
+    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+    sheet.merge_cells(f'A{row}:F{row}')
+    row += 2
+
+    # Calcular estadísticas de actividades
+    from core.models import Calibracion, Mantenimiento, Comprobacion
+
+    # Calibraciones
+    cal_programadas = Calibracion.objects.filter(
+        equipo__empresa=empresa,
+        fecha_calibracion__year=ano_actual
+    ).count()
     cal_vencidas = sum(1 for eq in equipos_list
-                      if eq.proxima_calibracion and eq.proxima_calibracion < hoy)
+                      if eq.proxima_calibracion and eq.proxima_calibracion < hoy_date)
     cal_proximas = sum(1 for eq in equipos_list
-                      if eq.proxima_calibracion and hoy <= eq.proxima_calibracion <= treinta_dias)
+                      if eq.proxima_calibracion and hoy_date <= eq.proxima_calibracion <= treinta_dias)
 
-    # Contar mantenimientos vencidos y próximos
+    # Mantenimientos
+    mant_programados = Mantenimiento.objects.filter(
+        equipo__empresa=empresa,
+        fecha_mantenimiento__year=ano_actual
+    ).count()
     mant_vencidos = sum(1 for eq in equipos_list
-                       if eq.proximo_mantenimiento and eq.proximo_mantenimiento < hoy)
+                       if eq.proximo_mantenimiento and eq.proximo_mantenimiento < hoy_date)
     mant_proximos = sum(1 for eq in equipos_list
-                       if eq.proximo_mantenimiento and hoy <= eq.proximo_mantenimiento <= treinta_dias)
+                       if eq.proximo_mantenimiento and hoy_date <= eq.proximo_mantenimiento <= treinta_dias)
 
-    # Contar comprobaciones vencidas y próximas
+    # Comprobaciones
+    comp_programadas = Comprobacion.objects.filter(
+        equipo__empresa=empresa,
+        fecha_comprobacion__year=ano_actual
+    ).count()
     comp_vencidas = sum(1 for eq in equipos_list
-                       if eq.proxima_comprobacion and eq.proxima_comprobacion < hoy)
+                       if eq.proxima_comprobacion and eq.proxima_comprobacion < hoy_date)
     comp_proximas = sum(1 for eq in equipos_list
-                       if eq.proxima_comprobacion and hoy <= eq.proxima_comprobacion <= treinta_dias)
+                       if eq.proxima_comprobacion and hoy_date <= eq.proxima_comprobacion <= treinta_dias)
 
-    sheet[f'A{row}'] = 'Calibraciones Vencidas:'
-    sheet[f'B{row}'] = cal_vencidas
+    # Tabla de actividades
+    act_headers = ['Tipo de Actividad', f'Realizadas {ano_actual}', 'Vencidas', 'Próximas (30 días)']
+    for col, header in enumerate(act_headers, 1):
+        cell = sheet.cell(row=row, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
     row += 1
-    sheet[f'A{row}'] = 'Calibraciones Próximas (30 días):'
-    sheet[f'B{row}'] = cal_proximas
-    row += 1
-    sheet[f'A{row}'] = 'Mantenimientos Vencidos:'
-    sheet[f'B{row}'] = mant_vencidos
-    row += 1
-    sheet[f'A{row}'] = 'Mantenimientos Próximos (30 días):'
-    sheet[f'B{row}'] = mant_proximos
-    row += 1
-    sheet[f'A{row}'] = 'Comprobaciones Vencidas:'
-    sheet[f'B{row}'] = comp_vencidas
-    row += 1
-    sheet[f'A{row}'] = 'Comprobaciones Próximas (30 días):'
-    sheet[f'B{row}'] = comp_proximas
 
-    # Aplicar estilos
-    for col in ['A', 'B']:
-        for cell in sheet[col]:
-            if cell.value and 'RESUMEN' in str(cell.value) or 'EQUIPOS POR TIPO' in str(cell.value) or 'ACTIVIDADES' in str(cell.value):
-                cell.fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-                cell.font = Font(bold=True, color="FFFFFF")
+    actividades_data = [
+        ('Calibraciones', cal_programadas, cal_vencidas, cal_proximas),
+        ('Mantenimientos', mant_programados, mant_vencidos, mant_proximos),
+        ('Comprobaciones', comp_programadas, comp_vencidas, comp_proximas)
+    ]
 
-    # Ajustar ancho de columnas
-    sheet.column_dimensions['A'].width = 30
-    sheet.column_dimensions['B'].width = 15
+    chart_data_row_start = row
+    for tipo, realizadas, vencidas, proximas in actividades_data:
+        sheet.cell(row=row, column=1, value=tipo)
+        sheet.cell(row=row, column=2, value=realizadas)
+        sheet.cell(row=row, column=3, value=vencidas)
+        sheet.cell(row=row, column=4, value=proximas)
+        row += 1
+    chart_data_row_end = row - 1
+
+    # ==============================================
+    # SECCIÓN: ACTIVIDADES NO PROGRAMADAS
+    # ==============================================
+
+    row += 2
+    sheet[f'A{row}'] = '⚠️ ACTIVIDADES NO PROGRAMADAS (CORRECTIVAS)'
+    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+    sheet.merge_cells(f'A{row}:F{row}')
+    row += 2
+
+    # Mantenimientos correctivos (no programados)
+    mantenimientos_correctivos = Mantenimiento.objects.filter(
+        equipo__empresa=empresa,
+        tipo_mantenimiento='Correctivo',
+        fecha_mantenimiento__year=ano_actual
+    )
+
+    if mantenimientos_correctivos.exists():
+        # Headers para correctivos
+        correctivos_headers = ['Equipo', 'Fecha', 'Descripción', 'Responsable']
+        for col, header in enumerate(correctivos_headers, 1):
+            cell = sheet.cell(row=row, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="FF6B35", end_color="FF6B35", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+        row += 1
+
+        for mant in mantenimientos_correctivos[:10]:  # Limitar a 10
+            sheet.cell(row=row, column=1, value=mant.equipo.codigo_interno)
+            sheet.cell(row=row, column=2, value=mant.fecha_mantenimiento.strftime("%d/%m/%Y"))
+            sheet.cell(row=row, column=3, value=mant.descripcion or "Mantenimiento correctivo")
+            sheet.cell(row=row, column=4, value=mant.responsable or "No especificado")
+            row += 1
+    else:
+        sheet.cell(row=row, column=1, value="✅ No se registraron actividades correctivas este año")
+        sheet[f'A{row}'].font = Font(bold=True, color="27AE60")
+        row += 1
+
+    # ==============================================
+    # GRÁFICO DE EXCEL NATIVO
+    # ==============================================
+
+    row += 2
+    sheet[f'A{row}'] = '📈 GRÁFICO DE ACTIVIDADES'
+    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+    row += 1
+
+    # Crear gráfico de barras
+    chart = BarChart()
+    chart.title = "Comparativa de Actividades por Tipo"
+    chart.x_axis.title = "Tipo de Actividad"
+    chart.y_axis.title = "Cantidad"
+
+    # Referencias a los datos
+    categories = Reference(sheet, min_col=1, min_row=chart_data_row_start, max_row=chart_data_row_end)
+    realizadas_data = Reference(sheet, min_col=2, min_row=chart_data_row_start-1, max_row=chart_data_row_end)
+    vencidas_data = Reference(sheet, min_col=3, min_row=chart_data_row_start-1, max_row=chart_data_row_end)
+
+    chart.add_data(realizadas_data, titles_from_data=True)
+    chart.add_data(vencidas_data, titles_from_data=True)
+    chart.set_categories(categories)
+
+    # Configurar colores del gráfico
+    chart.series[0].graphicalProperties.solidFill = "27AE60"  # Verde para realizadas
+    chart.series[1].graphicalProperties.solidFill = "E74C3C"  # Rojo para vencidas
+
+    # Posicionar gráfico
+    chart.width = 15
+    chart.height = 10
+    sheet.add_chart(chart, f"A{row}")
+
+    # Ajustar anchos de columnas
+    for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+        sheet.column_dimensions[col].width = 20
+
+    # Ajustar altura de filas del encabezado
+    sheet.row_dimensions[1].height = 40
+    sheet.row_dimensions[2].height = 25
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
@@ -720,8 +877,8 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
 
 def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset):
     """
-    Genera un Excel consolidado con 3 hojas: Equipos, Proveedores y Procedimientos.
-    Usado para el ZIP completo.
+    Genera un Excel consolidado con 4 hojas: Equipos, Proveedores, Procedimientos y Reporte Dashboard.
+    Usado para el ZIP completo con todas las funcionalidades.
     """
     workbook = Workbook()
 
@@ -1052,6 +1209,117 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
             if column_letter:
                 adjusted_width = min(max_length + 2, 50)
                 sheet.column_dimensions[column_letter].width = adjusted_width
+
+    # === HOJA 4: REPORTE DASHBOARD ===
+    # Agregar la hoja de reporte dashboard al Excel del ZIP
+    empresa = equipos_queryset.first().empresa if equipos_queryset.exists() else None
+
+    if empresa:
+        sheet_dashboard = workbook.create_sheet(title="Reporte Dashboard")
+
+        # Reutilizar la lógica del dashboard pero adaptada para hoja adicional
+        from collections import Counter
+        from datetime import datetime, timedelta
+        from openpyxl.chart import BarChart, Reference
+        from openpyxl.styles import Alignment
+
+        # Configurar datos
+        equipos_list = list(equipos_queryset)
+        total_equipos = len(equipos_list)
+        equipos_activos = sum(1 for eq in equipos_list if eq.estado == 'Activo')
+        equipos_inactivos = sum(1 for eq in equipos_list if eq.estado == 'Inactivo')
+        equipos_baja = sum(1 for eq in equipos_list if eq.estado == 'De Baja')
+
+        hoy = datetime.now()
+        hoy_date = hoy.date()
+        ano_actual = hoy_date.year
+
+        # Encabezado profesional
+        sheet_dashboard.merge_cells('A1:F2')
+        sheet_dashboard['A1'] = 'INFORMES GENERADOS POR SAM METROLOGÍA SAS'
+        sheet_dashboard['A1'].font = Font(bold=True, size=20, color="FFFFFF")
+        sheet_dashboard['A1'].fill = PatternFill(start_color="1f4e79", end_color="1f4e79", fill_type="solid")
+        sheet_dashboard['A1'].alignment = Alignment(horizontal="center", vertical="center")
+
+        sheet_dashboard.merge_cells('A3:F3')
+        sheet_dashboard['A3'] = f'EMPRESA: {empresa.nombre.upper()}'
+        sheet_dashboard['A3'].font = Font(bold=True, size=14, color="1f4e79")
+        sheet_dashboard['A3'].alignment = Alignment(horizontal="center")
+
+        sheet_dashboard.merge_cells('A4:F4')
+        sheet_dashboard['A4'] = f'Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
+        sheet_dashboard['A4'].font = Font(bold=True, size=12)
+        sheet_dashboard['A4'].alignment = Alignment(horizontal="center")
+
+        # Resumen general
+        row = 6
+        sheet_dashboard[f'A{row}'] = '📊 RESUMEN GENERAL DE EQUIPOS'
+        sheet_dashboard[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+        sheet_dashboard.merge_cells(f'A{row}:F{row}')
+        row += 2
+
+        # Tabla de resumen
+        headers = ['Categoría', 'Cantidad', 'Porcentaje']
+        for col, header in enumerate(headers, 1):
+            cell = sheet_dashboard.cell(row=row, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+        row += 1
+
+        resumen_data = [
+            ('Total de Equipos', total_equipos, '100%'),
+            ('Equipos Activos', equipos_activos, f'{(equipos_activos/total_equipos*100):.1f}%' if total_equipos > 0 else '0%'),
+            ('Equipos Inactivos', equipos_inactivos, f'{(equipos_inactivos/total_equipos*100):.1f}%' if total_equipos > 0 else '0%'),
+            ('Equipos de Baja', equipos_baja, f'{(equipos_baja/total_equipos*100):.1f}%' if total_equipos > 0 else '0%')
+        ]
+
+        for categoria, cantidad, porcentaje in resumen_data:
+            sheet_dashboard.cell(row=row, column=1, value=categoria)
+            sheet_dashboard.cell(row=row, column=2, value=cantidad)
+            sheet_dashboard.cell(row=row, column=3, value=porcentaje)
+            row += 1
+
+        # Estadísticas de actividades
+        row += 2
+        sheet_dashboard[f'A{row}'] = '📅 ACTIVIDADES REALIZADAS'
+        sheet_dashboard[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
+        sheet_dashboard.merge_cells(f'A{row}:F{row}')
+        row += 2
+
+        # Importar modelos para calcular actividades
+        from core.models import Calibracion, Mantenimiento, Comprobacion
+
+        cal_realizadas = Calibracion.objects.filter(equipo__empresa=empresa, fecha_calibracion__year=ano_actual).count()
+        mant_realizados = Mantenimiento.objects.filter(equipo__empresa=empresa, fecha_mantenimiento__year=ano_actual).count()
+        comp_realizadas = Comprobacion.objects.filter(equipo__empresa=empresa, fecha_comprobacion__year=ano_actual).count()
+
+        # Tabla de actividades
+        act_headers = ['Tipo de Actividad', f'Realizadas {ano_actual}']
+        for col, header in enumerate(act_headers, 1):
+            cell = sheet_dashboard.cell(row=row, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="E74C3C", end_color="E74C3C", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+        row += 1
+
+        actividades_data = [
+            ('Calibraciones', cal_realizadas),
+            ('Mantenimientos', mant_realizados),
+            ('Comprobaciones', comp_realizadas)
+        ]
+
+        for tipo, realizadas in actividades_data:
+            sheet_dashboard.cell(row=row, column=1, value=tipo)
+            sheet_dashboard.cell(row=row, column=2, value=realizadas)
+            row += 1
+
+        # Ajustar anchos de columnas
+        for col in ['A', 'B', 'C', 'D', 'E', 'F']:
+            sheet_dashboard.column_dimensions[col].width = 20
+
+        # Ajustar altura de filas del encabezado
+        sheet_dashboard.row_dimensions[1].height = 40
 
     # Guardar y retornar contenido
     excel_buffer = io.BytesIO()
