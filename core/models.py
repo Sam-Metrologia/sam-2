@@ -175,7 +175,6 @@ class Empresa(models.Model):
 
         # Actualizar estados relacionados
         self.estado_suscripcion = 'Activo'
-        self.subscription_status = 'active'
 
         self.save()
 
@@ -223,7 +222,6 @@ class Empresa(models.Model):
 
         # Actualizar estados
         self.estado_suscripcion = 'Expirado'
-        self.subscription_status = 'expired'
 
         self.save()
 
