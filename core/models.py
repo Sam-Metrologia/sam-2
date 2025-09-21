@@ -874,7 +874,16 @@ class Equipo(models.Model):
             freq = int(self.frecuencia_mantenimiento_meses)
             self.proximo_mantenimiento = latest_mantenimiento.fecha_mantenimiento + relativedelta(months=freq)
         else:
-            base_date = self.fecha_adquisicion if self.fecha_adquisicion else self.fecha_registro.date()
+            # JERARQUÍA CORRECTA: 1. fecha_ultima_mantenimiento, 2. fecha_ultima_calibracion, 3. fecha_adquisicion, 4. fecha_registro
+            if self.fecha_ultimo_mantenimiento:
+                base_date = self.fecha_ultimo_mantenimiento
+            elif self.fecha_ultima_calibracion:
+                base_date = self.fecha_ultima_calibracion
+            elif self.fecha_adquisicion:
+                base_date = self.fecha_adquisicion
+            else:
+                base_date = self.fecha_registro.date()
+
             if base_date:
                 freq = int(self.frecuencia_mantenimiento_meses)
                 self.proximo_mantenimiento = base_date + relativedelta(months=freq)
@@ -897,7 +906,16 @@ class Equipo(models.Model):
             freq = int(self.frecuencia_comprobacion_meses)
             self.proxima_comprobacion = latest_comprobacion.fecha_comprobacion + relativedelta(months=freq)
         else:
-            base_date = self.fecha_adquisicion if self.fecha_adquisicion else self.fecha_registro.date()
+            # JERARQUÍA CORRECTA: 1. fecha_ultima_comprobacion, 2. fecha_ultima_calibracion, 3. fecha_adquisicion, 4. fecha_registro
+            if self.fecha_ultima_comprobacion:
+                base_date = self.fecha_ultima_comprobacion
+            elif self.fecha_ultima_calibracion:
+                base_date = self.fecha_ultima_calibracion
+            elif self.fecha_adquisicion:
+                base_date = self.fecha_adquisicion
+            else:
+                base_date = self.fecha_registro.date()
+
             if base_date:
                 freq = int(self.frecuencia_comprobacion_meses)
                 self.proxima_comprobacion = base_date + relativedelta(months=freq)

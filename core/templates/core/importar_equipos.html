@@ -35,10 +35,10 @@
                     Por favor, asegúrate de que tu archivo Excel (.xlsx o .xls) tenga las columnas correctas.
                 </p>
                 <p class="mt-1 text-sm text-gray-500">
-                    Descarga la plantilla de ejemplo para conocer el formato esperado: 
-                    <a href="{% static 'templates/plantilla_importacion_equipos.xlsx' %}" 
-                       class="text-blue-600 hover:text-blue-800 font-semibold" download>
-                        Descargar Plantilla
+                    Descarga la plantilla mejorada con validaciones y ejemplos:
+                    <a href="{% url 'core:descargar_plantilla_excel' %}"
+                       class="text-blue-600 hover:text-blue-800 font-semibold">
+                        📥 Descargar Plantilla Mejorada
                     </a>
                 </p>
             </div>
@@ -51,42 +51,114 @@
             </button>
         </form>
 
-        <div class="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-700 mb-3">Instrucciones para la Importación:</h2>
-            <ul class="list-disc list-inside text-gray-600 space-y-2">
-                <li>El archivo debe ser en formato **.xlsx** o **.xls**.</li>
-                <li>La primera fila de tu archivo Excel debe contener los encabezados de columna.</li>
-                <li>Los nombres de las columnas deben coincidir exactamente con los siguientes:
-                    <ul class="list-disc list-inside ml-5 text-gray-600">
-                        <li>`codigo_interno` (Obligatorio)</li>
-                        <li>`nombre` (Obligatorio)</li>
-                        <li>`empresa` (Obligatorio - debe coincidir con el nombre de una empresa existente)</li>
-                        <li>`tipo_equipo`</li>
-                        <li>`marca`</li>
-                        <li>`modelo`</li>
-                        <li>`numero_serie`</li>
-                        <li>`ubicacion` (Obligatorio - debe coincidir con el nombre de una ubicación existente)</li>
-                        <li>`responsable` (Opcional - nombre de usuario existente)</li>
-                        <li>`estado`</li>
-                        <li>`fecha_adquisicion` (Formato YYYY-MM-DD o DD/MM/YYYY)</li>
-                        <li>`rango_medida`</li>
-                        <li>`resolucion`</li>
-                        <li>`error_maximo_permisible`</li>
-                        <li>`observaciones`</li>
-                        <li>`version_formato`</li>
-                        <li>`fecha_version_formato` (Formato YYYY-MM-DD o DD/MM/YYYY)</li>
-                        <li>`codificacion_formato`</li>
-                        <li>`frecuencia_calibracion_meses`</li>
-                        <li>`frecuencia_mantenimiento_meses`</li>
-                        <li>`frecuencia_comprobacion_meses`</li>
-                    </ul>
-                </li>
-                <li>Las fechas deben estar en formato `YYYY-MM-DD` o `DD/MM/YYYY`.</li>
-                <li>Los valores de `frecuencia_..._meses` y `error_maximo_permisible` pueden ser decimales (ej. 0.5, 1.5).</li>
-                <li>Si un `codigo_interno` ya existe, el equipo **no será actualizado**, se ignorará para evitar sobrescribir datos accidentalmente.</li>
-                <li>Si una `empresa` o `ubicacion` no existe, la importación de esa fila fallará. Asegúrate de que existan previamente.</li>
-                <li>Si un `responsable` no existe, ese campo se dejará nulo.</li>
-            </ul>
+        <div class="mt-8 space-y-6">
+            <!-- NUEVA: Actualización Selectiva -->
+            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                <h2 class="text-xl font-semibold text-green-800 mb-3">🔄 Actualización Selectiva de Equipos</h2>
+                <div class="grid md:grid-cols-2 gap-4 text-green-700">
+                    <div>
+                        <h3 class="font-semibold mb-2">💡 ¿Cómo funciona?</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong>Equipos nuevos</strong>: Se crean normalmente</li>
+                            <li><strong>Equipos existentes</strong>: Se actualizan solo los campos que completes</li>
+                            <li><strong>Campos vacíos</strong>: Se mantienen como estaban</li>
+                            <li><strong>Sin duplicados</strong>: Nunca se crean equipos duplicados</li>
+                            <li><strong>Programación automática</strong>: Se recalculan fechas al actualizar</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2">🎯 Casos de Uso:</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong>Actualizar ubicaciones</strong>: Solo llena código + empresa + ubicación</li>
+                            <li><strong>Cambiar responsables</strong>: Solo llena código + empresa + responsable</li>
+                            <li><strong>Actualizar fechas</strong>: Solo llena código + empresa + fechas</li>
+                            <li><strong>Múltiples campos</strong>: Llena los que necesites cambiar</li>
+                            <li><strong>Masivo</strong>: Actualiza cientos de equipos a la vez</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ventajas de la plantilla mejorada -->
+            <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h2 class="text-xl font-semibold text-blue-800 mb-3">✨ Plantilla Mejorada</h2>
+                <div class="grid md:grid-cols-2 gap-4 text-blue-700">
+                    <div>
+                        <h3 class="font-semibold mb-2">🎯 Ventajas:</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li>Listas desplegables para campos obligatorios</li>
+                            <li>Validación automática de fechas y números</li>
+                            <li>Comentarios explicativos en cada columna</li>
+                            <li>Ejemplo completo incluido</li>
+                            <li>Incluye fechas de últimas actividades</li>
+                            <li>Formato profesional SAM Metrología</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2">📋 Campos Obligatorios:</h3>
+                        <ul class="list-disc list-inside space-y-1 text-sm">
+                            <li><strong>Código Interno</strong>: Único por empresa</li>
+                            <li><strong>Nombre</strong>: Descripción del equipo</li>
+                            <li><strong>Empresa</strong>: Selección desde lista</li>
+                            <li><strong>Tipo de Equipo</strong>: Lista desplegable</li>
+                            <li><strong>Estado</strong>: Lista desplegable</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instrucciones paso a paso -->
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">📝 Instrucciones Paso a Paso:</h2>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-2">1️⃣ Preparación:</h3>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1 text-sm">
+                            <li>Descarga la plantilla mejorada</li>
+                            <li>Abre con Microsoft Excel o compatible</li>
+                            <li>Revisa el ejemplo en la fila 8</li>
+                            <li>Lee los comentarios en los headers</li>
+                        </ul>
+
+                        <h3 class="font-semibold text-gray-800 mb-2 mt-4">2️⃣ Completar Datos:</h3>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1 text-sm">
+                            <li>Completa desde la fila 9 en adelante</li>
+                            <li>Usa las listas desplegables</li>
+                            <li>Fechas en formato DD/MM/AAAA</li>
+                            <li>Números decimales permitidos (ej: 12, 0.5)</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-2">3️⃣ Validación:</h3>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1 text-sm">
+                            <li>Excel mostrará errores automáticamente</li>
+                            <li>Verifica que no hay celdas rojas</li>
+                            <li>Guarda el archivo como .xlsx</li>
+                            <li>Sube el archivo usando este formulario</li>
+                        </ul>
+
+                        <h3 class="font-semibold text-gray-800 mb-2 mt-4">4️⃣ Importación:</h3>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1 text-sm">
+                            <li>El sistema validará automáticamente</li>
+                            <li>Recibirás feedback detallado</li>
+                            <li>Solo equipos válidos serán creados</li>
+                            <li>Errores específicos se mostrarán</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ayuda adicional -->
+            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <h2 class="text-lg font-semibold text-yellow-800 mb-2">💡 Consejos Importantes:</h2>
+                <ul class="list-disc list-inside text-yellow-700 space-y-1 text-sm">
+                    <li><strong>NO modifiques</strong> los headers (fila 7) - están protegidos</li>
+                    <li><strong>NO borres</strong> la fila de ejemplo - se ignorará automáticamente</li>
+                    <li><strong>Empresas</strong>: Solo aparecerán las que tienes permiso para usar</li>
+                    <li><strong>Códigos únicos</strong>: Si ya existe, se saltará sin error</li>
+                    <li><strong>Máximo 1000 equipos</strong> por archivo para mejor rendimiento</li>
+                </ul>
+            </div>
         </div>
     </div>
 </div>

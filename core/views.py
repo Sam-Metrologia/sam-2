@@ -3038,6 +3038,500 @@ def añadir_equipo(request):
     return render(request, 'core/añadir_equipo.html', context)
 
 
+@access_check
+@login_required
+@permission_required('core.add_equipo', raise_exception=True)
+def descargar_plantilla_excel(request):
+    """
+    Genera y descarga una plantilla Excel mejorada con validaciones, instrucciones y ejemplos.
+    """
+    from openpyxl.styles import Font, PatternFill, Alignment, Protection
+    from openpyxl.worksheet.datavalidation import DataValidation
+    from openpyxl.comments import Comment
+    from datetime import datetime, date
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Plantilla Equipos"
+
+    # La protección se aplicará al final, después de configurar todo
+
+    # ==============================================
+    # ENCABEZADO PROFESIONAL
+    # ==============================================
+
+    # Título principal (Z es la columna 26, suficiente para las nuevas columnas)
+    sheet.merge_cells('A1:Z3')
+    title_cell = sheet['A1']
+    title_cell.value = "PLANTILLA DE IMPORTACIÓN DE EQUIPOS - SAM METROLOGÍA SAS"
+    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
+    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Información importante
+    sheet.merge_cells('A4:Z4')
+    info_cell = sheet['A4']
+    info_cell.value = f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Complete SOLO las filas de datos (fila 8 en adelante)"
+    info_cell.font = Font(name="Arial", size=11, bold=True, color="1F4E79")
+    info_cell.alignment = Alignment(horizontal="center")
+
+    # ==============================================
+    # HEADERS CON VALIDACIONES
+    # ==============================================
+
+    # Headers principales (fila 6)
+    headers = [
+        "codigo_interno", "nombre", "empresa_nombre", "tipo_equipo", "marca", "modelo",
+        "numero_serie", "ubicacion_nombre", "responsable", "estado", "fecha_adquisicion",
+        "fecha_ultima_calibracion", "fecha_ultimo_mantenimiento", "fecha_ultima_comprobacion",
+        "rango_medida", "resolucion", "error_maximo_permisible", "observaciones",
+        "version_formato", "fecha_version_formato", "codificacion_formato",
+        "frecuencia_calibracion_meses", "frecuencia_mantenimiento_meses", "frecuencia_comprobacion_meses"
+    ]
+
+    # Headers legibles (fila 7)
+    headers_legibles = [
+        "Código Interno", "Nombre del Equipo", "Nombre de Empresa", "Tipo de Equipo", "Marca", "Modelo",
+        "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha Adquisición",
+        "Última Calibración", "Último Mantenimiento", "Última Comprobación",
+        "Rango de Medida", "Resolución", "Error Máximo", "Observaciones",
+        "Versión Formato", "Fecha Versión", "Codificación",
+        "Calibración (meses)", "Mantenimiento (meses)", "Comprobación (meses)"
+    ]
+
+    # Configurar headers
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Headers técnicos (ocultos para usuarios)
+    for col, header in enumerate(headers, 1):
+        cell = sheet.cell(row=6, column=col, value=header)
+        cell.font = Font(name="Arial", size=8, color="666666")
+        cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+
+    # Headers legibles (visibles)
+    for col, header in enumerate(headers_legibles, 1):
+        cell = sheet.cell(row=7, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+
+    # ==============================================
+    # VALIDACIONES Y LISTAS DESPLEGABLES
+    # ==============================================
+
+    # Obtener datos dinámicos del sistema
+    empresas_disponibles = []
+    if request.user.is_superuser:
+        empresas_disponibles = [emp.nombre for emp in Empresa.objects.all()]
+    else:
+        empresas_disponibles = [request.user.empresa.nombre] if request.user.empresa else []
+
+    tipos_equipo = [choice[0] for choice in Equipo.TIPO_EQUIPO_CHOICES]
+    estados_equipo = [choice[0] for choice in Equipo.ESTADO_CHOICES]
+
+    # Crear hoja de datos de validación
+    validation_sheet = workbook.create_sheet("Datos_Validacion")
+    validation_sheet.sheet_state = 'hidden'  # Ocultar hoja
+
+    # Escribir listas de validación
+    for i, empresa in enumerate(empresas_disponibles, 1):
+        validation_sheet[f'A{i}'] = empresa
+
+    for i, tipo in enumerate(tipos_equipo, 1):
+        validation_sheet[f'B{i}'] = tipo
+
+    for i, estado in enumerate(estados_equipo, 1):
+        validation_sheet[f'C{i}'] = estado
+
+    # Aplicar validaciones (desde fila 8 hasta 1000)
+    start_row = 8
+    end_row = 1000
+
+    # Validación para empresas (columna C)
+    if empresas_disponibles:
+        dv_empresa = DataValidation(
+            type="list",
+            formula1=f"Datos_Validacion!$A$1:$A${len(empresas_disponibles)}",
+            showErrorMessage=True,
+            errorTitle="Empresa Inválida",
+            error="Seleccione una empresa de la lista desplegable"
+        )
+        dv_empresa.add(f"C{start_row}:C{end_row}")
+        sheet.add_data_validation(dv_empresa)
+
+    # Validación para tipos de equipo (columna D)
+    dv_tipo = DataValidation(
+        type="list",
+        formula1=f"Datos_Validacion!$B$1:$B${len(tipos_equipo)}",
+        showErrorMessage=True,
+        errorTitle="Tipo de Equipo Inválido",
+        error="Seleccione un tipo de equipo de la lista desplegable"
+    )
+    dv_tipo.add(f"D{start_row}:D{end_row}")
+    sheet.add_data_validation(dv_tipo)
+
+    # Validación para estados (columna J)
+    dv_estado = DataValidation(
+        type="list",
+        formula1=f"Datos_Validacion!$C$1:$C${len(estados_equipo)}",
+        showErrorMessage=True,
+        errorTitle="Estado Inválido",
+        error="Seleccione un estado de la lista desplegable"
+    )
+    dv_estado.add(f"J{start_row}:J{end_row}")
+    sheet.add_data_validation(dv_estado)
+
+    # Validación para fechas (columnas K y Q)
+    dv_fecha = DataValidation(
+        type="date",
+        operator="between",
+        formula1=date(2000, 1, 1),
+        formula2=date(2099, 12, 31),
+        showErrorMessage=True,
+        errorTitle="Fecha Inválida",
+        error="Ingrese una fecha válida en formato DD/MM/AAAA"
+    )
+    dv_fecha.add(f"K{start_row}:K{end_row}")  # fecha_adquisicion
+    dv_fecha.add(f"Q{start_row}:Q{end_row}")  # fecha_version_formato
+    sheet.add_data_validation(dv_fecha)
+
+    # Validación para números decimales (frecuencias)
+    dv_decimal = DataValidation(
+        type="decimal",
+        operator="greaterThan",
+        formula1=0,
+        showErrorMessage=True,
+        errorTitle="Número Inválido",
+        error="Ingrese un número mayor a 0 (puede usar decimales: 0.5, 1, 12, etc.)"
+    )
+    dv_decimal.add(f"S{start_row}:S{end_row}")  # frecuencia_calibracion_meses
+    dv_decimal.add(f"T{start_row}:T{end_row}")  # frecuencia_mantenimiento_meses
+    dv_decimal.add(f"U{start_row}:U{end_row}")  # frecuencia_comprobacion_meses
+    sheet.add_data_validation(dv_decimal)
+
+    # ==============================================
+    # FILA DE EJEMPLO
+    # ==============================================
+
+    ejemplo_data = [
+        "EQ-001",  # codigo_interno
+        "Balanza Analítica Ejemplo",  # nombre
+        empresas_disponibles[0] if empresas_disponibles else "Mi Empresa",  # empresa_nombre
+        tipos_equipo[0] if tipos_equipo else "Equipo de Medición",  # tipo_equipo
+        "Mettler Toledo",  # marca
+        "XPE205",  # modelo
+        "B123456789",  # numero_serie
+        "Laboratorio Principal",  # ubicacion_nombre
+        "Técnico Responsable",  # responsable
+        estados_equipo[0] if estados_equipo else "Activo",  # estado
+        "15/01/2023",  # fecha_adquisicion
+        "20/11/2024",  # fecha_ultima_calibracion
+        "15/10/2024",  # fecha_ultimo_mantenimiento
+        "10/12/2024",  # fecha_ultima_comprobacion
+        "0-220g",  # rango_medida
+        "0.1mg",  # resolucion
+        "±0.1mg",  # error_maximo_permisible
+        "Equipo nuevo para laboratorio",  # observaciones
+        "V1.0",  # version_formato
+        "01/01/2023",  # fecha_version_formato
+        "CAL-001",  # codificacion_formato
+        "12",  # frecuencia_calibracion_meses
+        "6",  # frecuencia_mantenimiento_meses
+        "3"   # frecuencia_comprobacion_meses
+    ]
+
+    # Aplicar ejemplo con estilo diferente
+    for col, valor in enumerate(ejemplo_data, 1):
+        cell = sheet.cell(row=8, column=col, value=valor)
+        cell.font = Font(name="Arial", size=10, italic=True, color="666666")
+        cell.fill = PatternFill(start_color="F9F9F9", end_color="F9F9F9", fill_type="solid")
+
+    # ==============================================
+    # COMENTARIOS E INSTRUCCIONES
+    # ==============================================
+
+    # Agregar comentarios a headers críticos
+    comentarios = {
+        1: "OBLIGATORIO: Código único del equipo en su empresa",
+        2: "OBLIGATORIO: Nombre descriptivo del equipo",
+        3: "OBLIGATORIO: Debe coincidir exactamente con una empresa existente",
+        4: "OBLIGATORIO: Seleccione de la lista desplegable",
+        7: "OBLIGATORIO: Número de serie único",
+        8: "OBLIGATORIO: Ubicación física del equipo",
+        10: "OBLIGATORIO: Seleccione de la lista desplegable",
+        11: "OPCIONAL: Fecha adquisición - DD/MM/AAAA (ej: 15/01/2023)",
+        12: "OPCIONAL: Fecha última calibración - DD/MM/AAAA (ej: 20/11/2024)",
+        13: "OPCIONAL: Fecha último mantenimiento - DD/MM/AAAA (ej: 15/10/2024)",
+        14: "OPCIONAL: Fecha última comprobación - DD/MM/AAAA (ej: 10/12/2024)",
+        20: "Formato: DD/MM/AAAA (ej: 01/01/2023)",
+        22: "Número de meses (puede ser decimal: 0.5, 1, 12)",
+        23: "Número de meses (puede ser decimal: 0.5, 1, 12)",
+        24: "Número de meses (puede ser decimal: 0.5, 1, 12)"
+    }
+
+    for col, texto in comentarios.items():
+        comment = Comment(texto, "SAM Sistema")
+        sheet.cell(row=7, column=col).comment = comment
+
+    # ==============================================
+    # CONFIGURACIÓN DE PROTECCIÓN (DESHABILITADA PARA FACILIDAD DE USO)
+    # ==============================================
+
+    # Nota: Protección deshabilitada para permitir edición libre
+    # Las validaciones proporcionarán la guía necesaria al usuario
+
+    # ==============================================
+    # FORMATO Y AJUSTES FINALES
+    # ==============================================
+
+    # Ocultar fila de headers técnicos
+    sheet.row_dimensions[6].hidden = True
+
+    # Ajustar anchos de columna (actualizados para incluir las 3 nuevas fechas)
+    anchos = [15, 25, 20, 18, 15, 15, 15, 20, 20, 15, 15, 18, 18, 18, 15, 15, 15, 25, 15, 15, 15, 10, 10, 10]
+    for i, ancho in enumerate(anchos, 1):
+        from openpyxl.utils import get_column_letter
+        column_letter = get_column_letter(i)
+        sheet.column_dimensions[column_letter].width = ancho
+
+    # Ajustar alturas
+    sheet.row_dimensions[1].height = 30
+    sheet.row_dimensions[7].height = 30
+
+    # Congelar paneles para que headers siempre sean visibles
+    sheet.freeze_panes = "A8"
+
+    # Configurar área de impresión
+    sheet.print_area = "A1:U50"
+
+    # ==============================================
+    # PROTECCIÓN DESHABILITADA PARA FACILIDAD DE USO
+    # ==============================================
+
+    # Sin protección de hoja para permitir edición libre
+    # Las validaciones de datos proporcionarán la guía necesaria
+
+    # Crear respuesta HTTP
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+
+    response = HttpResponse(
+        excel_buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f"Plantilla_Equipos_SAM_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    return response
+
+
+@access_check
+@login_required
+@permission_required('core.add_equipo', raise_exception=True)
+def preview_equipos_excel(request):
+    """
+    Vista para previsualizar equipos antes de importar (validación previa).
+    """
+    if request.method == 'POST':
+        form = ExcelUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            excel_file = request.FILES['excel_file']
+
+            try:
+                workbook = openpyxl.load_workbook(excel_file)
+                sheet = workbook.active
+                headers = [cell.value for cell in sheet[1]]
+
+                # Detectar tipo de plantilla
+                headers_row = 1
+                if headers and headers[0] and "PLANTILLA DE IMPORTACIÓN" in str(headers[0]):
+                    headers_row = 6
+                    headers = [cell.value for cell in sheet[headers_row]]
+
+                # Validar headers
+                required_headers = ['codigo_interno', 'nombre', 'empresa_nombre', 'tipo_equipo']
+                missing_headers = [h for h in required_headers if h not in headers]
+
+                # Obtener preview de datos
+                preview_data = []
+                start_row = headers_row + 1 if headers_row > 1 else 2
+                count = 0
+
+                for row in sheet.iter_rows(min_row=start_row, values_only=True):
+                    if count >= 10:  # Limitar preview a 10 filas
+                        break
+                    if any(cell for cell in row if cell is not None and str(cell).strip()):
+                        row_dict = dict(zip(headers, row))
+                        preview_data.append(row_dict)
+                        count += 1
+
+                context = {
+                    'preview_data': preview_data,
+                    'total_detected': count,
+                    'missing_headers': missing_headers,
+                    'headers': headers,
+                    'can_import': len(missing_headers) == 0,
+                }
+
+                return render(request, 'core/preview_equipos.html', context)
+
+            except Exception as e:
+                messages.error(request, f'Error procesando archivo: {e}')
+                return redirect('core:importar_equipos_excel')
+
+    return redirect('core:importar_equipos_excel')
+
+
+def actualizar_equipo_selectivo(equipo_existente, nuevos_datos, row_index):
+    """
+    Actualiza solo los campos que NO están vacíos en los nuevos datos.
+
+    Returns:
+        list: Lista de nombres de campos que fueron actualizados
+    """
+    campos_actualizados = []
+
+    # Mapeo de campos que se pueden actualizar (excluyendo empresa y codigo_interno que son identificadores)
+    campos_actualizables = {
+        'nombre': 'nombre',
+        'tipo_equipo': 'tipo_equipo',
+        'marca': 'marca',
+        'modelo': 'modelo',
+        'numero_serie': 'numero_serie',
+        'ubicacion': 'ubicacion',
+        'responsable': 'responsable',
+        'estado': 'estado',
+        'fecha_adquisicion': 'fecha_adquisicion',
+        'fecha_ultima_calibracion': 'fecha_ultima_calibracion',
+        'fecha_ultimo_mantenimiento': 'fecha_ultimo_mantenimiento',
+        'fecha_ultima_comprobacion': 'fecha_ultima_comprobacion',
+        'rango_medida': 'rango_medida',
+        'resolucion': 'resolucion',
+        'error_maximo_permisible': 'error_maximo_permisible',
+        'observaciones': 'observaciones',
+        'version_formato': 'version_formato',
+        'fecha_version_formato': 'fecha_version_formato',
+        'codificacion_formato': 'codificacion_formato',
+        'frecuencia_calibracion_meses': 'frecuencia_calibracion_meses',
+        'frecuencia_mantenimiento_meses': 'frecuencia_mantenimiento_meses',
+        'frecuencia_comprobacion_meses': 'frecuencia_comprobacion_meses',
+    }
+
+    for campo_excel, campo_modelo in campos_actualizables.items():
+        if campo_modelo in nuevos_datos:
+            nuevo_valor = nuevos_datos[campo_modelo]
+
+            # Solo actualizar si el nuevo valor no está vacío y es diferente al actual
+            if es_valor_valido_para_actualizacion(nuevo_valor):
+                valor_actual = getattr(equipo_existente, campo_modelo)
+
+                # Comparar valores (manejar None y tipos diferentes)
+                if valores_son_diferentes(valor_actual, nuevo_valor):
+                    setattr(equipo_existente, campo_modelo, nuevo_valor)
+                    campos_actualizados.append(campo_excel)
+
+    # Guardar solo si hay cambios
+    if campos_actualizados:
+        equipo_existente.save()
+
+    return campos_actualizados
+
+
+def es_valor_valido_para_actualizacion(valor):
+    """
+    Determina si un valor es válido para actualizar (no está vacío).
+    """
+    if valor is None:
+        return False
+    if isinstance(valor, str) and valor.strip() == '':
+        return False
+    return True
+
+
+def valores_son_diferentes(valor_actual, nuevo_valor):
+    """
+    Compara dos valores manejando diferentes tipos de datos.
+    """
+    # Si ambos son None, son iguales
+    if valor_actual is None and nuevo_valor is None:
+        return False
+
+    # Si uno es None y el otro no, son diferentes
+    if valor_actual is None or nuevo_valor is None:
+        return True
+
+    # Para strings, comparar sin espacios
+    if isinstance(valor_actual, str) and isinstance(nuevo_valor, str):
+        return valor_actual.strip() != nuevo_valor.strip()
+
+    # Para otros tipos, comparación directa
+    return valor_actual != nuevo_valor
+
+
+def calcular_proximas_fechas_personalizadas(equipo):
+    """
+    Aplica la lógica personalizada para calcular próximas fechas de actividades.
+
+    Lógica CORRECTA por tipo de actividad:
+    1. Su propia fecha anterior (fecha_ultimo_X para actividad X)
+    2. fecha_ultima_calibracion (como segunda opción)
+    3. fecha_adquisicion (como tercera opción)
+    4. fecha_registro (como último recurso)
+    """
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+
+    def obtener_fecha_base_para_actividad(fecha_propia, equipo):
+        """
+        Obtiene la fecha base siguiendo la jerarquía correcta para cada actividad.
+        """
+        if fecha_propia:
+            return fecha_propia
+        elif equipo.fecha_ultima_calibracion:
+            return equipo.fecha_ultima_calibracion
+        elif equipo.fecha_adquisicion:
+            return equipo.fecha_adquisicion
+        else:
+            return equipo.fecha_registro.date()
+
+    # CALIBRACIÓN: Usar su propia fecha como primera opción
+    if equipo.frecuencia_calibracion_meses and equipo.frecuencia_calibracion_meses > 0:
+        fecha_base_calibracion = obtener_fecha_base_para_actividad(
+            equipo.fecha_ultima_calibracion, equipo
+        )
+        equipo.proxima_calibracion = fecha_base_calibracion + relativedelta(
+            months=int(equipo.frecuencia_calibracion_meses)
+        )
+
+    # MANTENIMIENTO: Usar jerarquía específica para mantenimiento
+    if equipo.frecuencia_mantenimiento_meses and equipo.frecuencia_mantenimiento_meses > 0:
+        fecha_base_mantenimiento = obtener_fecha_base_para_actividad(
+            equipo.fecha_ultimo_mantenimiento, equipo
+        )
+        equipo.proximo_mantenimiento = fecha_base_mantenimiento + relativedelta(
+            months=int(equipo.frecuencia_mantenimiento_meses)
+        )
+
+    # COMPROBACIÓN: Usar jerarquía específica para comprobación
+    if equipo.frecuencia_comprobacion_meses and equipo.frecuencia_comprobacion_meses > 0:
+        fecha_base_comprobacion = obtener_fecha_base_para_actividad(
+            equipo.fecha_ultima_comprobacion, equipo
+        )
+        equipo.proxima_comprobacion = fecha_base_comprobacion + relativedelta(
+            months=int(equipo.frecuencia_comprobacion_meses)
+        )
+
+    # Guardar solo los campos de fechas calculadas
+    equipo.save(update_fields=[
+        'proxima_calibracion',
+        'proximo_mantenimiento',
+        'proxima_comprobacion'
+    ])
+
+
 @access_check # APLICAR ESTE DECORADOR
 @login_required
 @permission_required('core.add_equipo', raise_exception=True)
@@ -3073,6 +3567,9 @@ def importar_equipos_excel(request):
                     'responsable': 'responsable',
                     'estado': 'estado',
                     'fecha_adquisicion': 'fecha_adquisicion',
+                    'fecha_ultima_calibracion': 'fecha_ultima_calibracion',
+                    'fecha_ultimo_mantenimiento': 'fecha_ultimo_mantenimiento',
+                    'fecha_ultima_comprobacion': 'fecha_ultima_comprobacion',
                     'rango_medida': 'rango_medida',
                     'resolucion': 'resolucion',
                     'error_maximo_permisible': 'error_maximo_permisible',
@@ -3085,24 +3582,124 @@ def importar_equipos_excel(request):
                     'frecuencia_comprobacion_meses': 'frecuencia_comprobacion_meses',
                 }
 
+                # Validación mejorada de headers
                 required_headers = ['codigo_interno', 'nombre', 'empresa_nombre', 'tipo_equipo', 'marca', 'modelo', 'numero_serie', 'ubicacion_nombre', 'responsable', 'estado', 'fecha_adquisicion']
-                if not all(h in headers for h in required_headers):
-                    missing_headers = [h for h in required_headers if h not in headers]
-                    messages.error(request, f'Faltan encabezados obligatorios en el archivo Excel: {", ".join(missing_headers)}. Por favor, usa la plantilla recomendada.')
+
+                # Detectar automáticamente la fila de headers
+                headers_row = 1
+                headers_found = False
+
+                # Buscar la fila que contiene "codigo_interno" para detectar headers (debe ser exacto)
+                for row_num in range(1, 11):  # Buscar en las primeras 10 filas
+                    try:
+                        test_headers = [cell.value for cell in sheet[row_num]]
+
+                        # Buscar exactamente "codigo_interno" (no variaciones)
+                        if test_headers and any(str(h).strip() == 'codigo_interno' for h in test_headers if h):
+                            headers_row = row_num
+                            headers = test_headers
+                            headers_found = True
+                            break
+                    except Exception:
+                        continue
+
+                if not headers_found:
+                    # Debug: Mostrar las primeras filas para diagnosticar
+                    debug_info = []
+                    for row_num in range(1, 8):
+                        try:
+                            row_data = [cell.value for cell in sheet[row_num]]
+                            debug_info.append(f"Fila {row_num}: {row_data[:3]}...")  # Primeras 3 columnas
+                        except:
+                            pass
+
+                    messages.error(
+                        request,
+                        f'❌ No se encontró la fila de encabezados con "codigo_interno". '
+                        f'Debug: {"; ".join(debug_info)}. '
+                        'Descarga la plantilla mejorada para evitar errores.'
+                    )
                     return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
+
+                # Normalizar headers para mapeo flexible
+                normalized_headers = []
+                for h in headers:
+                    if h:
+                        # Convertir a string, quitar espacios, convertir a minúsculas, reemplazar guiones
+                        normalized = str(h).strip().lower().replace(' ', '_').replace('-', '_')
+                        normalized_headers.append(normalized)
+                    else:
+                        normalized_headers.append('')
+
+                # Crear mapeo flexible de headers
+                header_indices = {}
+                for i, norm_header in enumerate(normalized_headers):
+                    for excel_col, model_field in column_mapping.items():
+                        if excel_col.lower().replace(' ', '_').replace('-', '_') == norm_header:
+                            header_indices[excel_col] = i
+                            break
+
+                # Verificar headers obligatorios con mapeo flexible
+                missing_headers = []
+                for req_header in required_headers:
+                    if req_header not in header_indices:
+                        missing_headers.append(req_header)
+
+                if missing_headers:
+                    messages.error(
+                        request,
+                        f'❌ Faltan encabezados obligatorios: {", ".join(missing_headers)}. '
+                        f'Encabezados encontrados: {", ".join([h for h in headers if h])}. '
+                        f'Descarga la plantilla mejorada para evitar errores.'
+                    )
+                    return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
+
+                # Contar filas con datos reales (saltar filas de headers y ejemplo)
+                total_rows = 0
+                start_row = max(headers_row + 1, 8)  # Siempre empezar desde la fila 8 o después de headers
+
+                for row in sheet.iter_rows(min_row=start_row, values_only=True):
+                    if any(cell for cell in row if cell is not None and str(cell).strip()):
+                        # Saltar fila de ejemplo si contiene "EQ-001"
+                        if row and "EQ-001" in str(row[0]):
+                            continue
+                        total_rows += 1
+
+                if total_rows == 0:
+                    messages.error(request, '❌ El archivo no contiene datos para importar. Agregue equipos en las filas después de los encabezados.')
+                    return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
+
+                messages.info(request, f'📋 Archivo validado: {total_rows} equipos detectados para procesar...')
 
                 created_count = 0
                 errors = []
                 
                 with transaction.atomic():
-                    for row_index, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-                        row_data = dict(zip(headers, row))
-                        
+                    start_row = max(headers_row + 1, 8)  # Siempre empezar desde la fila 8 o después de headers
+
+                    for row_index, row in enumerate(sheet.iter_rows(min_row=start_row, values_only=True), start=start_row):
+                        # Saltar fila de ejemplo si contiene "EQ-001" independientemente de la posición
+                        if row and "EQ-001" in str(row[0]):
+                            continue
+
+                        # Verificar si la fila tiene datos
+                        if not any(cell for cell in row if cell is not None and str(cell).strip()):
+                            continue
+
+                        # Saltar si la fila contiene headers legibles (caso de error de detección)
+                        if row and any(header in str(row[0]).lower() for header in ['código', 'codigo', 'nombre del equipo']):
+                            continue
+
+                        # Usar mapeo flexible de headers para extraer datos
                         equipo_data = {}
                         row_errors = []
 
                         for excel_col, model_field in column_mapping.items():
-                            value = row_data.get(excel_col)
+                            value = None
+                            if excel_col in header_indices:
+                                col_index = header_indices[excel_col]
+                                if col_index < len(row):
+                                    value = row[col_index]
                             
                             if excel_col in required_headers and (value is None or (isinstance(value, str) and value.strip() == '')):
                                 row_errors.append(f"'{excel_col}' es un campo obligatorio y está vacío.")
@@ -3113,77 +3710,262 @@ def importar_equipos_excel(request):
                                 continue
 
                             if excel_col == 'empresa_nombre':
-                                try:
-                                    empresa = Empresa.objects.get(nombre=value)
-                                    if not request.user.is_superuser and request.user.empresa != empresa:
-                                        row_errors.append(f"No tienes permiso para añadir equipos a la empresa '{value}'.")
-                                    equipo_data['empresa'] = empresa
-                                except Empresa.DoesNotExist:
-                                    row_errors.append(f"Empresa '{value}' no encontrada.")
+                                if value and str(value).strip():
+                                    empresa_nombre = str(value).strip()
+                                    empresa = None
+
+                                    # Buscar empresa por nombre exacto primero
+                                    try:
+                                        empresa = Empresa.objects.get(nombre__iexact=empresa_nombre)
+                                    except Empresa.DoesNotExist:
+                                        # Buscar por coincidencia parcial si no se encuentra exacta
+                                        empresas_parciales = Empresa.objects.filter(nombre__icontains=empresa_nombre)
+                                        if empresas_parciales.count() == 1:
+                                            empresa = empresas_parciales.first()
+                                        elif empresas_parciales.count() > 1:
+                                            empresas_nombres = [e.nombre for e in empresas_parciales]
+                                            row_errors.append(f"Múltiples empresas encontradas para '{value}': {', '.join(empresas_nombres)}. Use el nombre exacto.")
+                                        else:
+                                            # Buscar en empresas disponibles para el usuario
+                                            if request.user.is_superuser:
+                                                disponibles = [e.nombre for e in Empresa.objects.all()[:10]]
+                                            else:
+                                                disponibles = [request.user.empresa.nombre] if request.user.empresa else []
+                                            row_errors.append(f"Empresa '{value}' no encontrada. Empresas disponibles: {', '.join(disponibles)}")
+
+                                    if empresa:
+                                        if not request.user.is_superuser and request.user.empresa != empresa:
+                                            row_errors.append(f"No tienes permiso para añadir equipos a la empresa '{value}'.")
+                                        else:
+                                            equipo_data['empresa'] = empresa
+                                else:
+                                    row_errors.append("El nombre de la empresa es obligatorio y no puede estar vacío.")
                             elif excel_col == 'ubicacion_nombre':
                                 equipo_data['ubicacion'] = str(value).strip() if value is not None else ''
                             elif excel_col == 'tipo_equipo':
                                 valid_choices = [choice[0] for choice in Equipo.TIPO_EQUIPO_CHOICES]
-                                if value not in valid_choices:
-                                    row_errors.append(f"Tipo de equipo '{value}' no es válido. Opciones: {', '.join(valid_choices)}.")
-                                equipo_data[model_field] = value
+                                # Validación flexible para tipo de equipo
+                                if value and str(value).strip():
+                                    value_str = str(value).strip()
+                                    # Buscar coincidencia exacta primero
+                                    if value_str in valid_choices:
+                                        equipo_data[model_field] = value_str
+                                    else:
+                                        # Buscar coincidencia insensible a mayúsculas
+                                        value_lower = value_str.lower()
+                                        matched = False
+                                        for choice in valid_choices:
+                                            if choice.lower() == value_lower:
+                                                equipo_data[model_field] = choice
+                                                matched = True
+                                                break
+                                        if not matched:
+                                            row_errors.append(f"Tipo de equipo '{value}' no es válido. Opciones disponibles: {', '.join(valid_choices)}.")
+                                else:
+                                    equipo_data[model_field] = value
                             elif excel_col == 'estado':
                                 valid_choices = [choice[0] for choice in Equipo.ESTADO_CHOICES]
-                                if value not in valid_choices:
-                                    row_errors.append(f"Estado '{value}' no es válido. Opciones: {', '.join(valid_choices)}.")
-                                equipo_data[model_field] = value
-                            elif excel_col in ['fecha_adquisicion', 'fecha_version_formato']:
+                                # Validación flexible para estado
+                                if value and str(value).strip():
+                                    value_str = str(value).strip()
+                                    # Buscar coincidencia exacta primero
+                                    if value_str in valid_choices:
+                                        equipo_data[model_field] = value_str
+                                    else:
+                                        # Buscar coincidencia insensible a mayúsculas
+                                        value_lower = value_str.lower()
+                                        matched = False
+                                        for choice in valid_choices:
+                                            if choice.lower() == value_lower:
+                                                equipo_data[model_field] = choice
+                                                matched = True
+                                                break
+                                        if not matched:
+                                            row_errors.append(f"Estado '{value}' no es válido. Opciones disponibles: {', '.join(valid_choices)}.")
+                                else:
+                                    equipo_data[model_field] = value
+                            elif excel_col in ['fecha_adquisicion', 'fecha_version_formato', 'fecha_ultima_calibracion', 'fecha_ultimo_mantenimiento', 'fecha_ultima_comprobacion']:
                                 parsed_date = None
+
+                                # Manejar diferentes tipos de fechas
                                 if isinstance(value, datetime):
                                     parsed_date = value.date()
-                                else:
+                                elif isinstance(value, date):
+                                    parsed_date = value
+                                elif isinstance(value, (int, float)):
+                                    # Excel guarda fechas como números seriales
                                     try:
-                                        parsed_date = datetime.strptime(str(value), '%Y/%m/%d').date()
-                                    except ValueError:
+                                        # Convertir número serial de Excel a fecha
+                                        from datetime import date as dt_date, timedelta
+                                        excel_epoch = dt_date(1899, 12, 30)  # Época base de Excel
+                                        parsed_date = excel_epoch + timedelta(days=int(value))
+
+                                        # Validar que la fecha sea razonable (entre 1900 y 2100)
+                                        if parsed_date.year < 1900 or parsed_date.year > 2100:
+                                            row_errors.append(f"Fecha fuera de rango válido para '{excel_col}': '{value}' (año {parsed_date.year}). Use fechas entre 1900-2100.")
+                                            parsed_date = None
+                                    except (ValueError, OverflowError):
+                                        row_errors.append(f"Número de fecha inválido para '{excel_col}': '{value}'. Use formato de fecha válido.")
+                                elif value and str(value).strip():
+                                    # Intentar parsear como string con múltiples formatos
+                                    date_str = str(value).strip()
+                                    date_formats = [
+                                        '%d/%m/%Y',     # DD/MM/YYYY (formato español común)
+                                        '%Y/%m/%d',     # YYYY/MM/DD
+                                        '%Y-%m-%d',     # YYYY-MM-DD (ISO)
+                                        '%d-%m-%Y',     # DD-MM-YYYY
+                                        '%m/%d/%Y',     # MM/DD/YYYY (formato US)
+                                        '%d.%m.%Y',     # DD.MM.YYYY (formato europeo)
+                                        '%Y.%m.%d',     # YYYY.MM.DD
+                                    ]
+
+                                    for date_format in date_formats:
                                         try:
-                                            parsed_date = datetime.strptime(str(value), '%d/%m/%Y').date()
+                                            parsed_date = datetime.strptime(date_str, date_format).date()
+                                            break
                                         except ValueError:
-                                            try:
-                                                parsed_date = datetime.strptime(str(value), '%Y-%m-%d').date()
-                                            except ValueError:
-                                                row_errors.append(f"Formato de fecha inválido para '{excel_col}': '{value}'. Use YYYY/MM/DD, DD/MM/YYYY o YYYY-MM-DD.")
-                                
+                                            continue
+
+                                    if parsed_date is None:
+                                        row_errors.append(f"Formato de fecha inválido para '{excel_col}': '{value}'. Use DD/MM/YYYY, YYYY/MM/DD, YYYY-MM-DD, o similares.")
+
                                 equipo_data[model_field] = parsed_date
                             elif excel_col in ['frecuencia_calibracion_meses', 'frecuencia_mantenimiento_meses', 'frecuencia_comprobacion_meses']:
                                 try:
                                     if value is not None and str(value).strip() != '':
-                                        equipo_data[model_field] = decimal.Decimal(str(value)) # Guardar como Decimal
+                                        # Manejar diferentes tipos numéricos flexiblemente
+                                        if isinstance(value, (int, float)):
+                                            equipo_data[model_field] = decimal.Decimal(str(value))
+                                        else:
+                                            # Limpiar el string para permitir decimales con coma
+                                            value_str = str(value).strip().replace(',', '.')
+                                            equipo_data[model_field] = decimal.Decimal(value_str)
                                     else:
                                         equipo_data[model_field] = None
                                 except (ValueError, TypeError, decimal.InvalidOperation):
-                                    row_errors.append(f"Valor numérico inválido para '{excel_col}': '{value}'.")
+                                    row_errors.append(f"Valor numérico inválido para '{excel_col}': '{value}'. Use números enteros o decimales.")
                             elif excel_col == 'error_maximo_permisible':
-                                equipo_data[model_field] = str(value).strip() if value is not None else ''
+                                if value is not None:
+                                    if isinstance(value, (int, float)):
+                                        equipo_data[model_field] = str(value)
+                                    else:
+                                        equipo_data[model_field] = str(value).strip()
+                                else:
+                                    equipo_data[model_field] = ''
                             else:
-                                equipo_data[model_field] = value
+                                # Manejar campos de texto de manera flexible
+                                if value is not None:
+                                    if isinstance(value, (int, float)):
+                                        equipo_data[model_field] = str(value)
+                                    else:
+                                        equipo_data[model_field] = str(value).strip()
+                                else:
+                                    equipo_data[model_field] = value
 
+                        # Validación y creación/actualización de equipos
                         if 'empresa' in equipo_data and 'codigo_interno' in equipo_data and not row_errors:
-                            if Equipo.objects.filter(empresa=equipo_data['empresa'], codigo_interno=equipo_data['codigo_interno']).exists():
-                                row_errors.append(f"Ya existe un equipo con el código interno '{equipo_data['codigo_interno']}' para la empresa '{equipo_data['empresa'].nombre}'.")
+                            codigo_interno = equipo_data['codigo_interno']
+                            empresa = equipo_data['empresa']
 
-                        if row_errors:
+                            # Verificar si ya existe un equipo con el mismo código en la misma empresa
+                            equipo_existente = Equipo.objects.filter(
+                                empresa=empresa,
+                                codigo_interno__iexact=codigo_interno
+                            ).first()
+
+                            if equipo_existente:
+                                # ACTUALIZACIÓN SELECTIVA: Actualizar solo campos no vacíos
+                                campos_actualizados = actualizar_equipo_selectivo(equipo_existente, equipo_data, row_index)
+                                if campos_actualizados:
+                                    # Recalcular fechas después de la actualización
+                                    calcular_proximas_fechas_personalizadas(equipo_existente)
+                                    errors.append(f"ACTUALIZADO: Equipo '{codigo_interno}' en '{empresa.nombre}' - Campos: {', '.join(campos_actualizados)}")
+                                else:
+                                    errors.append(f"SALTADO: Equipo '{codigo_interno}' en '{empresa.nombre}' - Todos los campos estaban vacíos o iguales.")
+                            else:
+                                # Crear nuevo equipo
+                                try:
+                                    equipo = Equipo.objects.create(**equipo_data)
+                                    calcular_proximas_fechas_personalizadas(equipo)
+                                    created_count += 1
+                                except Exception as e:
+                                    errors.append(f"Fila {row_index}: Error al crear el equipo - {e}")
+                                    raise
+
+                        elif row_errors:
                             errors.append(f"Fila {row_index}: {'; '.join(row_errors)}")
-                        else:
-                            try:
-                                Equipo.objects.create(**equipo_data)
-                                created_count += 1
-                            except Exception as e:
-                                errors.append(f"Fila {row_index}: Error al crear el equipo - {e}")
-                                raise # Re-lanza la excepción para que transaction.atomic() haga rollback
 
-                if errors:
-                    messages.warning(request, f'Importación completada con {created_count} equipos creados y {len(errors)} errores.')
-                    for err in errors:
-                        messages.error(request, err)
-                    # No redirect aquí para que el usuario pueda ver los mensajes de error
+                # Clasificar mensajes por tipo para mejor manejo
+                errores_criticos = []
+                equipos_saltados = []
+                equipos_actualizados = []
+
+                for error in errors:
+                    if "SALTADO:" in error:
+                        equipos_saltados.append(error)
+                    elif "ACTUALIZADO:" in error:
+                        equipos_actualizados.append(error)
+                    else:
+                        errores_criticos.append(error)
+
+                # Mostrar resumen de la importación
+                total_procesados = created_count + len(equipos_actualizados) + len(equipos_saltados)
+
+                if total_procesados > 0 or errores_criticos:
+                    # Mensajes principales de resumen
+                    if created_count > 0:
+                        messages.success(
+                            request,
+                            f'✅ {created_count} equipos nuevos creados exitosamente.'
+                        )
+
+                    if equipos_actualizados:
+                        messages.success(
+                            request,
+                            f'🔄 {len(equipos_actualizados)} equipos existentes actualizados.'
+                        )
+
+                    if equipos_saltados:
+                        messages.info(
+                            request,
+                            f'ℹ️ {len(equipos_saltados)} equipos saltados (sin cambios necesarios).'
+                        )
+
+                    if errores_criticos:
+                        messages.warning(
+                            request,
+                            f'⚠️ {len(errores_criticos)} errores encontrados que requieren corrección.'
+                        )
+
+                        # Mostrar solo los primeros 6 errores críticos
+                        for err in errores_criticos[:6]:
+                            if not ("SALTADO:" in err or "ACTUALIZADO:" in err):
+                                messages.error(request, err)
+
+                        if len(errores_criticos) > 6:
+                            messages.info(request, f'... y {len(errores_criticos) - 6} errores adicionales.')
+
+                    # Mostrar detalles de actualizaciones (primeras 4)
+                    for actualizado in equipos_actualizados[:4]:
+                        messages.success(request, actualizado.replace("ACTUALIZADO: ", "✏️ "))
+
+                    if len(equipos_actualizados) > 4:
+                        messages.info(request, f'... y {len(equipos_actualizados) - 4} actualizaciones adicionales.')
+
+                    # Mostrar algunos equipos saltados como información (primeros 2)
+                    for saltado in equipos_saltados[:2]:
+                        messages.info(request, saltado.replace("SALTADO: ", "⏭️ "))
+
+                    if len(equipos_saltados) > 2:
+                        messages.info(request, f'... y {len(equipos_saltados) - 2} equipos saltados adicionales.')
+
                     return render(request, 'core/importar_equipos.html', {'form': form, 'titulo_pagina': titulo_pagina})
                 else:
-                    messages.success(request, f'¡Importación exitosa! Se crearon {created_count} equipos.')
+                    messages.success(
+                        request,
+                        f'🎉 ¡Importación perfecta! Se crearon {created_count} equipos correctamente. '
+                        f'Todos los datos fueron procesados sin errores.'
+                    )
                     return redirect('core:home')
             
             except Exception as e: # Este catch capturará la excepción relanzada si hay un error atómico

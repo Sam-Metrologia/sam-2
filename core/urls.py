@@ -29,7 +29,8 @@ urlpatterns = [
     path('equipos/<int:equipo_pk>/dar_baja/', views.dar_baja_equipo, name='dar_baja_equipo'),
     path('equipos/<int:equipo_pk>/inactivar/', views.inactivar_equipo, name='inactivar_equipo'),
     path('equipos/<int:equipo_pk>/activar/', views.activar_equipo, name='activar_equipo'),
-    path('equipos/importar_excel/', views.importar_equipos_excel, name='importar_equipos_excel'), 
+    path('equipos/importar_excel/', views.importar_equipos_excel, name='importar_equipos_excel'),
+    path('equipos/plantilla_excel/', views.descargar_plantilla_excel, name='descargar_plantilla_excel'), 
 
     # Calibraciones
     path('equipos/<int:equipo_pk>/calibraciones/añadir/', views.añadir_calibracion, name='añadir_calibracion'),
