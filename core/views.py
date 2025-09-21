@@ -603,9 +603,125 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
 
 # --- Funciones Auxiliares para Generación de Excel ---
 
+def _generate_dashboard_excel_content(equipos_queryset, empresa):
+    """
+    Genera un Excel simplificado para el dashboard con solo hoja de estadísticas/reporte detallado.
+    Usado cuando se descarga desde el botón del dashboard.
+    """
+    from collections import Counter
+    from datetime import datetime, timedelta
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Reporte Dashboard"
+
+    # Configurar datos estadísticos
+    equipos_list = list(equipos_queryset)
+    total_equipos = len(equipos_list)
+    equipos_activos = sum(1 for eq in equipos_list if eq.estado == 'Activo')
+    equipos_inactivos = sum(1 for eq in equipos_list if eq.estado == 'Inactivo')
+    equipos_baja = sum(1 for eq in equipos_list if eq.estado == 'De Baja')
+
+    # Estadísticas por tipo
+    tipos_count = Counter(eq.get_tipo_equipo_display() for eq in equipos_list)
+
+    # Estadísticas de calibraciones, mantenimientos y comprobaciones
+    hoy = datetime.now().date()
+    treinta_dias = hoy + timedelta(days=30)
+
+    # Crear encabezado del reporte
+    sheet['A1'] = f'REPORTE DASHBOARD - {empresa.nombre}'
+    sheet['A1'].font = Font(bold=True, size=16)
+    sheet['A2'] = f'Generado el: {hoy.strftime("%d/%m/%Y")}'
+    sheet['A2'].font = Font(bold=True)
+
+    # Estadísticas generales
+    sheet['A4'] = 'RESUMEN GENERAL'
+    sheet['A4'].font = Font(bold=True, size=14)
+
+    sheet['A5'] = 'Total de Equipos:'
+    sheet['B5'] = total_equipos
+    sheet['A6'] = 'Equipos Activos:'
+    sheet['B6'] = equipos_activos
+    sheet['A7'] = 'Equipos Inactivos:'
+    sheet['B7'] = equipos_inactivos
+    sheet['A8'] = 'Equipos de Baja:'
+    sheet['B8'] = equipos_baja
+
+    # Estadísticas por tipo
+    row = 10
+    sheet[f'A{row}'] = 'EQUIPOS POR TIPO'
+    sheet[f'A{row}'].font = Font(bold=True, size=14)
+    row += 1
+
+    for tipo, cantidad in tipos_count.items():
+        sheet[f'A{row}'] = tipo
+        sheet[f'B{row}'] = cantidad
+        row += 1
+
+    # Estadísticas de actividades
+    row += 2
+    sheet[f'A{row}'] = 'ACTIVIDADES PROGRAMADAS'
+    sheet[f'A{row}'].font = Font(bold=True, size=14)
+    row += 1
+
+    # Contar calibraciones vencidas y próximas
+    cal_vencidas = sum(1 for eq in equipos_list
+                      if eq.proxima_calibracion and eq.proxima_calibracion < hoy)
+    cal_proximas = sum(1 for eq in equipos_list
+                      if eq.proxima_calibracion and hoy <= eq.proxima_calibracion <= treinta_dias)
+
+    # Contar mantenimientos vencidos y próximos
+    mant_vencidos = sum(1 for eq in equipos_list
+                       if eq.proximo_mantenimiento and eq.proximo_mantenimiento < hoy)
+    mant_proximos = sum(1 for eq in equipos_list
+                       if eq.proximo_mantenimiento and hoy <= eq.proximo_mantenimiento <= treinta_dias)
+
+    # Contar comprobaciones vencidas y próximas
+    comp_vencidas = sum(1 for eq in equipos_list
+                       if eq.proxima_comprobacion and eq.proxima_comprobacion < hoy)
+    comp_proximas = sum(1 for eq in equipos_list
+                       if eq.proxima_comprobacion and hoy <= eq.proxima_comprobacion <= treinta_dias)
+
+    sheet[f'A{row}'] = 'Calibraciones Vencidas:'
+    sheet[f'B{row}'] = cal_vencidas
+    row += 1
+    sheet[f'A{row}'] = 'Calibraciones Próximas (30 días):'
+    sheet[f'B{row}'] = cal_proximas
+    row += 1
+    sheet[f'A{row}'] = 'Mantenimientos Vencidos:'
+    sheet[f'B{row}'] = mant_vencidos
+    row += 1
+    sheet[f'A{row}'] = 'Mantenimientos Próximos (30 días):'
+    sheet[f'B{row}'] = mant_proximos
+    row += 1
+    sheet[f'A{row}'] = 'Comprobaciones Vencidas:'
+    sheet[f'B{row}'] = comp_vencidas
+    row += 1
+    sheet[f'A{row}'] = 'Comprobaciones Próximas (30 días):'
+    sheet[f'B{row}'] = comp_proximas
+
+    # Aplicar estilos
+    for col in ['A', 'B']:
+        for cell in sheet[col]:
+            if cell.value and 'RESUMEN' in str(cell.value) or 'EQUIPOS POR TIPO' in str(cell.value) or 'ACTIVIDADES' in str(cell.value):
+                cell.fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+                cell.font = Font(bold=True, color="FFFFFF")
+
+    # Ajustar ancho de columnas
+    sheet.column_dimensions['A'].width = 30
+    sheet.column_dimensions['B'].width = 15
+
+    excel_buffer = io.BytesIO()
+    workbook.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer.getvalue()
+
+
 def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset):
     """
     Genera un Excel consolidado con 3 hojas: Equipos, Proveedores y Procedimientos.
+    Usado para el ZIP completo.
     """
     workbook = Workbook()
 
@@ -4881,8 +4997,8 @@ def generar_informe_dashboard_excel(request):
     logger.info(f"Generando Excel Dashboard para empresa {empresa.nombre}: {equipos_empresa.count()} equipos")
 
     try:
-        # Generar Excel consolidado con las 4 hojas
-        excel_content = _generate_consolidated_excel_content(equipos_empresa, proveedores_empresa, procedimientos_empresa)
+        # Generar Excel simplificado del dashboard (solo estadísticas)
+        excel_content = _generate_dashboard_excel_content(equipos_empresa, empresa)
 
         # Crear respuesta HTTP
         response = HttpResponse(excel_content, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

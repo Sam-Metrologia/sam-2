@@ -334,6 +334,44 @@
         </div>
     </div>
 
+    {# Sección de Accesos Rápidos #}
+    {% if perms.core.can_export_reports %}
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-md mb-8">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">📊 Accesos Rápidos a Informes</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {# Botón para Dashboard Excel desde Dashboard #}
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-blue-200 hover:border-blue-400 transition-colors">
+                <h3 class="text-lg font-semibold text-blue-700 mb-2 text-center">Dashboard Excel</h3>
+                <p class="text-gray-600 text-sm mb-3 text-center">Descarga el reporte del dashboard con estadísticas detalladas</p>
+                <a href="{% url 'core:generar_informe_dashboard_excel' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}"
+                   class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out block text-center">
+                    <i class="fas fa-chart-bar mr-2"></i> Descargar Excel
+                </a>
+            </div>
+
+            {# Botón para ir a la sección completa de informes #}
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-green-200 hover:border-green-400 transition-colors">
+                <h3 class="text-lg font-semibold text-green-700 mb-2 text-center">Todos los Informes</h3>
+                <p class="text-gray-600 text-sm mb-3 text-center">Accede a la sección completa con todas las opciones de informes</p>
+                <a href="{% url 'core:informes' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}"
+                   class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out block text-center">
+                    <i class="fas fa-chart-line mr-2"></i> Ver Informes
+                </a>
+            </div>
+
+            {# Botón para solicitar ZIP #}
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-purple-200 hover:border-purple-400 transition-colors">
+                <h3 class="text-lg font-semibold text-purple-700 mb-2 text-center">ZIP Completo</h3>
+                <p class="text-gray-600 text-sm mb-3 text-center">Descarga archivo ZIP con documentos y hojas de vida</p>
+                <a href="{% url 'core:informes' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}#zip-section"
+                   class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out block text-center">
+                    <i class="fas fa-file-archive mr-2"></i> Solicitar ZIP
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {# Gráfica de Torta para Calibraciones #}
         <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">

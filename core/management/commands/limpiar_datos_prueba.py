@@ -71,7 +71,7 @@ class Command(BaseCommand):
             self.show_stats(final_stats, "DATOS DESPUÉS DE LIMPIEZA")
 
             self.stdout.write(
-                self.style.SUCCESS('\n✅ Limpieza completada exitosamente')
+                self.style.SUCCESS('\n[EXITO] Limpieza completada exitosamente')
             )
             self.stdout.write(
                 'La base de datos está lista para datos reales de producción.'
@@ -79,7 +79,7 @@ class Command(BaseCommand):
 
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f'❌ Error durante la limpieza: {e}')
+                self.style.ERROR(f'[ERROR] Error durante la limpieza: {e}')
             )
             logger.error(f'Error en limpieza de datos: {e}', exc_info=True)
 
@@ -114,42 +114,42 @@ class Command(BaseCommand):
         # 1. Eliminar solicitudes ZIP
         zip_count = ZipRequest.objects.count()
         ZipRequest.objects.all().delete()
-        self.stdout.write(f'🗑️  Eliminadas {zip_count} solicitudes ZIP')
+        self.stdout.write(f'[ELIMINADO] {zip_count} solicitudes ZIP')
 
         # 2. Eliminar registros de equipos (en orden de dependencias)
         comprobaciones_count = Comprobacion.objects.count()
         Comprobacion.objects.all().delete()
-        self.stdout.write(f'🗑️  Eliminadas {comprobaciones_count} comprobaciones')
+        self.stdout.write(f'[ELIMINADO] {comprobaciones_count} comprobaciones')
 
         mantenimientos_count = Mantenimiento.objects.count()
         Mantenimiento.objects.all().delete()
-        self.stdout.write(f'🗑️  Eliminados {mantenimientos_count} mantenimientos')
+        self.stdout.write(f'[ELIMINADO] {mantenimientos_count} mantenimientos')
 
         calibraciones_count = Calibracion.objects.count()
         Calibracion.objects.all().delete()
-        self.stdout.write(f'🗑️  Eliminadas {calibraciones_count} calibraciones')
+        self.stdout.write(f'[ELIMINADO] {calibraciones_count} calibraciones')
 
         # 3. Eliminar equipos
         equipos_count = Equipo.objects.count()
         Equipo.objects.all().delete()
-        self.stdout.write(f'🗑️  Eliminados {equipos_count} equipos')
+        self.stdout.write(f'[ELIMINADO] {equipos_count} equipos')
 
         # 4. Eliminar usuarios (excepto superusuarios)
         usuarios_normales = CustomUser.objects.filter(is_superuser=False)
         usuarios_count = usuarios_normales.count()
         usuarios_normales.delete()
-        self.stdout.write(f'🗑️  Eliminados {usuarios_count} usuarios normales')
+        self.stdout.write(f'[ELIMINADO] {usuarios_count} usuarios normales')
 
         superusers_count = CustomUser.objects.filter(is_superuser=True).count()
-        self.stdout.write(f'✅ Mantenidos {superusers_count} superusuarios')
+        self.stdout.write(f'[MANTENIDO] {superusers_count} superusuarios')
 
         # 5. Eliminar empresas
         empresas_count = Empresa.objects.count()
         Empresa.objects.all().delete()
-        self.stdout.write(f'🗑️  Eliminadas {empresas_count} empresas')
+        self.stdout.write(f'[ELIMINADO] {empresas_count} empresas')
 
         # 6. Los grupos se mantienen automáticamente
         grupos_count = Group.objects.count()
-        self.stdout.write(f'✅ Mantenidos {grupos_count} grupos de usuarios')
+        self.stdout.write(f'[MANTENIDO] {grupos_count} grupos de usuarios')
 
         logger.info('Limpieza de datos de prueba completada exitosamente')
