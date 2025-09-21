@@ -133,6 +133,10 @@ def trial_check(view_func):
     """
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
+        # Los superusuarios siempre tienen acceso
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+
         if request.user.is_authenticated and hasattr(request.user, 'empresa'):
             empresa = request.user.empresa
 
