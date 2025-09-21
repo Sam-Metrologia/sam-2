@@ -946,8 +946,12 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
 
 def _generate_general_equipment_list_excel_content(equipos_queryset):
     """
-    Generates an Excel file with the general list of equipment.
+    Generates an Excel file with the general list of equipment including visual charts.
     """
+    from openpyxl.chart import PieChart, BarChart, Reference
+    from openpyxl.chart.series import DataPoint
+    from collections import Counter
+
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Listado de Equipos"
@@ -1024,6 +1028,81 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
                 pass
         adjusted_width = (max_length + 2)
         sheet.column_dimensions[column].width = adjusted_width
+
+    # Crear hoja de gráficas
+    chart_sheet = workbook.create_sheet("Estadísticas")
+
+    # Recopilar datos para gráficas
+    equipos_list = list(equipos_queryset)
+
+    if equipos_list:
+        # 1. Gráfica de equipos por empresa
+        empresas_count = Counter(eq.empresa.nombre if eq.empresa else "Sin empresa" for eq in equipos_list)
+
+        # Crear datos para gráfica de empresas
+        chart_sheet['A1'] = 'Empresa'
+        chart_sheet['B1'] = 'Cantidad de Equipos'
+
+        row = 2
+        for empresa, count in empresas_count.items():
+            chart_sheet[f'A{row}'] = empresa
+            chart_sheet[f'B{row}'] = count
+            row += 1
+
+        # Crear gráfica de torta para empresas
+        pie_chart = PieChart()
+        pie_chart.title = "Distribución de Equipos por Empresa"
+        labels = Reference(chart_sheet, min_col=1, min_row=2, max_row=row-1)
+        data = Reference(chart_sheet, min_col=2, min_row=1, max_row=row-1)
+        pie_chart.add_data(data, titles_from_data=True)
+        pie_chart.set_categories(labels)
+        chart_sheet.add_chart(pie_chart, "D2")
+
+        # 2. Gráfica de equipos por tipo
+        tipos_count = Counter(eq.get_tipo_equipo_display() for eq in equipos_list)
+
+        # Crear datos para gráfica de tipos
+        chart_sheet['A12'] = 'Tipo de Equipo'
+        chart_sheet['B12'] = 'Cantidad'
+
+        row = 13
+        for tipo, count in tipos_count.items():
+            chart_sheet[f'A{row}'] = tipo
+            chart_sheet[f'B{row}'] = count
+            row += 1
+
+        # Crear gráfica de barras para tipos
+        bar_chart = BarChart()
+        bar_chart.title = "Equipos por Tipo"
+        bar_chart.x_axis.title = "Tipo de Equipo"
+        bar_chart.y_axis.title = "Cantidad"
+        labels = Reference(chart_sheet, min_col=1, min_row=13, max_row=row-1)
+        data = Reference(chart_sheet, min_col=2, min_row=12, max_row=row-1)
+        bar_chart.add_data(data, titles_from_data=True)
+        bar_chart.set_categories(labels)
+        chart_sheet.add_chart(bar_chart, "D13")
+
+        # 3. Gráfica de estados de equipos
+        estados_count = Counter(eq.estado for eq in equipos_list)
+
+        # Crear datos para gráfica de estados
+        chart_sheet['A25'] = 'Estado'
+        chart_sheet['B25'] = 'Cantidad'
+
+        row = 26
+        for estado, count in estados_count.items():
+            chart_sheet[f'A{row}'] = estado
+            chart_sheet[f'B{row}'] = count
+            row += 1
+
+        # Crear gráfica de torta para estados
+        status_pie = PieChart()
+        status_pie.title = "Distribución por Estado de Equipos"
+        labels = Reference(chart_sheet, min_col=1, min_row=26, max_row=row-1)
+        data = Reference(chart_sheet, min_col=2, min_row=25, max_row=row-1)
+        status_pie.add_data(data, titles_from_data=True)
+        status_pie.set_categories(labels)
+        chart_sheet.add_chart(status_pie, "D26")
 
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
