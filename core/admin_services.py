@@ -291,7 +291,7 @@ class ScheduleManager:
             'notifications_daily': {
                 'enabled': False,
                 'time': '08:00',
-                'types': ['calibration', 'maintenance']
+                'types': ['consolidated']
             },
             'maintenance_weekly': {
                 'enabled': False,

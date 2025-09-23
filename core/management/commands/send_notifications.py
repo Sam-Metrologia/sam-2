@@ -15,9 +15,9 @@ class Command(BaseCommand):
         parser.add_argument(
             '--type',
             type=str,
-            choices=['consolidated', 'weekly', 'all'],
-            default='all',
-            help='Tipo de notificaciones a enviar (consolidated incluye calibraciones, mantenimientos y comprobaciones)'
+            choices=['consolidated', 'calibration', 'maintenance', 'comprobacion', 'weekly', 'all'],
+            default='consolidated',
+            help='Tipo de notificaciones a enviar (consolidated es recomendado - incluye calibraciones, mantenimientos y comprobaciones en UN email)'
         )
         parser.add_argument(
             '--dry-run',
@@ -59,6 +59,42 @@ class Command(BaseCommand):
                     )
                 else:
                     self.stdout.write('   [SIMULADO] Recordatorios consolidados')
+
+            if notification_type in ['calibration', 'all']:
+                self.stdout.write('Enviando recordatorios individuales de calibracion...')
+                if not options['dry_run']:
+                    sent = NotificationScheduler.check_calibration_reminders()
+                    total_sent += sent
+                    self.stdout.write(
+                        self.style.SUCCESS(f'Recordatorios de calibracion enviados: {sent}')
+                    )
+                else:
+                    self.stdout.write('   [SIMULADO] Recordatorios de calibracion')
+
+            if notification_type in ['maintenance', 'all']:
+                self.stdout.write('Enviando recordatorios individuales de mantenimiento...')
+                if not options['dry_run']:
+                    sent = NotificationScheduler.check_maintenance_reminders()
+                    total_sent += sent
+                    self.stdout.write(
+                        self.style.SUCCESS(f'Recordatorios de mantenimiento enviados: {sent}')
+                    )
+                else:
+                    self.stdout.write('   [SIMULADO] Recordatorios de mantenimiento')
+
+            if notification_type in ['comprobacion', 'all']:
+                self.stdout.write('Enviando recordatorios individuales de comprobacion...')
+                if not options['dry_run']:
+                    # Nota: Las comprobaciones ya están incluidas en el sistema consolidado
+                    # Para mantener compatibilidad, redirigimos al sistema consolidado
+                    self.stdout.write('Las comprobaciones se envian a traves del sistema consolidado')
+                    sent = 0
+                    total_sent += sent
+                    self.stdout.write(
+                        self.style.SUCCESS(f'Use --type consolidated para incluir comprobaciones: {sent}')
+                    )
+                else:
+                    self.stdout.write('   [SIMULADO] Recordatorios de comprobacion')
 
             if notification_type in ['weekly', 'all']:
                 self.stdout.write('Enviando resumenes semanales...')

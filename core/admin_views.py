@@ -147,10 +147,12 @@ def system_notifications(request):
     context = {
         'notification_history': notification_history,
         'notification_options': [
+            ('consolidated', 'Consolidado (Recomendado) - UN email con todas las actividades'),
             ('all', 'Todas las notificaciones'),
-            ('calibration', 'Recordatorios de calibración'),
-            ('maintenance', 'Recordatorios de mantenimiento'),
-            ('weekly', 'Resúmenes semanales')
+            ('calibration', 'Solo recordatorios de calibración'),
+            ('maintenance', 'Solo recordatorios de mantenimiento'),
+            ('comprobacion', 'Solo recordatorios de comprobación'),
+            ('weekly', 'Solo resúmenes semanales')
         ]
     }
 
