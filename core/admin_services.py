@@ -142,6 +142,53 @@ class AdminService:
             return error_result
 
     @staticmethod
+    def execute_restore(backup_file_path, new_name=None, overwrite=False, restore_files=False, dry_run=False):
+        """
+        Ejecuta restauración de backup y retorna resultados.
+        """
+        try:
+            output = io.StringIO()
+
+            args = {
+                'backup_file': backup_file_path,
+                'dry_run': dry_run,
+                'overwrite': overwrite,
+                'restore_files': restore_files,
+                'stdout': output,
+                'stderr': output
+            }
+
+            if new_name:
+                args['new_name'] = new_name
+
+            call_command('restore_backup', **args)
+
+            result = {
+                'success': True,
+                'output': output.getvalue(),
+                'timestamp': timezone.now().isoformat(),
+                'backup_file': backup_file_path,
+                'new_name': new_name,
+                'overwrite': overwrite,
+                'restore_files': restore_files,
+                'dry_run': dry_run
+            }
+
+            logger.info(f'Restore executed from web interface', extra=result)
+            return result
+
+        except Exception as e:
+            error_result = {
+                'success': False,
+                'error': str(e),
+                'timestamp': timezone.now().isoformat(),
+                'backup_file': backup_file_path
+            }
+
+            logger.error(f'Error executing restore from web: {e}', extra=error_result)
+            return error_result
+
+    @staticmethod
     def get_system_status():
         """
         Obtiene estado completo del sistema.
@@ -239,6 +286,8 @@ class AdminService:
             return "Notificaciones enviadas"
         elif 'backup' in action:
             return "Backup creado exitosamente"
+        elif 'restore' in action:
+            return "Restauración completada exitosamente"
         elif 'system_status' in action:
             return "Estado del sistema verificado"
         else:

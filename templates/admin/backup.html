@@ -6,8 +6,8 @@
 <div class="max-w-6xl mx-auto">
     <!-- Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">💾 Backup del Sistema</h1>
-        <p class="text-gray-600">Crear copias de seguridad de todas las empresas y datos</p>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">💾 Backup y Restauración</h1>
+        <p class="text-gray-600">Crear copias de seguridad y restaurar empresas desde backups</p>
     </div>
 
     <!-- Navigation Tabs -->
@@ -22,13 +22,30 @@
         </nav>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Backup/Restore Tabs -->
+    <div class="mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8">
+                <button id="backup-tab" onclick="showTab('backup')" class="tab-button py-2 px-1 border-b-2 border-blue-500 text-blue-600 font-medium text-sm">
+                    💾 Crear Backup
+                </button>
+                <button id="restore-tab" onclick="showTab('restore')" class="tab-button py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
+                    🔄 Restaurar Backup
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Backup Section -->
+    <div id="backup-section" class="tab-content">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Backup Form -->
         <div class="bg-white rounded-lg shadow-sm border p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-6">Crear Backup</h2>
 
             <form method="post" class="space-y-6">
                 {% csrf_token %}
+                <input type="hidden" name="action" value="backup">
 
                 <div>
                     <label for="empresa_id" class="block text-sm font-medium text-gray-700 mb-2">Alcance del Backup</label>
@@ -143,6 +160,120 @@
             {% endif %}
         </div>
     </div>
+    </div>
+
+    <!-- Restore Section -->
+    <div id="restore-section" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Restore Form -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Restaurar desde Backup</h2>
+
+                <form method="post" class="space-y-6">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="restore">
+
+                    <div>
+                        <label for="backup_file_path" class="block text-sm font-medium text-gray-700 mb-2">Archivo de Backup</label>
+                        <select id="backup_file_path" name="backup_file_path" class="w-full border border-gray-300 rounded-md px-3 py-2" required>
+                            <option value="">Seleccionar archivo de backup...</option>
+                            {% for backup in available_backups %}
+                            <option value="{{ backup.path }}" data-type="{{ backup.type }}" data-empresa="{{ backup.empresa|default:'Desconocido' }}">
+                                {{ backup.name }} ({{ backup.type }}, {{ backup.size_mb }} MB) - {{ backup.empresa|default:'Desconocido' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="new_name" class="block text-sm font-medium text-gray-700 mb-2">Nuevo nombre (opcional)</label>
+                        <input type="text" id="new_name" name="new_name" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Dejar vacío para usar nombre original">
+                        <p class="text-sm text-gray-500 mt-1">Si no se especifica, se usará el nombre original de la empresa</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <input type="checkbox" id="dry_run" name="dry_run" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                            <label for="dry_run" class="ml-2 block text-sm text-gray-700">
+                                Simulación (no hacer cambios reales)
+                            </label>
+                        </div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox" id="overwrite" name="overwrite" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                            <label for="overwrite" class="ml-2 block text-sm text-gray-700">
+                                Sobrescribir empresa existente (PELIGROSO)
+                            </label>
+                        </div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox" id="restore_files" name="restore_files" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="restore_files" class="ml-2 block text-sm text-gray-700">
+                                Restaurar archivos adjuntos (solo ZIP)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                        <div class="flex">
+                            <div class="text-yellow-400 mr-3">⚠️</div>
+                            <div class="text-sm text-yellow-700">
+                                <p class="font-medium mb-1">Importante sobre la restauración:</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>Simulación:</strong> Siempre ejecute primero con "Simulación" marcado</li>
+                                    <li><strong>Sobrescribir:</strong> Solo marque si desea reemplazar empresa existente</li>
+                                    <li><strong>Archivos:</strong> Solo disponible para backups ZIP</li>
+                                    <li><strong>Nuevo nombre:</strong> Permite restaurar sin conflictos</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                        🔄 Restaurar Backup
+                    </button>
+                </form>
+            </div>
+
+            <!-- Available Backups -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">Backups Disponibles</h2>
+
+                {% if available_backups %}
+                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                        {% for backup in available_backups %}
+                        <div class="border border-gray-200 rounded-md p-4 hover:bg-gray-50 cursor-pointer" onclick="selectBackup('{{ backup.path }}', '{{ backup.name }}')">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center">
+                                    {% if backup.type == 'ZIP' %}
+                                        <span class="text-blue-500 mr-2">📦</span>
+                                    {% else %}
+                                        <span class="text-green-500 mr-2">🗃️</span>
+                                    {% endif %}
+                                    <span class="font-medium text-gray-900">{{ backup.empresa|default:"Desconocido" }}</span>
+                                </div>
+                                <span class="text-xs text-gray-500">{{ backup.modified|date:"d/m/y H:i" }}</span>
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                <span class="font-medium">Tipo:</span> {{ backup.type }} |
+                                <span class="font-medium">Tamaño:</span> {{ backup.size_mb }} MB
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                {{ backup.name }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-4xl mb-2">📂</div>
+                        <p>No hay backups disponibles</p>
+                        <p class="text-sm">Cree un backup primero</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     <!-- System Info Cards -->
     <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -179,6 +310,52 @@
 </div>
 
 <script>
+// Tab switching functionality
+function showTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Reset all tab buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('border-blue-500', 'text-blue-600');
+        button.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    // Show selected tab content
+    document.getElementById(tabName + '-section').classList.remove('hidden');
+
+    // Activate selected tab button
+    const tabButton = document.getElementById(tabName + '-tab');
+    tabButton.classList.remove('border-transparent', 'text-gray-500');
+    tabButton.classList.add('border-blue-500', 'text-blue-600');
+}
+
+// Backup selection functionality
+function selectBackup(path, name) {
+    const selectElement = document.getElementById('backup_file_path');
+    selectElement.value = path;
+
+    // Auto-populate new name field with a suggestion
+    const option = selectElement.querySelector(`option[value="${path}"]`);
+    if (option) {
+        const empresa = option.getAttribute('data-empresa');
+        const type = option.getAttribute('data-type');
+        if (empresa && empresa !== 'Desconocido') {
+            document.getElementById('new_name').placeholder = `${empresa} (Restaurado)`;
+        }
+
+        // Auto-check restore files if it's a ZIP
+        if (type === 'ZIP') {
+            document.getElementById('restore_files').checked = true;
+        }
+    }
+
+    // Show selected feedback
+    showToast(`Backup seleccionado: ${name}`, 'success');
+}
+
 async function executeQuickBackup(backupType) {
     const typeNames = {
         'database_only': 'solo base de datos',

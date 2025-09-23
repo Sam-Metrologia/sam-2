@@ -162,53 +162,101 @@ def system_notifications(request):
 @user_passes_test(is_superuser)
 def system_backup(request):
     """
-    Página para gestionar backups.
+    Página para gestionar backups y restauraciones.
     """
     if request.method == 'POST':
-        empresa_id = request.POST.get('empresa_id')
-        include_files = request.POST.get('include_files') == 'on'
-        backup_format = request.POST.get('format', 'both')
+        action = request.POST.get('action', 'backup')
 
-        try:
-            empresa_id = int(empresa_id) if empresa_id and empresa_id != 'all' else None
+        if action == 'backup':
+            empresa_id = request.POST.get('empresa_id')
+            include_files = request.POST.get('include_files') == 'on'
+            backup_format = request.POST.get('format', 'both')
 
-            result = AdminService.execute_backup(
-                empresa_id=empresa_id,
-                include_files=include_files,
-                backup_format=backup_format
-            )
+            try:
+                empresa_id = int(empresa_id) if empresa_id and empresa_id != 'all' else None
 
-            # Guardar en historial
-            AdminService.save_execution_to_history(
-                f'backup_{backup_format}',
+                result = AdminService.execute_backup(
+                    empresa_id=empresa_id,
+                    include_files=include_files,
+                    backup_format=backup_format
+                )
+
+                # Guardar en historial
+                AdminService.save_execution_to_history(
+                    f'backup_{backup_format}',
                 result,
                 request.user
             )
 
-            if result['success']:
-                messages.success(request, '✅ Backup creado correctamente')
-            else:
-                messages.error(request, f'❌ Error en backup: {result.get("error", "Error desconocido")}')
+                if result['success']:
+                    messages.success(request, '✅ Backup creado correctamente')
+                else:
+                    messages.error(request, f'❌ Error en backup: {result.get("error", "Error desconocido")}')
 
-        except Exception as e:
-            logger.error(f'Error executing backup: {e}')
-            messages.error(request, f'❌ Error creando backup: {e}')
+            except Exception as e:
+                logger.error(f'Error executing backup: {e}')
+                messages.error(request, f'❌ Error creando backup: {e}')
+
+        elif action == 'restore':
+            backup_file_path = request.POST.get('backup_file_path')
+            new_name = request.POST.get('new_name')
+            overwrite = request.POST.get('overwrite') == 'on'
+            restore_files = request.POST.get('restore_files') == 'on'
+            dry_run = request.POST.get('dry_run') == 'on'
+
+            try:
+                import os
+                # Verificar que el archivo existe
+                if not os.path.exists(backup_file_path):
+                    messages.error(request, f'❌ Archivo de backup no encontrado: {backup_file_path}')
+                    return redirect('core:admin_backup')
+
+                result = AdminService.execute_restore(
+                    backup_file_path=backup_file_path,
+                    new_name=new_name if new_name else None,
+                    overwrite=overwrite,
+                    restore_files=restore_files,
+                    dry_run=dry_run
+                )
+
+                # Guardar en historial
+                AdminService.save_execution_to_history(
+                    f'restore_{"dry_run" if dry_run else "real"}',
+                    result,
+                    request.user
+                )
+
+                if result['success']:
+                    if dry_run:
+                        messages.success(request, '✅ Simulación de restauración completada')
+                    else:
+                        messages.success(request, '✅ Restauración completada exitosamente')
+                else:
+                    messages.error(request, f'❌ Error en restauración: {result.get("error", "Error desconocido")}')
+
+            except Exception as e:
+                logger.error(f'Error executing restore: {e}')
+                messages.error(request, f'❌ Error ejecutando restauración: {e}')
 
         return redirect('core:admin_backup')
 
     # Obtener empresas para el selector
     empresas = Empresa.objects.all().order_by('nombre')
 
-    # Obtener historial de backups
+    # Obtener historial de backups y restauraciones
     history = AdminService.get_execution_history()
     backup_history = [
         h for h in history.get('history', [])
-        if 'backup' in h.get('action', '')
+        if 'backup' in h.get('action', '') or 'restore' in h.get('action', '')
     ][-10:]
+
+    # Obtener archivos de backup disponibles
+    available_backups = _get_available_backup_files()
 
     context = {
         'empresas': empresas,
         'backup_history': backup_history,
+        'available_backups': available_backups,
         'format_options': [
             ('both', 'JSON + ZIP con archivos'),
             ('json', 'Solo JSON'),
@@ -489,3 +537,59 @@ def api_execute_command(request):
     except Exception as e:
         logger.error(f'Error in API command execution: {e}')
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+def _get_available_backup_files():
+    """
+    Obtiene lista de archivos de backup disponibles.
+    """
+    try:
+        import os
+        import glob
+        from datetime import datetime
+
+        backup_files = []
+        backup_dir = os.path.join(os.getcwd(), 'backups')
+
+        if os.path.exists(backup_dir):
+            # Buscar archivos JSON y ZIP
+            json_files = glob.glob(os.path.join(backup_dir, '*.json'))
+            zip_files = glob.glob(os.path.join(backup_dir, '*.zip'))
+
+            all_files = json_files + zip_files
+
+            for file_path in all_files:
+                try:
+                    stat = os.stat(file_path)
+                    file_info = {
+                        'name': os.path.basename(file_path),
+                        'path': file_path,
+                        'size': stat.st_size,
+                        'size_mb': round(stat.st_size / (1024 * 1024), 2),
+                        'modified': datetime.fromtimestamp(stat.st_mtime),
+                        'type': 'ZIP' if file_path.endswith('.zip') else 'JSON'
+                    }
+
+                    # Extraer nombre de empresa del nombre del archivo
+                    filename = os.path.basename(file_path)
+                    if filename.startswith('backup_'):
+                        parts = filename.replace('backup_', '').split('_')
+                        if len(parts) >= 2:
+                            # Reconstruir nombre de empresa
+                            empresa_name = '_'.join(parts[:-2])  # Todo excepto fecha y hora
+                            file_info['empresa'] = empresa_name.replace('_', ' ')
+
+                    backup_files.append(file_info)
+
+                except Exception as e:
+                    logger.warning(f'Error reading backup file {file_path}: {e}')
+                    continue
+
+            # Ordenar por fecha modificada (más recientes primero)
+            backup_files.sort(key=lambda x: x['modified'], reverse=True)
+
+        return backup_files
+
+    except Exception as e:
+        logger.error(f'Error getting available backup files: {e}')
+        return []
