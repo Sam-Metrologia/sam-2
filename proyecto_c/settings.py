@@ -438,6 +438,12 @@ if not DEBUG:
         SECURE_SSL_REDIRECT = True
         SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+        # Configurar CSRF para Render
+        CSRF_TRUSTED_ORIGINS = [
+            f'https://{RENDER_EXTERNAL_HOSTNAME}',
+            'https://sam-9o6o.onrender.com',  # Tu dominio específico
+        ]
+
 # ==============================================================================
 # CONFIGURACIONES DE ARCHIVOS Y UPLOADS
 # ==============================================================================
