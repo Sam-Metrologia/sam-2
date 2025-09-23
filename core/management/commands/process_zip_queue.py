@@ -146,7 +146,7 @@ class Command(BaseCommand):
         parte_numero = zip_request.parte_numero
 
         # Configuración igual que en la vista original
-        EQUIPOS_POR_ZIP = 35
+        EQUIPOS_POR_ZIP = 100
         equipos_empresa_total = Equipo.objects.filter(empresa=empresa).count()
         offset = (parte_numero - 1) * EQUIPOS_POR_ZIP
 

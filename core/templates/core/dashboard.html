@@ -276,6 +276,86 @@
     </div>
     {% endif %}
 
+    {# Alertas Críticas de Notificación #}
+    {% if calibraciones_vencidas > 0 or mantenimientos_vencidos > 0 or comprobaciones_vencidas > 0 %}
+    <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-lg shadow-md">
+        <div class="flex items-center">
+            <div class="text-red-500 text-2xl mr-4">⚠️</div>
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-red-800 mb-2">ACTIVIDADES VENCIDAS - ACCIÓN REQUERIDA</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% if calibraciones_vencidas > 0 %}
+                    <div class="bg-white p-3 rounded border border-red-200">
+                        <div class="text-red-700 font-bold">🔬 Calibraciones</div>
+                        <div class="text-red-600">{{ calibraciones_vencidas }} vencida{{ calibraciones_vencidas|pluralize }}</div>
+                        {% if vencidos_calibracion_codigos %}
+                        <div class="text-xs text-red-500 mt-1">{{ vencidos_calibracion_codigos|slice:":3"|join:", " }}{% if vencidos_calibracion_codigos|length > 3 %}...{% endif %}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if mantenimientos_vencidos > 0 %}
+                    <div class="bg-white p-3 rounded border border-red-200">
+                        <div class="text-red-700 font-bold">🔧 Mantenimientos</div>
+                        <div class="text-red-600">{{ mantenimientos_vencidos }} vencido{{ mantenimientos_vencidos|pluralize }}</div>
+                        {% if vencidos_mantenimiento_codigos %}
+                        <div class="text-xs text-red-500 mt-1">{{ vencidos_mantenimiento_codigos|slice:":3"|join:", " }}{% if vencidos_mantenimiento_codigos|length > 3 %}...{% endif %}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if comprobaciones_vencidas > 0 %}
+                    <div class="bg-white p-3 rounded border border-red-200">
+                        <div class="text-red-700 font-bold">✅ Comprobaciones</div>
+                        <div class="text-red-600">{{ comprobaciones_vencidas }} vencida{{ comprobaciones_vencidas|pluralize }}</div>
+                        {% if vencidos_comprobacion_codigos %}
+                        <div class="text-xs text-red-500 mt-1">{{ vencidos_comprobacion_codigos|slice:":3"|join:", " }}{% if vencidos_comprobacion_codigos|length > 3 %}...{% endif %}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="mt-3 text-sm text-red-700">
+                    📧 <strong>Recordatorio:</strong> Recibirá notificaciones automáticas por email para estas actividades.
+                    <a href="{% url 'core:listar_equipos' %}" class="text-red-800 underline hover:text-red-900">Ver equipos completos</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# Alertas de Actividades Próximas #}
+    {% if calibraciones_proximas > 0 or mantenimientos_proximas > 0 or comprobaciones_proximas > 0 %}
+    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg shadow-md">
+        <div class="flex items-center">
+            <div class="text-yellow-600 text-2xl mr-4">📅</div>
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-yellow-800 mb-2">ACTIVIDADES PRÓXIMAS (30 días)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% if calibraciones_proximas > 0 %}
+                    <div class="bg-white p-3 rounded border border-yellow-200">
+                        <div class="text-yellow-700 font-bold">🔬 Calibraciones</div>
+                        <div class="text-yellow-600">{{ calibraciones_proximas }} próxima{{ calibraciones_proximas|pluralize }}</div>
+                    </div>
+                    {% endif %}
+                    {% if mantenimientos_proximas > 0 %}
+                    <div class="bg-white p-3 rounded border border-yellow-200">
+                        <div class="text-yellow-700 font-bold">🔧 Mantenimientos</div>
+                        <div class="text-yellow-600">{{ mantenimientos_proximas }} próximo{{ mantenimientos_proximas|pluralize }}</div>
+                    </div>
+                    {% endif %}
+                    {% if comprobaciones_proximas > 0 %}
+                    <div class="bg-white p-3 rounded border border-yellow-200">
+                        <div class="text-yellow-700 font-bold">✅ Comprobaciones</div>
+                        <div class="text-yellow-600">{{ comprobaciones_proximas }} próxima{{ comprobaciones_proximas|pluralize }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="mt-3 text-sm text-yellow-700">
+                    📧 <strong>Sistema de notificaciones:</strong> Recibirá recordatorios automáticos a los 15 días, 7 días y el día de vencimiento.
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div class="info-card total-equipos">
             <h3>Total de Equipos</h3>

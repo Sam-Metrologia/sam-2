@@ -22,8 +22,8 @@ class OptimizedZipGenerator:
     """
 
     # Configuración optimizada
-    CHUNK_SIZE = 50  # Equipos por chunk (aumentado de 35)
-    MEMORY_LIMIT_MB = 100  # Límite de memoria por operación
+    CHUNK_SIZE = 100  # Equipos por chunk (aumentado de 50)
+    MEMORY_LIMIT_MB = 150  # Límite de memoria por operación
     COMPRESSION_LEVEL = 6  # Compresión balanceada
 
     def __init__(self, empresa, formatos_seleccionados, user):

@@ -5881,8 +5881,8 @@ def calcular_info_paginacion_zip(empresa_id, is_superuser=False):
     Calcula información de paginación para ZIPs basado en número de equipos.
     Returns: (total_equipos, total_partes, equipos_por_zip)
     """
-    # OPTIMIZACIÓN: 35 equipos por ZIP (con hoja de vida PDF, nombres optimizados)
-    EQUIPOS_POR_ZIP = 35
+    # OPTIMIZACIÓN: 100 equipos por ZIP (optimizado para memoria y rendimiento)
+    EQUIPOS_POR_ZIP = 100
 
     total_equipos = Equipo.objects.filter(empresa_id=empresa_id).count()
     total_partes = (total_equipos + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP if total_equipos > 0 else 1
@@ -5984,7 +5984,7 @@ def generar_informe_zip(request):
     # OPTIMIZACIÓN: Configurar compresión más eficiente y streaming de archivos
 
     # Usar sistema optimizado para empresas con muchos equipos
-    if equipos_empresa_total > 100:
+    if equipos_empresa_total > 50:
         from core.zip_optimizer import generate_optimized_zip, create_streaming_download
 
         # Determinar formatos seleccionados (por defecto PDF + Excel)
