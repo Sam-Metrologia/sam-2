@@ -4,7 +4,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, Http404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.core.paginator import Paginator
@@ -593,3 +593,64 @@ def _get_available_backup_files():
     except Exception as e:
         logger.error(f'Error getting available backup files: {e}')
         return []
+
+
+@login_required
+@user_passes_test(is_superuser)
+def download_backup(request, filename):
+    """
+    Permite descargar archivos de backup de forma segura.
+    """
+    try:
+        import os
+        import mimetypes
+        from django.http import FileResponse
+        from urllib.parse import unquote
+
+        # Decodificar el nombre del archivo
+        filename = unquote(filename)
+
+        # Validar que el archivo esté en el directorio de backups
+        backup_dir = os.path.join(os.getcwd(), 'backups')
+        file_path = os.path.join(backup_dir, filename)
+
+        # Verificar que el archivo existe y está en el directorio correcto
+        if not os.path.exists(file_path):
+            raise Http404("Archivo de backup no encontrado")
+
+        # Verificar que el archivo está dentro del directorio de backups (seguridad)
+        if not os.path.abspath(file_path).startswith(os.path.abspath(backup_dir)):
+            raise Http404("Acceso denegado")
+
+        # Verificar que es un archivo de backup válido
+        if not (filename.endswith('.json') or filename.endswith('.zip')):
+            raise Http404("Tipo de archivo no válido")
+
+        # Log de la descarga
+        logger.info(f'Backup download requested: {filename} by {request.user.username}')
+
+        # Detectar tipo de contenido
+        content_type, _ = mimetypes.guess_type(file_path)
+        if not content_type:
+            content_type = 'application/octet-stream'
+
+        # Crear respuesta de descarga
+        response = FileResponse(
+            open(file_path, 'rb'),
+            content_type=content_type,
+            as_attachment=True,
+            filename=filename
+        )
+
+        # Agregar headers adicionales
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = os.path.getsize(file_path)
+
+        return response
+
+    except Http404:
+        raise
+    except Exception as e:
+        logger.error(f'Error downloading backup {filename}: {e}')
+        messages.error(request, f'Error descargando backup: {e}')
+        return redirect('core:admin_backup')

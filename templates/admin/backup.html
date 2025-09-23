@@ -237,30 +237,82 @@
 
             <!-- Available Backups -->
             <div class="bg-white rounded-lg shadow-sm border p-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-6">Backups Disponibles</h2>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900">Backups Disponibles</h2>
+                    <span class="text-sm text-gray-500">{{ available_backups|length }} archivo(s)</span>
+                </div>
+
+                <!-- Search and Filter Controls -->
+                <div class="mb-4 space-y-3">
+                    <div class="flex space-x-3">
+                        <div class="flex-1">
+                            <input type="text" id="backup-search" placeholder="Buscar por empresa o archivo..."
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        </div>
+                        <select id="type-filter" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <option value="">Todos los tipos</option>
+                            <option value="JSON">Solo JSON</option>
+                            <option value="ZIP">Solo ZIP</option>
+                        </select>
+                    </div>
+                    <div class="flex space-x-3 text-sm">
+                        <button onclick="sortBackups('date')" class="sort-btn text-blue-600 hover:text-blue-800">
+                            📅 Por Fecha
+                        </button>
+                        <button onclick="sortBackups('empresa')" class="sort-btn text-blue-600 hover:text-blue-800">
+                            🏢 Por Empresa
+                        </button>
+                        <button onclick="sortBackups('size')" class="sort-btn text-blue-600 hover:text-blue-800">
+                            📊 Por Tamaño
+                        </button>
+                        <button onclick="clearFilters()" class="text-gray-500 hover:text-gray-700">
+                            🗑️ Limpiar
+                        </button>
+                    </div>
+                </div>
 
                 {% if available_backups %}
-                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                    <div id="backup-list" class="space-y-4 max-h-96 overflow-y-auto">
                         {% for backup in available_backups %}
-                        <div class="border border-gray-200 rounded-md p-4 hover:bg-gray-50 cursor-pointer" onclick="selectBackup('{{ backup.path }}', '{{ backup.name }}')">
+                        <div class="backup-item border border-gray-200 rounded-md p-4 hover:bg-gray-50"
+                             data-empresa="{{ backup.empresa|default:'Desconocido' }}"
+                             data-type="{{ backup.type }}"
+                             data-size="{{ backup.size }}"
+                             data-date="{{ backup.modified|date:'Y-m-d' }}"
+                             data-name="{{ backup.name }}">
                             <div class="flex items-center justify-between mb-2">
                                 <div class="flex items-center">
                                     {% if backup.type == 'ZIP' %}
-                                        <span class="text-blue-500 mr-2">📦</span>
+                                        <span class="text-blue-500 mr-2 text-lg">📦</span>
                                     {% else %}
-                                        <span class="text-green-500 mr-2">🗃️</span>
+                                        <span class="text-green-500 mr-2 text-lg">🗃️</span>
                                     {% endif %}
-                                    <span class="font-medium text-gray-900">{{ backup.empresa|default:"Desconocido" }}</span>
+                                    <div>
+                                        <span class="font-medium text-gray-900">{{ backup.empresa|default:"Desconocido" }}</span>
+                                        <div class="text-xs text-gray-500">{{ backup.modified|date:"d/m/Y H:i" }}</div>
+                                    </div>
                                 </div>
-                                <span class="text-xs text-gray-500">{{ backup.modified|date:"d/m/y H:i" }}</span>
+                                <div class="flex space-x-2">
+                                    <button onclick="downloadBackup('{{ backup.path }}', '{{ backup.name }}')"
+                                            class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded text-xs font-medium">
+                                        📥 Descargar
+                                    </button>
+                                    <button onclick="selectBackup('{{ backup.path }}', '{{ backup.name }}')"
+                                            class="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1 rounded text-xs font-medium">
+                                        🔄 Restaurar
+                                    </button>
+                                </div>
                             </div>
                             <div class="text-sm text-gray-600">
                                 <span class="font-medium">Tipo:</span> {{ backup.type }} |
-                                <span class="font-medium">Tamaño:</span> {{ backup.size_mb }} MB
+                                <span class="font-medium">Tamaño:</span> {{ backup.size_mb }} MB |
+                                <span class="font-medium">Archivo:</span> {{ backup.name }}
                             </div>
-                            <div class="text-xs text-gray-500 mt-1">
-                                {{ backup.name }}
+                            {% if backup.type == 'ZIP' %}
+                            <div class="text-xs text-blue-600 mt-1">
+                                ✅ Incluye archivos adjuntos
                             </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -332,8 +384,122 @@ function showTab(tabName) {
     tabButton.classList.add('border-blue-500', 'text-blue-600');
 }
 
+// Global variables for backup management
+let allBackups = [];
+let currentSort = 'date';
+let currentFilter = '';
+let currentSearch = '';
+
+// Initialize backup data and event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Store original backup data
+    const backupItems = document.querySelectorAll('.backup-item');
+    allBackups = Array.from(backupItems).map(item => ({
+        element: item,
+        empresa: item.dataset.empresa,
+        type: item.dataset.type,
+        size: parseInt(item.dataset.size),
+        date: item.dataset.date,
+        name: item.dataset.name
+    }));
+
+    // Add event listeners
+    document.getElementById('backup-search').addEventListener('input', handleSearch);
+    document.getElementById('type-filter').addEventListener('change', handleFilter);
+});
+
+// Search functionality
+function handleSearch(event) {
+    currentSearch = event.target.value.toLowerCase();
+    filterAndSortBackups();
+}
+
+// Filter functionality
+function handleFilter(event) {
+    currentFilter = event.target.value;
+    filterAndSortBackups();
+}
+
+// Sort functionality
+function sortBackups(sortBy) {
+    currentSort = sortBy;
+    filterAndSortBackups();
+
+    // Update sort button states
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.classList.remove('font-bold');
+    });
+    event.target.classList.add('font-bold');
+}
+
+// Clear all filters
+function clearFilters() {
+    document.getElementById('backup-search').value = '';
+    document.getElementById('type-filter').value = '';
+    currentSearch = '';
+    currentFilter = '';
+    filterAndSortBackups();
+    showToast('Filtros limpiados', 'success');
+}
+
+// Filter and sort backups
+function filterAndSortBackups() {
+    let filteredBackups = allBackups.filter(backup => {
+        // Search filter
+        const searchMatch = !currentSearch ||
+            backup.empresa.toLowerCase().includes(currentSearch) ||
+            backup.name.toLowerCase().includes(currentSearch);
+
+        // Type filter
+        const typeMatch = !currentFilter || backup.type === currentFilter;
+
+        return searchMatch && typeMatch;
+    });
+
+    // Sort backups
+    filteredBackups.sort((a, b) => {
+        switch(currentSort) {
+            case 'date':
+                return new Date(b.date) - new Date(a.date);
+            case 'empresa':
+                return a.empresa.localeCompare(b.empresa);
+            case 'size':
+                return b.size - a.size;
+            default:
+                return 0;
+        }
+    });
+
+    // Update DOM
+    const backupList = document.getElementById('backup-list');
+    backupList.innerHTML = '';
+
+    if (filteredBackups.length === 0) {
+        backupList.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <div class="text-4xl mb-2">🔍</div>
+                <p>No se encontraron backups</p>
+                <p class="text-sm">Intenta con otros filtros</p>
+            </div>
+        `;
+    } else {
+        filteredBackups.forEach(backup => {
+            backupList.appendChild(backup.element);
+        });
+    }
+
+    // Update counter
+    const counter = document.querySelector('.text-gray-500');
+    if (counter) {
+        counter.textContent = `${filteredBackups.length} archivo(s)`;
+    }
+}
+
 // Backup selection functionality
 function selectBackup(path, name) {
+    // Switch to restore tab if not already there
+    showTab('restore');
+
     const selectElement = document.getElementById('backup_file_path');
     selectElement.value = path;
 
@@ -352,8 +518,43 @@ function selectBackup(path, name) {
         }
     }
 
+    // Highlight selected backup
+    document.querySelectorAll('.backup-item').forEach(item => {
+        item.classList.remove('ring-2', 'ring-green-500', 'bg-green-50');
+    });
+
+    const selectedItem = document.querySelector(`[data-name="${name}"]`);
+    if (selectedItem) {
+        selectedItem.classList.add('ring-2', 'ring-green-500', 'bg-green-50');
+    }
+
     // Show selected feedback
-    showToast(`Backup seleccionado: ${name}`, 'success');
+    showToast(`✅ Backup seleccionado para restaurar: ${name}`, 'success');
+}
+
+// Download backup functionality
+async function downloadBackup(path, name) {
+    try {
+        // Show loading state
+        showToast('📥 Preparando descarga...', 'info');
+
+        // Create download link using Django URL
+        const link = document.createElement('a');
+        link.href = `{% url 'core:download_backup' filename='FILENAME_PLACEHOLDER' %}`.replace('FILENAME_PLACEHOLDER', encodeURIComponent(name));
+        link.download = name;
+        link.target = '_blank';
+
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast(`✅ Descarga iniciada: ${name}`, 'success');
+
+    } catch (error) {
+        console.error('Error downloading backup:', error);
+        showToast(`❌ Error descargando backup: ${error.message}`, 'error');
+    }
 }
 
 async function executeQuickBackup(backupType) {

@@ -112,6 +112,7 @@ urlpatterns = [
     path('admin/system/maintenance/', admin_views.system_maintenance, name='admin_maintenance'),
     path('admin/system/notifications/', admin_views.system_notifications, name='admin_notifications'),
     path('admin/system/backup/', admin_views.system_backup, name='admin_backup'),
+    path('admin/system/backup/download/<path:filename>/', admin_views.download_backup, name='download_backup'),
     path('admin/system/monitoring/', admin_views.system_monitoring, name='admin_monitoring'),
     path('admin/system/schedule/', admin_views.system_schedule, name='admin_schedule'),
     path('admin/system/email/', admin_views.email_configuration, name='admin_email_config'),
