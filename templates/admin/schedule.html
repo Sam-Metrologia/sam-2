@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}Programación del Sistema{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">⏰ Programación del Sistema</h1>
+        <p class="text-gray-600">Configurar tareas automáticas y horarios de ejecución</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Mantenimiento</a>
+            <a href="{% url 'core:admin_notifications' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Notificaciones</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Monitoreo</a>
+            <a href="{% url 'core:admin_schedule' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Programación</a>
+        </nav>
+    </div>
+
+    <!-- Schedule Configuration -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Schedule Settings -->
+        <div class="space-y-6">
+            <!-- Daily Maintenance -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">🧹 Mantenimiento Diario</h3>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="maintenance_daily_enabled" class="form-checkbox h-5 w-5 text-blue-600" {% if schedule_config.maintenance_daily.enabled %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Habilitado</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora de Ejecución</label>
+                        <input type="time" id="maintenance_daily_time" value="{{ schedule_config.maintenance_daily.time }}" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tareas</label>
+                        <div class="space-y-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="cache" class="maintenance-daily-task" {% if 'cache' in schedule_config.maintenance_daily.tasks %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Limpieza de Cache</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="database" class="maintenance-daily-task" {% if 'database' in schedule_config.maintenance_daily.tasks %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Optimización de BD</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Notifications -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">📧 Notificaciones Diarias</h3>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="notifications_daily_enabled" class="form-checkbox h-5 w-5 text-blue-600" {% if schedule_config.notifications_daily.enabled %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Habilitado</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora de Envío</label>
+                        <input type="time" id="notifications_daily_time" value="{{ schedule_config.notifications_daily.time }}" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipos</label>
+                        <div class="space-y-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="calibration" class="notifications-daily-type" {% if 'calibration' in schedule_config.notifications_daily.types %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Calibraciones</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="maintenance" class="notifications-daily-type" {% if 'maintenance' in schedule_config.notifications_daily.types %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Mantenimientos</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly and Monthly Tasks -->
+        <div class="space-y-6">
+            <!-- Weekly Maintenance -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">🗓️ Mantenimiento Semanal</h3>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="maintenance_weekly_enabled" class="form-checkbox h-5 w-5 text-blue-600" {% if schedule_config.maintenance_weekly.enabled %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Habilitado</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Día de la Semana</label>
+                        <select id="maintenance_weekly_day" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            <option value="1" {% if schedule_config.maintenance_weekly.day == '1' %}selected{% endif %}>Lunes</option>
+                            <option value="7" {% if schedule_config.maintenance_weekly.day == '7' %}selected{% endif %}>Domingo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tareas</label>
+                        <div class="space-y-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="logs" class="maintenance-weekly-task" {% if 'logs' in schedule_config.maintenance_weekly.tasks %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Limpieza de Logs</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="zip" class="maintenance-weekly-task" {% if 'zip' in schedule_config.maintenance_weekly.tasks %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Limpieza de ZIPs</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Backup -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">💾 Backup Mensual</h3>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="backup_monthly_enabled" class="form-checkbox h-5 w-5 text-blue-600" {% if schedule_config.backup_monthly.enabled %}checked{% endif %}>
+                        <span class="ml-2 text-sm text-gray-700">Habilitado</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Día del Mes</label>
+                        <select id="backup_monthly_day" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            {% for day in "123456789012345678901234567890"|make_list %}
+                                {% if forloop.counter <= 28 %}
+                                <option value="{{ forloop.counter }}" {% if schedule_config.backup_monthly.day == forloop.counter|stringformat:"s" %}selected{% endif %}>Día {{ forloop.counter }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="backup_monthly_include_files" {% if schedule_config.backup_monthly.include_files %}checked{% endif %}>
+                            <span class="ml-2 text-sm">Incluir archivos adjuntos</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="mt-8 text-center">
+        <button onclick="saveScheduleConfig()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-md transition-colors">
+            💾 Guardar Configuración
+        </button>
+    </div>
+
+    <!-- Command Execution Section -->
+    <div class="mt-8 bg-gray-50 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">🚀 Ejecución Manual</h3>
+        <p class="text-gray-600 mb-4">Para probar las tareas programadas o ejecutar comando de línea:</p>
+
+        <div class="bg-gray-800 text-green-400 p-4 rounded-md font-mono text-sm mb-4">
+            <div class="mb-2"># Comando para ejecutar tareas programadas:</div>
+            <div class="text-white">python manage.py run_scheduled_tasks</div>
+            <div class="mt-2 mb-2"># Solo verificar qué tareas se ejecutarían:</div>
+            <div class="text-white">python manage.py run_scheduled_tasks --check-only</div>
+            <div class="mt-2 mb-2"># Forzar ejecución de todas las tareas habilitadas:</div>
+            <div class="text-white">python manage.py run_scheduled_tasks --force</div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div class="flex">
+                <div class="text-blue-400 mr-3">ℹ️</div>
+                <div class="text-sm text-blue-700">
+                    <p class="font-medium mb-1">Configuración de Cron (Producción):</p>
+                    <p>Para automatizar en producción, puedes configurar cron jobs que ejecuten este comando según los horarios configurados aquí.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function saveScheduleConfig() {
+    const config = {
+        maintenance_daily: {
+            enabled: document.getElementById('maintenance_daily_enabled').checked,
+            time: document.getElementById('maintenance_daily_time').value,
+            tasks: Array.from(document.querySelectorAll('.maintenance-daily-task:checked')).map(cb => cb.value)
+        },
+        notifications_daily: {
+            enabled: document.getElementById('notifications_daily_enabled').checked,
+            time: document.getElementById('notifications_daily_time').value,
+            types: Array.from(document.querySelectorAll('.notifications-daily-type:checked')).map(cb => cb.value)
+        },
+        maintenance_weekly: {
+            enabled: document.getElementById('maintenance_weekly_enabled').checked,
+            day: document.getElementById('maintenance_weekly_day').value,
+            tasks: Array.from(document.querySelectorAll('.maintenance-weekly-task:checked')).map(cb => cb.value)
+        },
+        backup_monthly: {
+            enabled: document.getElementById('backup_monthly_enabled').checked,
+            day: document.getElementById('backup_monthly_day').value,
+            include_files: document.getElementById('backup_monthly_include_files').checked
+        }
+    };
+
+    showLoading('Guardando configuración...');
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'save_schedule',
+                params: config
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            showToast('✅ Configuración guardada correctamente', 'success');
+        } else {
+            showToast(`❌ Error guardando configuración: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+</script>
+{% endblock %}

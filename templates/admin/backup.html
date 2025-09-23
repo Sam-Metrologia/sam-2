@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block title %}Backup del Sistema{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">💾 Backup del Sistema</h1>
+        <p class="text-gray-600">Crear copias de seguridad de todas las empresas y datos</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Mantenimiento</a>
+            <a href="{% url 'core:admin_notifications' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Notificaciones</a>
+            <a href="{% url 'core:admin_backup' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Monitoreo</a>
+            <a href="{% url 'core:admin_schedule' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Programación</a>
+        </nav>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Backup Form -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Crear Backup</h2>
+
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <div>
+                    <label for="empresa_id" class="block text-sm font-medium text-gray-700 mb-2">Alcance del Backup</label>
+                    <select id="empresa_id" name="empresa_id" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="all">Todas las empresas (Backup completo)</option>
+                        {% for empresa in empresas %}
+                        <option value="{{ empresa.id }}">Solo {{ empresa.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="format" class="block text-sm font-medium text-gray-700 mb-2">Formato del Backup</label>
+                    <select id="format" name="format" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        {% for value, label in format_options %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="include_files" name="include_files" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <label for="include_files" class="ml-2 block text-sm text-gray-700">
+                        Incluir archivos adjuntos (logos, documentos)
+                    </label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="compress_backup" name="compress_backup" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <label for="compress_backup" class="ml-2 block text-sm text-gray-700">
+                        Comprimir backup (recomendado)
+                    </label>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="text-yellow-400 mr-3">⚠️</div>
+                        <div class="text-sm text-yellow-700">
+                            <p class="font-medium mb-1">Importante sobre el backup:</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><strong>Alcance:</strong> El backup incluye TODAS las empresas del sistema</li>
+                                <li><strong>Contenido:</strong> Base de datos + archivos adjuntos</li>
+                                <li><strong>Ubicación:</strong> Se guarda en S3 (producción) o local (desarrollo)</li>
+                                <li><strong>RAM:</strong> Uso moderado, procesa por chunks para optimizar memoria</li>
+                                <li><strong>Diferencia con ZIP:</strong> Backup es para restauración completa, ZIP es para informes</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                    💾 Crear Backup Completo
+                </button>
+            </form>
+
+            <!-- Quick Actions -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h3 class="text-sm font-medium text-gray-700 mb-3">Acciones Rápidas</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="executeQuickBackup('json')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        🗃️ Solo BD (JSON)
+                    </button>
+                    <button onclick="executeQuickBackup('both')" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        📦 Completo (JSON+ZIP)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup History -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Historial de Backups</h2>
+
+            {% if backup_history %}
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+                    {% for execution in backup_history %}
+                    <div class="border border-gray-200 rounded-md p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center">
+                                {% if execution.success %}
+                                    <span class="text-green-500 mr-2">✅</span>
+                                {% else %}
+                                    <span class="text-red-500 mr-2">❌</span>
+                                {% endif %}
+                                <span class="font-medium text-gray-900">{{ execution.summary }}</span>
+                            </div>
+                            <span class="text-xs text-gray-500">{{ execution.timestamp|date:"d/m H:i" }}</span>
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            <span class="font-medium">Usuario:</span> {{ execution.user }}
+                        </div>
+                        {% if execution.details %}
+                        <div class="text-sm text-gray-600 mt-1">
+                            <span class="font-medium">Tamaño:</span> {{ execution.details.size_mb|default:"N/A" }} MB |
+                            <span class="font-medium">Empresas:</span> {{ execution.details.companies_count|default:"N/A" }}
+                        </div>
+                        {% endif %}
+                        {% if not execution.success and execution.error %}
+                        <div class="text-sm text-red-600 mt-1">
+                            <span class="font-medium">Error:</span> {{ execution.error }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-gray-500 py-8">
+                    <div class="text-4xl mb-2">📂</div>
+                    <p>No hay historial de backups aún</p>
+                    <p class="text-sm">Los backups aparecerán aquí</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- System Info Cards -->
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">💾</div>
+                <div>
+                    <div class="text-sm opacity-80">Backup Completo</div>
+                    <div class="font-semibold">Todas las empresas</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">☁️</div>
+                <div>
+                    <div class="text-sm opacity-80">Almacenamiento</div>
+                    <div class="font-semibold">AWS S3 / Local</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">📦</div>
+                <div>
+                    <div class="text-sm opacity-80">Compresión</div>
+                    <div class="font-semibold">ZIP optimizado</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function executeQuickBackup(backupType) {
+    const typeNames = {
+        'database_only': 'solo base de datos',
+        'full_compressed': 'completo comprimido'
+    };
+
+    showLoading(`Creando backup ${typeNames[backupType]}...`);
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'backup',
+                params: {
+                    empresa_id: null,
+                    include_files: backupType === 'both',
+                    format: backupType
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            const size = result.details?.size_mb ? `(${result.details.size_mb} MB)` : '';
+            showToast(`✅ Backup ${typeNames[backupType]} creado ${size}`, 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast(`❌ Error creando backup: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+</script>
+{% endblock %}

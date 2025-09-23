@@ -1,0 +1,33 @@
+RECORDATORIO DE CALIBRACION - {{ site_name }}
+==============================================
+
+Hola,
+
+Le informamos que el equipo {{ equipo.codigo_interno }} - {{ equipo.nombre }} tiene una calibracion proxima a vencer.
+
+DETALLES DEL EQUIPO:
+- Codigo: {{ equipo.codigo_interno }}
+- Nombre: {{ equipo.nombre }}
+- Marca: {{ equipo.marca }}
+- Modelo: {{ equipo.modelo }}
+- Serie: {{ equipo.numero_serie }}
+
+INFORMACION DE CALIBRACION:
+- Fecha de vencimiento: {{ due_date|date:"d/m/Y" }}
+- Dias restantes: {{ days_until_due }}
+- Nivel de urgencia: {{ urgency_level }}
+
+{% if urgency_level == "critical" %}
+ATENCION: La calibracion ha VENCIDO. Es necesario tomar accion inmediata.
+{% elif urgency_level == "high" %}
+URGENTE: La calibracion vence en menos de 3 dias.
+{% elif urgency_level == "medium" %}
+IMPORTANTE: La calibracion vence en menos de 7 dias.
+{% endif %}
+
+Por favor, coordine la calibracion lo antes posible para mantener la conformidad de sus equipos.
+
+---
+{{ site_name }}
+Sistema de Gestion de Metrologia
+{{ empresa.nombre }}

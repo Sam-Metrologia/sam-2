@@ -1,0 +1,63 @@
+RECORDATORIO CONSOLIDADO - {{ site_name }}
+==============================================
+
+Estimado cliente,
+
+Le informamos que {{ empresa.nombre }} tiene las siguientes actividades {{ urgency_text }}:
+
+=== RESUMEN DE ACTIVIDADES ===
+Total de actividades: {{ total_actividades }}
+Fecha objetivo: {{ target_date|date:"d/m/Y" }}
+
+{% if equipos_calibracion %}
+CALIBRACIONES ({{ equipos_calibracion|length }}):
+{% for equipo in equipos_calibracion %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha: {{ equipo.proxima_calibracion|date:"d/m/Y" }}
+{% endfor %}
+
+{% endif %}
+{% if equipos_mantenimiento %}
+MANTENIMIENTOS ({{ equipos_mantenimiento|length }}):
+{% for equipo in equipos_mantenimiento %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}
+{% endfor %}
+
+{% endif %}
+{% if equipos_comprobacion %}
+COMPROBACIONES ({{ equipos_comprobacion|length }}):
+{% for equipo in equipos_comprobacion %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha: {{ equipo.proxima_comprobacion|date:"d/m/Y" }}
+{% endfor %}
+
+{% endif %}
+{% if urgency_level == "critical" %}
+ATENCION CRITICA: Estas actividades VENCEN HOY.
+Es necesario tomar accion inmediata para mantener la conformidad.
+
+{% elif urgency_level == "high" %}
+URGENTE: Estas actividades vencen en {{ days_ahead }} dias.
+Coordine lo antes posible para evitar vencimientos.
+
+{% elif urgency_level == "medium" %}
+PROGRAMADO: Estas actividades vencen en {{ days_ahead }} dias.
+Planifique con anticipacion para mantener la conformidad.
+
+{% endif %}
+ACCIONES RECOMENDADAS:
+1. Revisar cada equipo listado
+2. Coordinar con proveedores de servicio
+3. Programar las actividades antes del vencimiento
+4. Mantener documentacion actualizada
+
+---
+{{ site_name }}
+Sistema de Gestion de Metrologia
+{{ empresa.nombre }}
+
+Fecha del reporte: {{ today|date:"d/m/Y" }}

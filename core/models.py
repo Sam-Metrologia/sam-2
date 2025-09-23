@@ -296,10 +296,17 @@ class Empresa(models.Model):
         import hashlib
         import time
 
-        # Crear clave de cache única para esta empresa
-        cache_key = f"storage_usage_empresa_{self.id}_v2"
+        # Crear clave de cache única para esta empresa con timestamp de última modificación
+        from django.utils import timezone
+        last_modified = self.equipos.aggregate(
+            last_mod=models.Max('fecha_registro')
+        ).get('last_mod', timezone.now())
 
-        # Intentar obtener del cache (válido por 10 minutos) con fallback graceful
+        # Cache más inteligente con timestamp para invalidación automática
+        cache_version = int(last_modified.timestamp()) if last_modified else 0
+        cache_key = f"storage_usage_empresa_{self.id}_v3_{cache_version}"
+
+        # Cache válido por 30 minutos para mejor performance
         try:
             cached_result = cache.get(cache_key)
             if cached_result is not None:
@@ -374,9 +381,9 @@ class Empresa(models.Model):
         # Convertir bytes a MB
         total_size_mb = round(total_size_bytes / (1024 * 1024), 2)
 
-        # Guardar en cache por 10 minutos (600 segundos) con fallback graceful
+        # Guardar en cache por 30 minutos (1800 segundos) para mejor performance
         try:
-            cache.set(cache_key, total_size_mb, 600)
+            cache.set(cache_key, total_size_mb, 1800)
         except Exception as e:
             # Si hay error con el cache, continuar sin guardarlo
             import logging
@@ -1372,3 +1379,462 @@ class ZipRequest(models.Model):
             status='pending',
             position_in_queue__lt=self.position_in_queue
         ).count() + 1
+
+
+# ==============================================================================
+# MODELO DE NOTIFICACIONES EN PLATAFORMA
+# ==============================================================================
+
+class Notification(models.Model):
+    """
+    Modelo para notificaciones dentro de la plataforma.
+    """
+    NOTIFICATION_TYPES = [
+        ('calibration', 'Calibración'),
+        ('maintenance', 'Mantenimiento'),
+        ('system', 'Sistema'),
+        ('info', 'Información'),
+        ('warning', 'Advertencia'),
+        ('error', 'Error'),
+    ]
+
+    PRIORITY_LEVELS = [
+        ('low', 'Baja'),
+        ('medium', 'Media'),
+        ('high', 'Alta'),
+        ('critical', 'Crítica'),
+    ]
+
+    title = models.CharField(max_length=200, verbose_name='Título')
+    message = models.TextField(verbose_name='Mensaje')
+    notification_type = models.CharField(
+        max_length=20,
+        choices=NOTIFICATION_TYPES,
+        default='info',
+        verbose_name='Tipo'
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=PRIORITY_LEVELS,
+        default='medium',
+        verbose_name='Prioridad'
+    )
+
+    # Relaciones
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        null=True,
+        blank=True,
+        verbose_name='Usuario'
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        null=True,
+        blank=True,
+        verbose_name='Empresa'
+    )
+    equipo = models.ForeignKey(
+        Equipo,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        null=True,
+        blank=True,
+        verbose_name='Equipo'
+    )
+
+    # Estado
+    is_read = models.BooleanField(default=False, verbose_name='Leída')
+    is_global = models.BooleanField(default=False, verbose_name='Global')
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name='Expira el')
+
+    # Timestamps
+    created_at = models.DateTimeField(default=timezone.now, verbose_name='Creada el')
+    read_at = models.DateTimeField(null=True, blank=True, verbose_name='Leída el')
+
+    class Meta:
+        verbose_name = 'Notificación'
+        verbose_name_plural = 'Notificaciones'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['empresa', 'is_read']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.get_notification_type_display()}"
+
+    def mark_as_read(self):
+        """Marca la notificación como leída."""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=['is_read', 'read_at'])
+
+    def is_expired(self):
+        """Verifica si la notificación ha expirado."""
+        if self.expires_at:
+            return timezone.now() > self.expires_at
+        return False
+
+    @classmethod
+    def create_calibration_notification(cls, equipo, days_until_due):
+        """Crea notificación de calibración próxima."""
+        if days_until_due <= 0:
+            title = f"⚠️ Calibración vencida - {equipo.nombre}"
+            priority = 'critical'
+            message = f"La calibración del equipo {equipo.codigo_interno} venció el {equipo.proxima_calibracion}."
+        elif days_until_due <= 3:
+            title = f"🚨 Calibración urgente - {equipo.nombre}"
+            priority = 'high'
+            message = f"La calibración del equipo {equipo.codigo_interno} vence en {days_until_due} días ({equipo.proxima_calibracion})."
+        elif days_until_due <= 7:
+            title = f"⏰ Calibración próxima - {equipo.nombre}"
+            priority = 'medium'
+            message = f"La calibración del equipo {equipo.codigo_interno} vence en {days_until_due} días ({equipo.proxima_calibracion})."
+        else:
+            title = f"📅 Calibración programada - {equipo.nombre}"
+            priority = 'low'
+            message = f"La calibración del equipo {equipo.codigo_interno} vence en {days_until_due} días ({equipo.proxima_calibracion})."
+
+        # Crear notificación para usuarios de la empresa
+        from django.db import transaction
+
+        with transaction.atomic():
+            # Crear notificación base
+            notification = cls.objects.create(
+                title=title,
+                message=message,
+                notification_type='calibration',
+                priority=priority,
+                empresa=equipo.empresa,
+                equipo=equipo,
+                expires_at=timezone.now() + timedelta(days=30)
+            )
+
+            # Duplicar para cada usuario activo de la empresa
+            usuarios = CustomUser.objects.filter(
+                empresa=equipo.empresa,
+                is_active=True
+            )
+
+            for usuario in usuarios:
+                if usuario != notification.user:  # Evitar duplicado
+                    cls.objects.create(
+                        title=title,
+                        message=message,
+                        notification_type='calibration',
+                        priority=priority,
+                        user=usuario,
+                        empresa=equipo.empresa,
+                        equipo=equipo,
+                        expires_at=timezone.now() + timedelta(days=30)
+                    )
+
+        return notification
+
+    @classmethod
+    def create_maintenance_notification(cls, equipo, days_until_due):
+        """Crea notificación de mantenimiento próximo."""
+        if days_until_due <= 0:
+            title = f"⚠️ Mantenimiento vencido - {equipo.nombre}"
+            priority = 'critical'
+            message = f"El mantenimiento del equipo {equipo.codigo_interno} venció el {equipo.proximo_mantenimiento}."
+        elif days_until_due <= 3:
+            title = f"🔧 Mantenimiento urgente - {equipo.nombre}"
+            priority = 'high'
+            message = f"El mantenimiento del equipo {equipo.codigo_interno} vence en {days_until_due} días ({equipo.proximo_mantenimiento})."
+        elif days_until_due <= 7:
+            title = f"🛠️ Mantenimiento próximo - {equipo.nombre}"
+            priority = 'medium'
+            message = f"El mantenimiento del equipo {equipo.codigo_interno} vence en {days_until_due} días ({equipo.proximo_mantenimiento})."
+        else:
+            title = f"📅 Mantenimiento programado - {equipo.nombre}"
+            priority = 'low'
+            message = f"El mantenimiento del equipo {equipo.codigo_interno} vence en {days_until_due} días ({equipo.proximo_mantenimiento})."
+
+        from django.db import transaction
+
+        with transaction.atomic():
+            notification = cls.objects.create(
+                title=title,
+                message=message,
+                notification_type='maintenance',
+                priority=priority,
+                empresa=equipo.empresa,
+                equipo=equipo,
+                expires_at=timezone.now() + timedelta(days=30)
+            )
+
+            usuarios = CustomUser.objects.filter(
+                empresa=equipo.empresa,
+                is_active=True
+            )
+
+            for usuario in usuarios:
+                if usuario != notification.user:
+                    cls.objects.create(
+                        title=title,
+                        message=message,
+                        notification_type='maintenance',
+                        priority=priority,
+                        user=usuario,
+                        empresa=equipo.empresa,
+                        equipo=equipo,
+                        expires_at=timezone.now() + timedelta(days=30)
+                    )
+
+        return notification
+
+    @classmethod
+    def create_system_notification(cls, title, message, priority='medium', is_global=False):
+        """Crea notificación del sistema."""
+        return cls.objects.create(
+            title=title,
+            message=message,
+            notification_type='system',
+            priority=priority,
+            is_global=is_global,
+            expires_at=timezone.now() + timedelta(days=7)
+        )
+
+
+# ==============================================================================
+# CONFIGURACIÓN DE EMAIL EN BASE DE DATOS
+# ==============================================================================
+
+class EmailConfiguration(models.Model):
+    """
+    Configuración de email que puede ser editada desde la interfaz web.
+    """
+    # Configuración SMTP
+    email_backend = models.CharField(
+        max_length=100,
+        default='django.core.mail.backends.smtp.EmailBackend',
+        verbose_name='Backend de Email'
+    )
+    email_host = models.CharField(
+        max_length=100,
+        default='smtp.gmail.com',
+        verbose_name='Servidor SMTP'
+    )
+    email_port = models.IntegerField(
+        default=587,
+        verbose_name='Puerto SMTP'
+    )
+    email_use_tls = models.BooleanField(
+        default=True,
+        verbose_name='Usar TLS'
+    )
+    email_use_ssl = models.BooleanField(
+        default=False,
+        verbose_name='Usar SSL'
+    )
+
+    # Credenciales
+    email_host_user = models.EmailField(
+        blank=True,
+        verbose_name='Usuario SMTP'
+    )
+    email_host_password = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Contraseña SMTP'
+    )
+
+    # Configuración de envío
+    default_from_email = models.EmailField(
+        default='noreply@sammetrologia.com',
+        verbose_name='Email de envío por defecto'
+    )
+    default_from_name = models.CharField(
+        max_length=100,
+        default='SAM Metrología',
+        verbose_name='Nombre de envío por defecto'
+    )
+
+    # Emails adicionales
+    admin_email = models.EmailField(
+        blank=True,
+        verbose_name='Email de administrador'
+    )
+    notification_emails = models.TextField(
+        blank=True,
+        help_text='Emails adicionales para notificaciones, separados por coma',
+        verbose_name='Emails adicionales'
+    )
+
+    # Estado y configuración
+    is_active = models.BooleanField(
+        default=False,
+        verbose_name='Email activo'
+    )
+    test_email_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Último email de prueba'
+    )
+    last_error = models.TextField(
+        blank=True,
+        verbose_name='Último error'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Actualizado por'
+    )
+
+    class Meta:
+        verbose_name = 'Configuración de Email'
+        verbose_name_plural = 'Configuraciones de Email'
+
+    def __str__(self):
+        status = "Activo" if self.is_active else "Inactivo"
+        return f"Configuración Email - {self.email_host} ({status})"
+
+    @classmethod
+    def get_current_config(cls):
+        """Obtiene la configuración activa o crea una por defecto."""
+        config = cls.objects.filter(is_active=True).first()
+        if not config:
+            config = cls.objects.create(
+                email_host='smtp.gmail.com',
+                email_port=587,
+                email_use_tls=True,
+                default_from_email='noreply@sammetrologia.com',
+                is_active=False  # Inactivo por defecto hasta configurar
+            )
+        return config
+
+    def get_notification_email_list(self):
+        """Retorna lista de emails adicionales."""
+        if not self.notification_emails:
+            return []
+
+        emails = [email.strip() for email in self.notification_emails.split(',')]
+        return [email for email in emails if email]  # Filtrar emails vacíos
+
+    def test_connection(self):
+        """Prueba la conexión de email."""
+        try:
+            from django.core.mail import get_connection
+            from django.conf import settings
+
+            # Crear conexión temporal con esta configuración
+            connection = get_connection(
+                backend=self.email_backend,
+                host=self.email_host,
+                port=self.email_port,
+                username=self.email_host_user,
+                password=self.email_host_password,
+                use_tls=self.email_use_tls,
+                use_ssl=self.email_use_ssl,
+            )
+
+            # Intentar abrir conexión
+            connection.open()
+            connection.close()
+
+            self.last_error = ''
+            self.save(update_fields=['last_error'])
+
+            return {
+                'success': True,
+                'message': 'Conexión exitosa'
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            self.last_error = error_msg
+            self.save(update_fields=['last_error'])
+
+            return {
+                'success': False,
+                'error': error_msg
+            }
+
+    def send_test_email(self, recipient_email):
+        """Envía email de prueba."""
+        try:
+            from django.core.mail import EmailMultiAlternatives
+            from django.template.loader import render_to_string
+
+            # Contexto para el email de prueba
+            context = {
+                'test_time': timezone.now(),
+                'config': self,
+                'site_name': 'SAM Metrología'
+            }
+
+            # Crear email de prueba
+            subject = '🧪 Email de Prueba - SAM Metrología'
+            text_content = render_to_string('emails/test_email.txt', context)
+            html_content = render_to_string('emails/test_email.html', context)
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=f"{self.default_from_name} <{self.default_from_email}>",
+                to=[recipient_email],
+                connection=self._get_connection()
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            # Actualizar timestamp
+            self.test_email_sent_at = timezone.now()
+            self.last_error = ''
+            self.save(update_fields=['test_email_sent_at', 'last_error'])
+
+            return {
+                'success': True,
+                'message': f'Email de prueba enviado a {recipient_email}'
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            self.last_error = error_msg
+            self.save(update_fields=['last_error'])
+
+            return {
+                'success': False,
+                'error': error_msg
+            }
+
+    def _get_connection(self):
+        """Obtiene conexión de email con esta configuración."""
+        from django.core.mail import get_connection
+
+        return get_connection(
+            backend=self.email_backend,
+            host=self.email_host,
+            port=self.email_port,
+            username=self.email_host_user,
+            password=self.email_host_password,
+            use_tls=self.email_use_tls,
+            use_ssl=self.email_use_ssl,
+        )
+
+    def apply_to_django_settings(self):
+        """Aplica esta configuración a Django settings temporalmente."""
+        from django.conf import settings
+
+        # Actualizar configuración de Django
+        settings.EMAIL_BACKEND = self.email_backend
+        settings.EMAIL_HOST = self.email_host
+        settings.EMAIL_PORT = self.email_port
+        settings.EMAIL_USE_TLS = self.email_use_tls
+        settings.EMAIL_USE_SSL = self.email_use_ssl
+        settings.EMAIL_HOST_USER = self.email_host_user
+        settings.EMAIL_HOST_PASSWORD = self.email_host_password
+        settings.DEFAULT_FROM_EMAIL = self.default_from_email

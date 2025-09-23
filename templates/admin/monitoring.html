@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+
+{% block title %}Monitoreo del Sistema{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">📊 Monitoreo del Sistema</h1>
+        <p class="text-gray-600">Supervisión en tiempo real del estado y rendimiento</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Mantenimiento</a>
+            <a href="{% url 'core:admin_notifications' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Notificaciones</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Monitoreo</a>
+            <a href="{% url 'core:admin_schedule' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Programación</a>
+        </nav>
+    </div>
+
+    <!-- Real-time Metrics -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- System Health -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Estado del Sistema</h3>
+                <button onclick="refreshSystemHealth()" class="text-blue-600 hover:text-blue-800 text-sm">🔄 Actualizar</button>
+            </div>
+            <div id="system-health" class="space-y-3">
+                <!-- Se llena dinámicamente -->
+                <div class="animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Rendimiento</h3>
+            <div id="performance-metrics" class="space-y-3">
+                <!-- Se llena dinámicamente -->
+                <div class="animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Users -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Usuarios Activos</h3>
+            <div id="active-users" class="text-center">
+                <!-- Se llena dinámicamente -->
+                <div class="text-4xl font-bold text-blue-600 mb-2">--</div>
+                <div class="text-sm text-gray-600">Últimos 15 minutos</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Actividad Reciente</h3>
+                <button onclick="refreshActivity()" class="text-blue-600 hover:text-blue-800 text-sm">🔄 Actualizar</button>
+            </div>
+            <div id="recent-activity" class="space-y-3 max-h-96 overflow-y-auto">
+                <!-- Se llena dinámicamente -->
+                {% if recent_activity %}
+                    {% for activity in recent_activity %}
+                    <div class="flex items-center p-3 bg-gray-50 rounded-md">
+                        <div class="text-sm">
+                            <div class="font-medium text-gray-900">{{ activity.action }}</div>
+                            <div class="text-gray-600">{{ activity.user }} - {{ activity.timestamp|date:"H:i" }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-gray-500 py-4">
+                        <div class="text-2xl mb-2">📝</div>
+                        <p>No hay actividad reciente</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- System Alerts -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Alertas del Sistema</h3>
+            <div id="system-alerts" class="space-y-3">
+                <!-- Se llena dinámicamente -->
+                {% if system_alerts %}
+                    {% for alert in system_alerts %}
+                    <div class="flex items-center p-3 {% if alert.severity == 'high' %}bg-red-50 border border-red-200{% elif alert.severity == 'medium' %}bg-yellow-50 border border-yellow-200{% else %}bg-blue-50 border border-blue-200{% endif %} rounded-md">
+                        {% if alert.severity == 'high' %}
+                            <span class="text-red-500 mr-2">🔴</span>
+                        {% elif alert.severity == 'medium' %}
+                            <span class="text-yellow-500 mr-2">🟡</span>
+                        {% else %}
+                            <span class="text-blue-500 mr-2">🔵</span>
+                        {% endif %}
+                        <div class="text-sm">
+                            <div class="font-medium">{{ alert.message }}</div>
+                            <div class="text-gray-600">{{ alert.timestamp|date:"d/m H:i" }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-gray-500 py-4">
+                        <div class="text-green-500 text-2xl mb-2">✅</div>
+                        <p>No hay alertas activas</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Overview -->
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">🏢</div>
+                <div>
+                    <div class="text-sm opacity-80">Empresas Activas</div>
+                    <div class="font-semibold text-xl" id="active-companies">{{ stats.active_companies|default:"--" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">⚙️</div>
+                <div>
+                    <div class="text-sm opacity-80">Equipos Activos</div>
+                    <div class="font-semibold text-xl" id="active-equipment">{{ stats.active_equipment|default:"--" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">📊</div>
+                <div>
+                    <div class="text-sm opacity-80">Actividades Hoy</div>
+                    <div class="font-semibold text-xl" id="activities-today">{{ stats.activities_today|default:"--" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">📈</div>
+                <div>
+                    <div class="text-sm opacity-80">Uso de Sistema</div>
+                    <div class="font-semibold text-xl" id="system-usage">{{ stats.system_usage|default:"--" }}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh cada 30 segundos
+setInterval(refreshAllMetrics, 30000);
+
+async function refreshSystemHealth() {
+    try {
+        const response = await fetch('{% url "core:api_system_status" %}');
+        const data = await response.json();
+
+        const healthDiv = document.getElementById('system-health');
+        if (data.success && data.health) {
+            const health = data.health;
+            healthDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Base de Datos</span>
+                    <span class="text-${health.metrics.database.status === 'healthy' ? 'green' : 'red'}-600 text-sm">
+                        ${health.metrics.database.status === 'healthy' ? '✅' : '❌'}
+                        ${health.metrics.database.response_time_ms}ms
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Cache</span>
+                    <span class="text-${health.metrics.cache.status === 'healthy' ? 'green' : 'yellow'}-600 text-sm">
+                        ${health.metrics.cache.status === 'healthy' ? '✅' : '⚠️'}
+                        ${health.metrics.cache.response_time_ms}ms
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Almacenamiento</span>
+                    <span class="text-green-600 text-sm">
+                        ✅ ${health.metrics.storage.total_storage_mb} MB
+                    </span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error refreshing system health:', error);
+    }
+}
+
+async function refreshActivity() {
+    // Simular actividad reciente (en implementación real vendría del backend)
+    const activityDiv = document.getElementById('recent-activity');
+    activityDiv.innerHTML = `
+        <div class="flex items-center p-3 bg-gray-50 rounded-md">
+            <div class="text-sm">
+                <div class="font-medium text-gray-900">Usuario logueado</div>
+                <div class="text-gray-600">admin - ${new Date().toLocaleTimeString()}</div>
+            </div>
+        </div>
+    `;
+}
+
+async function refreshAllMetrics() {
+    await refreshSystemHealth();
+    await refreshActivity();
+}
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    refreshAllMetrics();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block title %}Panel de Administración - Sistema{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🛠️ Panel de Administración del Sistema</h1>
+        <p class="text-gray-600">Gestión y monitoreo completo del sistema SAM Metrología</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Mantenimiento</a>
+            <a href="{% url 'core:admin_notifications' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Notificaciones</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Monitoreo</a>
+            <a href="{% url 'core:admin_schedule' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Programación</a>
+            <a href="{% url 'core:admin_email_config' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Config Email</a>
+        </nav>
+    </div>
+
+    {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <strong>Error:</strong> {{ error }}
+        </div>
+    {% else %}
+
+    <!-- System Status Overview -->
+    {% if system_status.success %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Health Status -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Estado del Sistema</h3>
+                {% if system_status.health.status == 'healthy' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        ✅ Saludable
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        ❌ Error
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if system_status.health.metrics %}
+            <div class="space-y-3">
+                <!-- Database -->
+                {% with db=system_status.health.metrics.database %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Base de Datos</span>
+                    {% if db.status == 'healthy' %}
+                        <span class="text-green-600 text-sm">✅ {{ db.response_time_ms|floatformat:1 }}ms</span>
+                    {% else %}
+                        <span class="text-red-600 text-sm">❌ Error</span>
+                    {% endif %}
+                </div>
+                {% endwith %}
+
+                <!-- Cache -->
+                {% with cache=system_status.health.metrics.cache %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Cache</span>
+                    {% if cache.status == 'healthy' %}
+                        <span class="text-green-600 text-sm">✅ {{ cache.response_time_ms|floatformat:1 }}ms</span>
+                    {% else %}
+                        <span class="text-yellow-600 text-sm">⚠️ {{ cache.status }}</span>
+                    {% endif %}
+                </div>
+                {% endwith %}
+
+                <!-- Storage -->
+                {% with storage=system_status.health.metrics.storage %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Almacenamiento</span>
+                    {% if storage.status == 'healthy' %}
+                        <span class="text-green-600 text-sm">✅ {{ storage.total_storage_mb }} MB</span>
+                    {% else %}
+                        <span class="text-red-600 text-sm">❌ Error</span>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Business Metrics -->
+        {% if system_status.health.metrics.business %}
+        {% with business=system_status.health.metrics.business %}
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Métricas de Negocio</h3>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Empresas</span>
+                    <span class="text-blue-600 font-medium">{{ business.empresas.total }} ({{ business.empresas.activas }} activas)</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Equipos</span>
+                    <span class="text-blue-600 font-medium">{{ business.equipos.total }} ({{ business.equipos.activos }} activos)</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Esta semana</span>
+                    <span class="text-green-600 font-medium">{{ business.actividades_recientes.calibraciones_esta_semana }} cal, {{ business.actividades_recientes.mantenimientos_esta_semana }} mant</span>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endif %}
+
+        <!-- Alerts -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Alertas Activas</h3>
+            {% if system_status.alerts %}
+                <div class="space-y-2">
+                    {% for alert in system_status.alerts %}
+                    <div class="flex items-center">
+                        {% if alert.severity == 'high' %}
+                            <span class="text-red-500 mr-2">🔴</span>
+                        {% elif alert.severity == 'medium' %}
+                            <span class="text-yellow-500 mr-2">🟡</span>
+                        {% else %}
+                            <span class="text-blue-500 mr-2">🔵</span>
+                        {% endif %}
+                        <span class="text-sm text-gray-700">{{ alert.message }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-gray-500">
+                    <span class="text-green-500">✅</span>
+                    <p class="text-sm mt-1">No hay alertas activas</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <button onclick="executeQuickAction('maintenance')" class="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-lg text-center transition-colors">
+            <div class="text-2xl mb-2">🧹</div>
+            <div class="font-medium">Mantenimiento Rápido</div>
+            <div class="text-sm opacity-80">Cache + BD</div>
+        </button>
+
+        <button onclick="executeQuickAction('notifications')" class="bg-green-600 hover:bg-green-700 text-white p-4 rounded-lg text-center transition-colors">
+            <div class="text-2xl mb-2">📧</div>
+            <div class="font-medium">Enviar Notificaciones</div>
+            <div class="text-sm opacity-80">Calibraciones + Mantenimientos</div>
+        </button>
+
+        <button onclick="executeQuickAction('backup')" class="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-lg text-center transition-colors">
+            <div class="text-2xl mb-2">💾</div>
+            <div class="font-medium">Backup Completo</div>
+            <div class="text-sm opacity-80">Todas las empresas</div>
+        </button>
+
+        <button onclick="location.href='{% url 'core:admin_monitoring' %}'" class="bg-orange-600 hover:bg-orange-700 text-white p-4 rounded-lg text-center transition-colors">
+            <div class="text-2xl mb-2">📊</div>
+            <div class="font-medium">Monitoreo</div>
+            <div class="text-sm opacity-80">Tiempo real</div>
+        </button>
+    </div>
+
+    <!-- Recent Executions -->
+    {% if execution_history %}
+    <div class="bg-white rounded-lg shadow-sm border p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Ejecuciones Recientes</h3>
+            <a href="{% url 'core:admin_history' %}" class="text-blue-600 hover:text-blue-800 text-sm">Ver historial completo →</a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for execution in execution_history %}
+                    <tr>
+                        <td class="px-4 py-2 text-sm text-gray-900">{{ execution.summary }}</td>
+                        <td class="px-4 py-2">
+                            {% if execution.success %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Exitoso</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Error</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-sm text-gray-600">{{ execution.user }}</td>
+                        <td class="px-4 py-2 text-sm text-gray-600">{{ execution.timestamp|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+
+<!-- Loading Modal -->
+<div id="actionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md mx-4">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Ejecutando acción...</h3>
+            <p id="actionMessage" class="text-gray-600">Por favor espere mientras se procesa la solicitud.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+async function executeQuickAction(actionType) {
+    const modal = document.getElementById('actionModal');
+    const messageEl = document.getElementById('actionMessage');
+
+    // Configurar mensaje según la acción
+    const messages = {
+        'maintenance': 'Ejecutando mantenimiento del sistema...',
+        'notifications': 'Enviando notificaciones...',
+        'backup': 'Creando backup completo...'
+    };
+
+    messageEl.textContent = messages[actionType] || 'Procesando...';
+    modal.classList.remove('hidden');
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: actionType,
+                params: {
+                    task_type: actionType === 'maintenance' ? 'cache,database' : 'all',
+                    notification_type: actionType === 'notifications' ? 'calibration,maintenance' : 'all',
+                    format: 'both',
+                    dry_run: false
+                }
+            })
+        });
+
+        const result = await response.json();
+
+        modal.classList.add('hidden');
+
+        if (result.success) {
+            showToast(`✅ ${actionType} ejecutado correctamente`, 'success');
+            // Recargar página después de 2 segundos para mostrar nuevos datos
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast(`❌ Error en ${actionType}: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        modal.classList.add('hidden');
+        showToast(`❌ Error ejecutando ${actionType}: ${error.message}`, 'error');
+    }
+}
+
+// Auto-refresh del dashboard cada 5 minutos
+setTimeout(() => location.reload(), 300000);
+</script>
+{% endblock %}

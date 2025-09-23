@@ -1,0 +1,41 @@
+RESUMEN SEMANAL - {{ site_name }}
+==============================================
+
+Hola,
+
+A continuacion se presenta el resumen semanal de actividades pendientes para {{ empresa.nombre }}.
+
+CALIBRACIONES URGENTES (Proximos 7 dias):
+{% for equipo in equipos_calibracion_urgente %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }} - Vence: {{ equipo.proxima_calibracion|date:"d/m/Y" }}
+{% empty %}
+No hay calibraciones urgentes en los proximos 7 dias.
+{% endfor %}
+
+MANTENIMIENTOS URGENTES (Proximos 7 dias):
+{% for equipo in equipos_mantenimiento_urgente %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }} - Vence: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}
+{% empty %}
+No hay mantenimientos urgentes en los proximos 7 dias.
+{% endfor %}
+
+CALIBRACIONES PROXIMAS (Proximos 30 dias):
+{% for equipo in equipos_calibracion_proximo %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }} - Vence: {{ equipo.proxima_calibracion|date:"d/m/Y" }}
+{% empty %}
+No hay calibraciones programadas en los proximos 30 dias.
+{% endfor %}
+
+MANTENIMIENTOS PROXIMOS (Proximos 30 dias):
+{% for equipo in equipos_mantenimiento_proximo %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }} - Vence: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}
+{% empty %}
+No hay mantenimientos programados en los proximos 30 dias.
+{% endfor %}
+
+Fecha del reporte: {{ today|date:"d/m/Y" }}
+
+---
+{{ site_name }}
+Sistema de Gestion de Metrologia
+{{ empresa.nombre }}

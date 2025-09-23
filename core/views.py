@@ -2218,17 +2218,18 @@ def dashboard(request):
         line_chart_labels.append(f"{calendar.month_abbr[target_date.month]}. {target_date.year}")
 
     # Datos "Realizadas" (basado en registros de actividad) - Solo para equipos que no estén de baja o inactivos
-    calibraciones_realizadas_period = Calibracion.objects.filter(
+    # OPTIMIZACIÓN: Usar select_related para evitar consultas N+1
+    calibraciones_realizadas_period = Calibracion.objects.select_related('equipo').filter(
         equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_calibracion__gte=start_date_range,
         fecha_calibracion__lte=start_date_range + relativedelta(months=12, days=-1)
     )
-    mantenimientos_realizados_period = Mantenimiento.objects.filter(
+    mantenimientos_realizados_period = Mantenimiento.objects.select_related('equipo').filter(
         equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_mantenimiento__gte=start_date_range,
         fecha_mantenimiento__lte=start_date_range + relativedelta(months=12, days=-1)
     )
-    comprobaciones_realizadas_period = Comprobacion.objects.filter(
+    comprobaciones_realizadas_period = Comprobacion.objects.select_related('equipo').filter(
         equipo__in=equipos_para_dashboard, # Filtrar por equipos elegibles
         fecha_comprobacion__gte=start_date_range,
         fecha_comprobacion__lte=start_date_range + relativedelta(months=12, days=-1)
@@ -2707,7 +2708,8 @@ def home(request):
     selected_company_id = request.GET.get('empresa_id')
     empresas_disponibles = Empresa.objects.all().order_by('nombre')
 
-    equipos_list = Equipo.objects.all().order_by('codigo_interno')
+    # OPTIMIZACIÓN: select_related para evitar consultas N+1 en listado de equipos
+    equipos_list = Equipo.objects.select_related('empresa').all().order_by('codigo_interno')
 
     current_company_format_info = None # Initialize to None
 
@@ -3987,7 +3989,13 @@ def detalle_equipo(request, pk):
     """
     Displays the details of a specific equipment.
     """
-    equipo = get_object_or_404(Equipo, pk=pk)
+    # OPTIMIZACIÓN: select_related para empresa y prefetch_related para actividades
+    equipo = get_object_or_404(
+        Equipo.objects.select_related('empresa').prefetch_related(
+            'calibraciones', 'mantenimientos', 'comprobaciones'
+        ),
+        pk=pk
+    )
 
     if not request.user.is_superuser and request.user.empresa != equipo.empresa:
         messages.error(request, 'No tienes permiso para ver este equipo.')
@@ -5947,8 +5955,8 @@ def generar_informe_zip(request):
         parte_numero = 1
 
     # OPTIMIZACIÓN: Prefetch relacionados para evitar consultas N+1
-    # PAGINACIÓN: Limitar equipos para evitar problemas de memoria en servidor (512MB)
-    EQUIPOS_POR_ZIP = 35  # 35 equipos por ZIP (con hoja de vida PDF, nombres optimizados)
+    # PAGINACIÓN OPTIMIZADA: Aumentado límite para mejor rendimiento
+    EQUIPOS_POR_ZIP = 50  # 50 equipos por ZIP (optimizado con streaming y mejor gestión de memoria)
 
     equipos_empresa_total = Equipo.objects.filter(empresa=empresa).count()
 
@@ -5975,12 +5983,42 @@ def generar_informe_zip(request):
 
     # OPTIMIZACIÓN: Configurar compresión más eficiente y streaming de archivos
 
+    # Usar sistema optimizado para empresas con muchos equipos
+    if equipos_empresa_total > 100:
+        from core.zip_optimizer import generate_optimized_zip, create_streaming_download
+
+        # Determinar formatos seleccionados (por defecto PDF + Excel)
+        formatos_seleccionados = ['pdf', 'excel']
+
+        logger.info(f"Usando sistema ZIP optimizado para {equipos_empresa_total} equipos")
+
+        # Generar ZIP optimizado
+        resultado = generate_optimized_zip(empresa, formatos_seleccionados, request.user)
+
+        if resultado['success']:
+            # Crear respuesta de streaming
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+            filename = f"SAM_Equipos_{empresa.nombre}_{timestamp}_Optimizado.zip"
+
+            response = create_streaming_download(resultado['file_path'], filename)
+
+            # Log exitoso
+            logger.info(f"ZIP optimizado generado exitosamente: {resultado['file_size_mb']}MB, {resultado['total_equipos']} equipos")
+
+            return response
+        else:
+            messages.error(request, f"Error generando ZIP optimizado: {resultado.get('error', 'Error desconocido')}")
+            return redirect('core:informes')
+
     zip_buffer = io.BytesIO()
-    # OPTIMIZACIÓN: Compresión eficiente sin Excel individuales
-    compresslevel = 2  # Compresión balanceada para todos los usuarios
+    # OPTIMIZACIÓN: Compresión mejorada para archivos estándar
+    compresslevel = 6  # Compresión balanceada mejorada
 
     # OPTIMIZACIÓN: Cache nombre empresa para evitar accesos repetidos
     empresa_nombre = empresa.nombre
+
+    # OPTIMIZACIÓN: Agregar limpieza de memoria periódica
+    import gc
 
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=compresslevel) as zf:
         # OPTIMIZACIÓN: Un solo Excel consolidado con 4 hojas (Equipos, Proveedores, Procedimientos, Dashboard)
@@ -5988,7 +6026,8 @@ def generar_informe_zip(request):
         zf.writestr(f"{empresa_nombre}/Informe_Consolidado.xlsx", excel_consolidado)
 
         # 4. For each equipment, add its "Hoja de Vida" (PDF) and existing activity PDFs
-        for equipo in equipos_empresa:
+        # OPTIMIZACIÓN: Usar enumerate para mejor control de memoria
+        for idx, equipo in enumerate(equipos_empresa, 1):
             # OPTIMIZACIÓN: Código interno con procesamiento mínimo pero necesario para identificación
             safe_codigo = equipo.codigo_interno.replace('/', '_').replace('\\', '_')
             equipo_folder = f"{empresa_nombre}/Equipos/{safe_codigo}"
@@ -6109,6 +6148,14 @@ def generar_informe_zip(request):
                             logger.debug(f" Archivo no es PDF o no encontrado: {doc_field.name}")
                     except Exception as e:
                         logger.error(f"Error adding equipment document {doc_field.name} to zip: {e}")
+
+            # OPTIMIZACIÓN: Liberar memoria cada 10 equipos procesados
+            if idx % 10 == 0:
+                gc.collect()
+                logger.debug(f"Memoria liberada después de procesar {idx} equipos")
+
+        # OPTIMIZACIÓN: Limpieza final de memoria antes de procesar procedimientos
+        gc.collect()
 
         # Add existing Procedure PDFs (NEW)
         for proc in procedimientos_empresa:

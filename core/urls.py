@@ -2,6 +2,7 @@
 
 from django.urls import path
 from . import views
+from . import admin_views
 # Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
@@ -105,6 +106,20 @@ urlpatterns = [
 
     # Acceso Denegado
     path('access_denied/', views.access_denied, name='access_denied'),
+
+    # Panel de Administración del Sistema (solo superusuarios)
+    path('admin/system/', admin_views.admin_dashboard, name='admin_dashboard'),
+    path('admin/system/maintenance/', admin_views.system_maintenance, name='admin_maintenance'),
+    path('admin/system/notifications/', admin_views.system_notifications, name='admin_notifications'),
+    path('admin/system/backup/', admin_views.system_backup, name='admin_backup'),
+    path('admin/system/monitoring/', admin_views.system_monitoring, name='admin_monitoring'),
+    path('admin/system/schedule/', admin_views.system_schedule, name='admin_schedule'),
+    path('admin/system/email/', admin_views.email_configuration, name='admin_email_config'),
+    path('admin/system/history/', admin_views.execution_history, name='admin_history'),
+
+    # API endpoints para el panel de administración
+    path('api/admin/status/', admin_views.api_system_status, name='api_system_status'),
+    path('api/admin/execute/', admin_views.api_execute_command, name='api_execute_command'),
 
     # Diagnóstico temporal de cache
     path('cache_diagnostics/', views.cache_diagnostics, name='cache_diagnostics'),

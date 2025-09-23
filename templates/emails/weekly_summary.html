@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen Semanal - {{ site_name }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #007bff; color: white; padding: 20px; border-radius: 8px; text-align: center; }
+        .content { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .section { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .urgent-section { border-left: 5px solid #dc3545; }
+        .upcoming-section { border-left: 5px solid #ffc107; }
+        .equipment-list { list-style: none; padding: 0; }
+        .equipment-item { padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 3px; }
+        .footer { text-align: center; color: #6c757d; font-size: 14px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Resumen Semanal</h1>
+        <h2>{{ site_name }}</h2>
+    </div>
+
+    <div class="content">
+        <p>Estimado cliente,</p>
+        
+        <p>A continuacion se presenta el resumen semanal de actividades pendientes para <strong>{{ empresa.nombre }}</strong>.</p>
+
+        <div class="section urgent-section">
+            <h3>🚨 Calibraciones Urgentes (Proximos 7 dias)</h3>
+            <ul class="equipment-list">
+                {% for equipo in equipos_calibracion_urgente %}
+                <li class="equipment-item">
+                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
+                    <span style="color: #dc3545;">Vence: {{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
+                </li>
+                {% empty %}
+                <li class="equipment-item" style="color: #28a745;">✅ No hay calibraciones urgentes en los proximos 7 dias.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section urgent-section">
+            <h3>🔧 Mantenimientos Urgentes (Proximos 7 dias)</h3>
+            <ul class="equipment-list">
+                {% for equipo in equipos_mantenimiento_urgente %}
+                <li class="equipment-item">
+                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
+                    <span style="color: #dc3545;">Vence: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span>
+                </li>
+                {% empty %}
+                <li class="equipment-item" style="color: #28a745;">✅ No hay mantenimientos urgentes en los proximos 7 dias.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section upcoming-section">
+            <h3>📅 Calibraciones Proximas (Proximos 30 dias)</h3>
+            <ul class="equipment-list">
+                {% for equipo in equipos_calibracion_proximo %}
+                <li class="equipment-item">
+                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
+                    <span style="color: #ffc107;">Vence: {{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
+                </li>
+                {% empty %}
+                <li class="equipment-item" style="color: #6c757d;">No hay calibraciones programadas en los proximos 30 dias.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section upcoming-section">
+            <h3>🛠️ Mantenimientos Proximos (Proximos 30 dias)</h3>
+            <ul class="equipment-list">
+                {% for equipo in equipos_mantenimiento_proximo %}
+                <li class="equipment-item">
+                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
+                    <span style="color: #ffc107;">Vence: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span>
+                </li>
+                {% empty %}
+                <li class="equipment-item" style="color: #6c757d;">No hay mantenimientos programados en los proximos 30 dias.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <p><strong>Fecha del reporte:</strong> {{ today|date:"d/m/Y" }}</p>
+    </div>
+
+    <div class="footer">
+        <p>{{ site_name }} - Sistema de Gestion de Metrologia</p>
+        <p>{{ empresa.nombre }}</p>
+    </div>
+</body>
+</html>

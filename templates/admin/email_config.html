@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuración de Email{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">📧 Configuración de Email</h1>
+        <p class="text-gray-600">Configurar servidor de correo para notificaciones automáticas</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Mantenimiento</a>
+            <a href="{% url 'core:admin_notifications' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Notificaciones</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Monitoreo</a>
+            <a href="{% url 'core:admin_schedule' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Programación</a>
+            <a href="{% url 'core:admin_email_config' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Config Email</a>
+        </nav>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Email Configuration Form -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Configuración SMTP</h2>
+                <div class="flex items-center">
+                    {% if email_config.is_active %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ✅ Activo
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            ❌ Inactivo
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Servidor SMTP -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="email_host" class="block text-sm font-medium text-gray-700 mb-2">Servidor SMTP</label>
+                        <select id="email_host" name="email_host" class="w-full border border-gray-300 rounded-md px-3 py-2" onchange="updateSMTPDefaults()">
+                            <option value="smtp.gmail.com" {% if email_config.email_host == 'smtp.gmail.com' %}selected{% endif %}>Gmail</option>
+                            <option value="smtp.outlook.com" {% if email_config.email_host == 'smtp.outlook.com' %}selected{% endif %}>Outlook/Hotmail</option>
+                            <option value="smtp.yahoo.com" {% if email_config.email_host == 'smtp.yahoo.com' %}selected{% endif %}>Yahoo</option>
+                            <option value="custom" {% if email_config.email_host not in 'smtp.gmail.com,smtp.outlook.com,smtp.yahoo.com' %}selected{% endif %}>Personalizado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="email_host_custom" class="block text-sm font-medium text-gray-700 mb-2">Servidor personalizado</label>
+                        <input type="text" id="email_host_custom" name="email_host_custom" value="{{ email_config.email_host }}" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="mail.tuempresa.com">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="email_port" class="block text-sm font-medium text-gray-700 mb-2">Puerto</label>
+                        <input type="number" id="email_port" name="email_port" value="{{ email_config.email_port }}" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Seguridad</label>
+                        <div class="space-y-2">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="security" value="tls" {% if email_config.email_use_tls %}checked{% endif %} class="form-radio">
+                                <span class="ml-2 text-sm">TLS (recomendado)</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="security" value="ssl" {% if email_config.email_use_ssl %}checked{% endif %} class="form-radio">
+                                <span class="ml-2 text-sm">SSL</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Credenciales -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="email_host_user" class="block text-sm font-medium text-gray-700 mb-2">Email/Usuario</label>
+                        <input type="email" id="email_host_user" name="email_host_user" value="{{ email_config.email_host_user }}" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="tu_email@gmail.com">
+                    </div>
+                    <div>
+                        <label for="email_host_password" class="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+                        <input type="password" id="email_host_password" name="email_host_password" value="{{ email_config.email_host_password }}" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Contraseña de aplicación">
+                        <p class="text-xs text-gray-500 mt-1">Para Gmail: usa contraseña de aplicación, no tu contraseña normal</p>
+                    </div>
+                </div>
+
+                <!-- Configuración de envío -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="default_from_email" class="block text-sm font-medium text-gray-700 mb-2">Email de envío</label>
+                        <input type="email" id="default_from_email" name="default_from_email" value="{{ email_config.default_from_email }}" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="noreply@tuempresa.com">
+                    </div>
+                    <div>
+                        <label for="default_from_name" class="block text-sm font-medium text-gray-700 mb-2">Nombre de envío</label>
+                        <input type="text" id="default_from_name" name="default_from_name" value="{{ email_config.default_from_name }}" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="SAM Metrología">
+                    </div>
+                </div>
+
+                <!-- Emails adicionales -->
+                <div>
+                    <label for="notification_emails" class="block text-sm font-medium text-gray-700 mb-2">Emails adicionales</label>
+                    <textarea id="notification_emails" name="notification_emails" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="admin@empresa.com, gerencia@empresa.com">{{ email_config.notification_emails }}</textarea>
+                    <p class="text-xs text-gray-500 mt-1">Separar múltiples emails con comas</p>
+                </div>
+
+                <!-- Estado -->
+                <div class="flex items-center">
+                    <input type="checkbox" id="is_active" name="is_active" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" {% if email_config.is_active %}checked{% endif %}>
+                    <label for="is_active" class="ml-2 block text-sm text-gray-700">
+                        Activar envío de emails
+                    </label>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                        💾 Guardar Configuración
+                    </button>
+                    <button type="button" onclick="testConnection()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                        🔌 Probar Conexión
+                    </button>
+                </div>
+            </form>
+
+            {% if email_config.last_error %}
+            <div class="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
+                <div class="flex">
+                    <div class="text-red-400 mr-3">❌</div>
+                    <div class="text-sm text-red-700">
+                        <p class="font-medium">Último error:</p>
+                        <p>{{ email_config.last_error }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Test and Status -->
+        <div class="space-y-6">
+            <!-- Test Email -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">🧪 Probar Email</h3>
+
+                <div class="space-y-4">
+                    <div>
+                        <label for="test_email" class="block text-sm font-medium text-gray-700 mb-2">Enviar email de prueba a:</label>
+                        <input type="email" id="test_email" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="admin@empresa.com">
+                    </div>
+
+                    <button onclick="sendTestEmail()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                        📬 Enviar Email de Prueba
+                    </button>
+
+                    {% if email_config.test_email_sent_at %}
+                    <div class="text-sm text-gray-600">
+                        <p><strong>Último email de prueba:</strong> {{ email_config.test_email_sent_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Configuration Guide -->
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-6">
+                <h3 class="text-lg font-semibold text-blue-900 mb-4">📋 Guía de Configuración</h3>
+
+                <div class="space-y-4 text-sm text-blue-800">
+                    <div>
+                        <p class="font-medium">🌟 Para Gmail:</p>
+                        <ul class="list-disc list-inside mt-1 space-y-1">
+                            <li>Activar verificación en 2 pasos</li>
+                            <li>Generar "contraseña de aplicación"</li>
+                            <li>Usar esa contraseña, no la normal</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <p class="font-medium">📧 Para Outlook:</p>
+                        <ul class="list-disc list-inside mt-1 space-y-1">
+                            <li>Puerto: 587 con TLS</li>
+                            <li>Usar credenciales normales</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <p class="font-medium">🔧 Para servidor personalizado:</p>
+                        <ul class="list-disc list-inside mt-1 space-y-1">
+                            <li>Consultar con el proveedor de email</li>
+                            <li>Verificar puerto y tipo de seguridad</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Status -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">📊 Estado Actual</h3>
+
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Configuración</span>
+                        {% if email_config.email_host_user %}
+                            <span class="text-green-600 text-sm">✅ Configurado</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm">❌ Pendiente</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Estado</span>
+                        {% if email_config.is_active %}
+                            <span class="text-green-600 text-sm">✅ Activo</span>
+                        {% else %}
+                            <span class="text-gray-600 text-sm">⏸️ Inactivo</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Última actualización</span>
+                        <span class="text-gray-600 text-sm">{{ email_config.updated_at|date:"d/m H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateSMTPDefaults() {
+    const host = document.getElementById('email_host').value;
+    const customHost = document.getElementById('email_host_custom');
+    const port = document.getElementById('email_port');
+
+    if (host === 'custom') {
+        customHost.style.display = 'block';
+        return;
+    }
+
+    customHost.style.display = 'none';
+
+    const defaults = {
+        'smtp.gmail.com': { port: 587, tls: true },
+        'smtp.outlook.com': { port: 587, tls: true },
+        'smtp.yahoo.com': { port: 587, tls: true }
+    };
+
+    if (defaults[host]) {
+        port.value = defaults[host].port;
+        if (defaults[host].tls) {
+            document.querySelector('input[name="security"][value="tls"]').checked = true;
+        }
+    }
+}
+
+async function testConnection() {
+    showLoading('Probando conexión SMTP...');
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'test_email_connection',
+                params: {}
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            showToast('✅ Conexión SMTP exitosa', 'success');
+        } else {
+            showToast(`❌ Error de conexión: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+async function sendTestEmail() {
+    const testEmail = document.getElementById('test_email').value;
+
+    if (!testEmail) {
+        showToast('❌ Por favor ingresa un email de prueba', 'error');
+        return;
+    }
+
+    showLoading('Enviando email de prueba...');
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'send_test_email',
+                params: {
+                    recipient_email: testEmail
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            showToast(`✅ Email de prueba enviado a ${testEmail}`, 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast(`❌ Error enviando email: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    updateSMTPDefaults();
+});
+</script>
+{% endblock %}

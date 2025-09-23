@@ -1,0 +1,17 @@
+🧪 EMAIL DE PRUEBA - {{ site_name }}
+==============================================
+
+¡Hola!
+
+Este es un email de prueba enviado desde {{ site_name }}.
+
+✅ Si recibes este mensaje, la configuración de email está funcionando correctamente.
+
+Detalles de la prueba:
+- Fecha y hora: {{ test_time|date:"d/m/Y H:i" }}
+- Servidor SMTP: {{ config.email_host }}:{{ config.email_port }}
+- Email de envío: {{ config.default_from_email }}
+
+---
+{{ site_name }}
+Sistema de Gestión de Metrología

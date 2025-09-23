@@ -1,0 +1,33 @@
+RECORDATORIO DE MANTENIMIENTO - {{ site_name }}
+==============================================
+
+Hola,
+
+Le informamos que el equipo {{ equipo.codigo_interno }} - {{ equipo.nombre }} tiene un mantenimiento proximo a vencer.
+
+DETALLES DEL EQUIPO:
+- Codigo: {{ equipo.codigo_interno }}
+- Nombre: {{ equipo.nombre }}
+- Marca: {{ equipo.marca }}
+- Modelo: {{ equipo.modelo }}
+- Serie: {{ equipo.numero_serie }}
+
+INFORMACION DE MANTENIMIENTO:
+- Fecha de vencimiento: {{ due_date|date:"d/m/Y" }}
+- Dias restantes: {{ days_until_due }}
+- Nivel de urgencia: {{ urgency_level }}
+
+{% if urgency_level == "critical" %}
+ATENCION: El mantenimiento ha VENCIDO. Es necesario tomar accion inmediata.
+{% elif urgency_level == "high" %}
+URGENTE: El mantenimiento vence en menos de 3 dias.
+{% elif urgency_level == "medium" %}
+IMPORTANTE: El mantenimiento vence en menos de 7 dias.
+{% endif %}
+
+Por favor, coordine el mantenimiento lo antes posible para asegurar el funcionamiento optimo del equipo.
+
+---
+{{ site_name }}
+Sistema de Gestion de Metrologia
+{{ empresa.nombre }}

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Recordatorio Consolidado - {{ site_name }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 8px; text-align: center; }
+        .content { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 20px 0; }
+        .summary { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 5px solid #2196f3; }
+        .section { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; }
+        .calibracion { border-left: 5px solid #9c27b0; }
+        .mantenimiento { border-left: 5px solid #ff9800; }
+        .comprobacion { border-left: 5px solid #4caf50; }
+        .equipment-list { list-style: none; padding: 0; }
+        .equipment-item { 
+            padding: 12px; margin: 8px 0; background: #f8f9fa; border-radius: 5px; 
+            border-left: 3px solid #ddd; display: flex; justify-content: space-between; align-items: center;
+        }
+        .equipment-info { flex: 1; }
+        .equipment-date { background: #e9ecef; padding: 5px 10px; border-radius: 3px; font-size: 12px; color: #495057; }
+        .urgent-critical { background: #dc3545; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .urgent-high { background: #fd7e14; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .urgent-medium { background: #28a745; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .actions { background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 5px solid #ffc107; }
+        .footer { text-align: center; color: #6c757d; font-size: 14px; margin-top: 30px; }
+        .section-title { display: flex; align-items: center; margin-bottom: 15px; }
+        .section-icon { font-size: 24px; margin-right: 10px; }
+        .count-badge { background: #007bff; color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Recordatorio Consolidado</h1>
+        <h2>{{ site_name }}</h2>
+        <p style="margin: 0; opacity: 0.9;">{{ empresa.nombre }}</p>
+    </div>
+
+    <div class="content">
+        <p>Estimado cliente,</p>
+        
+        <p>Le informamos que <strong>{{ empresa.nombre }}</strong> tiene las siguientes actividades <strong>{{ urgency_text }}</strong>:</p>
+
+        <div class="summary">
+            <h3>Resumen de Actividades</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>Total de actividades:</strong> {{ total_actividades }}
+                </div>
+                <div>
+                    <strong>Fecha objetivo:</strong> {{ target_date|date:"d/m/Y" }}
+                </div>
+            </div>
+        </div>
+
+        {% if equipos_calibracion %}
+        <div class="section calibracion">
+            <div class="section-title">
+                <span class="section-icon">CAL</span>
+                <h3 style="margin: 0;">CALIBRACIONES</h3>
+                <span class="count-badge">{{ equipos_calibracion|length }}</span>
+            </div>
+            <ul class="equipment-list">
+                {% for equipo in equipos_calibracion %}
+                <li class="equipment-item">
+                    <div class="equipment-info">
+                        <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
+                        <small>{{ equipo.marca|default:"N/A" }} | {{ equipo.modelo|default:"N/A" }}</small>
+                    </div>
+                    <div class="equipment-date">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if equipos_mantenimiento %}
+        <div class="section mantenimiento">
+            <div class="section-title">
+                <span class="section-icon">MNT</span>
+                <h3 style="margin: 0;">MANTENIMIENTOS</h3>
+                <span class="count-badge">{{ equipos_mantenimiento|length }}</span>
+            </div>
+            <ul class="equipment-list">
+                {% for equipo in equipos_mantenimiento %}
+                <li class="equipment-item">
+                    <div class="equipment-info">
+                        <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
+                        <small>{{ equipo.marca|default:"N/A" }} | {{ equipo.modelo|default:"N/A" }}</small>
+                    </div>
+                    <div class="equipment-date">{{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if equipos_comprobacion %}
+        <div class="section comprobacion">
+            <div class="section-title">
+                <span class="section-icon">CHK</span>
+                <h3 style="margin: 0;">COMPROBACIONES</h3>
+                <span class="count-badge">{{ equipos_comprobacion|length }}</span>
+            </div>
+            <ul class="equipment-list">
+                {% for equipo in equipos_comprobacion %}
+                <li class="equipment-item">
+                    <div class="equipment-info">
+                        <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
+                        <small>{{ equipo.marca|default:"N/A" }} | {{ equipo.modelo|default:"N/A" }}</small>
+                    </div>
+                    <div class="equipment-date">{{ equipo.proxima_comprobacion|date:"d/m/Y" }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if urgency_level == "critical" %}
+        <div class="urgent-critical">
+            <h3>ATENCION CRITICA</h3>
+            <p><strong>Estas actividades VENCEN HOY.</strong> Es necesario tomar accion inmediata para mantener la conformidad de sus equipos.</p>
+        </div>
+        {% elif urgency_level == "high" %}
+        <div class="urgent-high">
+            <h3>URGENTE</h3>
+            <p><strong>Estas actividades vencen en {{ days_ahead }} dias.</strong> Coordine lo antes posible para evitar vencimientos.</p>
+        </div>
+        {% elif urgency_level == "medium" %}
+        <div class="urgent-medium">
+            <h3>PROGRAMADO</h3>
+            <p><strong>Estas actividades vencen en {{ days_ahead }} dias.</strong> Planifique con anticipacion para mantener la conformidad.</p>
+        </div>
+        {% endif %}
+
+        <div class="actions">
+            <h3>Acciones Recomendadas</h3>
+            <ol>
+                <li><strong>Revisar cada equipo listado</strong> y verificar su estado actual</li>
+                <li><strong>Coordinar con proveedores de servicio</strong> para programar las actividades</li>
+                <li><strong>Programar las actividades antes del vencimiento</strong> para evitar interrupciones</li>
+                <li><strong>Mantener documentacion actualizada</strong> tras completar cada actividad</li>
+            </ol>
+        </div>
+
+        <p><strong>Fecha del reporte:</strong> {{ today|date:"d/m/Y" }}</p>
+    </div>
+
+    <div class="footer">
+        <p>{{ site_name }} - Sistema de Gestion de Metrologia</p>
+        <p>{{ empresa.nombre }}</p>
+        <p style="font-size: 12px; margin-top: 10px;">
+            Este es un email automatico. Las actividades se verifican diariamente y se envian recordatorios a los 15 dias, 7 dias y el dia de vencimiento.
+        </p>
+    </div>
+</body>
+</html>

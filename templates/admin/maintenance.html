@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}Mantenimiento del Sistema{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🧹 Mantenimiento del Sistema</h1>
+        <p class="text-gray-600">Ejecutar tareas de limpieza y optimización del sistema</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Mantenimiento</a>
+            <a href="{% url 'core:admin_notifications' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Notificaciones</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Monitoreo</a>
+            <a href="{% url 'core:admin_schedule' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Programación</a>
+        </nav>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Maintenance Form -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Ejecutar Mantenimiento</h2>
+
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <div>
+                    <label for="task_type" class="block text-sm font-medium text-gray-700 mb-2">Tipo de Tarea</label>
+                    <select id="task_type" name="task_type" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        {% for value, label in task_options %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="dry_run" name="dry_run" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="dry_run" class="ml-2 block text-sm text-gray-700">
+                        Modo simulación (no hacer cambios reales)
+                    </label>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="text-blue-400 mr-3">ℹ️</div>
+                        <div class="text-sm text-blue-700">
+                            <p class="font-medium mb-1">Descripción de tareas:</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><strong>Cache:</strong> Limpia entradas obsoletas del cache</li>
+                                <li><strong>Logs:</strong> Elimina archivos de log antiguos (>30 días)</li>
+                                <li><strong>Base de datos:</strong> Optimiza y actualiza registros</li>
+                                <li><strong>ZIP:</strong> Limpia archivos ZIP temporales</li>
+                                <li><strong>Todas:</strong> Ejecuta todas las tareas anteriores</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                    🚀 Ejecutar Mantenimiento
+                </button>
+            </form>
+
+            <!-- Quick Actions -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h3 class="text-sm font-medium text-gray-700 mb-3">Acciones Rápidas</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="executeQuickMaintenance('cache')" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        🗄️ Solo Cache
+                    </button>
+                    <button onclick="executeQuickMaintenance('database')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        🗃️ Solo BD
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Maintenance History -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Historial de Mantenimiento</h2>
+
+            {% if maintenance_history %}
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+                    {% for execution in maintenance_history %}
+                    <div class="border border-gray-200 rounded-md p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center">
+                                {% if execution.success %}
+                                    <span class="text-green-500 mr-2">✅</span>
+                                {% else %}
+                                    <span class="text-red-500 mr-2">❌</span>
+                                {% endif %}
+                                <span class="font-medium text-gray-900">{{ execution.summary }}</span>
+                            </div>
+                            <span class="text-xs text-gray-500">{{ execution.timestamp|date:"d/m H:i" }}</span>
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            <span class="font-medium">Usuario:</span> {{ execution.user }}
+                        </div>
+                        {% if not execution.success and execution.error %}
+                        <div class="text-sm text-red-600 mt-1">
+                            <span class="font-medium">Error:</span> {{ execution.error }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-gray-500 py-8">
+                    <div class="text-4xl mb-2">📝</div>
+                    <p>No hay historial de mantenimiento aún</p>
+                    <p class="text-sm">Las ejecuciones aparecerán aquí</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- System Status Cards -->
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">🗄️</div>
+                <div>
+                    <div class="text-sm opacity-80">Cache del Sistema</div>
+                    <div class="font-semibold">Optimización disponible</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">🗃️</div>
+                <div>
+                    <div class="text-sm opacity-80">Base de Datos</div>
+                    <div class="font-semibold">Actualización automática</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="text-2xl mr-3">📄</div>
+                <div>
+                    <div class="text-sm opacity-80">Archivos de Log</div>
+                    <div class="font-semibold">Limpieza programada</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function executeQuickMaintenance(taskType) {
+    showLoading(`Ejecutando limpieza de ${taskType}...`);
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'maintenance',
+                params: {
+                    task_type: taskType,
+                    dry_run: false
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            showToast(`✅ Limpieza de ${taskType} completada`, 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast(`❌ Error en limpieza: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+</script>
+{% endblock %}

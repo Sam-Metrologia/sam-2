@@ -323,6 +323,11 @@
                 <li><a href="{% url 'core:informes' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'informes' %}active{% endif %}">
                     <i class="fas fa-chart-line"></i> Informes
                 </a></li>
+                {% if user.is_superuser %}
+                <li><a href="{% url 'core:admin_dashboard' %}" class="{% if 'admin' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-cogs"></i> Admin Sistema
+                </a></li>
+                {% endif %}
             </ul>
         </nav>
         <div class="mt-auto pb-4"> {# Añadido mt-auto para empujar los enlaces de perfil/logout al final #}
@@ -653,6 +658,196 @@
             }
         }
     </script>
+
+    <!-- Loading Overlay para mejorar UX -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
+            <div class="flex items-center space-x-3">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span class="text-gray-700 font-medium">Cargando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications para mejor feedback -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Mejoras de UX con JavaScript -->
+    <script>
+        // Sistema de loading overlay
+        window.showLoading = function(message = 'Cargando...') {
+            const overlay = document.getElementById('loadingOverlay');
+            const text = overlay.querySelector('span');
+            text.textContent = message;
+            overlay.classList.remove('hidden');
+        };
+
+        window.hideLoading = function() {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.add('hidden');
+        };
+
+        // Sistema de toast notifications
+        window.showToast = function(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            const colors = {
+                'success': 'bg-green-600',
+                'error': 'bg-red-600',
+                'warning': 'bg-yellow-600',
+                'info': 'bg-blue-600'
+            };
+
+            const icons = {
+                'success': 'fas fa-check-circle',
+                'error': 'fas fa-exclamation-circle',
+                'warning': 'fas fa-exclamation-triangle',
+                'info': 'fas fa-info-circle'
+            };
+
+            toast.className = `${colors[type]} text-white p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0 max-w-sm`;
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="${icons[type]}"></i>
+                        <span class="text-sm font-medium">${message}</span>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(toast);
+
+            // Animar entrada
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            }, 100);
+
+            // Auto-remover
+            if (duration > 0) {
+                setTimeout(() => {
+                    toast.classList.add('translate-x-full', 'opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            }
+        };
+
+        // Mejorar experiencia de formularios
+        document.addEventListener('DOMContentLoaded', function() {
+            // Añadir indicadores de carga a formularios
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                    if (submitBtn && !submitBtn.disabled) {
+                        showLoading('Procesando...');
+                        submitBtn.disabled = true;
+
+                        // Re-habilitar botón después de 30 segundos como fallback
+                        setTimeout(() => {
+                            submitBtn.disabled = false;
+                            hideLoading();
+                        }, 30000);
+                    }
+                });
+            });
+
+            // Mejorar indicadores visuales de enlaces activos
+            const currentPath = window.location.pathname;
+            const sidebarLinks = document.querySelectorAll('.sidebar a');
+            sidebarLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Añadir efecto de hover suave a tarjetas
+            const cards = document.querySelectorAll('.bg-white, .bg-gray-50, .bg-blue-50');
+            cards.forEach(card => {
+                if (!card.classList.contains('no-hover')) {
+                    card.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+                    card.addEventListener('mouseenter', function() {
+                        this.style.transform = 'translateY(-1px)';
+                        this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    });
+                    card.addEventListener('mouseleave', function() {
+                        this.style.transform = 'translateY(0)';
+                        this.style.boxShadow = '';
+                    });
+                }
+            });
+
+            // Lazy loading para imágenes
+            const images = document.querySelectorAll('img[data-src]');
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        img.src = img.dataset.src;
+                        img.classList.remove('opacity-0');
+                        img.classList.add('opacity-100');
+                        observer.unobserve(img);
+                    }
+                });
+            });
+
+            images.forEach(img => {
+                img.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                imageObserver.observe(img);
+            });
+        });
+
+        // Prevenir múltiples clics en botones críticos
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-submit') || e.target.type === 'submit') {
+                if (e.target.disabled) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                setTimeout(() => {
+                    e.target.disabled = true;
+                    setTimeout(() => {
+                        e.target.disabled = false;
+                    }, 2000);
+                }, 100);
+            }
+        });
+
+        // Manejo mejorado de errores de red
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'IMG') {
+                console.warn('Error cargando imagen:', e.target.src);
+                // Opcional: mostrar imagen placeholder
+            }
+        });
+
+        // Auto-guardar para formularios largos (opcional)
+        let autoSaveTimeout;
+        const autoSaveInputs = document.querySelectorAll('input[data-autosave], textarea[data-autosave]');
+        autoSaveInputs.forEach(input => {
+            input.addEventListener('input', function() {
+                clearTimeout(autoSaveTimeout);
+                autoSaveTimeout = setTimeout(() => {
+                    const key = `autosave_${input.name || input.id}`;
+                    localStorage.setItem(key, input.value);
+                    console.log('Auto-guardado:', key);
+                }, 2000);
+            });
+
+            // Cargar valor guardado al cargar página
+            const key = `autosave_${input.name || input.id}`;
+            const saved = localStorage.getItem(key);
+            if (saved && !input.value) {
+                input.value = saved;
+                showToast('Contenido restaurado automáticamente', 'info', 3000);
+            }
+        });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

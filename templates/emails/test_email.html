@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Email de Prueba - {{ site_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .content {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #e9ecef;
+        }
+        .success-badge {
+            background: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            margin: 15px 0;
+        }
+        .details {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+        }
+        .footer {
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Email de Prueba</h1>
+        <h2>{{ site_name }}</h2>
+    </div>
+
+    <div class="content">
+        <p>¡Hola!</p>
+
+        <p>Este es un email de prueba enviado desde <strong>{{ site_name }}</strong>.</p>
+
+        <div class="success-badge">
+            ✅ Si recibes este mensaje, la configuración de email está funcionando correctamente.
+        </div>
+
+        <div class="details">
+            <h3>📋 Detalles de la prueba:</h3>
+            <ul>
+                <li><strong>Fecha y hora:</strong> {{ test_time|date:"d/m/Y H:i" }}</li>
+                <li><strong>Servidor SMTP:</strong> {{ config.email_host }}:{{ config.email_port }}</li>
+                <li><strong>Email de envío:</strong> {{ config.default_from_email }}</li>
+                <li><strong>Uso TLS:</strong> {{ config.email_use_tls|yesno:"Sí,No" }}</li>
+            </ul>
+        </div>
+
+        <p>Ahora puedes usar el sistema de notificaciones por email con confianza.</p>
+    </div>
+
+    <div class="footer">
+        <p>{{ site_name }} - Sistema de Gestión de Metrología</p>
+    </div>
+</body>
+</html>
