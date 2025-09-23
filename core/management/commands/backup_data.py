@@ -194,6 +194,9 @@ class Command(BaseCommand):
             if verbose:
                 self.stdout.write(f'     ✅ JSON backup: {os.path.basename(json_path)}')
 
+            # Subir a S3 automáticamente
+            self.upload_to_s3(json_path, verbose)
+
         except Exception as e:
             logger.error(f'Error creating JSON backup: {e}')
             raise
@@ -223,6 +226,9 @@ class Command(BaseCommand):
 
             if verbose:
                 self.stdout.write(f'     ✅ ZIP backup: {os.path.basename(zip_path)}')
+
+            # Subir a S3 automáticamente
+            self.upload_to_s3(zip_path, verbose)
 
         except Exception as e:
             logger.error(f'Error creating ZIP backup: {e}')
@@ -332,3 +338,51 @@ class Command(BaseCommand):
         except Exception as e:
             logger.error(f'Error adding equipo files to ZIP: {e}')
             return files_added
+
+    def upload_to_s3(self, file_path, verbose=False):
+        """Sube archivo de backup a S3."""
+        try:
+            from django.conf import settings
+
+            # Solo subir a S3 en producción (cuando hay variables AWS configuradas)
+            if not all([
+                getattr(settings, 'AWS_ACCESS_KEY_ID', None),
+                getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
+                getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+            ]):
+                if verbose:
+                    self.stdout.write(f'     ⚠️  S3 no configurado, backup solo local')
+                return
+
+            from storages.backends.s3boto3 import S3Boto3Storage
+            import os
+
+            # Crear storage para backups
+            storage = S3Boto3Storage(
+                bucket_name=settings.AWS_STORAGE_BUCKET_NAME,
+                custom_domain=None,
+                file_overwrite=False
+            )
+
+            filename = os.path.basename(file_path)
+            s3_path = f'backups/{filename}'
+
+            # Subir archivo
+            with open(file_path, 'rb') as f:
+                storage.save(s3_path, f)
+
+            if verbose:
+                self.stdout.write(f'     ☁️  Subido a S3: s3://{settings.AWS_STORAGE_BUCKET_NAME}/{s3_path}')
+
+            # Eliminar archivo local para ahorrar espacio
+            try:
+                os.remove(file_path)
+                if verbose:
+                    self.stdout.write(f'     🗑️  Archivo local eliminado')
+            except:
+                pass
+
+        except Exception as e:
+            logger.error(f'Error uploading to S3: {e}')
+            if verbose:
+                self.stdout.write(f'     ❌ Error subiendo a S3: {e}')
