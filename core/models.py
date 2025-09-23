@@ -15,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings # ¡ASEGURARSE DE QUE ESTA LÍNEA ESTÉ PRESENTE!
 import calendar # Importar calendar para nombres de meses
 import uuid # Importar uuid para generar nombres únicos temporales
+import json # Para almacenar configuraciones JSON
 
 # ==============================================================================
 # MODELO DE USUARIO PERSONALIZADO (AÑADIDO Y AJUSTADO)
@@ -1838,3 +1839,85 @@ class EmailConfiguration(models.Model):
         settings.EMAIL_HOST_USER = self.email_host_user
         settings.EMAIL_HOST_PASSWORD = self.email_host_password
         settings.DEFAULT_FROM_EMAIL = self.default_from_email
+
+
+# ==============================================================================
+# MODELO PARA CONFIGURACIÓN DE PROGRAMACIÓN (NUEVO)
+# ==============================================================================
+
+class SystemScheduleConfig(models.Model):
+    """
+    Configuración de programación del sistema que persiste en base de datos.
+    """
+    config_name = models.CharField(max_length=100, default='default', unique=True)
+    config_data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schedule_configs'
+    )
+
+    class Meta:
+        verbose_name = 'Configuración de Programación'
+        verbose_name_plural = 'Configuraciones de Programación'
+
+    def __str__(self):
+        return f"Configuración: {self.config_name}"
+
+    @classmethod
+    def get_default_config(cls):
+        """Obtiene la configuración por defecto."""
+        return {
+            'maintenance_daily': {
+                'enabled': False,
+                'time': '02:00',
+                'tasks': ['cache', 'database']
+            },
+            'notifications_daily': {
+                'enabled': False,
+                'time': '08:00',
+                'types': ['consolidated']
+            },
+            'maintenance_weekly': {
+                'enabled': False,
+                'day': 'sunday',
+                'time': '03:00',
+                'tasks': ['all']
+            },
+            'notifications_weekly': {
+                'enabled': False,
+                'day': 'monday',
+                'time': '09:00',
+                'types': ['weekly']
+            },
+            'backup_monthly': {
+                'enabled': False,
+                'day': 1,
+                'time': '01:00',
+                'include_files': True
+            }
+        }
+
+    @classmethod
+    def get_or_create_config(cls):
+        """Obtiene o crea la configuración por defecto."""
+        config, created = cls.objects.get_or_create(
+            config_name='default',
+            defaults={'config_data': cls.get_default_config()}
+        )
+        return config
+
+    def save_config(self, config_data):
+        """Guarda nueva configuración."""
+        self.config_data = config_data
+        self.save()
+
+    def get_config(self):
+        """Obtiene la configuración actual."""
+        if not self.config_data:
+            return self.get_default_config()
+        return self.config_data

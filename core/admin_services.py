@@ -324,62 +324,35 @@ class ScheduleManager:
     Gestiona la programación automática de tareas.
     """
 
-    SCHEDULE_CACHE_KEY = 'admin_schedule_config'
-
     @staticmethod
     def get_schedule_config():
         """
-        Obtiene configuración de programación.
+        Obtiene configuración de programación desde base de datos.
         """
-        default_config = {
-            'maintenance_daily': {
-                'enabled': False,
-                'time': '02:00',
-                'tasks': ['cache', 'database']
-            },
-            'notifications_daily': {
-                'enabled': False,
-                'time': '08:00',
-                'types': ['consolidated']
-            },
-            'maintenance_weekly': {
-                'enabled': False,
-                'day': 'sunday',
-                'time': '03:00',
-                'tasks': ['all']
-            },
-            'notifications_weekly': {
-                'enabled': False,
-                'day': 'monday',
-                'time': '09:00',
-                'types': ['weekly']
-            },
-            'backup_monthly': {
-                'enabled': False,
-                'day': 1,
-                'time': '01:00',
-                'include_files': True
-            }
-        }
-
         try:
-            config = cache.get(ScheduleManager.SCHEDULE_CACHE_KEY, default_config)
-            return config
-        except Exception:
-            return default_config
+            from core.models import SystemScheduleConfig
+            config_obj = SystemScheduleConfig.get_or_create_config()
+            return config_obj.get_config()
+        except Exception as e:
+            logger.error(f'Error getting schedule config from DB: {e}')
+            # Fallback a configuración por defecto
+            from core.models import SystemScheduleConfig
+            return SystemScheduleConfig.get_default_config()
 
     @staticmethod
     def save_schedule_config(config):
         """
-        Guarda configuración de programación.
+        Guarda configuración de programación en base de datos.
         """
         try:
-            cache.set(ScheduleManager.SCHEDULE_CACHE_KEY, config, 86400 * 365)  # 1 año
+            from core.models import SystemScheduleConfig
+            config_obj = SystemScheduleConfig.get_or_create_config()
+            config_obj.save_config(config)
 
-            logger.info('Schedule configuration updated', extra={'config': config})
+            logger.info('Schedule configuration updated in database', extra={'config': config})
             return True
         except Exception as e:
-            logger.error(f'Error saving schedule config: {e}')
+            logger.error(f'Error saving schedule config to DB: {e}')
             return False
 
     @staticmethod
