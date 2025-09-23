@@ -2597,7 +2597,7 @@ def dashboard(request):
             'fecha_inicio': user.empresa.fecha_inicio_plan if user.empresa else None,
             'fecha_fin': user.empresa.get_fecha_fin_plan() if user.empresa else None,
             'limite_equipos_actual': user.empresa.get_limite_equipos() if user.empresa else 0,
-            'limite_almacenamiento_actual': user.empresa.get_limite_almacenamiento() if user.empresa else 0,
+            'limite_almacenamiento_actual': (user.empresa.get_limite_almacenamiento() * 1024 * 1024) if user.empresa and user.empresa.get_limite_almacenamiento() != float('inf') else 0,
         } if user.empresa else {},
     }
     return render(request, 'core/dashboard.html', context)
@@ -5956,24 +5956,40 @@ def generar_informe_zip(request):
 
     # OPTIMIZACIÓN: Prefetch relacionados para evitar consultas N+1
     # PAGINACIÓN OPTIMIZADA: Aumentado límite para mejor rendimiento
-    EQUIPOS_POR_ZIP = 50  # 50 equipos por ZIP (optimizado con streaming y mejor gestión de memoria)
+    EQUIPOS_POR_ZIP = 100  # 100 equipos por ZIP (optimizado)
 
     equipos_empresa_total = Equipo.objects.filter(empresa=empresa).count()
 
-    # Calcular offset para paginación
-    offset = (parte_numero - 1) * EQUIPOS_POR_ZIP
+    # SI NO SE ESPECIFICA PARTE EN EL REQUEST, DESCARGAR TODOS LOS EQUIPOS
+    if 'parte' not in request.GET:
+        # Descargar TODOS los equipos sin paginación
+        equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
+            'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
+        ).order_by('codigo_interno')
 
-    # OPTIMIZACIÓN: Prefetch simple sin slice para evitar QuerySet conflicts
-    equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
-        'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
-    ).order_by('codigo_interno')[offset:offset + EQUIPOS_POR_ZIP]
+        # Para estadísticas
+        total_partes = 1
+        equipos_en_esta_parte = equipos_empresa_total
+        parte_numero = 1
 
-    # Calcular información de paginación
-    total_partes = (equipos_empresa_total + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP  # Redondeo hacia arriba
-    equipos_en_esta_parte = len(equipos_empresa)  # Usar len() en lugar de count() para QuerySet con slice
+        logger.info(f"Descargando TODOS los equipos: {equipos_empresa_total} equipos en un solo ZIP")
+    else:
+        # Sistema de paginación original (solo cuando se especifica parte)
+        offset = (parte_numero - 1) * EQUIPOS_POR_ZIP
+
+        equipos_empresa = Equipo.objects.filter(empresa=empresa).select_related('empresa').prefetch_related(
+            'calibraciones', 'mantenimientos', 'comprobaciones', 'baja_registro'
+        ).order_by('codigo_interno')[offset:offset + EQUIPOS_POR_ZIP]
+
+        # Calcular información de paginación
+        total_partes = (equipos_empresa_total + EQUIPOS_POR_ZIP - 1) // EQUIPOS_POR_ZIP
+        equipos_en_esta_parte = len(equipos_empresa)
 
     # Información para logs y filename con optimizaciones aplicadas
-    if total_partes > 1:
+    if 'parte' not in request.GET:
+        logger.info(f"Generando ZIP COMPLETO para empresa {empresa.nombre}: TODOS los {equipos_empresa_total} equipos en un solo archivo")
+    elif total_partes > 1:
+        offset = (parte_numero - 1) * EQUIPOS_POR_ZIP  # Recalcular offset para el log
         logger.info(f"Generando ZIP OPTIMIZADO parte {parte_numero}/{total_partes} para empresa {empresa.nombre}: equipos {offset + 1}-{offset + equipos_en_esta_parte} de {equipos_empresa_total} (sin Excel individuales)")
     else:
         logger.info(f"Generando ZIP OPTIMIZADO completo para empresa {empresa.nombre}: {equipos_en_esta_parte} equipos (sin Excel individuales)")
