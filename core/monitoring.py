@@ -161,13 +161,25 @@ class SystemMonitor:
             last_week = now - timedelta(days=7)
             last_month = now - timedelta(days=30)
 
+            # Incluir información de usuarios activos recientes (últimas 24 horas de actividad)
+            last_24h = now - timedelta(hours=24)
+
             metrics = {
                 'total_users': CustomUser.objects.count(),
                 'active_users': CustomUser.objects.filter(is_active=True).count(),
                 'users_with_empresa': CustomUser.objects.filter(empresa__isnull=False).count(),
                 'superusers': CustomUser.objects.filter(is_superuser=True).count(),
+                'users_logged_recently': CustomUser.objects.filter(last_login__gte=last_24h).count(),
                 'new_users_this_week': CustomUser.objects.filter(date_joined__gte=last_week).count(),
                 'new_users_this_month': CustomUser.objects.filter(date_joined__gte=last_month).count(),
+                'active_user_list': [
+                    {
+                        'username': u.username,
+                        'empresa': u.empresa.nombre if u.empresa else 'Sin empresa',
+                        'last_login': u.last_login.isoformat() if u.last_login else 'Nunca',
+                        'is_superuser': u.is_superuser
+                    } for u in CustomUser.objects.filter(is_active=True)[:10]  # Máximo 10
+                ],
                 'last_check': now.isoformat()
             }
 
@@ -186,7 +198,9 @@ class SystemMonitor:
             last_month = now - timedelta(days=30)
 
             # Métricas de empresas
-            empresas_activas = Empresa.objects.filter(estado_suscripcion='Activo').count()
+            empresas_activas = Empresa.objects.filter(estado_suscripcion='activa').count()
+            if empresas_activas == 0:  # Fallback para diferentes valores
+                empresas_activas = Empresa.objects.filter(estado_suscripcion='Activo').count()
             empresas_trial = Empresa.objects.filter(es_periodo_prueba=True).count()
 
             # Métricas de equipos
@@ -228,10 +242,22 @@ class SystemMonitor:
                     'nuevos_este_mes': Equipo.objects.filter(fecha_registro__gte=last_month).count()
                 },
                 'actividades_recientes': {
+                    'calibraciones_hoy': Calibracion.objects.filter(fecha_calibracion__date=now.date()).count(),
+                    'mantenimientos_hoy': Mantenimiento.objects.filter(fecha_mantenimiento__date=now.date()).count(),
+                    'comprobaciones_hoy': Comprobacion.objects.filter(fecha_comprobacion__date=now.date()).count(),
                     'calibraciones_esta_semana': calibraciones_semana,
                     'mantenimientos_esta_semana': mantenimientos_semana,
                     'comprobaciones_esta_semana': comprobaciones_semana
                 },
+                'empresas_detalle': [
+                    {
+                        'nombre': e.nombre,
+                        'equipos': e.equipos.count(),
+                        'estado': e.estado_suscripcion,
+                        'limite': e.limite_equipos_empresa,
+                        'porcentaje_uso': round((e.equipos.count() / max(e.limite_equipos_empresa, 1)) * 100, 1)
+                    } for e in Empresa.objects.all()[:5]
+                ],
                 'proximas_actividades': {
                     'calibraciones_proxima_semana': calibraciones_proximas,
                     'mantenimientos_proxima_semana': mantenimientos_proximos
