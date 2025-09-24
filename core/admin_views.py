@@ -274,8 +274,31 @@ def system_monitoring(request):
     """
     try:
         system_status = AdminService.get_system_status()
+
+        # Calcular estadísticas específicas para el template
+        stats = {}
+        if system_status.get('success') and system_status.get('health'):
+            health_data = system_status['health']
+            business_metrics = health_data.get('metrics', {}).get('business', {})
+
+            # Extraer los valores específicos que el template necesita
+            stats = {
+                'active_companies': business_metrics.get('empresas', {}).get('activas', 0),
+                'active_equipment': business_metrics.get('equipos', {}).get('activos', 0),
+                'activities_today': (
+                    business_metrics.get('actividades_recientes', {}).get('calibraciones_hoy', 0) +
+                    business_metrics.get('actividades_recientes', {}).get('mantenimientos_hoy', 0) +
+                    business_metrics.get('actividades_recientes', {}).get('comprobaciones_hoy', 0)
+                ),
+                'system_usage': round(
+                    (business_metrics.get('equipos', {}).get('total', 1) /
+                     max(sum(e.get('limite', 1) for e in business_metrics.get('empresas_detalle', [])), 1)) * 100, 1
+                )
+            }
+
         context = {
             'system_status': system_status,
+            'stats': stats,
             'refresh_interval': 30,  # segundos
         }
 

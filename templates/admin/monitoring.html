@@ -220,9 +220,55 @@ async function refreshActivity() {
     `;
 }
 
+async function refreshBusinessMetrics() {
+    try {
+        const response = await fetch('{% url "core:api_system_status" %}');
+        const data = await response.json();
+
+        if (data.success && data.health && data.health.metrics && data.health.metrics.business) {
+            const business = data.health.metrics.business;
+
+            // Actualizar empresas activas
+            const companiesElement = document.getElementById('active-companies');
+            if (companiesElement) {
+                companiesElement.textContent = business.empresas?.activas || 0;
+            }
+
+            // Actualizar equipos activos
+            const equipmentElement = document.getElementById('active-equipment');
+            if (equipmentElement) {
+                equipmentElement.textContent = business.equipos?.activos || 0;
+            }
+
+            // Actualizar actividades de hoy
+            const activitiesTodayElement = document.getElementById('activities-today');
+            if (activitiesTodayElement) {
+                const activitiesHoy = (
+                    (business.actividades_recientes?.calibraciones_hoy || 0) +
+                    (business.actividades_recientes?.mantenimientos_hoy || 0) +
+                    (business.actividades_recientes?.comprobaciones_hoy || 0)
+                );
+                activitiesTodayElement.textContent = activitiesHoy;
+            }
+
+            // Actualizar uso del sistema
+            const systemUsageElement = document.getElementById('system-usage');
+            if (systemUsageElement) {
+                const totalEquipos = business.equipos?.total || 0;
+                const limiteTotal = business.empresas_detalle?.reduce((sum, e) => sum + (e.limite || 0), 0) || 1;
+                const porcentaje = Math.round((totalEquipos / limiteTotal) * 100);
+                systemUsageElement.textContent = `${porcentaje}%`;
+            }
+        }
+    } catch (error) {
+        console.error('Error refreshing business metrics:', error);
+    }
+}
+
 async function refreshAllMetrics() {
     await refreshSystemHealth();
     await refreshActivity();
+    await refreshBusinessMetrics();
 }
 
 // Inicializar al cargar la página
