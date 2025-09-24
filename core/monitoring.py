@@ -242,9 +242,18 @@ class SystemMonitor:
                     'nuevos_este_mes': Equipo.objects.filter(fecha_registro__gte=last_month).count()
                 },
                 'actividades_recientes': {
-                    'calibraciones_hoy': Calibracion.objects.filter(fecha_calibracion__date=now.date()).count(),
-                    'mantenimientos_hoy': Mantenimiento.objects.filter(fecha_mantenimiento__date=now.date()).count(),
-                    'comprobaciones_hoy': Comprobacion.objects.filter(fecha_comprobacion__date=now.date()).count(),
+                    'calibraciones_hoy': Calibracion.objects.filter(
+                        fecha_calibracion__gte=now.date(),
+                        fecha_calibracion__lt=now.date() + timedelta(days=1)
+                    ).count(),
+                    'mantenimientos_hoy': Mantenimiento.objects.filter(
+                        fecha_mantenimiento__gte=now.date(),
+                        fecha_mantenimiento__lt=now.date() + timedelta(days=1)
+                    ).count(),
+                    'comprobaciones_hoy': Comprobacion.objects.filter(
+                        fecha_comprobacion__gte=now.date(),
+                        fecha_comprobacion__lt=now.date() + timedelta(days=1)
+                    ).count(),
                     'calibraciones_esta_semana': calibraciones_semana,
                     'mantenimientos_esta_semana': mantenimientos_semana,
                     'comprobaciones_esta_semana': comprobaciones_semana
