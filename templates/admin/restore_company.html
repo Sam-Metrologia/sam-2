@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Restaurar Empresa{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🔄 Restaurar Empresa</h1>
+        <p class="text-gray-600">Confirmar restauración de empresa eliminada</p>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border p-6">
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Información de la Empresa</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nombre</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.nombre }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">NIT</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.nit|default:"No especificado" }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.email|default:"No especificado" }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Teléfono</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.telefono|default:"No especificado" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información de eliminación -->
+        <div class="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+            <h3 class="text-lg font-medium text-red-900 mb-3">Información de Eliminación</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-red-700">Eliminada el</label>
+                    <p class="mt-1 text-sm text-red-900">{{ delete_info.deleted_at|date:"d/m/Y H:i" }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-red-700">Eliminada por</label>
+                    <p class="mt-1 text-sm text-red-900">{{ delete_info.deleted_by }}</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-red-700">Razón de eliminación</label>
+                    <p class="mt-1 text-sm text-red-900">{{ delete_info.delete_reason }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-red-700">Días desde eliminación</label>
+                    <p class="mt-1 text-sm text-red-900">{{ delete_info.days_since_deletion }} días</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas de la empresa -->
+        <div class="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <h3 class="text-lg font-medium text-blue-900 mb-3">Datos a Restaurar</h3>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ empresa.equipos.count }}</div>
+                    <div class="text-sm text-blue-700">Equipos</div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ empresa.usuarios_empresa.count }}</div>
+                    <div class="text-sm text-blue-700">Usuarios</div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">
+                        {% with cal_count=empresa.equipos.all.0.calibraciones.count %}
+                            {{ cal_count|default:0 }}
+                        {% endwith %}
+                    </div>
+                    <div class="text-sm text-blue-700">Calibraciones</div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ empresa.procedimientos.count }}</div>
+                    <div class="text-sm text-blue-700">Procedimientos</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirmación -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
+            <div class="flex">
+                <div class="text-yellow-400 mr-3">⚠️</div>
+                <div class="text-sm text-yellow-700">
+                    <p class="font-medium">Confirmar Restauración</p>
+                    <p class="mt-1">Al restaurar la empresa:</p>
+                    <ul class="mt-2 list-disc list-inside space-y-1">
+                        <li>Volverá a aparecer en el listado de empresas activas</li>
+                        <li>Todos sus equipos, usuarios y datos estarán disponibles</li>
+                        <li>Se recuperará completamente la funcionalidad</li>
+                        <li>Esta acción se registrará en los logs del sistema</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="flex space-x-4">
+            <form method="POST" class="inline">
+                {% csrf_token %}
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        onclick="return confirm('¿Está seguro de que desea restaurar la empresa {{ empresa.nombre }}?')">
+                    🔄 Confirmar Restauración
+                </button>
+            </form>
+
+            <a href="{% url 'core:deleted_companies' %}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                ❌ Cancelar
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

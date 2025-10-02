@@ -1,0 +1,534 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Gerencia - {{ empresa.nombre }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.min.css" rel="stylesheet">
+<style>
+    /* Paleta de colores: Blanco, Azul (#1e3a8a, #3b82f6), Gris (#6b7280, #f8fafc) */
+    .client-dashboard {
+        background-color: #f8fafc;
+        min-height: 100vh;
+    }
+
+    .client-header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+    }
+
+    .metric-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        border-left: 4px solid #3b82f6;
+        transition: transform 0.2s ease;
+        height: 100%;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.1);
+    }
+
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1e3a8a;
+        margin-bottom: 0.5rem;
+    }
+
+    .metric-value.large {
+        font-size: 3rem;
+    }
+
+    .metric-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 500;
+    }
+
+    .metric-change {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+
+    .metric-change.positive {
+        color: #10b981;
+    }
+
+    .metric-change.negative {
+        color: #ef4444;
+    }
+
+    .metric-change.neutral {
+        color: #6b7280;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        height: 400px;
+    }
+
+    .chart-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-excellent {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-good {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-warning {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+
+    .comparison-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        margin-bottom: 2rem;
+    }
+
+    .comparison-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .year-comparison {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .year-comparison.current {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+    }
+
+    .year-data {
+        text-align: center;
+    }
+
+    .year-label {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #6b7280;
+        margin-bottom: 0.5rem;
+    }
+
+    .year-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e3a8a;
+    }
+
+    .compliance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .info-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1);
+        border-left: 4px solid #6b7280;
+    }
+
+    .info-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 1rem;
+    }
+
+    .icon-metric {
+        font-size: 1.5rem;
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="client-dashboard">
+    <!-- Header Cliente -->
+    <div class="client-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2">📊 Dashboard Gerencia</h1>
+                    <h2 class="h4 mb-0 opacity-90">{{ empresa.nombre }}</h2>
+                    <p class="mb-0 opacity-75">Análisis del programa de aseguramiento metrológico</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="text-white">
+                        <div class="h6 mb-1">{{ empresa.tipo_organismo }}</div>
+                        <div class="small">
+                            {% if empresa.normas_aplicables %}
+                                {{ empresa.normas_aplicables }}
+                            {% else %}
+                                Gestión Metrológica
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Comparación Año a Año - Inversión -->
+        <div class="comparison-section">
+            <div class="comparison-title">💰 Inversión en Metrología - Comparación Anual</div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="year-comparison">
+                        <div class="year-data">
+                            <div class="year-label">{{ previous_year }}</div>
+                            <div class="year-value">${{ inversion_anterior|floatformat:0 }}</div>
+                            <div class="small text-muted">Año anterior</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="year-comparison current">
+                        <div class="year-data">
+                            <div class="year-label">{{ current_year }}</div>
+                            <div class="year-value">${{ inversion_actual|floatformat:0 }}</div>
+                            <div class="small text-primary fw-bold">
+                                {% if variacion_inversion >= 0 %}+{% endif %}{{ variacion_inversion }}% vs año anterior
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas de Inversión Detallada {{ current_year }} -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_calibracion_cliente|floatformat:0 }}</div>
+                    <div class="metric-label">💎 Calibraciones</div>
+                    <div class="metric-change neutral">
+                        Inversión {{ current_year }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_mantenimiento_cliente|floatformat:0 }}</div>
+                    <div class="metric-label">🔧 Mantenimientos</div>
+                    <div class="metric-change neutral">
+                        Inversión {{ current_year }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_comprobacion_cliente|floatformat:0 }}</div>
+                    <div class="metric-label">✅ Comprobaciones</div>
+                    <div class="metric-change neutral">
+                        Inversión {{ current_year }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costo_promedio_por_equipo|floatformat:0 }}</div>
+                    <div class="metric-label">📊 Costo por Equipo</div>
+                    <div class="metric-change neutral">
+                        {{ num_equipos_empresa }} equipos totales
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Eficacia del Programa Metrológico -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value large">{{ cumplimiento_general }}%</div>
+                    <div class="metric-label">⚡ Cumplimiento General</div>
+                    <div class="mt-2">
+                        <span class="status-badge {% if cumplimiento_general >= 95 %}status-excellent{% elif cumplimiento_general >= 85 %}status-good{% else %}status-warning{% endif %}">
+                            {% if cumplimiento_general >= 95 %}EXCELENTE{% elif cumplimiento_general >= 85 %}BUENO{% else %}REQUIERE ATENCIÓN{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">{{ porcentaje_operativo }}%</div>
+                    <div class="metric-label">🎯 Equipos Operativos</div>
+                    <div class="metric-change positive">
+                        {{ equipos_operativos }}/{{ num_equipos_empresa }} equipos
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">{{ trazabilidad_porcentaje }}%</div>
+                    <div class="metric-label">🛡️ Trazabilidad</div>
+                    <div class="metric-change {% if equipos_sin_calibrar == 0 %}positive{% else %}negative{% endif %}">
+                        {{ equipos_sin_calibrar }} equipos sin calibrar
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">{{ equipos_criticos }}</div>
+                    <div class="metric-label">⚠️ Equipos Críticos</div>
+                    <div class="metric-change {% if equipos_criticos == 0 %}positive{% else %}negative{% endif %}">
+                        {% if equipos_proximos_vencer > 0 %}
+                            {{ equipos_proximos_vencer }} próximos a vencer
+                        {% else %}
+                            Sistema bajo control
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cumplimiento por Actividad -->
+        <div class="compliance-grid">
+            <div class="metric-card">
+                <div class="icon-metric">📏</div>
+                <div class="metric-value">{{ cumplimiento_calibracion }}%</div>
+                <div class="metric-label">Calibraciones</div>
+                <div class="mt-2">
+                    <span class="status-badge {% if cumplimiento_calibracion >= 95 %}status-excellent{% elif cumplimiento_calibracion >= 85 %}status-good{% else %}status-warning{% endif %}">
+                        {% if cumplimiento_calibracion >= 95 %}AL DÍA{% elif cumplimiento_calibracion >= 85 %}BUENO{% else %}ATENCIÓN{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="icon-metric">🔧</div>
+                <div class="metric-value">{{ cumplimiento_mantenimiento }}%</div>
+                <div class="metric-label">Mantenimientos</div>
+                <div class="mt-2">
+                    <span class="status-badge {% if cumplimiento_mantenimiento >= 95 %}status-excellent{% elif cumplimiento_mantenimiento >= 85 %}status-good{% else %}status-warning{% endif %}">
+                        {% if cumplimiento_mantenimiento >= 95 %}AL DÍA{% elif cumplimiento_mantenimiento >= 85 %}BUENO{% else %}ATENCIÓN{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="icon-metric">✅</div>
+                <div class="metric-value">{{ cumplimiento_comprobacion }}%</div>
+                <div class="metric-label">Comprobaciones</div>
+                <div class="mt-2">
+                    <span class="status-badge {% if cumplimiento_comprobacion >= 95 %}status-excellent{% elif cumplimiento_comprobacion >= 85 %}status-good{% else %}status-warning{% endif %}">
+                        {% if cumplimiento_comprobacion >= 95 %}AL DÍA{% elif cumplimiento_comprobacion >= 85 %}BUENO{% else %}ATENCIÓN{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos de Análisis -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-title">📈 Actividades Mensuales {{ current_year }}</div>
+                    <canvas id="activitiesChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-title">🎯 Estado de Equipos</div>
+                    <canvas id="equipmentChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valor del Programa Metrológico -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="comparison-section">
+                    <div class="comparison-title">💎 Valor del Programa {{ current_year }}</div>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h2 text-success fw-bold">{{ cumplimiento_general }}%</div>
+                                <div class="text-muted">Cumplimiento Total</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="h2 text-primary fw-bold">{{ porcentaje_operativo }}%</div>
+                                <div class="text-muted">Disponibilidad</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="comparison-section">
+                    <div class="comparison-title">🏆 Resultados Clave</div>
+                    <div class="small">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>📊 Total Equipos:</span>
+                            <strong>{{ num_equipos_empresa }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>✅ Equipos Operativos:</span>
+                            <strong class="text-success">{{ equipos_operativos }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>⚠️ Equipos Críticos:</span>
+                            <strong class="{% if equipos_criticos == 0 %}text-success{% else %}text-warning{% endif %}">{{ equipos_criticos }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>💰 Inversión Total:</span>
+                            <strong class="text-primary">${{ inversion_actual|floatformat:0 }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información del Sistema -->
+        <div class="info-section">
+            <div class="info-title">🔍 Información del Análisis</div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="small text-muted">
+                        <strong>💰 Inversión:</strong> Suma de costos de calibraciones, mantenimientos y comprobaciones<br>
+                        <strong>📊 Cumplimiento:</strong> Porcentaje de equipos al día con sus actividades programadas<br>
+                        <strong>🎯 Operativos:</strong> Equipos en estado Activo (excluyendo De Baja e Inactivo)<br>
+                        <strong>🛡️ Trazabilidad:</strong> Equipos con calibraciones vigentes y documentadas
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="small text-muted">
+                        <strong>🔄 Última actualización:</strong> {{ now|date:"d/m/Y H:i" }}<br>
+                        <strong>📈 Período actual:</strong> {{ current_year }}<br>
+                        <strong>📊 Comparación:</strong> vs {{ previous_year }}<br>
+                        <strong>🏢 Tipo de organismo:</strong> {{ empresa.tipo_organismo }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuración de colores
+    const colors = {
+        primary: '#1e3a8a',
+        secondary: '#3b82f6',
+        success: '#10b981',
+        warning: '#f59e0b',
+        danger: '#ef4444',
+        gray: '#6b7280'
+    };
+
+    // Gráfico de Actividades Mensuales
+    const activitiesCtx = document.getElementById('activitiesChart').getContext('2d');
+    new Chart(activitiesCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ months_labels|safe }},
+            datasets: [{
+                label: 'Actividades Realizadas',
+                data: {{ monthly_activities_data|safe }},
+                backgroundColor: colors.secondary + '80',
+                borderColor: colors.primary,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    // Gráfico de Estado de Equipos
+    const equipmentCtx = document.getElementById('equipmentChart').getContext('2d');
+    new Chart(equipmentCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ equipment_status_labels|safe }},
+            datasets: [{
+                data: {{ equipment_status_data|safe }},
+                backgroundColor: [
+                    colors.success,   // Activo
+                    colors.warning,   // Inactivo
+                    colors.danger,    // De Baja
+                    colors.gray       // Otros
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

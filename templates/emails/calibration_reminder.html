@@ -16,7 +16,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>⚠️ Recordatorio de Calibracion</h1>
+        <h1>ALERTA - Recordatorio de Calibracion</h1>
         <h2>{{ site_name }}</h2>
     </div>
 
@@ -26,7 +26,7 @@
         <p>Le informamos que el siguiente equipo tiene una calibracion proxima a vencer:</p>
 
         <div class="equipment-details">
-            <h3>📋 Detalles del Equipo</h3>
+            <h3>DETALLES DEL EQUIPO</h3>
             <ul>
                 <li><strong>Codigo:</strong> {{ equipo.codigo_interno }}</li>
                 <li><strong>Nombre:</strong> {{ equipo.nombre }}</li>
@@ -37,7 +37,7 @@
         </div>
 
         <div class="equipment-details">
-            <h3>🗓️ Informacion de Calibracion</h3>
+            <h3>INFORMACION DE CALIBRACION</h3>
             <ul>
                 <li><strong>Fecha de vencimiento:</strong> {{ due_date|date:"d/m/Y" }}</li>
                 <li><strong>Dias restantes:</strong> {{ days_until_due }}</li>
@@ -46,15 +46,15 @@
 
         {% if urgency_level == "critical" %}
         <div class="urgent">
-            <strong>⚠️ ATENCION:</strong> La calibracion ha VENCIDO. Es necesario tomar accion inmediata.
+            <strong>ATENCION:</strong> La calibracion ha VENCIDO. Es necesario tomar accion inmediata.
         </div>
         {% elif urgency_level == "high" %}
         <div class="high">
-            <strong>🚨 URGENTE:</strong> La calibracion vence en menos de 3 dias.
+            <strong>URGENTE:</strong> La calibracion vence en menos de 3 dias.
         </div>
         {% elif urgency_level == "medium" %}
         <div class="medium">
-            <strong>⏰ IMPORTANTE:</strong> La calibracion vence en menos de 7 dias.
+            <strong>IMPORTANTE:</strong> La calibracion vence en menos de 7 dias.
         </div>
         {% endif %}
 

@@ -6,8 +6,8 @@
 {% endblock extra_head %}
 
 {% block content %}
-<div class="container mx-auto p-4">
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ titulo_pagina }}</h1>
+<div class="container mx-auto p-4 informes-container">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6 informes-title">{{ titulo_pagina }}</h1>
 
     {% if messages %}
         <div class="mb-4">
@@ -32,31 +32,46 @@
     </div>
     {% endif %}
 
+    {# Mensaje para técnicos sin permisos de descarga #}
+    {% if user.rol_usuario == 'TECNICO' %}
+    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg shadow-md informes-tecnico-message">
+        <div class="flex">
+            <div class="text-yellow-600 text-2xl mr-4">ℹ️</div>
+            <div>
+                <h3 class="text-lg font-bold text-yellow-800 mb-2">Acceso Limitado - Rol Técnico</h3>
+                <p class="text-yellow-700">Como usuario con rol <strong>Técnico</strong>, no tienes permisos para descargar informes.</p>
+                <p class="text-yellow-700 mt-2">Solo usuarios con rol <strong>Administrador</strong> o <strong>Gerente</strong> pueden descargar informes Excel, PDF y ZIP.</p>
+                <p class="text-yellow-700 mt-2">Puedes ver las <strong>Actividades Programadas</strong> más abajo para consultar el cronograma de trabajo.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {# Botón para exportar listado general de equipos a Excel #}
-        {% if perms.core.can_export_reports %} {# INICIO: Condición para permiso de exportar informes #}
-        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
+        {# Botón para exportar listado general de equipos a Excel - Solo Administrador y Gerente #}
+        {% if user.rol_usuario == 'ADMINISTRADOR' or user.rol_usuario == 'GERENCIA' or user.is_superuser %}
+        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center informes-card">
             <h3 class="text-xl font-semibold text-gray-700 mb-3">Listado General Equipos (Excel)</h3>
             <p class="text-gray-600 mb-4">Exporta un archivo Excel con la información general de todos los equipos.</p>
             <a href="{% url 'core:exportar_equipos_excel' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
                 <i class="fas fa-file-excel mr-2"></i> Exportar Excel
             </a>
         </div>
-        {% endif %} {# FIN: Condición para permiso de exportar informes #}
+        {% endif %}
 
-        {# Botón para generar Dashboard Excel consolidado #}
-        {% if perms.core.can_export_reports %} {# INICIO: Condición para permiso de exportar informes #}
-        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
+        {# Botón para generar Dashboard Excel consolidado - Solo Administrador y Gerente #}
+        {% if user.rol_usuario == 'ADMINISTRADOR' or user.rol_usuario == 'GERENCIA' or user.is_superuser %}
+        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center informes-card">
             <h3 class="text-xl font-semibold text-gray-700 mb-3">Dashboard Excel Completo</h3>
             <p class="text-gray-600 mb-4">Genera Excel con 4 hojas: Equipos, Proveedores, Procedimientos y Dashboard detallado con actividades programadas.</p>
             <a href="{% url 'core:generar_informe_dashboard_excel' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
                 <i class="fas fa-chart-bar mr-2"></i> Generar Dashboard Excel
             </a>
         </div>
-        {% endif %} {# FIN: Condición para permiso de exportar informes #}
+        {% endif %}
 
-        {# Sistema de Cola para ZIP #}
-        {% if perms.core.can_export_reports %} {# INICIO: Condición para permiso de exportar informes #}
+        {# Sistema de Cola para ZIP - Solo Administrador y Gerente #}
+        {% if user.rol_usuario == 'ADMINISTRADOR' or user.rol_usuario == 'GERENCIA' or user.is_superuser %}
         <div id="zip-section" class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
             <h3 class="text-xl font-semibold text-gray-700 mb-3">Descargar Informe Completo (ZIP)</h3>
 
@@ -115,7 +130,7 @@
         {% endif %} {# FIN: Condición para permiso de exportar informes #}
     </div>
 
-    {# SECCIÓN DE LISTADOS DE ACTIVIDADES #}
+    {# SECCIÓN DE LISTADOS DE ACTIVIDADES - Visible para TODOS los roles (incluyendo Técnicos) #}
     <div class="mt-8">
         <h2 class="text-2xl font-bold text-gray-800 mb-4">Actividades Programadas y Vencidas</h2>
 
@@ -213,9 +228,9 @@
             
             <div class="mb-4">
                 <h4 class="text-lg font-medium text-yellow-600 mb-2">Próximas (15-30 días)</h4>
-                {% if comprobaciones_proximos_30 %}
+                {% if comprobaciones_proximas_30 %}
                 <ul class="list-disc list-inside text-gray-700">
-                    {% for comp in comprobaciones_proximos_30 %}
+                    {% for comp in comprobaciones_proximas_30 %}
                         <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"d/m/Y" }}, Faltan: {{ comp.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
@@ -226,9 +241,9 @@
 
             <div class="mb-4">
                 <h4 class="text-lg font-medium text-green-600 mb-2">Próximas (0-15 días)</h4>
-                {% if comprobaciones_proximos_15 %}
+                {% if comprobaciones_proximas_15 %}
                 <ul class="list-disc list-inside text-gray-700">
-                    {% for comp in comprobaciones_proximos_15 %}
+                    {% for comp in comprobaciones_proximas_15 %}
                         <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"d/m/Y" }}, Faltan: {{ comp.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
@@ -307,32 +322,73 @@
                 }
                 {% endif %}
 
-                // Construir URL de solicitud
-                let url = '{% url "core:solicitar_zip" %}?parte=' + parte;
-                {% if user.is_superuser %}
-                if (companyId) {
-                    url += '&empresa_id=' + companyId;
-                }
-                {% endif %}
+                // FUNCIONALIDAD ZIP HABILITADA
+                let url = '/core/solicitar_zip/?parte=' + parte;
 
-                // Realizar solicitud
+                // Agregar empresa_id si está en la URL (para superusuarios)
+                const urlParams = new URLSearchParams(window.location.search);
+                const empresaId = urlParams.get('empresa_id');
+                if (empresaId) {
+                    url += '&empresa_id=' + empresaId;
+                    console.log('ZIP solicitado para empresa ID:', empresaId);
+                }
+
+                // Cambiar botón a "Descargando..."
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Descargando...';
+                btn.disabled = true;
+
                 fetch(url)
-                    .then(response => response.json())
+                    .then(response => {
+                        // Verificar si la respuesta es un archivo (descarga directa)
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/zip')) {
+                            // Es una descarga directa - crear un blob y descargar
+                            return response.blob().then(blob => {
+                                const downloadUrl = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = downloadUrl;
+                                a.download = response.headers.get('content-disposition')
+                                    ?.split('filename=')[1]?.replace(/"/g, '') || `ZIP_${Date.now()}.zip`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(downloadUrl);
+
+                                // Restaurar botón
+                                btn.innerHTML = '<i class="fas fa-clock mr-2"></i>Solicitar ZIP Completo';
+                                btn.disabled = false;
+
+                                alert('¡ZIP descargado exitosamente!');
+                                return null; // No procesar como JSON
+                            });
+                        } else {
+                            // Es una respuesta JSON (cola)
+                            return response.json();
+                        }
+                    })
                     .then(data => {
-                        if (data.status === 'queued' || data.status === 'already_pending') {
+                        if (data && (data.status === 'queued' || data.status === 'already_pending')) {
                             currentRequestId = data.request_id;
                             showZipStatus(data);
-                            // Usar el sistema global de notificaciones
                             if (window.startZipMonitoring) {
                                 window.startZipMonitoring(data.request_id);
                             }
-                        } else {
+                            // Restaurar botón para cola
+                            btn.innerHTML = '<i class="fas fa-clock mr-2"></i>Solicitar ZIP Completo';
+                            btn.disabled = false;
+                        } else if (data && data.error) {
                             alert('Error: ' + (data.message || data.error));
+                            // Restaurar botón en caso de error
+                            btn.innerHTML = '<i class="fas fa-clock mr-2"></i>Solicitar ZIP Completo';
+                            btn.disabled = false;
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         alert('Error solicitando ZIP');
+                        // Restaurar botón en caso de error
+                        btn.innerHTML = '<i class="fas fa-clock mr-2"></i>Solicitar ZIP Completo';
+                        btn.disabled = false;
                     });
             });
         });
@@ -349,9 +405,9 @@
                     <div class="text-center">
                         <div class="flex items-center justify-center mb-2">
                             <i class="fas fa-clock text-blue-600 mr-2"></i>
-                            <span class="font-semibold">En Cola - Posición #${data.position}</span>
+                            <span class="font-semibold">${data.detailed_message || data.message || 'En Cola'}</span>
                         </div>
-                        <p class="text-sm text-gray-600">Tiempo estimado: ${data.estimated_time} minutos</p>
+                        <p class="text-sm text-gray-600">Posición: #${data.position || 'N/A'} - Tiempo estimado: ${data.estimated_time || 'Calculando...'} minutos</p>
                         <div class="mt-3">
                             <button onclick="cancelZipRequest(${data.request_id})"
                                     class="text-sm text-red-600 hover:text-red-800">
@@ -365,7 +421,7 @@
                     <div class="text-center">
                         <div class="flex items-center justify-center mb-2">
                             <i class="fas fa-spinner fa-spin text-green-600 mr-2"></i>
-                            <span class="font-semibold">Generando ZIP...</span>
+                            <span class="font-semibold">${data.detailed_message || data.message || 'Generando ZIP...'}</span>
                         </div>
                         <p class="text-sm text-gray-600">Por favor espere, se está procesando su archivo</p>
                     </div>
@@ -375,7 +431,7 @@
                     <div class="text-center">
                         <div class="flex items-center justify-center mb-2">
                             <i class="fas fa-check-circle text-green-600 mr-2"></i>
-                            <span class="font-semibold">¡ZIP Listo!</span>
+                            <span class="font-semibold">${data.detailed_message || data.message || '¡ZIP Listo!'}</span>
                         </div>
                         <a href="${data.download_url}"
                            class="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md mt-2">
@@ -388,9 +444,9 @@
                     <div class="text-center">
                         <div class="flex items-center justify-center mb-2">
                             <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
-                            <span class="font-semibold">Error en generación</span>
+                            <span class="font-semibold">${data.detailed_message || data.message || 'Error en generación'}</span>
                         </div>
-                        <p class="text-sm text-gray-600">${data.error_message || 'Error desconocido'}</p>
+                        <p class="text-sm text-gray-600">${data.error_message || data.error || 'Error desconocido'}</p>
                     </div>
                 `;
             }
@@ -399,13 +455,13 @@
             statusArea.style.display = 'block';
         }
 
-        // Verificar estado periódicamente
+        // Función ZIP habilitada
         function startStatusCheck() {
             if (statusCheckInterval) clearInterval(statusCheckInterval);
 
             statusCheckInterval = setInterval(() => {
                 if (currentRequestId) {
-                    fetch(`{% url "core:zip_status" 0 %}`.replace('0', currentRequestId))
+                    fetch(`/core/zip_status/${currentRequestId}/`)
                         .then(response => response.json())
                         .then(data => {
                             showZipStatus(data);
@@ -420,10 +476,10 @@
             }, 15000); // Revisar cada 15 segundos
         }
 
-        // Cancelar solicitud
+        // Función ZIP habilitada
         function cancelZipRequest(requestId) {
             if (confirm('¿Estás seguro de que quieres cancelar esta solicitud?')) {
-                fetch(`{% url "core:cancel_zip_request" 0 %}`.replace('0', requestId), {
+                fetch(`/core/cancel_zip_request/${requestId}/`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': '{{ csrf_token }}'
@@ -450,11 +506,11 @@
             }
         }
 
-        // Mostrar mis solicitudes
+        // Función ZIP habilitada
         document.getElementById('show-my-requests').addEventListener('click', function() {
             const area = document.getElementById('my-requests-area');
             if (area.style.display === 'none') {
-                fetch('{% url "core:my_zip_requests" %}')
+                fetch('/core/my_zip_requests/')
                     .then(response => response.json())
                     .then(data => {
                         let html = '<div class="bg-gray-50 border rounded-lg p-3 mt-2"><h4 class="font-semibold mb-2">Mis Solicitudes ZIP</h4>';
@@ -463,18 +519,24 @@
                             html += '<p class="text-sm text-gray-600">No tienes solicitudes recientes</p>';
                         } else {
                             data.requests.forEach(req => {
+                                const createdDate = new Date(req.created_at).toLocaleString('es-CO');
                                 html += `
                                     <div class="border-b pb-2 mb-2 last:border-b-0">
                                         <div class="flex justify-between items-center">
-                                            <span class="text-sm font-medium">Parte ${req.parte_numero} - ${req.status_display}</span>
-                                            <span class="text-xs text-gray-500">${req.created_at}</span>
+                                            <span class="text-sm font-medium">${req.empresa_nombre}</span>
+                                            <span class="text-xs text-gray-500">${createdDate}</span>
+                                        </div>
+                                        <div class="mt-1">
+                                            <span class="text-xs text-gray-700">${req.detailed_message || req.status}</span>
                                         </div>
                                 `;
 
-                                if (req.status === 'pending') {
-                                    html += `<p class="text-xs text-blue-600">Posición #${req.position} (${req.estimated_time} min)</p>`;
-                                } else if (req.status === 'completed') {
-                                    html += `<a href="${req.download_url}" class="text-xs text-green-600 hover:text-green-800">Descargar</a>`;
+                                if (req.status === 'completed' && req.download_url) {
+                                    html += `<div class="mt-1"><a href="${req.download_url}" class="text-xs text-green-600 hover:text-green-800 font-medium"><i class="fas fa-download mr-1"></i>Descargar ZIP</a></div>`;
+                                } else if (req.status === 'pending' && req.time_until_ready) {
+                                    html += `<div class="mt-1"><span class="text-xs text-blue-600">⏱️ ${req.time_until_ready}</span></div>`;
+                                } else if (req.status === 'processing' && req.time_until_ready) {
+                                    html += `<div class="mt-1"><span class="text-xs text-orange-600">🔄 ${req.time_until_ready}</span></div>`;
                                 }
 
                                 html += '</div>';

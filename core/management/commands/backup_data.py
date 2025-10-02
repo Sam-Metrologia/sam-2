@@ -76,19 +76,19 @@ class Command(BaseCommand):
                     self.backup_empresa(empresa, backup_path, timestamp, backup_format, include_files, verbose)
 
             self.stdout.write(
-                self.style.SUCCESS(f'✅ Backup completado en: {backup_path}')
+                self.style.SUCCESS(f'OK Backup completado en: {backup_path}')
             )
 
         except Exception as e:
             logger.error(f'Error in backup command: {e}')
             self.stdout.write(
-                self.style.ERROR(f'❌ Error durante backup: {e}')
+                self.style.ERROR(f'ERROR Error durante backup: {e}')
             )
 
     def backup_empresa(self, empresa, backup_path, timestamp, backup_format, include_files, verbose):
         """Crea backup completo de una empresa."""
         if verbose:
-            self.stdout.write(f'   📊 Procesando: {empresa.nombre}')
+            self.stdout.write(f'   Procesando Procesando: {empresa.nombre}')
 
         try:
             # Preparar datos para serialización
@@ -109,12 +109,12 @@ class Command(BaseCommand):
                 self.create_zip_backup(empresa, backup_data, zip_path, include_files, verbose)
 
             if verbose:
-                self.stdout.write(f'   ✅ Backup completado para: {empresa.nombre}')
+                self.stdout.write(f'   OK Backup completado para: {empresa.nombre}')
 
         except Exception as e:
             logger.error(f'Error backing up empresa {empresa.nombre}: {e}')
             self.stdout.write(
-                self.style.ERROR(f'   ❌ Error en backup de {empresa.nombre}: {e}')
+                self.style.ERROR(f'   ERROR Error en backup de {empresa.nombre}: {e}')
             )
 
     def gather_empresa_data(self, empresa, verbose=False):
@@ -192,7 +192,7 @@ class Command(BaseCommand):
                 json.dump(backup_data, f, ensure_ascii=False, indent=2)
 
             if verbose:
-                self.stdout.write(f'     ✅ JSON backup: {os.path.basename(json_path)}')
+                self.stdout.write(f'     OK JSON backup: {os.path.basename(json_path)}')
 
             # Subir a S3 automáticamente
             self.upload_to_s3(json_path, verbose)
@@ -225,7 +225,7 @@ class Command(BaseCommand):
                 zipf.writestr('backup_info.json', json.dumps(info, ensure_ascii=False, indent=2))
 
             if verbose:
-                self.stdout.write(f'     ✅ ZIP backup: {os.path.basename(zip_path)}')
+                self.stdout.write(f'     OK ZIP backup: {os.path.basename(zip_path)}')
 
             # Subir a S3 automáticamente
             self.upload_to_s3(zip_path, verbose)
@@ -385,4 +385,4 @@ class Command(BaseCommand):
         except Exception as e:
             logger.error(f'Error uploading to S3: {e}')
             if verbose:
-                self.stdout.write(f'     ❌ Error subiendo a S3: {e}')
+                self.stdout.write(f'     ERROR Error subiendo a S3: {e}')

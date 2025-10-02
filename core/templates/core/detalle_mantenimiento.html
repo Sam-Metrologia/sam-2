@@ -63,7 +63,7 @@
             {% if mantenimiento.documento_mantenimiento %}
             <div class="md:col-span-2">
                 <p class="text-gray-600 font-semibold">Documento de Mantenimiento:</p>
-                <a href="{{ mantenimiento.documento_mantenimiento.url }}" target="_blank" class="text-blue-600 hover:underline">
+                <a href="{% url 'core:ver_archivo_mantenimiento' mantenimiento.pk %}" target="_blank" class="text-blue-600 hover:underline">
                     Ver Documento
                 </a>
             </div>

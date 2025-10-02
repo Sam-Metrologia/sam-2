@@ -1,0 +1,2088 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if perspectiva == 'sam' %}Panel de Decisiones SAM - Vista Estratégica{% else %}Panel de Decisiones - {{ empresa.nombre }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos para Panel de Decisiones en modo oscuro */
+
+    /* Badges de estado - colores visibles en modo oscuro */
+    [data-theme="dark"] .estado-badge.estado-CRÍTICO {
+        background-color: rgba(239, 68, 68, 0.2) !important;
+        color: #f87171 !important; /* red-400 */
+        font-weight: bold !important;
+    }
+
+    [data-theme="dark"] .estado-badge.estado-EN\\ RIESGO {
+        background-color: rgba(251, 146, 60, 0.2) !important;
+        color: #fb923c !important; /* orange-400 */
+        font-weight: bold !important;
+    }
+
+    [data-theme="dark"] .estado-badge.estado-BUENO {
+        background-color: rgba(74, 222, 128, 0.2) !important;
+        color: #4ade80 !important; /* green-400 */
+        font-weight: bold !important;
+    }
+
+    [data-theme="dark"] .estado-badge.estado-ÓPTIMO {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #10b981 !important; /* green-500 */
+        font-weight: bold !important;
+    }
+
+    [data-theme="dark"] .estado-badge.estado-EXCELENTE {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #10b981 !important; /* green-500 */
+        font-weight: bold !important;
+    }
+
+    [data-theme="dark"] .estado-badge.estado-REGULAR {
+        background-color: rgba(251, 191, 36, 0.2) !important;
+        color: #fbbf24 !important; /* yellow-400 */
+        font-weight: bold !important;
+    }
+
+    [data-theme="dark"] .estado-badge.estado-DEFICIENTE {
+        background-color: rgba(239, 68, 68, 0.2) !important;
+        color: #f87171 !important; /* red-400 */
+        font-weight: bold !important;
+    }
+
+    /* Fondos de fichas de fórmulas */
+    [data-theme="dark"] .formula-card {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Texto en fichas con fondo */
+    [data-theme="dark"] .decisiones-card-title {
+        color: #f3f4f6 !important; /* gray-100 */
+    }
+
+    [data-theme="dark"] .decisiones-card-value {
+        color: #ffffff !important;
+    }
+
+    [data-theme="dark"] .decisiones-card-label {
+        color: #d1d5db !important; /* gray-300 */
+    }
+
+    /* Fichas principales - las 3 métricas pilares */
+    [data-theme="dark"] .decisiones-pilar-card {
+        background-color: #1f2937 !important; /* gray-800 */
+    }
+
+    /* Fichas de información y secciones */
+    [data-theme="dark"] .decisiones-info-card,
+    [data-theme="dark"] .decisiones-section-card {
+        background-color: #1f2937 !important; /* gray-800 */
+    }
+
+    /* Contenedor principal */
+    [data-theme="dark"] .panel-decisiones-container {
+        background-color: #111827 !important; /* gray-900 */
+    }
+
+    /* Títulos en fichas */
+    [data-theme="dark"] .decisiones-pilar-card h3,
+    [data-theme="dark"] .decisiones-section-card h3,
+    [data-theme="dark"] .decisiones-info-card h4 {
+        color: #f3f4f6 !important; /* gray-100 */
+    }
+
+    /* Texto descriptivo */
+    [data-theme="dark"] .decisiones-pilar-card p,
+    [data-theme="dark"] .decisiones-section-card p,
+    [data-theme="dark"] .decisiones-info-card p {
+        color: #d1d5db !important; /* gray-300 */
+    }
+
+    /* Elementos con bordes blancos */
+    [data-theme="dark"] div[style*="background: white"] {
+        background-color: #374151 !important; /* gray-700 */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel-decisiones-container" style="background-color: #f8fafc; min-height: 100vh; padding: 20px; font-family: Arial, sans-serif;">
+
+    {% if error %}
+    <div class="decisiones-error-card" style="background: #fee2e2; color: #dc2626; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+        <h2 style="margin: 0; font-size: 1.5rem;">{{ error }}</h2>
+    </div>
+    {% else %}
+
+    <!-- Header -->
+    <div class="decisiones-header-gradient" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px;">
+        <h1 style="font-size: 2.5rem; font-weight: bold; margin: 0;">
+            {% if perspectiva == 'sam' %}
+                📊 Panel de Decisiones SAM
+            {% else %}
+                🎯 Panel de Decisiones
+            {% endif %}
+        </h1>
+        <p style="margin: 10px 0 0 0; opacity: 0.8;">
+            {% if perspectiva == 'sam' %}
+                Vista Estratégica Multi-Empresa - Información → Decisión
+                {% if selected_company_id %}
+                    {% for emp in empresas_disponibles %}
+                        {% if emp.id|stringformat:"s" == selected_company_id %}
+                            (Filtrado: {{ emp.nombre }})
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            {% else %}
+                {{ empresa.nombre }} - Gestión Táctica de Cumplimiento
+            {% endif %}
+        </p>
+        <p style="margin: 5px 0 0 0; opacity: 0.7; font-size: 0.9rem;">{{ today|date:"d/m/Y" }}</p>
+
+        {% if perspectiva == 'sam' %}
+        <!-- Selector de empresa para SAM -->
+        <div style="margin-top: 20px;">
+            <form method="get" style="display: flex; gap: 10px; align-items: center;">
+                <select name="empresa_id" onchange="this.form.submit()" style="padding: 8px 12px; border: none; border-radius: 6px; background: rgba(255,255,255,0.9); color: #1f2937;">
+                    <option value="">Todas las empresas</option>
+                    {% for emp in empresas_disponibles %}
+                        <option value="{{ emp.id }}" {% if selected_company_id == emp.id|stringformat:"s" %}selected{% endif %}>
+                            {{ emp.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Las 3 Métricas Pilares -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-bottom: 30px;">
+
+        <!-- PILAR 1: Salud del Equipo -->
+        <div class="decisiones-pilar-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid {% if salud_general_estado == 'ÓPTIMO' %}#10b981{% elif salud_general_estado == 'BUENO' %}#3b82f6{% elif salud_general_estado == 'EN RIESGO' %}#f59e0b{% else %}#ef4444{% endif %};">
+            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
+                <h3 style="font-size: 1.2rem; font-weight: bold; color: #1f2937; margin: 0;">🏥 Condición General de Equipos</h3>
+                <span class="estado-badge estado-{{ salud_general_estado }}" style="background: {% if salud_general_estado == 'ÓPTIMO' %}#d1fae5{% elif salud_general_estado == 'BUENO' %}#dbeafe{% elif salud_general_estado == 'EN RIESGO' %}#fef3c7{% else %}#fed7d7{% endif %}; color: {% if salud_general_estado == 'ÓPTIMO' %}#059669{% elif salud_general_estado == 'BUENO' %}#2563eb{% elif salud_general_estado == 'EN RIESGO' %}#d97706{% else %}#dc2626{% endif %}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">{{ salud_general_estado }}</span>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3rem; font-weight: bold; color: {% if salud_general_estado == 'ÓPTIMO' %}#059669{% elif salud_general_estado == 'BUENO' %}#2563eb{% elif salud_general_estado == 'EN RIESGO' %}#d97706{% else %}#dc2626{% endif %}; cursor: pointer;" onclick="toggleFormulaDetalle()" title="Haga clic para ver el desglose de la fórmula">
+                    {{ salud_general_porcentaje }}%
+                </div>
+                <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">
+                    {% if perspectiva == 'sam' %}
+                        {{ equipos_saludables_total|default:equipos_saludables }} de {{ total_equipos_gestionados|default:total_equipos_salud }} equipos en condición óptima
+                    {% else %}
+                        {{ equipos_saludables }} de {{ total_equipos_salud }} equipos en condición óptima
+                    {% endif %}
+                </p>
+
+                <!-- Botón Ver Detalles de Equipos -->
+                <button onclick="verDetallesEquiposSalud()" style="margin-top: 15px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: background 0.3s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+                    📋 Ver Detalles de Equipos
+                </button>
+
+                <!-- Fórmula Ponderada Detallada -->
+                {% if formula_detalle %}
+                <div id="formula-detalle" class="decisiones-detalle-box" style="display: none; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: left;">
+                    <h5 style="color: #374151; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold;">📋 Desglose del Cálculo de Condición General:</h5>
+
+                    <div style="font-family: monospace; font-size: 0.8rem; color: #4b5563; margin-bottom: 10px;">
+                        <strong>Fórmula:</strong> Estado({{ formula_detalle.peso_estado }}%) + Calibraciones({{ formula_detalle.peso_calibraciones }}%) + Mantenimientos({{ formula_detalle.peso_mantenimientos }}%) + Comprobaciones({{ formula_detalle.peso_comprobaciones }}%)
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div style="background: #dbeafe; padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #1e40af;">{{ formula_detalle.puntuacion_estado }}%</div>
+                            <div style="font-size: 0.7rem; color: #1e40af;">Estado Operativo</div>
+                            <div style="font-size: 0.65rem; color: #6b7280;">{{ formula_detalle.contribucion_estado }}pts</div>
+                        </div>
+                        <div style="background: #d1fae5; padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #059669;">{{ formula_detalle.puntuacion_calibraciones }}%</div>
+                            <div style="font-size: 0.7rem; color: #059669;">Calibraciones</div>
+                            <div style="font-size: 0.65rem; color: #6b7280;">{{ formula_detalle.contribucion_calibraciones }}pts</div>
+                        </div>
+                        <div style="background: #fef3c7; padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #d97706;">{{ formula_detalle.puntuacion_mantenimientos }}%</div>
+                            <div style="font-size: 0.7rem; color: #d97706;">Mantenimientos</div>
+                            <div style="font-size: 0.65rem; color: #6b7280;">{{ formula_detalle.contribucion_mantenimientos }}pts</div>
+                        </div>
+                        <div style="background: #fed7d7; padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #dc2626;">{{ formula_detalle.puntuacion_comprobaciones }}%</div>
+                            <div style="font-size: 0.7rem; color: #dc2626;">Comprobaciones</div>
+                            <div style="font-size: 0.65rem; color: #6b7280;">{{ formula_detalle.contribucion_comprobaciones }}pts</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 0.8rem; color: #374151; background: #f3f4f6; padding: 8px; border-radius: 4px;">
+                        <strong>Cálculo:</strong> {{ formula_detalle.calculo_ejemplo }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">{% if perspectiva == 'sam' %}{{ equipos_saludables_total|default:equipos_saludables }}{% else %}{{ equipos_saludables }}{% endif %}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">✅ Condición Óptima</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">{% if perspectiva == 'sam' %}{{ equipos_en_riesgo_total|default:equipos_en_riesgo }}{% else %}{{ equipos_en_riesgo }}{% endif %}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">⚠️ Requiere Atención</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">{% if perspectiva == 'sam' %}{{ equipos_criticos_total|default:equipos_criticos }}{% else %}{{ equipos_criticos }}{% endif %}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">🚨 Acción Inmediata</div>
+                </div>
+            </div>
+
+            <!-- Gráfica de distribución de equipos -->
+            <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 8px;">
+                <canvas id="saludEquiposChart" style="max-height: 200px;"></canvas>
+            </div>
+        </div>
+
+        <!-- PILAR 2: Cumplimiento -->
+        <div class="decisiones-pilar-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid {% if cumplimiento_estado == 'EXCELENTE' %}#10b981{% elif cumplimiento_estado == 'BUENO' %}#3b82f6{% elif cumplimiento_estado == 'REGULAR' %}#f59e0b{% else %}#ef4444{% endif %};">
+            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
+                <h3 style="font-size: 1.2rem; font-weight: bold; color: #1f2937; margin: 0;">📊 Puntualidad en Actividades</h3>
+                <span style="background: {% if cumplimiento_estado == 'EXCELENTE' %}#d1fae5{% elif cumplimiento_estado == 'BUENO' %}#dbeafe{% elif cumplimiento_estado == 'REGULAR' %}#fef3c7{% else %}#fed7d7{% endif %}; color: {% if cumplimiento_estado == 'EXCELENTE' %}#059669{% elif cumplimiento_estado == 'BUENO' %}#2563eb{% elif cumplimiento_estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">{{ cumplimiento_estado }}</span>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3rem; font-weight: bold; color: {% if cumplimiento_estado == 'EXCELENTE' %}#059669{% elif cumplimiento_estado == 'BUENO' %}#2563eb{% elif cumplimiento_estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; cursor: pointer;" onclick="toggleCumplimientoDetalle()" title="Haga clic para ver el desglose de la fórmula">
+                    {{ cumplimiento_porcentaje }}%
+                </div>
+                <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">
+                    {% if perspectiva == 'sam' %}
+                        {{ actividades_realizadas_total|default:actividades_realizadas }} de {{ actividades_programadas_total|default:actividades_programadas }} actividades completadas a tiempo
+                    {% else %}
+                        {{ actividades_realizadas }} de {{ actividades_programadas }} actividades completadas a tiempo
+                    {% endif %}
+                </p>
+
+                <!-- Desglose de Fórmula de Puntualidad -->
+                {% if formula_cumplimiento %}
+                <div id="cumplimiento-detalle" style="display: none; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: left;">
+                    <h5 style="color: #374151; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold;">📋 Desglose del Cálculo de Puntualidad:</h5>
+
+                    <div style="font-family: monospace; font-size: 0.8rem; color: #4b5563; margin-bottom: 10px;">
+                        <strong>Fórmula:</strong> Puntualidad = (Actividades Completadas a Tiempo ÷ Actividades Programadas) × 100
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div style="background: #d1fae5; padding: 10px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #059669; font-size: 1.2rem;">{{ formula_cumplimiento.actividades_completadas }}</div>
+                            <div style="font-size: 0.75rem; color: #047857;">Actividades Completadas</div>
+                            <div style="font-size: 0.7rem; color: #6b7280;">a tiempo según cronograma</div>
+                        </div>
+                        <div style="background: #dbeafe; padding: 10px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #1e40af; font-size: 1.2rem;">{{ formula_cumplimiento.actividades_programadas }}</div>
+                            <div style="font-size: 0.75rem; color: #1e40af;">Actividades Programadas</div>
+                            <div style="font-size: 0.7rem; color: #6b7280;">según frecuencias de equipos</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 0.8rem; color: #374151; background: #f3f4f6; padding: 8px; border-radius: 4px;">
+                        <strong>Cálculo:</strong> {{ formula_cumplimiento.calculo_ejemplo }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">{{ actividades_realizadas }}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">✅ Realizadas</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">{{ actividades_pendientes }}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">⏰ Pendientes</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PILAR 3: Eficiencia Operacional -->
+        <div class="decisiones-pilar-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid {% if eficiencia_estado == 'ÓPTIMO' %}#10b981{% elif eficiencia_estado == 'BUENO' %}#3b82f6{% elif eficiencia_estado == 'REGULAR' %}#f59e0b{% else %}#ef4444{% endif %};">
+            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
+                <h3 style="font-size: 1.2rem; font-weight: bold; color: #1f2937; margin: 0;">⚡ Disponibilidad de Equipos</h3>
+                <span style="background: {% if eficiencia_estado == 'ÓPTIMO' %}#d1fae5{% elif eficiencia_estado == 'BUENO' %}#dbeafe{% elif eficiencia_estado == 'REGULAR' %}#fef3c7{% else %}#fed7d7{% endif %}; color: {% if eficiencia_estado == 'ÓPTIMO' %}#059669{% elif eficiencia_estado == 'BUENO' %}#2563eb{% elif eficiencia_estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">{{ eficiencia_estado }}</span>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3rem; font-weight: bold; color: {% if eficiencia_estado == 'ÓPTIMO' %}#059669{% elif eficiencia_estado == 'BUENO' %}#2563eb{% elif eficiencia_estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; cursor: pointer;" onclick="toggleEficienciaDetalle()" title="Haga clic para ver el desglose de la fórmula">
+                    {{ eficiencia_porcentaje }}%
+                </div>
+                <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">{{ equipos_disponibles }} de {{ total_equipos_eficiencia }} equipos listos para operar</p>
+
+                <!-- Desglose de Fórmula de Disponibilidad -->
+                {% if formula_eficiencia %}
+                <div id="eficiencia-detalle" style="display: none; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: left;">
+                    <h5 style="color: #374151; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold;">📋 Desglose del Cálculo de Disponibilidad:</h5>
+
+                    <div style="font-family: monospace; font-size: 0.8rem; color: #4b5563; margin-bottom: 10px;">
+                        <strong>Fórmula Actual:</strong> Disponibilidad = (Equipos Activos/Operativos ÷ Total de Equipos) × 100
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div style="background: #d1fae5; padding: 10px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #059669; font-size: 1.2rem;">{{ formula_eficiencia.equipos_disponibles }}</div>
+                            <div style="font-size: 0.75rem; color: #047857;">Equipos Disponibles</div>
+                            <div style="font-size: 0.7rem; color: #6b7280;">Estado: Activo/Operativo</div>
+                        </div>
+                        <div style="background: #fed7d7; padding: 10px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #dc2626; font-size: 1.2rem;">{{ formula_eficiencia.equipos_baja_inactivo }}</div>
+                            <div style="font-size: 0.75rem; color: #dc2626;">No Disponibles</div>
+                            <div style="font-size: 0.7rem; color: #6b7280;">Estado: De Baja/Inactivo</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 0.8rem; color: #374151; background: #f3f4f6; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
+                        <strong>Cálculo:</strong> {{ formula_eficiencia.calculo_ejemplo }}
+                    </div>
+
+                    <div style="background: #fef3c7; padding: 8px; border-radius: 4px; text-align: center;">
+                        <div style="font-size: 0.75rem; color: #92400e;"><strong>🔄 Expansión Futura:</strong></div>
+                        <div style="font-size: 0.7rem; color: #78716c;">Esta métrica se expandirá para incluir:</div>
+                        <div style="font-size: 0.7rem; color: #78716c;">• Utilización efectiva (30%) • Puntualidad de cronograma (40%)</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">{{ equipos_disponibles }}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">🟢 Disponibles</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #6b7280;">{{ equipos_no_disponibles }}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">🔴 No Disponibles</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Análisis Financiero (NUEVO) -->
+    {% if perspectiva == 'empresa' %}
+    <div class="decisiones-analisis-costos" style="background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%); border-radius: 12px; padding: 30px; margin-bottom: 30px; color: white;">
+        <h3 style="font-size: 1.8rem; font-weight: bold; margin-bottom: 25px; text-align: center;">
+            💰 Análisis y Proyección de Costos Metrológicos
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+
+            <!-- Gasto YTD -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">💰 Gastos Reales del Año</h4>
+                <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleGastosRealesDetalle()" title="Haga clic para ver el desglose de la fórmula">
+                    ${{ gasto_ytd_total|floatformat:0 }} COP
+                </div>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">Dinero efectivamente gastado (Enero-{{ today|date:"M" }})</p>
+
+                <!-- Desglose por tipo -->
+                <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.75rem;">
+                    <div>
+                        <div style="font-weight: bold;">${{ costos_calibracion_ytd|floatformat:0 }}</div>
+                        <div style="opacity: 0.8;">Calibraciones ({{ porcentaje_calibracion }}%)</div>
+                    </div>
+                    <div>
+                        <div style="font-weight: bold;">${{ costos_mantenimiento_ytd|floatformat:0 }}</div>
+                        <div style="opacity: 0.8;">Mantenimientos ({{ porcentaje_mantenimiento }}%)</div>
+                    </div>
+                    <div>
+                        <div style="font-weight: bold;">${{ costos_comprobacion_ytd|floatformat:0 }}</div>
+                        <div style="opacity: 0.8;">Comprobaciones ({{ porcentaje_comprobacion }}%)</div>
+                    </div>
+                </div>
+
+                <!-- Desglose Interactivo de Gastos Reales -->
+                {% if formula_gastos_reales %}
+                <div id="gastos-reales-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">🗺 Desglose del Cálculo de Gastos Reales:</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 10px; font-family: monospace; font-size: 0.7rem;">
+                        <strong>Fórmula:</strong> Gasto Total = Calibraciones + Mantenimientos + Comprobaciones
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div style="background: rgba(59, 130, 246, 0.3); padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #dbeafe; font-size: 0.9rem;">${{ formula_gastos_reales.calibraciones|floatformat:0 }}</div>
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8);">Calibraciones</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">{{ formula_gastos_reales.porcentaje_cal }}% del total</div>
+                        </div>
+                        <div style="background: rgba(16, 185, 129, 0.3); padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #d1fae5; font-size: 0.9rem;">${{ formula_gastos_reales.mantenimientos|floatformat:0 }}</div>
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8);">Mantenimientos</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">{{ formula_gastos_reales.porcentaje_mant }}% del total</div>
+                        </div>
+                        <div style="background: rgba(245, 158, 11, 0.3); padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #fef3c7; font-size: 0.9rem;">${{ formula_gastos_reales.comprobaciones|floatformat:0 }}</div>
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8);">Comprobaciones</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">{{ formula_gastos_reales.porcentaje_comp }}% del total</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 0.7rem; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); padding: 6px; border-radius: 4px; margin-bottom: 8px;">
+                        <strong>Cálculo:</strong> {{ formula_gastos_reales.calculo_ejemplo }}
+                    </div>
+
+                    <div style="text-align: center; background: rgba(59, 130, 246, 0.2); padding: 6px; border-radius: 4px;">
+                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); font-weight: bold;">📅 Período:</div>
+                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.9);">{{ formula_gastos_reales.periodo }}</div>
+                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.8); margin-top: 3px;">
+                            ✓ Solo gastos efectivamente realizados y pagados
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Proyección Próximo Año -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">🔮 Presupuesto Estimado {{ current_year|add:1 }}</h4>
+                <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="togglePresupuestoDetalle()" title="Haga clic para ver el desglose de la fórmula">
+                    ${{ proyeccion_gasto_proximo_año|floatformat:0 }} COP
+                </div>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">Dinero que necesitará reservar para {{ current_year|add:1 }}</p>
+
+                <!-- Actividades proyectadas -->
+                <div style="margin-top: 15px;">
+                    <div style="font-size: 0.9rem; font-weight: bold;">{{ actividades_proyectadas_total }} actividades programadas</div>
+                    <div style="font-size: 0.75rem; opacity: 0.8;">basado en las frecuencias de sus equipos</div>
+                </div>
+
+                <!-- Desglose de Presupuesto -->
+                {% if formula_presupuesto %}
+                <div id="presupuesto-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">📊 Desglose del Cálculo de Presupuesto:</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Metodología de Proyección:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Basado en frecuencias programadas de cada equipo
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Costos históricos por marca y modelo de equipos similares
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Solo actividades preventivas programadas
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        • No incluye mantenimientos correctivos imprevistos
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Fuentes de Datos:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        📏 Calibraciones: Servicios de calibración contratados y facturados
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🔧 Mantenimientos: Costos de reparaciones y mantenimientos realizados
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        ✅ Comprobaciones: Verificaciones internas realizadas en la empresa
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Cálculo de Proyección:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Para cada equipo: (12 meses ÷ frecuencia_meses) × costo_promedio
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Si no hay historial: buscar costo promedio por marca/modelo
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8);">
+                        • Solo proyectar si existen datos históricos reales
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Indicador de Variación -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">📈 Variación Proyectada</h4>
+                {% if gasto_ytd_total > 0 %}
+                    {% widthratio proyeccion_gasto_proximo_año gasto_ytd_total 100 as variacion %}
+                    {% if variacion >= 110 %}
+                        <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; color: #fbbf24; cursor: pointer;" onclick="toggleVariacionDetalle()" title="Haga clic para ver el desglose de la fórmula">+{{ variacion|add:"-100" }}%</div>
+                        <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">⬆️ Incremento esperado</p>
+                    {% elif variacion <= 90 %}
+                        <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; color: #10b981; cursor: pointer;" onclick="toggleVariacionDetalle()" title="Haga clic para ver el desglose de la fórmula">{{ variacion|add:"-100" }}%</div>
+                        <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">⬇️ Reducción esperada</p>
+                    {% else %}
+                        <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; color: #e5e7eb; cursor: pointer;" onclick="toggleVariacionDetalle()" title="Haga clic para ver el desglose de la fórmula">~0%</div>
+                        <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">➡️ Similar al año actual</p>
+                    {% endif %}
+                {% else %}
+                    <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; color: #e5e7eb;">N/A</div>
+                    <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">Sin datos históricos</p>
+                {% endif %}
+
+                <!-- Desglose de Fórmula de Variación -->
+                {% if formula_variacion and gasto_ytd_total > 0 %}
+                <div id="variacion-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">🗺 Desglose del Cálculo de Variación:</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>¿Qué es la Variación Proyectada?</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-size: 0.7rem;">
+                        Compara cuánto gastó este año vs. cuánto necesitará el próximo año, mostrando si el presupuesto aumentará o disminuirá
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Fuentes de Datos:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px; font-size: 0.7rem;">
+                        📊 Gasto Real {{ current_year }}: Todas las facturas y pagos realizados este año
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-size: 0.7rem;">
+                        📅 Proyección {{ current_year|add:1 }}: Cálculo basado en frecuencias programadas de sus equipos
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 10px; font-family: monospace; font-size: 0.7rem;">
+                        <strong>Fórmula:</strong> Variación % = (Proyección {{ current_year|add:1 }} ÷ Gasto {{ current_year }}) × 100 - 100
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #fbbf24; font-size: 0.9rem;">${{ formula_variacion.proyeccion_2026|floatformat:0 }}</div>
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8);">Presupuesto 2026</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">basado en frecuencias</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold; color: #3b82f6; font-size: 0.9rem;">${{ formula_variacion.gasto_ytd_2025|floatformat:0 }}</div>
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8);">Gasto Real 2025</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">hasta {{ today|date:"M" }}</div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 0.7rem; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); padding: 6px; border-radius: 4px; margin-bottom: 8px;">
+                        <strong>Cálculo:</strong> {{ formula_variacion.calculo_ejemplo }}
+                    </div>
+
+                    <div style="text-align: center; background: {% if formula_variacion.variacion_porcentaje > 10 %}rgba(251, 191, 36, 0.2){% elif formula_variacion.variacion_porcentaje < -10 %}rgba(16, 185, 129, 0.2){% else %}rgba(229, 231, 235, 0.2){% endif %}; padding: 6px; border-radius: 4px;">
+                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.8); font-weight: bold;">📈 Interpretación:</div>
+                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.9);">{{ formula_variacion.interpretacion }}</div>
+                        {% if formula_variacion.diferencia_absoluta != 0 %}
+                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.8); margin-top: 3px;">
+                            Diferencia: {% if formula_variacion.diferencia_absoluta > 0 %}+{% endif %}${{ formula_variacion.diferencia_absoluta|floatformat:0 }} COP
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Nota sobre mantenimientos correctivos -->
+                <div style="margin-top: 15px; font-size: 0.7rem; opacity: 0.7; font-style: italic;">
+                    * No incluye mantenimientos correctivos no programados
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón de exportación funcional -->
+        <div style="text-align: center; margin-top: 25px;">
+            <a href="{% url 'core:exportar_analisis_financiero' %}" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 12px 20px; display: inline-block; font-size: 0.9rem; color: white; text-decoration: none; transition: all 0.3s ease;">
+                📊 Exportar Análisis Financiero a Excel
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Métricas Financieras del Negocio SAM (Solo Superusuarios) -->
+    {% if perspectiva == 'sam' %}
+    <div class="decisiones-analisis-sam" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 12px; padding: 30px; margin-bottom: 30px; color: white;">
+        <h3 style="font-size: 1.8rem; font-weight: bold; margin-bottom: 25px; text-align: center;">
+            📈 Análisis Financiero del Negocio SAM
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px;">
+
+            <!-- Ingreso YTD -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">💵 Ingresos del Negocio</h4>
+                <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleIngresosSamDetalle()" title="Ver desglose de la fórmula">
+                    ${{ ingreso_ytd_actual|floatformat:0 }} COP
+                </div>
+                <p style="margin: 0; font-size: 0.75rem; opacity: 0.8;">Dinero recibido de clientes ({{ current_year }})</p>
+
+                <!-- Desglose Fórmula Ingresos SAM -->
+                {% if formulas_sam.ingresos_formula %}
+                <div id="ingresos-sam-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 10px; margin-top: 10px; text-align: left; font-size: 0.7rem;">
+                    <div style="color: #e5e7eb; margin-bottom: 5px;"><strong>Fórmula:</strong></div>
+                    <div style="color: #d1d5db; margin-bottom: 8px;">Ingreso YTD = ∑ (Pagos Recibidos de Todas las Empresas)</div>
+                    <div style="background: rgba(255,255,255,0.1); padding: 6px; border-radius: 4px; color: #f3f4f6; font-family: monospace;">
+                        {{ formulas_sam.ingresos_formula.calculo_ejemplo }}
+                    </div>
+                    <div style="color: #d1d5db; margin-top: 5px; font-size: 0.65rem;">Período: {{ formulas_sam.ingresos_formula.periodo }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Crecimiento Ingresos -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">📊 Crecimiento vs {{ current_year|add:"-1" }}</h4>
+                <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; color: {% if crecimiento_ingresos_porcentaje >= 0 %}#10b981{% else %}#ef4444{% endif %}; cursor: pointer;" onclick="toggleCrecimientoSamDetalle()" title="Ver desglose de la fórmula">
+                    {% if crecimiento_ingresos_porcentaje >= 0 %}+{% endif %}{{ crecimiento_ingresos_porcentaje }}%
+                </div>
+                <p style="margin: 0; font-size: 0.75rem; opacity: 0.8;">
+                    {% if crecimiento_ingresos_porcentaje >= 0 %}⬆️ Crecimiento{% else %}⬇️ Reducción{% endif %}
+                </p>
+
+                <!-- Desglose Fórmula Crecimiento SAM -->
+                {% if formulas_sam.crecimiento_formula %}
+                <div id="crecimiento-sam-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 10px; margin-top: 10px; text-align: left; font-size: 0.7rem;">
+                    <div style="color: #e5e7eb; margin-bottom: 5px;"><strong>Fórmula:</strong></div>
+                    <div style="color: #d1d5db; margin-bottom: 8px;">Crecimiento % = (Actual - Anterior) ÷ Anterior × 100</div>
+                    <div style="background: rgba(255,255,255,0.1); padding: 6px; border-radius: 4px; color: #f3f4f6; font-family: monospace; font-size: 0.65rem;">
+                        {{ formulas_sam.crecimiento_formula.calculo_ejemplo }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Empresas Activas -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">🏢 Empresas Activas</h4>
+                <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 5px;">{{ empresas_activas_actual }}</div>
+                <p style="margin: 0; font-size: 0.75rem; opacity: 0.8;">Base de clientes {{ current_year }}</p>
+            </div>
+
+            <!-- Proyección Fin de Año -->
+            <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">🔮 Proyección Fin {{ current_year }}</h4>
+                <div style="font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleProyeccionSamDetalle()" title="Ver desglose de la fórmula">
+                    ${{ proyeccion_fin_año|floatformat:0 }} COP
+                </div>
+                <p style="margin: 0; font-size: 0.75rem; opacity: 0.8;">Ingresos estimados para diciembre</p>
+
+                <!-- Desglose Fórmula Proyección SAM -->
+                {% if formulas_sam.proyeccion_formula %}
+                <div id="proyeccion-sam-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 10px; margin-top: 10px; text-align: left; font-size: 0.7rem;">
+                    <div style="color: #e5e7eb; margin-bottom: 5px;"><strong>Fórmula:</strong></div>
+                    <div style="color: #d1d5db; margin-bottom: 8px;">Proyección = Ingreso YTD × (12 ÷ Mes Actual)</div>
+                    <div style="background: rgba(255,255,255,0.1); padding: 6px; border-radius: 4px; color: #f3f4f6; font-family: monospace; font-size: 0.65rem;">
+                        {{ formulas_sam.proyeccion_formula.calculo_ejemplo }}
+                    </div>
+                    <div style="color: #fbbf24; margin-top: 5px; font-size: 0.65rem;">⚠️ Asume crecimiento lineal</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Exportación a Excel para SAM -->
+        <div style="text-align: center;">
+            <a href="{% url 'core:exportar_analisis_financiero' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 12px 20px; display: inline-block; font-size: 0.9rem; color: white; text-decoration: none; transition: all 0.3s ease;">
+                📊 Exportar Métricas Financieras del Negocio
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Sección Explicativa: Metodología (DESPLEGABLE) -->
+    <div class="decisiones-metodologia" style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleMetodologia()">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; flex-grow: 1;">
+                📚 Metodología y Origen de los Datos
+            </h3>
+            <button id="metodologia-toggle" style="background: #3b82f6; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer; margin-left: 15px;">
+                ℹ️
+            </button>
+        </div>
+
+        <div id="metodologia-content" style="display: none; margin-top: 20px;">
+
+        {% if perspectiva == 'empresa' %}
+        <!-- Explicación para vista empresa -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #3b82f6;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">💰 Dinero Gastado en Metrología ({{ current_year }})</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>Calibraciones:</strong> Dinero pagado a laboratorios externos para certificar la precisión de sus equipos</li>
+                    <li><strong>Mantenimientos:</strong> Dinero invertido en reparaciones y mantenimiento preventivo para mantener equipos funcionando</li>
+                    <li><strong>Comprobaciones:</strong> Dinero gastado en comprobaciones internas para asegurar el buen funcionamiento</li>
+                    <li><strong>Cómo se calcula:</strong> Solo se cuenta el dinero efectivamente gastado desde enero hasta {{ today|date:"d/m/Y" }}</li>
+                </ul>
+            </div>
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #10b981;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">🔮 ¿Cuánto Dinero Necesitará en {{ current_year|add:1 }}?</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>Base del cálculo:</strong> Usamos el historial de gastos reales de equipos idénticos que ya tiene</li>
+                    <li><strong>Equipos similares:</strong> Si tiene varios equipos de la misma marca y modelo, promediamos sus costos</li>
+                    <li><strong>Solo lo programado:</strong> Calculamos únicamente las actividades que ya sabe que debe hacer</li>
+                    <li><strong>Solo datos reales:</strong> Si no hay historial de costos, esa actividad no se proyecta (aparece como $0)</li>
+                </ul>
+            </div>
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #f59e0b;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">⚠️ Tenga en Cuenta</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>No incluye emergencias:</strong> Reparaciones urgentes no programadas pueden aumentar el presupuesto</li>
+                    <li><strong>Solo equipos operativos:</strong> Equipos dados de baja o inactivos no consumen presupuesto</li>
+                    <li><strong>Equipos similares ahorran:</strong> Tener equipos de la misma marca facilita predecir costos</li>
+                    <li><strong>Información actualizada:</strong> Estas cifras reflejan su situación actual en tiempo real</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if perspectiva == 'sam' %}
+        <!-- Explicación para vista SAM -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #1e40af;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">💵 ¿Cuánto Dinero Genera el Negocio?</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>Ingresos reales:</strong> Dinero efectivamente recibido de todas las empresas cliente</li>
+                    <li><strong>Cómo se cobra:</strong> Tarifas mensuales fijas más servicios adicionales según cada contrato</li>
+                    <li><strong>Solo clientes activos:</strong> Empresas que actualmente pagan y usan nuestros servicios</li>
+                    <li><strong>Periodo actual:</strong> Dinero recibido desde enero {{ current_year }} hasta hoy</li>
+                </ul>
+            </div>
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #059669;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">📊 ¿El Negocio Está Creciendo?</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>Comparación:</strong> Estimamos lo que ganamos el año pasado usando las actividades realizadas</li>
+                    <li><strong>Cálculo simple:</strong> Si este año ganamos más que el anterior, el negocio está creciendo</li>
+                    <li><strong>Base de trabajo:</strong> Todas las actividades técnicas que prestamos a los clientes</li>
+                    <li><strong>Mejora continua:</strong> En el futuro tendremos datos más precisos de facturación histórica</li>
+                </ul>
+            </div>
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #7c3aed;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">🏢 ¿Cuántos Clientes Tenemos?</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>Clientes que pagan:</strong> Empresas que tienen equipos con nosotros O pagan tarifa mensual</li>
+                    <li><strong>Solo clientes reales:</strong> No incluimos empresas canceladas o suspendidas</li>
+                    <li><strong>Sin repeticiones:</strong> Cada empresa se cuenta una sola vez, sin importar cuántos equipos tenga</li>
+                    <li><strong>Nuestra base:</strong> Estas son las empresas que realmente generan ingresos para SAM</li>
+                </ul>
+            </div>
+
+            <div class="decisiones-info-card" style="background: white; border-radius: 8px; padding: 20px; border-left: 4px solid #dc2626;">
+                <h4 style="font-size: 1.1rem; font-weight: bold; color: #1f2937; margin-bottom: 15px;">🔮 ¿Cuánto Ganaremos Este Año?</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.6;">
+                    <li><strong>Estimación simple:</strong> Tomamos lo ganado hasta ahora y lo proyectamos al año completo</li>
+                    <li><strong>Cálculo directo:</strong> Si llevamos X meses, multiplicamos por 12 y dividimos por X</li>
+                    <li><strong>Consideración:</strong> Asume que todos los meses son similares (no considera temporadas altas/bajas)</li>
+                    <li><strong>Para qué sirve:</strong> Planificar inversiones, gastos y objetivos del negocio</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Nota sobre confiabilidad de datos -->
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; border-radius: 8px; padding: 20px; margin-top: 20px; text-align: center;">
+            <h4 style="font-size: 1.1rem; font-weight: bold; margin-bottom: 10px;">✅ Información Confiable y Actualizada</h4>
+            <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">
+                Todos los cálculos financieros están basados en los mismos datos que utiliza el sistema técnico.
+                La información es 100% coherente y se actualiza automáticamente con cada actividad registrada.
+            </p>
+        </div>
+    </div>
+
+    <!-- JavaScript para funcionalidad desplegable y trazabilidad -->
+    <script>
+        function toggleMetodologia() {
+            const content = document.getElementById('metodologia-content');
+            const button = document.getElementById('metodologia-toggle');
+
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                button.style.background = '#ef4444';
+                button.innerHTML = '✕';
+            } else {
+                content.style.display = 'none';
+                button.style.background = '#3b82f6';
+                button.innerHTML = 'ℹ️';
+            }
+        }
+
+        function toggleFormulaDetalle() {
+            const content = document.getElementById('formula-detalle');
+            if (content) {
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                } else {
+                    content.style.display = 'none';
+                }
+            }
+        }
+
+        function toggleCumplimientoDetalle() {
+            const content = document.getElementById('cumplimiento-detalle');
+            if (content) {
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                } else {
+                    content.style.display = 'none';
+                }
+            }
+        }
+
+        function toggleEficienciaDetalle() {
+            const content = document.getElementById('eficiencia-detalle');
+            if (content) {
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                } else {
+                    content.style.display = 'none';
+                }
+            }
+        }
+
+        // Funciones de trazabilidad financiera (mantenidas para casos específicos)
+        function mostrarTrazabilidadIngresos() {
+            alert('💵 Trazabilidad de Ingresos\n\nEste valor incluye:\n• Tarifas mensuales de empresas activas\n• Pagos recibidos por servicios prestados\n• Solo empresas con contratos vigentes\n\nLos cálculos se basan en el método get_ingresos_anuales_reales() de cada empresa.');
+        }
+
+        function mostrarDetalleCalibraciones() {
+            alert('🔧 Detalle de Calibraciones\n\nIncluye gastos en:\n• Calibraciones externas contratadas\n• Certificados y documentación\n• Traslados y logística\n\nFuente: Facturas y pagos registrados de calibraciones');
+        }
+
+        function mostrarDetalleMantenimientos() {
+            alert('🔧 Detalle de Mantenimientos\n\nIncluye gastos en:\n• Mantenimientos preventivos programados\n• Reparaciones correctivas\n• Repuestos y materiales\n\nFuente: Costos registrados en actividades de mantenimiento');
+        }
+
+        function mostrarDetalleComprobaciones() {
+            alert('✅ Detalle de Comprobaciones\n\nIncluye gastos en:\n• Comprobaciones internas\n• Pruebas de funcionamiento\n• Documentación y reportes\n\nFuente: Costos registrados en actividades de comprobación');
+        }
+
+        // Funciones para toggles de métricas SAM
+        function toggleIngresosSamDetalle() {
+            const content = document.getElementById('ingresos-sam-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleCrecimientoSamDetalle() {
+            const content = document.getElementById('crecimiento-sam-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleProyeccionSamDetalle() {
+            const content = document.getElementById('proyeccion-sam-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleVariacionDetalle() {
+            const content = document.getElementById('variacion-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function togglePresupuestoDetalle() {
+            const content = document.getElementById('presupuesto-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // Funciones para Alertas Predictivas
+        function toggleAlertasDetalle() {
+            const content = document.getElementById('alertas-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleVencidasDetalle() {
+            const content = document.getElementById('vencidas-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleCriticasDetalle() {
+            const content = document.getElementById('criticas-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleRiesgoAltoDetalle() {
+            const content = document.getElementById('riesgo-alto-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleRoiDetalle() {
+            const content = document.getElementById('roi-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function togglePreventivosDetalle() {
+            const content = document.getElementById('preventivos-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleTendenciasDetalle() {
+            const content = document.getElementById('tendencias-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleComplianceDetalle() {
+            const content = document.getElementById('compliance-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleOptimizadorDetalle() {
+            const content = document.getElementById('optimizador-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function toggleProblematicosDetalle() {
+            const content = document.getElementById('problematicos-detalle');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+    </script>
+
+    <!-- Actividades Críticas -->
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            🚨 Actividades Críticas
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <!-- Calibraciones Vencidas -->
+            {% if actividades_criticas.calibraciones_vencidas %}
+            <div class="decisiones-alerta-card" style="background: #fed7d7; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px;">📏 Calibraciones Vencidas ({{ actividades_criticas.calibraciones_vencidas|length }})</h4>
+                {% for equipo in actividades_criticas.calibraciones_vencidas %}
+                <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
+                    <strong>{{ equipo.codigo_interno }}</strong> - {{ equipo.nombre }}
+                    <small style="display: block; color: #991b1b;">Vencida: {{ equipo.proxima_calibracion|date:"d/m/Y" }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Mantenimientos Vencidos -->
+            {% if actividades_criticas.mantenimientos_vencidos %}
+            <div class="decisiones-alerta-card" style="background: #fed7d7; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px;">🔧 Mantenimientos Vencidos ({{ actividades_criticas.mantenimientos_vencidos|length }})</h4>
+                {% for equipo in actividades_criticas.mantenimientos_vencidos %}
+                <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
+                    <strong>{{ equipo.codigo_interno }}</strong> - {{ equipo.nombre }}
+                    <small style="display: block; color: #991b1b;">Vencido: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Comprobaciones Vencidas -->
+            {% if actividades_criticas.comprobaciones_vencidas %}
+            <div class="decisiones-alerta-card" style="background: #fed7d7; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px;">✅ Comprobaciones Vencidas ({{ actividades_criticas.comprobaciones_vencidas|length }})</h4>
+                {% for equipo in actividades_criticas.comprobaciones_vencidas %}
+                <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
+                    <strong>{{ equipo.codigo_interno }}</strong> - {{ equipo.nombre }}
+                    <small style="display: block; color: #991b1b;">Vencida: {{ equipo.proxima_comprobacion|date:"d/m/Y" }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if not actividades_criticas.calibraciones_vencidas and not actividades_criticas.mantenimientos_vencidos and not actividades_criticas.comprobaciones_vencidas %}
+        <div style="text-align: center; padding: 40px; color: #10b981;">
+            <div style="font-size: 3rem; margin-bottom: 10px;">✅</div>
+            <h4 style="color: #059669; margin: 0;">¡Excelente! No hay actividades vencidas</h4>
+            <p style="color: #6b7280; margin: 10px 0 0 0;">Todos los equipos están al día en sus actividades críticas.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recomendaciones Estratégicas -->
+    {% if recomendaciones %}
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            💡 Recomendaciones Estratégicas
+        </h3>
+
+        <div style="display: grid; gap: 15px;">
+            {% for rec in recomendaciones %}
+            <div class="decisiones-recomendacion-card" style="padding: 20px; border-radius: 8px; border-left: 4px solid {% if rec.tipo == 'CRÍTICO' %}#ef4444{% elif rec.tipo == 'URGENTE' %}#f59e0b{% elif rec.tipo == 'IMPORTANTE' %}#3b82f6{% else %}#10b981{% endif %}; background: {% if rec.tipo == 'CRÍTICO' %}#fef2f2{% elif rec.tipo == 'URGENTE' %}#fffbeb{% elif rec.tipo == 'IMPORTANTE' %}#eff6ff{% else %}#f0fdf4{% endif %};">
+                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
+                    <h4 class="decisiones-rec-titulo" style="color: {% if rec.tipo == 'CRÍTICO' %}#dc2626{% elif rec.tipo == 'URGENTE' %}#d97706{% elif rec.tipo == 'IMPORTANTE' %}#2563eb{% else %}#059669{% endif %}; font-weight: bold; margin: 0;">{{ rec.titulo }}</h4>
+                    <span style="background: {% if rec.tipo == 'CRÍTICO' %}#dc2626{% elif rec.tipo == 'URGENTE' %}#d97706{% elif rec.tipo == 'IMPORTANTE' %}#2563eb{% else %}#059669{% endif %}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">{{ rec.tipo }}</span>
+                </div>
+                <p class="decisiones-rec-desc" style="color: #374151; margin: 10px 0; font-size: 0.95rem;">{{ rec.descripcion }}</p>
+                <p class="decisiones-rec-accion" style="color: {% if rec.tipo == 'CRÍTICO' %}#991b1b{% elif rec.tipo == 'URGENTE' %}#92400e{% elif rec.tipo == 'IMPORTANTE' %}#1d4ed8{% else %}#047857{% endif %}; font-weight: 600; margin: 0; font-size: 0.9rem;">
+                    🎯 <strong>Acción:</strong> {{ rec.accion }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- NUEVAS SECCIONES DE INTELIGENCIA EMPRESARIAL -->
+    {% if perspectiva == 'empresa' %}
+
+    <!-- Sistema de Alertas Predictivas -->
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            🚨 Sistema de Alertas Predictivas
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+            <!-- Resumen de Alertas -->
+            <div style="background: linear-gradient(135deg,
+                {% if alertas_predictivas.nivel_riesgo_general == 'CRÍTICO' %}#dc2626{% elif alertas_predictivas.nivel_riesgo_general == 'ALTO' %}#d97706{% elif alertas_predictivas.nivel_riesgo_general == 'MEDIO' %}#2563eb{% else %}#059669{% endif %} 0%,
+                {% if alertas_predictivas.nivel_riesgo_general == 'CRÍTICO' %}#ef4444{% elif alertas_predictivas.nivel_riesgo_general == 'ALTO' %}#f59e0b{% elif alertas_predictivas.nivel_riesgo_general == 'MEDIO' %}#3b82f6{% else %}#10b981{% endif %} 100%);
+                color: white; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">📊 Nivel de Riesgo General</h4>
+                <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleAlertasDetalle()" title="Haga clic para ver el desglose detallado de alertas">{{ alertas_predictivas.nivel_riesgo_general }}</div>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">{{ alertas_predictivas.total_alertas_criticas }} alertas requieren atención inmediata</p>
+
+                <!-- Desglose Detallado de Alertas -->
+                <div id="alertas-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">🔍 Desglose Detallado de Alertas Predictivas:</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>¿Cómo se clasifican las alertas?</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🔴 <strong>VENCIDAS</strong>: Actividades que ya pasaron su fecha límite
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🟠 <strong>CRÍTICAS</strong>: Vencen en menos de 7 días (requieren acción inmediata)
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🟡 <strong>RIESGO ALTO</strong>: Vencen entre 7-15 días (planificar pronto)
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        🟢 <strong>RIESGO MEDIO</strong>: Vencen entre 15-30 días (monitorear)
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Resumen de Alertas Actuales:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🔴 Vencidas: {{ alertas_predictivas.alertas.vencidas|length }} alertas
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🟠 Críticas: {{ alertas_predictivas.alertas.criticas|length }} alertas
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🟡 Riesgo Alto: {{ alertas_predictivas.alertas.riesgo_alto|length }} alertas
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🟢 Riesgo Medio: {{ alertas_predictivas.alertas.riesgo_medio|length }} alertas
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8);">
+                        ✅ OK (>30 días): {{ alertas_predictivas.alertas.ok|length }} equipos
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vencidas -->
+            {% if alertas_predictivas.alertas.vencidas %}
+            <div class="decisiones-alerta-card" style="background: #fed7d7; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px; cursor: pointer;" onclick="toggleVencidasDetalle()" title="Haga clic para ver todas las actividades vencidas">🔴 VENCIDAS ({{ alertas_predictivas.alertas.vencidas|length }})</h4>
+
+                <!-- Muestra solo las primeras 3 por defecto -->
+                {% for alerta in alertas_predictivas.alertas.vencidas|slice:":3" %}
+                <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
+                    <strong>{{ alerta.equipo.codigo_interno }}</strong> - {{ alerta.tipo }}
+                    <small style="display: block; color: #991b1b;">Vencida hace {{ alerta.dias_vencido }} días</small>
+                </div>
+                {% endfor %}
+
+                <!-- Desglose completo de vencidas -->
+                <div id="vencidas-detalle" style="display: none; background: rgba(255,255,255,0.2); border-radius: 4px; padding: 10px; margin-top: 10px;">
+                    <div style="color: #7f1d1d; font-weight: bold; margin-bottom: 8px;">📋 Lista Completa de Actividades Vencidas:</div>
+                    {% for alerta in alertas_predictivas.alertas.vencidas %}
+                    <div style="background: white; border: 1px solid #f87171; border-radius: 4px; padding: 8px; margin-bottom: 5px;">
+                        <div style="color: #dc2626; font-weight: bold;">{{ alerta.equipo.codigo_interno }} - {{ alerta.equipo.nombre }}</div>
+                        <div style="color: #991b1b; font-size: 0.9rem;">
+                            <strong>Actividad:</strong> {{ alerta.tipo }}
+                        </div>
+                        <div style="color: #991b1b; font-size: 0.9rem;">
+                            <strong>Fecha de vencimiento:</strong> {{ alerta.fecha_vencimiento|date:"d/m/Y" }}
+                        </div>
+                        <div style="color: #7f1d1d; font-size: 0.9rem;">
+                            <strong>Días vencida:</strong> {{ alerta.dias_vencido }} días
+                        </div>
+                        {% if alerta.equipo.ubicacion %}
+                        <div style="color: #6b7280; font-size: 0.8rem;">
+                            <strong>Ubicación:</strong> {{ alerta.equipo.ubicacion }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if alertas_predictivas.alertas.vencidas|length > 3 %}
+                <div style="text-align: center; margin-top: 8px;">
+                    <small style="color: #991b1b; cursor: pointer;" onclick="toggleVencidasDetalle()">🔍 Ver todas las {{ alertas_predictivas.alertas.vencidas|length }} actividades vencidas</small>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Críticas -->
+            {% if alertas_predictivas.alertas.criticas %}
+            <div class="decisiones-alerta-card" style="background: #fed7d7; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px; cursor: pointer;" onclick="toggleCriticasDetalle()" title="Haga clic para ver todas las actividades críticas">🟠 CRÍTICAS ({{ alertas_predictivas.alertas.criticas|length }})</h4>
+
+                <!-- Muestra solo las primeras 3 por defecto -->
+                {% for alerta in alertas_predictivas.alertas.criticas|slice:":3" %}
+                <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
+                    <strong>{{ alerta.equipo.codigo_interno }}</strong> - {{ alerta.tipo }}
+                    <small style="display: block; color: #991b1b;">Vence en {{ alerta.dias_restantes }} días</small>
+                </div>
+                {% endfor %}
+
+                <!-- Desglose completo de críticas -->
+                <div id="criticas-detalle" style="display: none; background: rgba(255,255,255,0.2); border-radius: 4px; padding: 10px; margin-top: 10px;">
+                    <div style="color: #7f1d1d; font-weight: bold; margin-bottom: 8px;">⚠️ Lista Completa de Actividades Críticas:</div>
+                    {% for alerta in alertas_predictivas.alertas.criticas %}
+                    <div style="background: white; border: 1px solid #f87171; border-radius: 4px; padding: 8px; margin-bottom: 5px;">
+                        <div style="color: #dc2626; font-weight: bold;">{{ alerta.equipo.codigo_interno }} - {{ alerta.equipo.nombre }}</div>
+                        <div style="color: #991b1b; font-size: 0.9rem;">
+                            <strong>Actividad:</strong> {{ alerta.tipo }}
+                        </div>
+                        <div style="color: #991b1b; font-size: 0.9rem;">
+                            <strong>Fecha límite:</strong> {{ alerta.fecha_vencimiento|date:"d/m/Y" }}
+                        </div>
+                        <div style="color: #7f1d1d; font-size: 0.9rem;">
+                            <strong>Días restantes:</strong> {{ alerta.dias_restantes }} días ⏰
+                        </div>
+                        {% if alerta.equipo.ubicacion %}
+                        <div style="color: #6b7280; font-size: 0.8rem;">
+                            <strong>Ubicación:</strong> {{ alerta.equipo.ubicacion }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if alertas_predictivas.alertas.criticas|length > 3 %}
+                <div style="text-align: center; margin-top: 8px;">
+                    <small style="color: #991b1b; cursor: pointer;" onclick="toggleCriticasDetalle()">🔍 Ver todas las {{ alertas_predictivas.alertas.criticas|length }} actividades críticas</small>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Riesgo Alto -->
+            {% if alertas_predictivas.alertas.riesgo_alto %}
+            <div class="decisiones-alerta-card" style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #d97706;">
+                <h4 style="color: #d97706; font-weight: bold; margin-bottom: 10px; cursor: pointer;" onclick="toggleRiesgoAltoDetalle()" title="Haga clic para ver todas las actividades de riesgo alto">🟡 RIESGO ALTO ({{ alertas_predictivas.alertas.riesgo_alto|length }})</h4>
+
+                <!-- Muestra solo las primeras 3 por defecto -->
+                {% for alerta in alertas_predictivas.alertas.riesgo_alto|slice:":3" %}
+                <div style="font-size: 0.9rem; margin-bottom: 5px; color: #92400e;">
+                    <strong>{{ alerta.equipo.codigo_interno }}</strong> - {{ alerta.tipo }}
+                    <small style="display: block; color: #a16207;">Vence en {{ alerta.dias_restantes }} días</small>
+                </div>
+                {% endfor %}
+
+                <!-- Desglose completo de riesgo alto -->
+                <div id="riesgo-alto-detalle" style="display: none; background: rgba(255,255,255,0.2); border-radius: 4px; padding: 10px; margin-top: 10px;">
+                    <div style="color: #92400e; font-weight: bold; margin-bottom: 8px;">📅 Lista Completa de Actividades de Riesgo Alto:</div>
+                    {% for alerta in alertas_predictivas.alertas.riesgo_alto %}
+                    <div style="background: white; border: 1px solid #fbbf24; border-radius: 4px; padding: 8px; margin-bottom: 5px;">
+                        <div style="color: #d97706; font-weight: bold;">{{ alerta.equipo.codigo_interno }} - {{ alerta.equipo.nombre }}</div>
+                        <div style="color: #92400e; font-size: 0.9rem;">
+                            <strong>Actividad:</strong> {{ alerta.tipo }}
+                        </div>
+                        <div style="color: #92400e; font-size: 0.9rem;">
+                            <strong>Fecha límite:</strong> {{ alerta.fecha_vencimiento|date:"d/m/Y" }}
+                        </div>
+                        <div style="color: #a16207; font-size: 0.9rem;">
+                            <strong>Días restantes:</strong> {{ alerta.dias_restantes }} días 📅
+                        </div>
+                        {% if alerta.equipo.ubicacion %}
+                        <div style="color: #6b7280; font-size: 0.8rem;">
+                            <strong>Ubicación:</strong> {{ alerta.equipo.ubicacion }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if alertas_predictivas.alertas.riesgo_alto|length > 3 %}
+                <div style="text-align: center; margin-top: 8px;">
+                    <small style="color: #a16207; cursor: pointer;" onclick="toggleRiesgoAltoDetalle()">🔍 Ver todas las {{ alertas_predictivas.alertas.riesgo_alto|length }} actividades de riesgo alto</small>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Estado OK -->
+            {% if not alertas_predictivas.alertas.vencidas and not alertas_predictivas.alertas.criticas and not alertas_predictivas.alertas.riesgo_alto %}
+            <div class="decisiones-alerta-card" style="background: #d1fae5; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
+                <h4 style="color: #059669; font-weight: bold; margin-bottom: 10px;">✅ TODO BAJO CONTROL</h4>
+                <p style="color: #047857; margin: 0; font-size: 0.9rem;">No hay alertas críticas. Todos los equipos están en buenas condiciones.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Dashboard de ROI y Rentabilidad -->
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            💰 Dashboard de ROI y Rentabilidad
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <!-- ROI Principal -->
+            <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">📈 ROI de Mantenimiento</h4>
+                <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleRoiDetalle()" title="Haga clic para ver el desglose del cálculo ROI">{{ roi_rentabilidad.roi_porcentaje }}%</div>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">{{ roi_rentabilidad.interpretacion_roi }}</p>
+                {% if roi_rentabilidad.ahorro_total > 0 %}
+                <p style="margin: 5px 0 0 0; font-size: 0.75rem; opacity: 0.9;">Ahorro: ${{ roi_rentabilidad.ahorro_total|floatformat:0 }} COP</p>
+                {% endif %}
+
+                <!-- Desglose del ROI -->
+                <div id="roi-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">💡 ¿Cómo se calcula el ROI?</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Fórmula del ROI:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-family: monospace;">
+                        ROI = ((Costo Correctivos - Costo Preventivos) / Costo Preventivos) × 100
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Datos del Cálculo {{ current_year }}:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        💚 Mantenimientos Preventivos: {{ roi_rentabilidad.count_preventivos }} realizados
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        💚 Costo Total Preventivos: ${{ roi_rentabilidad.costo_preventivos|floatformat:0 }} COP
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        🔴 Mantenimientos Correctivos: {{ roi_rentabilidad.count_correctivos }} realizados
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        🔴 Costo Total Correctivos: ${{ roi_rentabilidad.costo_correctivos|floatformat:0 }} COP
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Interpretación:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 0.7rem;">
+                        {% if roi_rentabilidad.roi_porcentaje > 0 %}
+                        ✅ Por cada peso invertido en preventivos, se ahorraron ${{ roi_rentabilidad.roi_porcentaje|floatformat:2 }} pesos en correctivos
+                        {% else %}
+                        ⚠️ Los correctivos están costando menos que los preventivos. Revisar estrategia.
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preventivos vs Correctivos -->
+            <div style="background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px;">
+                <h4 style="color: #374151; font-weight: bold; margin-bottom: 15px; text-align: center; cursor: pointer;" onclick="togglePreventivosDetalle()" title="Haga clic para ver el desglose">🔧 Preventivos vs Correctivos</h4>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div style="text-align: center;">
+                        <div style="color: #059669; font-size: 1.5rem; font-weight: bold;">{{ roi_rentabilidad.count_preventivos }}</div>
+                        <div style="color: #6b7280; font-size: 0.8rem;">Preventivos</div>
+                        <div style="color: #059669; font-size: 0.75rem;">${{ roi_rentabilidad.costo_promedio_preventivo|floatformat:0 }} prom.</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: #dc2626; font-size: 1.5rem; font-weight: bold;">{{ roi_rentabilidad.count_correctivos }}</div>
+                        <div style="color: #6b7280; font-size: 0.8rem;">Correctivos</div>
+                        <div style="color: #dc2626; font-size: 0.75rem;">${{ roi_rentabilidad.costo_promedio_correctivo|floatformat:0 }} prom.</div>
+                    </div>
+                </div>
+
+                <!-- Ratio Preventivo -->
+                <div style="background: {% if roi_rentabilidad.evaluacion_ratio == 'EXCELENTE' %}#d1fae5{% elif roi_rentabilidad.evaluacion_ratio == 'BUENO' %}#dbeafe{% elif roi_rentabilidad.evaluacion_ratio == 'REGULAR' %}#fef3c7{% else %}#fed7d7{% endif %}; padding: 10px; border-radius: 6px; text-align: center;">
+                    <div style="color: {% if roi_rentabilidad.evaluacion_ratio == 'EXCELENTE' %}#059669{% elif roi_rentabilidad.evaluacion_ratio == 'BUENO' %}#2563eb{% elif roi_rentabilidad.evaluacion_ratio == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; font-weight: bold;">
+                        {{ roi_rentabilidad.ratio_preventivo }}% Preventivos
+                    </div>
+                    <div style="color: {% if roi_rentabilidad.evaluacion_ratio == 'EXCELENTE' %}#047857{% elif roi_rentabilidad.evaluacion_ratio == 'BUENO' %}#1d4ed8{% elif roi_rentabilidad.evaluacion_ratio == 'REGULAR' %}#92400e{% else %}#991b1b{% endif %}; font-size: 0.8rem;">
+                        {{ roi_rentabilidad.evaluacion_ratio }}
+                    </div>
+                </div>
+
+                <!-- Desglose Preventivos vs Correctivos -->
+                <div id="preventivos-detalle" style="display: none; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 15px; text-align: left;">
+                    <h5 style="color: #374151; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold;">📋 Desglose de Preventivos vs Correctivos:</h5>
+
+                    <div style="color: #4b5563; margin-bottom: 10px; font-size: 0.8rem;">
+                        <strong>Fórmula del Ratio Preventivo:</strong>
+                    </div>
+                    <div style="color: #6b7280; margin-bottom: 12px; font-family: monospace; font-size: 0.75rem;">
+                        Ratio = (Preventivos / Total Mantenimientos) × 100
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                        <div style="background: #d1fae5; padding: 10px; border-radius: 4px;">
+                            <div style="color: #059669; font-weight: bold; font-size: 0.8rem;">Preventivos</div>
+                            <div style="color: #047857; font-size: 0.75rem;">{{ roi_rentabilidad.count_preventivos }} mantenimientos</div>
+                            <div style="color: #047857; font-size: 0.75rem;">Costo: ${{ roi_rentabilidad.costo_preventivos|floatformat:0 }} COP</div>
+                            <div style="color: #047857; font-size: 0.7rem;">Promedio: ${{ roi_rentabilidad.costo_promedio_preventivo|floatformat:0 }} COP</div>
+                        </div>
+                        <div style="background: #fed7d7; padding: 10px; border-radius: 4px;">
+                            <div style="color: #dc2626; font-weight: bold; font-size: 0.8rem;">Correctivos</div>
+                            <div style="color: #991b1b; font-size: 0.75rem;">{{ roi_rentabilidad.count_correctivos }} mantenimientos</div>
+                            <div style="color: #991b1b; font-size: 0.75rem;">Costo: ${{ roi_rentabilidad.costo_correctivos|floatformat:0 }} COP</div>
+                            <div style="color: #991b1b; font-size: 0.7rem;">Promedio: ${{ roi_rentabilidad.costo_promedio_correctivo|floatformat:0 }} COP</div>
+                        </div>
+                    </div>
+
+                    <div style="background: #dbeafe; padding: 10px; border-radius: 4px; margin-bottom: 8px;">
+                        <div style="color: #1e40af; font-weight: bold; font-size: 0.75rem;">Cálculo del Ratio:</div>
+                        <div style="color: #1e3a8a; font-size: 0.7rem;">
+                            ({{ roi_rentabilidad.count_preventivos }} / {{ roi_rentabilidad.count_preventivos|add:roi_rentabilidad.count_correctivos }}) × 100 = {{ roi_rentabilidad.ratio_preventivo }}%
+                        </div>
+                    </div>
+
+                    <div style="color: #4b5563; font-size: 0.75rem; margin-top: 8px;">
+                        <strong>Interpretación:</strong>
+                    </div>
+                    <div style="color: #6b7280; font-size: 0.7rem;">
+                        {% if roi_rentabilidad.evaluacion_ratio == 'EXCELENTE' %}
+                        ✅ Excelente proporción de mantenimientos preventivos. Esto reduce costos y fallas inesperadas.
+                        {% elif roi_rentabilidad.evaluacion_ratio == 'BUENO' %}
+                        👍 Buena proporción de preventivos, pero hay espacio para mejoras.
+                        {% elif roi_rentabilidad.evaluacion_ratio == 'REGULAR' %}
+                        ⚠️ La proporción de preventivos es baja. Se recomienda aumentar el mantenimiento preventivo.
+                        {% else %}
+                        🔴 Proporción crítica. Demasiados correctivos indican falta de mantenimiento preventivo.
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Costos Totales -->
+            <div style="background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #374151; font-weight: bold; margin-bottom: 15px;">💸 Costos {{ current_year }}</h4>
+
+                <div style="color: #059669; font-size: 1.2rem; font-weight: bold; margin-bottom: 5px;">
+                    Preventivos: ${{ roi_rentabilidad.costo_preventivos|floatformat:0 }}
+                </div>
+                <div style="color: #dc2626; font-size: 1.2rem; font-weight: bold; margin-bottom: 10px;">
+                    Correctivos: ${{ roi_rentabilidad.costo_correctivos|floatformat:0 }}
+                </div>
+
+                <div style="border-top: 1px solid #e5e7eb; padding-top: 10px;">
+                    <div style="color: #374151; font-weight: bold;">
+                        Total: ${{ roi_rentabilidad.costo_preventivos|add:roi_rentabilidad.costo_correctivos|floatformat:0 }} COP
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Análisis de Tendencias Históricas -->
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            📈 Análisis de Tendencias Históricas
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px;">
+            <!-- Tendencia General -->
+            <div style="background: linear-gradient(135deg,
+                {% if tendencias_historicas.tendencia_direccion == 'ASCENDENTE' %}#d97706{% elif tendencias_historicas.tendencia_direccion == 'DESCENDENTE' %}#059669{% else %}#2563eb{% endif %} 0%,
+                {% if tendencias_historicas.tendencia_direccion == 'ASCENDENTE' %}#f59e0b{% elif tendencias_historicas.tendencia_direccion == 'DESCENDENTE' %}#10b981{% else %}#3b82f6{% endif %} 100%);
+                color: white; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">📊 Tendencia Últimos 3 Meses</h4>
+                <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleTendenciasDetalle()" title="Haga clic para ver el desglose del cálculo">
+                    {% if tendencias_historicas.tendencia_porcentaje > 0 %}+{% endif %}{{ tendencias_historicas.tendencia_porcentaje }}%
+                </div>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">{{ tendencias_historicas.tendencia_direccion }}</p>
+
+                <!-- Desglose de Tendencias -->
+                <div id="tendencias-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">💡 ¿Cómo se calcula la tendencia?</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Fórmula de Tendencia Trimestral:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-family: monospace;">
+                        Tendencia = ((Mes Actual - Promedio 3 Meses Anteriores) / Promedio 3 Meses) × 100
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Datos del Período:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        📅 Meses analizados: {{ tendencias_historicas.meses_con_datos }}
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        💰 Promedio Mensual: ${{ tendencias_historicas.promedio_mensual|floatformat:0 }} COP
+                    </div>
+                    {% if tendencias_historicas.mes_mas_caro %}
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        📈 Mes más caro: {{ tendencias_historicas.mes_mas_caro.nombre_mes }} (${{ tendencias_historicas.mes_mas_caro.gasto_total|floatformat:0 }} COP)
+                    </div>
+                    {% endif %}
+                    {% if tendencias_historicas.mes_mas_barato %}
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        📉 Mes más barato: {{ tendencias_historicas.mes_mas_barato.nombre_mes }} (${{ tendencias_historicas.mes_mas_barato.gasto_total|floatformat:0 }} COP)
+                    </div>
+                    {% endif %}
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Interpretación:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 0.7rem;">
+                        {% if tendencias_historicas.tendencia_direccion == 'ASCENDENTE' %}
+                        📈 Los costos están aumentando. Se recomienda revisar la estrategia de mantenimiento y buscar oportunidades de optimización.
+                        {% elif tendencias_historicas.tendencia_direccion == 'DESCENDENTE' %}
+                        📉 Los costos están disminuyendo. La estrategia de mantenimiento está funcionando bien.
+                        {% else %}
+                        ↔️ Los costos se mantienen estables. Continuar monitoreando para detectar cambios tempranos.
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mes Más Caro -->
+            {% if tendencias_historicas.mes_mas_caro %}
+            <div style="background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px;">📈 Mes Más Caro</h4>
+                <div style="color: #dc2626; font-size: 1.5rem; font-weight: bold; margin-bottom: 5px;">{{ tendencias_historicas.mes_mas_caro.nombre_mes }}</div>
+                <p style="color: #6b7280; margin: 0; font-size: 0.8rem;">${{ tendencias_historicas.mes_mas_caro.gasto_total|floatformat:0 }} COP</p>
+            </div>
+            {% endif %}
+
+            <!-- Mes Más Barato -->
+            {% if tendencias_historicas.mes_mas_barato %}
+            <div style="background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #059669; font-weight: bold; margin-bottom: 10px;">📉 Mes Más Barato</h4>
+                <div style="color: #059669; font-size: 1.5rem; font-weight: bold; margin-bottom: 5px;">{{ tendencias_historicas.mes_mas_barato.nombre_mes }}</div>
+                <p style="color: #6b7280; margin: 0; font-size: 0.8rem;">${{ tendencias_historicas.mes_mas_barato.gasto_total|floatformat:0 }} COP</p>
+            </div>
+            {% endif %}
+
+            <!-- Promedio Mensual -->
+            <div style="background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">📊 Promedio Mensual</h4>
+                <div style="color: #2563eb; font-size: 1.5rem; font-weight: bold; margin-bottom: 5px;">${{ tendencias_historicas.promedio_mensual|floatformat:0 }}</div>
+                <p style="color: #6b7280; margin: 0; font-size: 0.8rem;">{{ tendencias_historicas.meses_con_datos }} meses con datos</p>
+            </div>
+        </div>
+
+        <!-- Gráfico de Tendencias (Placeholder - se puede implementar con Chart.js) -->
+        <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; text-align: center;">
+            <h4 style="color: #374151; margin-bottom: 15px;">📈 Evolución Mensual de Gastos {{ current_year }}</h4>
+            <div style="color: #6b7280; font-size: 0.9rem;">
+                <!-- Aquí se puede agregar Chart.js posteriormente -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 5px;">
+                    {% for mes_data in tendencias_historicas.datos_mensuales %}
+                    {% if mes_data.gasto_total > 0 %}
+                    <div style="text-align: center;">
+                        <div style="background: #3b82f6; height: {{ mes_data.gasto_total|floatformat:0|slice:":1" }}0px; max-height: 100px; min-height: 20px; width: 100%; margin-bottom: 5px; border-radius: 2px;"></div>
+                        <div style="font-size: 0.7rem; color: #374151;">{{ mes_data.nombre_mes }}</div>
+                        <div style="font-size: 0.6rem; color: #6b7280;">${{ mes_data.gasto_total|floatformat:0|slice:":3" }}K</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de Cumplimiento -->
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            ⚖️ Panel de Cumplimiento
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+            <!-- Score Principal -->
+            <div style="background: linear-gradient(135deg,
+                {% if compliance_iso9001.evaluacion == 'EXCELENTE' %}#059669{% elif compliance_iso9001.evaluacion == 'BUENO' %}#2563eb{% elif compliance_iso9001.evaluacion == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %} 0%,
+                {% if compliance_iso9001.evaluacion == 'EXCELENTE' %}#10b981{% elif compliance_iso9001.evaluacion == 'BUENO' %}#3b82f6{% elif compliance_iso9001.evaluacion == 'REGULAR' %}#f59e0b{% else %}#ef4444{% endif %} 100%);
+                color: white; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">📋 Score de Cumplimiento</h4>
+                <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="toggleComplianceDetalle()" title="Haga clic para ver el desglose del cálculo">{{ compliance_iso9001.score_iso9001 }}%</div>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">{{ compliance_iso9001.evaluacion }}</p>
+                <p style="margin: 5px 0 0 0; font-size: 0.75rem; opacity: 0.9;">Gestión de Recursos de Medición</p>
+
+                <!-- Desglose de Compliance ISO 9001 -->
+                <div id="compliance-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">💡 ¿Cómo se calcula el Score de Cumplimiento?</div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Fórmula del Score:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px; font-family: monospace;">
+                        Score = (Equipos Conformes / Total Equipos) × 100
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Criterios de Conformidad:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        ✅ Calibraciones al día (no vencidas ni próximas a vencer)
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        ✅ Mantenimientos realizados según cronograma
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        ✅ Comprobaciones periódicas ejecutadas
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>Datos Actuales:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        📊 Total Equipos: {{ compliance_iso9001.total_equipos }}
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        ✅ Conformes: {{ compliance_iso9001.equipos_conformes }}
+                    </div>
+                    {% if compliance_iso9001.equipos_riesgo > 0 %}
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        ⚠️ En Riesgo: {{ compliance_iso9001.equipos_riesgo }}
+                    </div>
+                    {% endif %}
+                    {% if compliance_iso9001.equipos_no_conformes > 0 %}
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
+                        ❌ No Conformes: {{ compliance_iso9001.equipos_no_conformes }}
+                    </div>
+                    {% endif %}
+
+                    <div style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 4px; margin-top: 8px;">
+                        <div style="color: white; font-weight: bold; font-size: 0.75rem; margin-bottom: 3px;">📋 Referencia Normativa:</div>
+                        <div style="color: rgba(255,255,255,0.9); font-size: 0.7rem;">
+                            La organización debe determinar y proporcionar los recursos necesarios para asegurarse de la validez y fiabilidad de los resultados cuando se realice el seguimiento o la medición para verificar la conformidad de los productos y servicios con los requisitos.
+                        </div>
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-top: 10px; margin-bottom: 4px;">
+                        <strong>Interpretación:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); font-size: 0.7rem;">
+                        {% if compliance_iso9001.evaluacion == 'EXCELENTE' %}
+                        ✅ Cumplimiento excelente. La organización cumple plenamente con los estándares de calidad.
+                        {% elif compliance_iso9001.evaluacion == 'BUENO' %}
+                        👍 Buen nivel de cumplimiento. Pequeñas mejoras llevarán a la excelencia.
+                        {% elif compliance_iso9001.evaluacion == 'REGULAR' %}
+                        ⚠️ Cumplimiento regular. Se requieren acciones correctivas para mejorar la conformidad.
+                        {% else %}
+                        🔴 Cumplimiento crítico. Se requiere atención inmediata para cumplir con los estándares.
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Equipos Conformes -->
+            <div style="background: #d1fae5; border: 2px solid #10b981; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #059669; font-weight: bold; margin-bottom: 10px;">✅ Equipos Conformes</h4>
+                <div style="color: #059669; font-size: 2rem; font-weight: bold; margin-bottom: 5px;">{{ compliance_iso9001.equipos_conformes }}</div>
+                <p style="color: #047857; margin: 0; font-size: 0.8rem;">de {{ compliance_iso9001.total_equipos }} equipos totales</p>
+            </div>
+
+            <!-- Equipos en Riesgo -->
+            {% if compliance_iso9001.equipos_riesgo > 0 %}
+            <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #d97706; font-weight: bold; margin-bottom: 10px;">⚠️ En Riesgo</h4>
+                <div style="color: #d97706; font-size: 2rem; font-weight: bold; margin-bottom: 5px;">{{ compliance_iso9001.equipos_riesgo }}</div>
+                <p style="color: #92400e; margin: 0; font-size: 0.8rem;">vencen en < 30 días</p>
+            </div>
+            {% endif %}
+
+            <!-- No Conformidades -->
+            {% if compliance_iso9001.equipos_no_conformes > 0 %}
+            <div style="background: #fed7d7; border: 2px solid #ef4444; border-radius: 10px; padding: 20px; text-align: center;">
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px;">❌ No Conformes</h4>
+                <div style="color: #dc2626; font-size: 2rem; font-weight: bold; margin-bottom: 5px;">{{ compliance_iso9001.equipos_no_conformes }}</div>
+                <p style="color: #991b1b; margin: 0; font-size: 0.8rem;">requieren acción inmediata</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Lista de No Conformidades -->
+        {% if compliance_iso9001.no_conformidades %}
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px;">
+            <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 10px;">🔍 Detalle de No Conformidades</h4>
+            {% for nc in compliance_iso9001.no_conformidades|slice:":5" %}
+            <div style="background: white; border: 1px solid #f87171; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+                <div style="font-weight: bold; color: #dc2626;">{{ nc.equipo.codigo_interno }} - {{ nc.equipo.nombre }}</div>
+                <ul style="margin: 5px 0 0 20px; color: #991b1b; font-size: 0.9rem;">
+                    {% for problema in nc.problemas %}
+                    <li>{{ problema }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+            {% if compliance_iso9001.no_conformidades|length > 5 %}
+            <small style="color: #991b1b;">... y {{ compliance_iso9001.no_conformidades|length|add:"-5" }} no conformidades adicionales</small>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Optimizador de Cronogramas y Equipos Problemáticos -->
+    <div class="decisiones-section-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            🎯 Optimizador de Cronogramas y Equipos Problemáticos
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px;">
+            <!-- Oportunidades de Optimización -->
+            <div>
+                <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 15px;">📅 Oportunidades de Optimización</h4>
+
+                {% if optimizacion_cronogramas.oportunidades_optimizacion %}
+                <div style="background: #dbeafe; border: 2px solid #3b82f6; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: center;">
+                    <div style="color: #2563eb; font-size: 1.5rem; font-weight: bold; cursor: pointer;" onclick="toggleOptimizadorDetalle()" title="Haga clic para ver cómo se calcula">
+                        ${{ optimizacion_cronogramas.ahorro_total_cronograma|floatformat:0 }} COP
+                    </div>
+                    <div style="color: #1d4ed8; font-size: 0.9rem;">Ahorro potencial estimado</div>
+
+                    <!-- Desglose del Optimizador -->
+                    <div id="optimizador-detalle" style="display: none; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
+                        <h5 style="color: #374151; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold;">💡 ¿Cómo se calcula el ahorro?</h5>
+
+                        <div style="color: #4b5563; margin-bottom: 8px;">
+                            <strong>Metodología de Optimización:</strong>
+                        </div>
+                        <div style="color: #6b7280; margin-bottom: 10px; font-size: 0.7rem;">
+                            El sistema analiza todas las actividades programadas y agrupa aquellas que están en la misma ubicación y próximas en el tiempo (ventana de 15 días).
+                        </div>
+
+                        <div style="color: #4b5563; margin-bottom: 8px;">
+                            <strong>Fórmula del Ahorro:</strong>
+                        </div>
+                        <div style="color: #6b7280; margin-bottom: 10px; font-family: monospace; font-size: 0.7rem;">
+                            Ahorro por Oportunidad = (Actividades Agrupadas - 1) × Costo Promedio de Visita
+                        </div>
+
+                        <div style="color: #4b5563; margin-bottom: 8px;">
+                            <strong>Supuestos del Cálculo:</strong>
+                        </div>
+                        <div style="color: #6b7280; margin-bottom: 4px; font-size: 0.7rem;">
+                            💰 Costo promedio de visita/desplazamiento: $50,000 COP
+                        </div>
+                        <div style="color: #6b7280; margin-bottom: 10px; font-size: 0.7rem;">
+                            📅 Ventana de reagrupación: 15 días
+                        </div>
+
+                        <div style="color: #4b5563; margin-bottom: 8px;">
+                            <strong>Desglose de Oportunidades:</strong>
+                        </div>
+                        {% for oportunidad in optimizacion_cronogramas.oportunidades_optimizacion %}
+                        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                            <div style="color: #2563eb; font-weight: bold; font-size: 0.75rem;">📍 {{ oportunidad.ubicacion }}</div>
+                            <div style="color: #475569; font-size: 0.7rem;">{{ oportunidad.cantidad }} actividades → Ahorro: ${{ oportunidad.ahorro_estimado|floatformat:0 }} COP</div>
+                            <div style="color: #64748b; font-size: 0.65rem;">Fecha sugerida: {{ oportunidad.fecha_sugerida|date:"d/m/Y" }}</div>
+                        </div>
+                        {% endfor %}
+
+                        <div style="background: #dbeafe; padding: 8px; border-radius: 4px; margin-top: 10px;">
+                            <div style="color: #1e40af; font-weight: bold; font-size: 0.75rem;">Total Ahorro Estimado:</div>
+                            <div style="color: #1e3a8a; font-size: 0.7rem;">
+                                {{ optimizacion_cronogramas.oportunidades_optimizacion|length }} oportunidades × Ahorro promedio = ${{ optimizacion_cronogramas.ahorro_total_cronograma|floatformat:0 }} COP
+                            </div>
+                        </div>
+
+                        <div style="color: #4b5563; font-size: 0.75rem; margin-top: 10px; margin-bottom: 4px;">
+                            <strong>Interpretación:</strong>
+                        </div>
+                        <div style="color: #6b7280; font-size: 0.7rem;">
+                            Al agrupar actividades de la misma ubicación, se reducen los costos de desplazamiento y se optimiza el tiempo del personal técnico. El ahorro es conservador y no incluye beneficios adicionales como mejor productividad del personal.
+                        </div>
+                    </div>
+                </div>
+
+                {% for oportunidad in optimizacion_cronogramas.oportunidades_optimizacion %}
+                <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
+                        <strong style="color: #374151;">📍 {{ oportunidad.ubicacion }}</strong>
+                        <span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                            Ahorro: ${{ oportunidad.ahorro_estimado|floatformat:0 }}
+                        </span>
+                    </div>
+                    <div style="color: #6b7280; font-size: 0.9rem; margin-bottom: 8px;">
+                        {{ oportunidad.cantidad }} actividades programadas cerca de {{ oportunidad.fecha_sugerida|date:"d/m/Y" }}
+                    </div>
+                    <div style="color: #374151; font-size: 0.8rem;">
+                        {% for actividad in oportunidad.actividades|slice:":3" %}
+                        • {{ actividad.equipo.codigo_interno }} ({{ actividad.tipo }}){% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                        {% if oportunidad.actividades|length > 3 %}
+                        <br>• ... y {{ oportunidad.actividades|length|add:"-3" }} más
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; padding: 15px; text-align: center;">
+                    <div style="color: #059669; font-weight: bold;">✅ Cronograma Optimizado</div>
+                    <div style="color: #047857; font-size: 0.9rem;">No hay oportunidades de optimización detectadas</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Equipos Problemáticos -->
+            <div>
+                <h4 style="color: #dc2626; font-weight: bold; margin-bottom: 15px; cursor: pointer;" onclick="toggleProblematicosDetalle()" title="Haga clic para ver cómo se identifican">🔧 Equipos Problemáticos Recurrentes</h4>
+
+                <!-- Desglose de Equipos Problemáticos -->
+                <div id="problematicos-detalle" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: left; font-size: 0.75rem;">
+                    <h5 style="color: #dc2626; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold;">💡 ¿Cómo se identifican equipos problemáticos?</h5>
+
+                    <div style="color: #4b5563; margin-bottom: 8px;">
+                        <strong>Criterios de Clasificación:</strong>
+                    </div>
+                    <div style="color: #6b7280; margin-bottom: 10px; font-size: 0.7rem;">
+                        Se analizan los mantenimientos correctivos de los últimos 12 meses para identificar equipos con problemas recurrentes.
+                    </div>
+
+                    <div style="color: #4b5563; margin-bottom: 8px;">
+                        <strong>Niveles de Problema:</strong>
+                    </div>
+                    <div style="background: #fed7d7; padding: 6px; border-radius: 4px; margin-bottom: 4px;">
+                        <div style="color: #dc2626; font-weight: bold; font-size: 0.75rem;">🔴 CRÍTICO:</div>
+                        <div style="color: #991b1b; font-size: 0.7rem;">≥ 5 mantenimientos correctivos en 12 meses</div>
+                    </div>
+                    <div style="background: #fef3c7; padding: 6px; border-radius: 4px; margin-bottom: 4px;">
+                        <div style="color: #d97706; font-weight: bold; font-size: 0.75rem;">🟡 ALTO:</div>
+                        <div style="color: #92400e; font-size: 0.7rem;">3-4 mantenimientos correctivos en 12 meses</div>
+                    </div>
+                    <div style="background: #dbeafe; padding: 6px; border-radius: 4px; margin-bottom: 10px;">
+                        <div style="color: #2563eb; font-weight: bold; font-size: 0.75rem;">🔵 MODERADO:</div>
+                        <div style="color: #1d4ed8; font-size: 0.7rem;">2 mantenimientos correctivos en 12 meses</div>
+                    </div>
+
+                    <div style="color: #4b5563; margin-bottom: 8px;">
+                        <strong>¿Por qué es importante?</strong>
+                    </div>
+                    <div style="color: #6b7280; margin-bottom: 10px; font-size: 0.7rem;">
+                        • Los correctivos recurrentes indican problemas subyacentes<br>
+                        • Costos más altos que el mantenimiento preventivo<br>
+                        • Riesgo de fallas durante operación crítica<br>
+                        • Pueden requerir reemplazo o actualización del equipo
+                    </div>
+
+                    <div style="background: #fee2e2; padding: 8px; border-radius: 4px; margin-top: 10px;">
+                        <div style="color: #dc2626; font-weight: bold; font-size: 0.75rem;">📋 Recomendación General:</div>
+                        <div style="color: #991b1b; font-size: 0.7rem;">
+                            Para equipos críticos: Evaluar costo-beneficio de reemplazo vs. reparación. Para equipos con alto: Revisar plan de mantenimiento preventivo y considerar actualización.
+                        </div>
+                    </div>
+                </div>
+
+                {% if optimizacion_cronogramas.equipos_problematicos %}
+                {% for equipo_p in optimizacion_cronogramas.equipos_problematicos %}
+                <div style="background: {% if equipo_p.nivel_problema == 'CRÍTICO' %}#fed7d7{% elif equipo_p.nivel_problema == 'ALTO' %}#fef3c7{% else %}#dbeafe{% endif %};
+                    border: 1px solid {% if equipo_p.nivel_problema == 'CRÍTICO' %}#f87171{% elif equipo_p.nivel_problema == 'ALTO' %}#fbbf24{% else %}#93c5fd{% endif %};
+                    border-radius: 6px; padding: 15px; margin-bottom: 10px;">
+
+                    <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 8px;">
+                        <strong style="color: {% if equipo_p.nivel_problema == 'CRÍTICO' %}#dc2626{% elif equipo_p.nivel_problema == 'ALTO' %}#d97706{% else %}#2563eb{% endif %};">
+                            {{ equipo_p.equipo.codigo_interno }} - {{ equipo_p.equipo.nombre }}
+                        </strong>
+                        <span style="background: {% if equipo_p.nivel_problema == 'CRÍTICO' %}#dc2626{% elif equipo_p.nivel_problema == 'ALTO' %}#d97706{% else %}#2563eb{% endif %};
+                            color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                            {{ equipo_p.nivel_problema }}
+                        </span>
+                    </div>
+
+                    <div style="color: {% if equipo_p.nivel_problema == 'CRÍTICO' %}#991b1b{% elif equipo_p.nivel_problema == 'ALTO' %}#92400e{% else %}#1d4ed8{% endif %};
+                        font-size: 0.9rem; margin-bottom: 8px;">
+                        🔧 {{ equipo_p.cantidad_correctivos }} mantenimientos correctivos en 12 meses
+                    </div>
+
+                    {% if equipo_p.costo_total > 0 %}
+                    <div style="color: {% if equipo_p.nivel_problema == 'CRÍTICO' %}#991b1b{% elif equipo_p.nivel_problema == 'ALTO' %}#92400e{% else %}#1d4ed8{% endif %};
+                        font-size: 0.9rem; margin-bottom: 8px;">
+                        💰 Costo total: ${{ equipo_p.costo_total|floatformat:0 }} COP
+                    </div>
+                    {% endif %}
+
+                    <div style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px;">
+                        <div style="color: #374151; font-weight: bold; font-size: 0.8rem; margin-bottom: 3px;">🎯 Recomendación:</div>
+                        <div style="color: #374151; font-size: 0.8rem;">{{ equipo_p.recomendacion }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; padding: 15px; text-align: center;">
+                    <div style="color: #059669; font-weight: bold;">✅ Equipos en Buen Estado</div>
+                    <div style="color: #047857; font-size: 0.9rem;">No se detectaron equipos con problemas recurrentes</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- Footer -->
+    <div style="background: #1f2937; color: white; padding: 20px; border-radius: 12px; text-align: center;">
+        <p style="margin: 0; font-size: 0.875rem;">
+            ✅ Panel de Decisiones
+            {% if perspectiva == 'sam' %}SAM{% else %}{{ empresa.nombre }}{% endif %} |
+            Datos actualizados: {{ today|date:"d/m/Y" }}
+        </p>
+        <p style="margin: 5px 0 0 0; font-size: 0.75rem; opacity: 0.7;">
+            Lógica coherente con Dashboard Técnico | Las 3 Métricas Pilares: Salud + Cumplimiento + Eficiencia
+        </p>
+    </div>
+
+    {% endif %}
+
+<!-- Modal Detalles de Equipos por Salud -->
+<div id="modalEquiposSalud" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; overflow-y: auto;">
+    <div style="background: white; margin: 30px auto; max-width: 1200px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); position: relative;">
+        <!-- Header del modal -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 30px; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: bold;">📊 Detalles de Condición de Equipos</h2>
+            <button onclick="cerrarModalEquiposSalud()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
+        </div>
+
+        <!-- Resumen -->
+        <div id="modalEquiposSaludResumen" style="padding: 20px 30px; background: #f8fafc; border-bottom: 1px solid #e5e7eb;"></div>
+
+        <!-- Contenido -->
+        <div id="modalEquiposSaludContenido" style="padding: 30px; max-height: 600px; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<script>
+function verDetallesEquiposSalud() {
+    const modal = document.getElementById('modalEquiposSalud');
+    const contenido = document.getElementById('modalEquiposSaludContenido');
+    const resumen = document.getElementById('modalEquiposSaludResumen');
+
+    // Mostrar modal con loading
+    modal.style.display = 'block';
+    contenido.innerHTML = '<div style="text-align: center; padding: 40px;"><div style="font-size: 2rem;">⏳</div><div>Cargando detalles...</div></div>';
+
+    // Obtener empresa_id
+    const urlParams = new URLSearchParams(window.location.search);
+    const empresaId = urlParams.get('empresa_id') || '{{ selected_company_id }}';
+
+    // Llamar a la API
+    fetch(`/core/api/equipos-salud-detalles/?empresa_id=${empresaId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                contenido.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">${data.error}</div>`;
+                return;
+            }
+
+            // Mostrar resumen
+            resumen.innerHTML = `
+                <div style="display: flex; justify-content: space-around; align-items: center; text-align: center;">
+                    <div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #ef4444;">${data.totales.criticos}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">🔴 CRÍTICOS</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${data.totales.en_riesgo}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">⚠️ EN RIESGO</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${data.totales.saludables}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">✅ SALUDABLES</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${data.totales.total}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">📦 TOTAL</div>
+                    </div>
+                </div>
+            `;
+
+            // Generar lista de equipos
+            let html = '';
+
+            data.equipos.forEach(equipo => {
+                const colorClasificacion = equipo.clasificacion === 'CRÍTICO' ? '#ef4444' : (equipo.clasificacion === 'EN RIESGO' ? '#f59e0b' : '#10b981');
+                const bgClasificacion = equipo.clasificacion === 'CRÍTICO' ? '#fee2e2' : (equipo.clasificacion === 'EN RIESGO' ? '#fef3c7' : '#d1fae5');
+
+                html += `
+                    <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${colorClasificacion}; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                        <!-- Header del equipo -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: bold; color: #1f2937;">${equipo.codigo_interno} - ${equipo.nombre}</h3>
+                                <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #6b7280;">${equipo.marca} | ${equipo.modelo} | Estado: ${equipo.estado}</p>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 2rem; font-weight: bold; color: ${colorClasificacion};">${equipo.puntuacion_total}pts</div>
+                                <div style="background: ${bgClasificacion}; color: ${colorClasificacion}; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">${equipo.clasificacion}</div>
+                            </div>
+                        </div>
+
+                        <!-- Desglose de puntuación -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                            <!-- Estado del Equipo -->
+                            <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+                                <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 5px;">⚙️ Estado del Equipo (${equipo.detalles.estado_equipo.peso}%)</div>
+                                <div style="font-size: 1.2rem; font-weight: bold; color: ${equipo.detalles.estado_equipo.puntuacion === 100 ? '#10b981' : '#ef4444'};">${equipo.detalles.estado_equipo.puntuacion}pts</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">Contribución: ${equipo.detalles.estado_equipo.contribucion}pts</div>
+                            </div>
+
+                            <!-- Calibración -->
+                            <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+                                <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 5px;">🔬 Calibración (${equipo.detalles.calibracion.peso}%)</div>
+                                <div style="font-size: 1.2rem; font-weight: bold; color: ${equipo.detalles.calibracion.puntuacion === 100 ? '#10b981' : '#ef4444'};">${equipo.detalles.calibracion.puntuacion}pts</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">${equipo.detalles.calibracion.estado}</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">Próxima: ${equipo.detalles.calibracion.proxima_fecha}</div>
+                            </div>
+
+                            <!-- Mantenimiento -->
+                            <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+                                <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 5px;">🔧 Mantenimiento (${equipo.detalles.mantenimiento.peso}%)</div>
+                                <div style="font-size: 1.2rem; font-weight: bold; color: ${equipo.detalles.mantenimiento.puntuacion === 100 ? '#10b981' : '#ef4444'};">${equipo.detalles.mantenimiento.puntuacion}pts</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">${equipo.detalles.mantenimiento.estado}</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">Próximo: ${equipo.detalles.mantenimiento.proxima_fecha}</div>
+                            </div>
+
+                            <!-- Comprobación -->
+                            <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+                                <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 5px;">✅ Comprobación (${equipo.detalles.comprobacion.peso}%)</div>
+                                <div style="font-size: 1.2rem; font-weight: bold; color: ${equipo.detalles.comprobacion.puntuacion === 100 ? '#10b981' : '#ef4444'};">${equipo.detalles.comprobacion.puntuacion}pts</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">${equipo.detalles.comprobacion.estado}</div>
+                                <div style="font-size: 0.7rem; color: #9ca3af;">Próxima: ${equipo.detalles.comprobacion.proxima_fecha}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (data.equipos.length === 0) {
+                html = '<div style="text-align: center; padding: 40px; color: #6b7280;">No hay equipos activos para mostrar.</div>';
+            }
+
+            contenido.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error cargando detalles:', error);
+            contenido.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">Error al cargar los detalles. Por favor intente nuevamente.</div>';
+        });
+}
+
+function cerrarModalEquiposSalud() {
+    document.getElementById('modalEquiposSalud').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('modalEquiposSalud');
+    if (event.target === modal) {
+        cerrarModalEquiposSalud();
+    }
+});
+
+// ===== GRÁFICAS INTERACTIVAS CON CHART.JS =====
+
+// Configuración de colores adaptativos al tema
+function getChartColors() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    return {
+        background: isDark ? '#1f2937' : '#ffffff',
+        textColor: isDark ? '#f3f4f6' : '#374151',
+        gridColor: isDark ? '#374151' : '#e5e7eb'
+    };
+}
+
+// Gráfica 1: Distribución de Salud de Equipos (Doughnut)
+const saludEquiposCanvas = document.getElementById('saludEquiposChart');
+if (saludEquiposCanvas) {
+    const colors = getChartColors();
+    const saludEquiposCtx = saludEquiposCanvas.getContext('2d');
+
+    const saludEquiposData = {
+        labels: ['✅ Condición Óptima', '⚠️ Requiere Atención', '🚨 Acción Inmediata'],
+        datasets: [{
+            data: [
+                {% if perspectiva == 'sam' %}{{ equipos_saludables_total|default:equipos_saludables }}{% else %}{{ equipos_saludables }}{% endif %},
+                {% if perspectiva == 'sam' %}{{ equipos_en_riesgo_total|default:equipos_en_riesgo }}{% else %}{{ equipos_en_riesgo }}{% endif %},
+                {% if perspectiva == 'sam' %}{{ equipos_criticos_total|default:equipos_criticos }}{% else %}{{ equipos_criticos }}{% endif %}
+            ],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+            borderWidth: 2,
+            borderColor: colors.background
+        }]
+    };
+
+    const saludEquiposChart = new Chart(saludEquiposCtx, {
+        type: 'doughnut',
+        data: saludEquiposData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        color: colors.textColor,
+                        font: { size: 11 },
+                        padding: 10
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} equipos (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Actualizar gráfica cuando cambie el tema
+    document.addEventListener('themeChanged', () => {
+        const newColors = getChartColors();
+        saludEquiposChart.options.plugins.legend.labels.color = newColors.textColor;
+        saludEquiposChart.data.datasets[0].borderColor = newColors.background;
+        saludEquiposChart.update();
+    });
+}
+
+// Disparar evento cuando cambie el tema (agregar al toggle en base.html si no existe)
+if (typeof themeToggle !== 'undefined') {
+    const originalToggle = themeToggle.onclick;
+    themeToggle.addEventListener('click', function() {
+        setTimeout(() => {
+            document.dispatchEvent(new Event('themeChanged'));
+        }, 100);
+    });
+}
+</script>
+
+</div>
+{% endblock %}

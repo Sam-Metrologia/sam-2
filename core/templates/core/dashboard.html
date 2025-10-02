@@ -92,11 +92,111 @@
         }
         .storage-progress-bar {
             width: 100%;
-            height: 8px;
-            background-color: #e2e8f0;
-            border-radius: 4px;
+            height: 12px;
+            background-color: #f1f5f9;
+            border-radius: 10px;
             overflow: hidden;
-            margin: 0.5rem 0;
+            margin: 1rem 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .storage-progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.8s ease-in-out, background-color 0.3s ease;
+            position: relative;
+            background: linear-gradient(45deg, transparent 25%, rgba(255,255,255,0.2) 25%,
+                       rgba(255,255,255,0.2) 50%, transparent 50%, transparent 75%,
+                       rgba(255,255,255,0.2) 75%, rgba(255,255,255,0.2));
+            background-size: 30px 30px;
+            animation: progress-animation 2s linear infinite;
+        }
+
+        @keyframes progress-animation {
+            0% { background-position: 0 0; }
+            100% { background-position: 30px 0; }
+        }
+
+        .storage-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .storage-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #4f46e5, #06b6d4, #10b981);
+        }
+
+        .storage-card-content {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            margin: 8px;
+            padding: 20px;
+        }
+
+        .storage-info-display {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .storage-status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .equipment-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .equipment-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #10b981, #06b6d4, #4f46e5);
+        }
+
+        .equipment-card-content {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            margin: 8px;
+            padding: 20px;
+        }
+
+        .equipment-info-display {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #10b981, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         .storage-progress-fill {
             height: 100%;
@@ -162,6 +262,73 @@
         .corrective-maintenance-list a:hover {
             text-decoration: underline;
         }
+
+        /* Estilos para el modal de desglose de actividades */
+        .activity-modal {
+            background-color: white;
+        }
+
+        /* Modo oscuro para el modal */
+        [data-theme="dark"] .activity-modal {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .activity-modal h2 {
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .activity-modal table thead {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="dark"] .activity-modal table th {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="dark"] .activity-modal table tbody {
+            background-color: var(--bg-card);
+        }
+
+        [data-theme="dark"] .activity-modal table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="dark"] .activity-modal table td {
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .activity-modal input[type="text"] {
+            background-color: var(--bg-primary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .activity-modal input[type="text"]::placeholder {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="dark"] .activity-modal select {
+            background-color: var(--bg-primary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .activity-modal button {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .activity-modal button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Cursor pointer para gráficas clickeables */
+        canvas {
+            cursor: pointer !important;
+        }
     </style>
 {% endblock extra_head %}
 
@@ -196,7 +363,7 @@
                         <p>
                             <strong>{{ plan_info.dias_restantes }} días restantes</strong> de su período de prueba.
                             Disfrute de <strong>{{ plan_info.limite_equipos_actual }} equipos</strong> y
-                            <strong>{{ plan_info.limite_almacenamiento_actual|filesizeformat }}</strong> de almacenamiento.
+                            <strong>{{ plan_info.limite_almacenamiento_display }}</strong> de almacenamiento.
                         </p>
                         {% if plan_info.dias_restantes <= 2 %}
                         <p class="mt-2 font-semibold">
@@ -208,21 +375,21 @@
             </div>
         </div>
     {% elif plan_info.plan_actual == 'paid' %}
-        <div class="bg-gradient-to-r from-green-100 to-green-200 border border-green-300 rounded-lg p-4 mb-6">
+        <div class="plan-pagado-card border rounded-lg p-4 mb-6" style="background-color: #e8f5e9; border-color: #66bb6a;">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <svg class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                     </svg>
                 </div>
                 <div class="ml-3">
-                    <h3 class="text-sm font-medium text-green-800">
+                    <h3 class="text-sm font-medium plan-titulo">
                         💎 Plan Pagado Activo
                     </h3>
-                    <div class="mt-2 text-sm text-green-700">
+                    <div class="mt-2 text-sm plan-texto">
                         <p>
                             Su plan incluye <strong>{{ plan_info.limite_equipos_actual }} equipos</strong> y
-                            <strong>{{ plan_info.limite_almacenamiento_actual|filesizeformat }}</strong> de almacenamiento.
+                            <strong>{{ plan_info.limite_almacenamiento_display }}</strong> de almacenamiento.
                             {% if plan_info.dias_restantes != 'inf' %}
                                 <strong>{{ plan_info.dias_restantes }} días restantes</strong>.
                             {% endif %}
@@ -249,7 +416,7 @@
                             <strong>{{ plan_info.limite_almacenamiento_actual|filesizeformat }}</strong> de almacenamiento.
                         </p>
                         <p class="mt-2 font-semibold">
-                            📧 Para ampliar contacte: soporte@sammetrologia.com
+                            📧 Para ampliar contacte: metrologiasam@gmail.com
                         </p>
                     </div>
                 </div>
@@ -278,14 +445,14 @@
 
     {# Alertas Críticas de Notificación #}
     {% if calibraciones_vencidas > 0 or mantenimientos_vencidos > 0 or comprobaciones_vencidas > 0 %}
-    <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-lg shadow-md">
+    <div class="alerta-vencidas border-l-4 border-red-500 p-6 mb-6 rounded-lg shadow-md" style="background-color: #fee2e2;">
         <div class="flex items-center">
             <div class="text-red-500 text-2xl mr-4">⚠️</div>
             <div class="flex-1">
-                <h3 class="text-lg font-bold text-red-800 mb-2">ACTIVIDADES VENCIDAS - ACCIÓN REQUERIDA</h3>
+                <h3 class="text-lg font-bold alerta-titulo mb-2">ACTIVIDADES VENCIDAS - ACCIÓN REQUERIDA</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {% if calibraciones_vencidas > 0 %}
-                    <div class="bg-white p-3 rounded border border-red-200">
+                    <div class="alerta-item p-3 rounded border border-red-200" style="background-color: white;">
                         <div class="text-red-700 font-bold">🔬 Calibraciones</div>
                         <div class="text-red-600">{{ calibraciones_vencidas }} vencida{{ calibraciones_vencidas|pluralize }}</div>
                         {% if vencidos_calibracion_codigos %}
@@ -294,7 +461,7 @@
                     </div>
                     {% endif %}
                     {% if mantenimientos_vencidos > 0 %}
-                    <div class="bg-white p-3 rounded border border-red-200">
+                    <div class="alerta-item p-3 rounded border border-red-200" style="background-color: white;">
                         <div class="text-red-700 font-bold">🔧 Mantenimientos</div>
                         <div class="text-red-600">{{ mantenimientos_vencidos }} vencido{{ mantenimientos_vencidos|pluralize }}</div>
                         {% if vencidos_mantenimiento_codigos %}
@@ -303,7 +470,7 @@
                     </div>
                     {% endif %}
                     {% if comprobaciones_vencidas > 0 %}
-                    <div class="bg-white p-3 rounded border border-red-200">
+                    <div class="alerta-item p-3 rounded border border-red-200" style="background-color: white;">
                         <div class="text-red-700 font-bold">✅ Comprobaciones</div>
                         <div class="text-red-600">{{ comprobaciones_vencidas }} vencida{{ comprobaciones_vencidas|pluralize }}</div>
                         {% if vencidos_comprobacion_codigos %}
@@ -323,7 +490,7 @@
 
     {# Alertas de Actividades Próximas #}
     {% if calibraciones_proximas > 0 or mantenimientos_proximas > 0 or comprobaciones_proximas > 0 %}
-    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg shadow-md">
+    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg shadow-md dashboard-actividades-proximas">
         <div class="flex items-center">
             <div class="text-yellow-600 text-2xl mr-4">📅</div>
             <div class="flex-1">
@@ -416,13 +583,13 @@
 
     {# Sección de Accesos Rápidos #}
     {% if perms.core.can_export_reports %}
-    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-md mb-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">📊 Accesos Rápidos a Informes</h2>
+    <div class="accesos-rapidos p-6 rounded-lg shadow-md mb-8" style="background-color: #e3f2fd;">
+        <h2 class="text-2xl font-bold accesos-titulo mb-4 text-center">📊 Accesos Rápidos a Informes</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             {# Botón para Dashboard Excel desde Dashboard #}
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-blue-200 hover:border-blue-400 transition-colors">
+            <div class="acceso-card p-4 rounded-lg shadow-sm border border-blue-200 hover:border-blue-400 transition-colors" style="background-color: white;">
                 <h3 class="text-lg font-semibold text-blue-700 mb-2 text-center">Dashboard Excel</h3>
-                <p class="text-gray-600 text-sm mb-3 text-center">Descarga el reporte del dashboard con estadísticas detalladas</p>
+                <p class="acceso-texto text-sm mb-3 text-center">Descarga el reporte del dashboard con estadísticas detalladas</p>
                 <a href="{% url 'core:generar_informe_dashboard_excel' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}"
                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out block text-center">
                     <i class="fas fa-chart-bar mr-2"></i> Descargar Excel
@@ -430,9 +597,9 @@
             </div>
 
             {# Botón para ir a la sección completa de informes #}
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-green-200 hover:border-green-400 transition-colors">
+            <div class="acceso-card p-4 rounded-lg shadow-sm border border-green-200 hover:border-green-400 transition-colors" style="background-color: white;">
                 <h3 class="text-lg font-semibold text-green-700 mb-2 text-center">Todos los Informes</h3>
-                <p class="text-gray-600 text-sm mb-3 text-center">Accede a la sección completa con todas las opciones de informes</p>
+                <p class="acceso-texto text-sm mb-3 text-center">Accede a la sección completa con todas las opciones de informes</p>
                 <a href="{% url 'core:informes' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}"
                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out block text-center">
                     <i class="fas fa-chart-line mr-2"></i> Ver Informes
@@ -440,9 +607,9 @@
             </div>
 
             {# Botón para solicitar ZIP #}
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-purple-200 hover:border-purple-400 transition-colors">
+            <div class="acceso-card p-4 rounded-lg shadow-sm border border-purple-200 hover:border-purple-400 transition-colors" style="background-color: white;">
                 <h3 class="text-lg font-semibold text-purple-700 mb-2 text-center">ZIP Completo</h3>
-                <p class="text-gray-600 text-sm mb-3 text-center">Descarga archivo ZIP con documentos y hojas de vida</p>
+                <p class="acceso-texto text-sm mb-3 text-center">Descarga archivo ZIP con documentos y hojas de vida</p>
                 <a href="{% url 'core:informes' %}{% if selected_company_id %}?empresa_id={{ selected_company_id }}{% endif %}#zip-section"
                    class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out block text-center">
                     <i class="fas fa-file-archive mr-2"></i> Solicitar ZIP
@@ -494,6 +661,12 @@
                         </tr>
                     </tbody>
                 </table>
+                <div class="mt-4 text-center">
+                    <button onclick="openAllActivitiesModal('calibracion')"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
+                        📋 Ver Detalles Completos
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -538,6 +711,12 @@
                         </tr>
                     </tbody>
                 </table>
+                <div class="mt-4 text-center">
+                    <button onclick="openAllActivitiesModal('mantenimiento')"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
+                        📋 Ver Detalles Completos
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -582,6 +761,12 @@
                         </tr>
                     </tbody>
                 </table>
+                <div class="mt-4 text-center">
+                    <button onclick="openAllActivitiesModal('comprobacion')"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
+                        📋 Ver Detalles Completos
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -682,104 +867,283 @@
 
 {# Paneles de Límites - Ubicados al final del dashboard #}
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-    {# Panel de Uso de Almacenamiento - Compacto #}
-    <div class="bg-white rounded-lg shadow-md p-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">💾 Almacenamiento</h3>
-        <div class="text-center">
+    {# Panel de Uso de Almacenamiento - Diseño Profesional #}
+    <div class="storage-card rounded-xl">
+        <div class="storage-card-content">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4H8c-2.21 0-4 1.79-4 4z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h6v6H9z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800">Almacenamiento</h3>
+                </div>
+                {% if storage_percentage >= 90 %}
+                    <span class="text-red-500">⚠️</span>
+                {% elif storage_percentage >= 75 %}
+                    <span class="text-yellow-500">⚡</span>
+                {% else %}
+                    <span class="text-green-500">✓</span>
+                {% endif %}
+            </div>
+
             {% if not user.is_superuser %}
-                <p class="text-xs text-gray-500 mb-2">{{ storage_empresa_nombre }}</p>
+                <p class="text-sm text-gray-600 mb-3 font-medium">{{ storage_empresa_nombre }}</p>
             {% else %}
                 {% if storage_empresa_nombre != 'N/A' %}
-                    <p class="text-xs text-gray-500 mb-2">{{ storage_empresa_nombre }}</p>
+                    <p class="text-sm text-gray-600 mb-3 font-medium">{{ storage_empresa_nombre }}</p>
                 {% else %}
-                    <p class="text-xs text-gray-500 mb-2">Seleccione empresa</p>
+                    <p class="text-sm text-gray-400 mb-3 italic">Seleccione empresa para ver detalles</p>
                 {% endif %}
             {% endif %}
 
-            <p class="text-2xl font-bold mb-2 text-gray-800">{{ storage_usage_mb }} MB</p>
-            <div class="storage-progress-bar">
-                <div class="storage-progress-fill {{ storage_status_class }}"
-                     style="width: {{ storage_percentage }}%"></div>
+            <div class="flex items-end justify-between mb-2">
+                <div>
+                    <p class="storage-info-display">{{ storage_usage_display }}</p>
+                    <p class="text-sm text-gray-600">utilizado</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-lg font-semibold text-gray-700">{{ storage_limit_display }}</p>
+                    <p class="text-sm text-gray-600">total</p>
+                </div>
             </div>
-            <p class="text-xs {{ storage_status_class }} rounded px-2 py-1 inline-block mt-2">
-                {{ storage_percentage }}% de {{ storage_limit_mb }} MB
-            </p>
+
+            <div class="storage-progress-bar">
+                <div class="storage-progress-fill"
+                     style="width: {{ storage_percentage }}%;
+                            background-color: {% if storage_percentage >= 90 %}#ef4444{% elif storage_percentage >= 75 %}#f59e0b{% elif storage_percentage >= 50 %}#f97316{% else %}#10b981{% endif %};">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <span class="text-sm font-medium text-gray-700">{{ storage_percentage|floatformat:1 }}% utilizado</span>
+                {% if storage_percentage >= 90 %}
+                    <span class="storage-status-badge bg-red-100 text-red-700">
+                        🔴 Crítico
+                    </span>
+                {% elif storage_percentage >= 75 %}
+                    <span class="storage-status-badge bg-yellow-100 text-yellow-700">
+                        🟡 Alto
+                    </span>
+                {% elif storage_percentage >= 50 %}
+                    <span class="storage-status-badge bg-orange-100 text-orange-700">
+                        🟠 Moderado
+                    </span>
+                {% else %}
+                    <span class="storage-status-badge bg-green-100 text-green-700">
+                        🟢 Saludable
+                    </span>
+                {% endif %}
+            </div>
 
             {% if storage_percentage >= 90 %}
-                <div class="bg-red-50 border border-red-200 rounded p-2 mt-2">
-                    <p class="text-xs text-red-700 font-medium">⚠️ Casi lleno</p>
+                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-700 font-medium flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        Almacenamiento casi lleno
+                    </p>
+                    <p class="text-xs text-red-600 mt-1">Considere liberar espacio o ampliar su plan</p>
                 </div>
             {% elif storage_percentage >= 75 %}
-                <div class="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-                    <p class="text-xs text-yellow-700 font-medium">⚠️ Uso elevado</p>
-                </div>
-            {% elif storage_percentage >= 50 %}
-                <div class="bg-orange-50 border border-orange-200 rounded p-2 mt-2">
-                    <p class="text-xs text-orange-700 font-medium">📊 Uso moderado</p>
-                </div>
-            {% else %}
-                <div class="bg-green-50 border border-green-200 rounded p-2 mt-2">
-                    <p class="text-xs text-green-700 font-medium">✅ Disponible</p>
+                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-700 font-medium">Uso elevado del almacenamiento</p>
                 </div>
             {% endif %}
         </div>
     </div>
 
-    {# Panel de Límites de Equipos - Compacto #}
+    {# Panel de Límites de Equipos - Diseño Profesional #}
     {% if equipos_limite != 'inf' and equipos_limite > 0 %}
-    <div class="bg-white rounded-lg shadow-md p-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">📊 Límite Equipos</h3>
-        <div class="text-center">
+    <div class="equipment-card rounded-xl">
+        <div class="equipment-card-content">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-green-100 rounded-lg">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800">Límite de Equipos</h3>
+                </div>
+                {% if equipos_limite_critical %}
+                    <span class="text-red-500">🚨</span>
+                {% elif equipos_limite_warning %}
+                    <span class="text-yellow-500">⚠️</span>
+                {% else %}
+                    <span class="text-green-500">✅</span>
+                {% endif %}
+            </div>
+
             {% if not user.is_superuser %}
-                <p class="text-xs text-gray-500 mb-2">{{ storage_empresa_nombre }}</p>
+                <p class="text-sm text-gray-600 mb-3 font-medium">{{ storage_empresa_nombre }}</p>
             {% else %}
                 {% if storage_empresa_nombre != 'N/A' %}
-                    <p class="text-xs text-gray-500 mb-2">{{ storage_empresa_nombre }}</p>
+                    <p class="text-sm text-gray-600 mb-3 font-medium">{{ storage_empresa_nombre }}</p>
                 {% else %}
-                    <p class="text-xs text-gray-500 mb-2">Seleccione empresa</p>
+                    <p class="text-sm text-gray-400 mb-3 italic">Seleccione empresa para ver detalles</p>
                 {% endif %}
             {% endif %}
 
-            <p class="text-2xl font-bold mb-2 text-gray-800">{{ equipos_actuales_count }} / {{ equipos_limite }}</p>
-            <div class="storage-progress-bar">
-                <div class="storage-progress-fill {% if equipos_limite_critical %}bg-red-500{% elif equipos_limite_warning %}bg-yellow-500{% else %}bg-green-500{% endif %}"
-                     style="width: {{ equipos_limite_percentage }}%"></div>
+            <div class="flex items-end justify-between mb-2">
+                <div>
+                    <p class="equipment-info-display">{{ equipos_actuales_count }}</p>
+                    <p class="text-sm text-gray-600">equipos registrados</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-lg font-semibold text-gray-700">{{ equipos_limite }}</p>
+                    <p class="text-sm text-gray-600">límite máximo</p>
+                </div>
             </div>
-            <p class="text-xs rounded px-2 py-1 inline-block mt-2 {% if equipos_limite_critical %}text-red-700 bg-red-100{% elif equipos_limite_warning %}text-yellow-700 bg-yellow-100{% else %}text-green-700 bg-green-100{% endif %}">
-                {{ equipos_limite_percentage|floatformat:1 }}% utilizado
-            </p>
+
+            <div class="storage-progress-bar">
+                <div class="storage-progress-fill"
+                     style="width: {{ equipos_limite_percentage }}%;
+                            background-color: {% if equipos_limite_critical %}#ef4444{% elif equipos_limite_warning %}#f59e0b{% else %}#10b981{% endif %};">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <span class="text-sm font-medium text-gray-700">{{ equipos_limite_percentage|floatformat:1 }}% utilizado</span>
+                {% if equipos_limite_critical %}
+                    <span class="storage-status-badge bg-red-100 text-red-700">
+                        🔴 Límite Alcanzado
+                    </span>
+                {% elif equipos_limite_warning %}
+                    <span class="storage-status-badge bg-yellow-100 text-yellow-700">
+                        🟡 Cerca del Límite
+                    </span>
+                {% else %}
+                    <span class="storage-status-badge bg-green-100 text-green-700">
+                        🟢 Disponible
+                    </span>
+                {% endif %}
+            </div>
 
             {% if equipos_limite_critical %}
-                <div class="bg-red-50 border border-red-200 rounded p-2 mt-2">
-                    <p class="text-xs text-red-700 font-medium">🚨 Límite alcanzado</p>
+                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-700 font-medium flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        Límite de equipos alcanzado
+                    </p>
+                    <p class="text-xs text-red-600 mt-1">No puede agregar más equipos con el plan actual</p>
                 </div>
             {% elif equipos_limite_warning %}
-                <div class="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-                    <p class="text-xs text-yellow-700 font-medium">⚠️ Cerca del límite</p>
-                    <p class="text-xs text-yellow-600">{{ equipos_disponibles }} disponibles</p>
+                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-700 font-medium">Cerca del límite de equipos</p>
+                    <p class="text-xs text-yellow-600 mt-1">{{ equipos_disponibles }} equipos disponibles</p>
                 </div>
             {% else %}
-                <div class="bg-green-50 border border-green-200 rounded p-2 mt-2">
-                    <p class="text-xs text-green-700 font-medium">✅ {{ equipos_disponibles }} disponibles</p>
+                <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p class="text-sm text-green-700 font-medium">{{ equipos_disponibles }} equipos disponibles</p>
                 </div>
             {% endif %}
         </div>
     </div>
     {% else %}
     {# Panel placeholder cuando no hay límite de equipos #}
-    <div class="bg-white rounded-lg shadow-md p-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">📊 Límite Equipos</h3>
-        <div class="text-center">
-            <p class="text-xs text-gray-500 mb-2">{{ storage_empresa_nombre }}</p>
-            <p class="text-2xl font-bold mb-2 text-gray-800">{{ equipos_actuales_count }}</p>
-            <div class="bg-green-50 border border-green-200 rounded p-2 mt-2">
-                <p class="text-xs text-green-700 font-medium">✅ Sin límites</p>
+    <div class="equipment-card rounded-xl">
+        <div class="equipment-card-content">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-green-100 rounded-lg">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800">Equipos Registrados</h3>
+                </div>
+                <span class="text-green-500">♾️</span>
+            </div>
+
+            <p class="text-sm text-gray-600 mb-3 font-medium">{{ storage_empresa_nombre }}</p>
+
+            <div class="text-center mb-4">
+                <p class="equipment-info-display">{{ equipos_actuales_count }}</p>
+                <p class="text-sm text-gray-600">equipos registrados</p>
+            </div>
+
+            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p class="text-sm text-green-700 font-medium text-center">✅ Sin límites de equipos</p>
             </div>
         </div>
     </div>
     {% endif %}
 </div>
 
+<!-- Modal para Desglose de Actividades -->
+<div id="activityDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center" style="display: none;">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden activity-modal">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 id="modalTitle" class="text-2xl font-bold text-gray-800">Desglose de Actividades</h2>
+            <button onclick="closeActivityModal()" class="text-gray-500 hover:text-gray-700 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 140px);">
+            <div id="modalLoading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p class="mt-4 text-gray-600">Cargando datos...</p>
+            </div>
+
+            <div id="modalContent" class="hidden">
+                <div class="mb-4 flex flex-wrap gap-4 items-center justify-between">
+                    <div class="text-sm text-gray-600">
+                        Total de equipos: <span id="totalEquipos" class="font-bold text-gray-800">0</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="statusFilter"
+                                class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="all">Todas</option>
+                            <option value="Realizado">Realizadas</option>
+                            <option value="No Cumplido">No Cumplidas</option>
+                            <option value="Pendiente/Programado">Pendientes</option>
+                        </select>
+                        <input type="text" id="searchInput" placeholder="Buscar equipo..."
+                            class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Equipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Actividad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="modalError" class="hidden text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p id="modalErrorMessage" class="mt-4 text-red-600"></p>
+            </div>
+        </div>
+
+        <div class="flex justify-end p-6 border-t border-gray-200">
+            <button onclick="closeActivityModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -870,6 +1234,17 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '70%', // Makes it a doughnut chart
+                    onClick: (event, elements) => {
+                        if (elements && elements.length > 0) {
+                            const index = elements[0].index;
+                            const status = calibracionesTortaLabels[index];
+                            openActivityModal({
+                                chartType: 'pie',
+                                activityType: 'calibracion',
+                                status: status
+                            });
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'bottom', // Place legend at the bottom
@@ -884,7 +1259,7 @@
                                 label: function(tooltipItem) {
                                     const value = tooltipItem.parsed;
                                     const percentage = totalCalibracionesTorta > 0 ? ((value / totalCalibracionesTorta) * 100).toFixed(2) : 0;
-                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%) - Click para ver detalles`;
                                 }
                             }
                         },
@@ -929,6 +1304,17 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '70%',
+                    onClick: (event, elements) => {
+                        if (elements && elements.length > 0) {
+                            const index = elements[0].index;
+                            const status = mantenimientosCumplimientoTortaLabels[index];
+                            openActivityModal({
+                                chartType: 'pie',
+                                activityType: 'mantenimiento',
+                                status: status
+                            });
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'bottom',
@@ -943,7 +1329,7 @@
                                 label: function(tooltipItem) {
                                     const value = tooltipItem.parsed;
                                     const percentage = totalMantenimientosTorta > 0 ? ((value / totalMantenimientosTorta) * 100).toFixed(2) : 0;
-                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%) - Click para ver detalles`;
                                 }
                             }
                         },
@@ -1049,6 +1435,17 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '70%',
+                    onClick: (event, elements) => {
+                        if (elements && elements.length > 0) {
+                            const index = elements[0].index;
+                            const status = comprobacionesTortaLabels[index];
+                            openActivityModal({
+                                chartType: 'pie',
+                                activityType: 'comprobacion',
+                                status: status
+                            });
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'bottom',
@@ -1063,7 +1460,7 @@
                                 label: function(tooltipItem) {
                                     const value = tooltipItem.parsed;
                                     const percentage = totalComprobacionesTorta > 0 ? ((value / totalComprobacionesTorta) * 100).toFixed(2) : 0;
-                                    return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                                    return `${tooltipItem.label}: ${value} (${percentage}%) - Click para ver detalles`;
                                 }
                             }
                         },
@@ -1107,30 +1504,47 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#007bff',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 5,
-                            pointHoverRadius: 7,
-                            borderWidth: 2 // Grosor normal para programadas
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            borderWidth: 2 // Línea fina para programadas
                         },
                         {
                             label: 'Realizadas',
                             data: realizedCalibrationsLineData,
                             borderColor: '#28a745', // Green
-                            backgroundColor: 'rgba(40, 167, 69, 0.2)', // Light green fill
+                            backgroundColor: 'rgba(40, 167, 69, 0.3)', // Más visible
                             fill: false,
                             tension: 0.3,
                             pointBackgroundColor: '#28a745',
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#28a745',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado para notoriedad
-                            pointHoverRadius: 9, // Aumentado para notoriedad
-                            borderWidth: 4 // Aumentado para notoriedad
+                            pointRadius: 8, // Puntos más grandes
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizadas
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (event, elements, chart) => {
+                        if (elements && elements.length > 0) {
+                            const element = elements[0];
+                            const monthIndex = element.index;
+                            const datasetIndex = element.datasetIndex;
+                            const monthLabel = lineChartLabels[monthIndex];
+                            const dataType = datasetIndex === 0 ? 'programmed' : 'realized';
+
+                            openActivityModal({
+                                chartType: 'line',
+                                activityType: 'calibracion',
+                                monthIndex: monthIndex,
+                                monthLabel: monthLabel,
+                                dataType: dataType
+                            });
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
@@ -1142,6 +1556,13 @@
                         },
                         title: {
                             display: false,
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + ' - Click para ver detalles';
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -1193,9 +1614,9 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#6c757d',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 5,
-                            pointHoverRadius: 7,
-                            borderWidth: 2 // Grosor normal para programados
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            borderWidth: 2 // Línea fina para programados
                         },
                         {
                             label: 'Realizados - Preventivo',
@@ -1208,9 +1629,9 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#007bff',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado
-                            pointHoverRadius: 9, // Aumentado
-                            borderWidth: 4 // Aumentado
+                            pointRadius: 8, // Aumentado para visibilidad
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizados
                         },
                         {
                             label: 'Realizados - Correctivo',
@@ -1223,9 +1644,9 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#dc3545',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado
-                            pointHoverRadius: 9, // Aumentado
-                            borderWidth: 4 // Aumentado
+                            pointRadius: 8, // Aumentado para visibilidad
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizados
                         },
                         {
                             label: 'Realizados - Predictivo',
@@ -1238,9 +1659,9 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#800080',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado
-                            pointHoverRadius: 9, // Aumentado
-                            borderWidth: 4 // Aumentado
+                            pointRadius: 8, // Aumentado para visibilidad
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizados
                         },
                         {
                             label: 'Realizados - Inspección',
@@ -1253,9 +1674,9 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#008000',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado
-                            pointHoverRadius: 9, // Aumentado
-                            borderWidth: 4 // Aumentado
+                            pointRadius: 8, // Aumentado para visibilidad
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizados
                         },
                         {
                             label: 'Realizados - Otros', // For any other maintenance types
@@ -1268,15 +1689,32 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#ffc107',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado
-                            pointHoverRadius: 9, // Aumentado
-                            borderWidth: 4 // Aumentado
+                            pointRadius: 8, // Aumentado para visibilidad
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizados
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (event, elements, chart) => {
+                        if (elements && elements.length > 0) {
+                            const element = elements[0];
+                            const monthIndex = element.index;
+                            const datasetIndex = element.datasetIndex;
+                            const monthLabel = lineChartLabels[monthIndex];
+                            const dataType = datasetIndex === 0 ? 'programmed' : 'realized';
+
+                            openActivityModal({
+                                chartType: 'line',
+                                activityType: 'mantenimiento',
+                                monthIndex: monthIndex,
+                                monthLabel: monthLabel,
+                                dataType: dataType
+                            });
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
@@ -1288,6 +1726,13 @@
                         },
                         title: {
                             display: false,
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + ' - Click para ver detalles';
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -1339,30 +1784,47 @@
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#007bff',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 5,
-                            pointHoverRadius: 7,
-                            borderWidth: 2 // Grosor normal para programadas
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            borderWidth: 2 // Línea fina para programadas
                         },
                         {
                             label: 'Realizadas',
                             data: realizedComprobacionesLineData,
                             borderColor: '#28a745', // Green
-                            backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                            backgroundColor: 'rgba(40, 167, 69, 0.3)', // Más visible
                             fill: false,
                             tension: 0.3,
                             pointBackgroundColor: '#28a745',
                             pointBorderColor: '#fff',
                             pointHoverBackgroundColor: '#28a745',
                             pointHoverBorderColor: '#fff',
-                            pointRadius: 7, // Aumentado
-                            pointHoverRadius: 9, // Aumentado
-                            borderWidth: 4 // Aumentado
+                            pointRadius: 8, // Aumentado para visibilidad
+                            pointHoverRadius: 10,
+                            borderWidth: 6 // Línea MUY gruesa para realizados
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (event, elements, chart) => {
+                        if (elements && elements.length > 0) {
+                            const element = elements[0];
+                            const monthIndex = element.index;
+                            const datasetIndex = element.datasetIndex;
+                            const monthLabel = lineChartLabels[monthIndex];
+                            const dataType = datasetIndex === 0 ? 'programmed' : 'realized';
+
+                            openActivityModal({
+                                chartType: 'line',
+                                activityType: 'comprobacion',
+                                monthIndex: monthIndex,
+                                monthLabel: monthLabel,
+                                dataType: dataType
+                            });
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
@@ -1374,6 +1836,13 @@
                         },
                         title: {
                             display: false,
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + ' - Click para ver detalles';
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -1405,6 +1874,332 @@
                 }
             });
         }
+
+        // ============================
+        // SISTEMA DE DESGLOSE INTERACTIVO
+        // ============================
+
+        // Función para abrir el modal con TODAS las actividades y filtro dropdown
+        window.openAllActivitiesModal = function(activityType) {
+            const modal = document.getElementById('activityDetailsModal');
+            const loading = document.getElementById('modalLoading');
+            const content = document.getElementById('modalContent');
+            const error = document.getElementById('modalError');
+            const title = document.getElementById('modalTitle');
+
+            // Mostrar modal y loading
+            modal.style.display = 'flex';
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+            error.classList.add('hidden');
+
+            // Actualizar título
+            const activityNames = {
+                'calibracion': 'Calibraciones',
+                'mantenimiento': 'Mantenimientos',
+                'comprobacion': 'Comprobaciones'
+            };
+            title.textContent = `${activityNames[activityType]} - Año Actual`;
+
+            // Obtener empresa_id del select si existe
+            const empresaSelect = document.querySelector('select[name="empresa_id"]');
+            const empresaId = empresaSelect ? empresaSelect.value : '';
+
+            // Construir URL - sin status_filter para obtener TODAS
+            let url = '{% url "core:get_chart_details" %}?chart_type=pie&activity_type=' + activityType;
+            if (empresaId) {
+                url += '&empresa_id=' + empresaId;
+            }
+
+            // Fetch datos
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('=== ALL ACTIVITIES DEBUG ===');
+                    console.log('Activity Type:', activityType);
+                    console.log('Results Count:', data.count);
+                    console.log('Results Data:', data.data);
+                    console.log('============================');
+
+                    if (data.success) {
+                        // Guardar datos globalmente para filtrado
+                        window.allActivitiesData = data.data;
+                        window.currentActivityType = activityType;
+
+                        // Mostrar todas las actividades
+                        displayActivityDataWithFilter(data.data);
+                        loading.classList.add('hidden');
+                        content.classList.remove('hidden');
+
+                        // Agregar event listeners para filtros
+                        setupFilterListeners();
+                    } else {
+                        showError(data.error || 'Error al cargar datos');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    showError('Error de conexión. Por favor intenta de nuevo.');
+                });
+        };
+
+        // Función para abrir el modal de detalles (clicks en gráficas)
+        window.openActivityModal = function(params) {
+            const modal = document.getElementById('activityDetailsModal');
+            const loading = document.getElementById('modalLoading');
+            const content = document.getElementById('modalContent');
+            const error = document.getElementById('modalError');
+            const title = document.getElementById('modalTitle');
+
+            // Mostrar modal y loading
+            modal.style.display = 'flex';
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+            error.classList.add('hidden');
+
+            // Actualizar título
+            const activityNames = {
+                'calibracion': 'Calibraciones',
+                'mantenimiento': 'Mantenimientos',
+                'comprobacion': 'Comprobaciones'
+            };
+            const activityName = activityNames[params.activityType] || 'Actividades';
+
+            if (params.chartType === 'pie') {
+                title.textContent = `${activityName} - ${params.status}`;
+            } else if (params.chartType === 'line') {
+                const dataTypeName = params.dataType === 'programmed' ? 'Programadas' : 'Realizadas';
+                title.textContent = `${activityName} ${dataTypeName} - ${params.monthLabel}`;
+            }
+
+            // Obtener empresa_id del select si existe
+            const empresaSelect = document.querySelector('select[name="empresa_id"]');
+            const empresaId = empresaSelect ? empresaSelect.value : '';
+
+            // Construir URL
+            let url = '{% url "core:get_chart_details" %}?chart_type=' + params.chartType +
+                     '&activity_type=' + params.activityType;
+
+            if (empresaId) {
+                url += '&empresa_id=' + empresaId;
+            }
+
+            if (params.chartType === 'pie') {
+                url += '&status=' + encodeURIComponent(params.status);
+            } else if (params.chartType === 'line') {
+                url += '&month_index=' + params.monthIndex + '&data_type=' + params.dataType;
+            }
+
+            // Fetch datos
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    // Mostrar información de debug en consola
+                    console.log('=== DEBUG INFO ===');
+                    console.log('Chart Type:', params.chartType);
+                    console.log('Activity Type:', params.activityType);
+                    if (params.status) console.log('Status Filter:', params.status);
+                    if (data.debug) {
+                        console.log('Backend Debug:', data.debug);
+                    }
+                    console.log('Results Count:', data.count);
+                    console.log('Results Data:', data.data);
+                    console.log('==================');
+
+                    if (data.success) {
+                        displayActivityData(data.data, params);
+                        loading.classList.add('hidden');
+                        content.classList.remove('hidden');
+                    } else {
+                        showError(data.error || 'Error al cargar datos');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    showError('Error de conexión. Por favor intenta de nuevo.');
+                });
+        };
+
+        // Función para cerrar el modal
+        window.closeActivityModal = function() {
+            const modal = document.getElementById('activityDetailsModal');
+            modal.style.display = 'none';
+            modal.classList.add('hidden');
+        };
+
+        // Función para mostrar datos en la tabla
+        function displayActivityData(data, params) {
+            const tbody = document.getElementById('modalTableBody');
+            const totalElement = document.getElementById('totalEquipos');
+            const searchInput = document.getElementById('searchInput');
+
+            totalElement.textContent = data.length;
+
+            // Guardar datos para búsqueda
+            window.currentActivityData = data;
+
+            // Renderizar tabla
+            renderTable(data, params);
+
+            // Agregar evento de búsqueda
+            searchInput.value = '';
+            searchInput.oninput = function() {
+                const query = this.value.toLowerCase();
+                const filtered = window.currentActivityData.filter(item =>
+                    item.codigo.toLowerCase().includes(query) ||
+                    item.nombre.toLowerCase().includes(query)
+                );
+                renderTable(filtered, params);
+            };
+        }
+
+        // Función para renderizar la tabla
+        function renderTable(data, params) {
+            const tbody = document.getElementById('modalTableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                            No se encontraron equipos
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.classList.add('hover:bg-gray-50');
+
+                // Color de estado
+                let statusColor = 'gray';
+                if (item.status === 'Realizado' || item.status === 'Realizada') {
+                    statusColor = 'green';
+                } else if (item.status === 'No Cumplido') {
+                    statusColor = 'red';
+                } else if (item.status === 'Pendiente/Programado' || item.status === 'Programada') {
+                    statusColor = 'yellow';
+                }
+
+                const fecha = item.fecha_programada || item.fecha_realizada || 'N/A';
+
+                // Color para estado del equipo
+                let estadoEquipoColor = 'gray';
+                if (item.estado_equipo === 'Activo') {
+                    estadoEquipoColor = 'green';
+                } else if (item.estado_equipo === 'Inactivo') {
+                    estadoEquipoColor = 'yellow';
+                } else if (item.estado_equipo === 'De Baja') {
+                    estadoEquipoColor = 'red';
+                } else if (item.estado_equipo === 'En Calibración' || item.estado_equipo === 'En Mantenimiento') {
+                    estadoEquipoColor = 'blue';
+                }
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.codigo}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${item.nombre}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-${estadoEquipoColor}-100 text-${estadoEquipoColor}-800">
+                            ${item.estado_equipo}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${fecha}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-${statusColor}-100 text-${statusColor}-800">
+                            ${item.status}${item.tipo ? ' (' + item.tipo + ')' : ''}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Función para mostrar error
+        function showError(message) {
+            const loading = document.getElementById('modalLoading');
+            const content = document.getElementById('modalContent');
+            const error = document.getElementById('modalError');
+            const errorMessage = document.getElementById('modalErrorMessage');
+
+            loading.classList.add('hidden');
+            content.classList.add('hidden');
+            error.classList.remove('hidden');
+            errorMessage.textContent = message;
+        }
+
+        // Función para mostrar datos con filtro
+        function displayActivityDataWithFilter(data) {
+            const tbody = document.getElementById('modalTableBody');
+            const totalElement = document.getElementById('totalEquipos');
+
+            totalElement.textContent = data.length;
+
+            // Renderizar tabla
+            renderTable(data, {});
+        }
+
+        // Función para configurar los event listeners de filtros
+        function setupFilterListeners() {
+            const statusFilter = document.getElementById('statusFilter');
+            const searchInput = document.getElementById('searchInput');
+
+            // Resetear filtros
+            statusFilter.value = 'all';
+            searchInput.value = '';
+
+            // Event listener para el filtro de estado
+            statusFilter.onchange = function() {
+                applyFilters();
+            };
+
+            // Event listener para el buscador
+            searchInput.oninput = function() {
+                applyFilters();
+            };
+        }
+
+        // Función para aplicar ambos filtros (estado + búsqueda)
+        function applyFilters() {
+            if (!window.allActivitiesData) return;
+
+            const statusFilter = document.getElementById('statusFilter');
+            const searchInput = document.getElementById('searchInput');
+            const totalElement = document.getElementById('totalEquipos');
+
+            const statusValue = statusFilter.value;
+            const searchQuery = searchInput.value.toLowerCase();
+
+            let filtered = window.allActivitiesData;
+
+            // Filtrar por estado
+            if (statusValue !== 'all') {
+                filtered = filtered.filter(item => item.status === statusValue);
+            }
+
+            // Filtrar por búsqueda
+            if (searchQuery) {
+                filtered = filtered.filter(item =>
+                    item.codigo.toLowerCase().includes(searchQuery) ||
+                    item.nombre.toLowerCase().includes(searchQuery)
+                );
+            }
+
+            // Actualizar contador y tabla
+            totalElement.textContent = filtered.length;
+            renderTable(filtered, {});
+        }
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('activityDetailsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeActivityModal();
+            }
+        });
+
     });
 </script>
 {% endblock content %}

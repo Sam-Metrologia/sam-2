@@ -55,7 +55,7 @@ class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = CustomUser
         fields = UserCreationForm.Meta.fields + (
-            'email', 'first_name', 'last_name', 'empresa', 
+            'email', 'first_name', 'last_name', 'empresa', 'rol_usuario',
             'is_staff', 'is_superuser', 'groups', 'user_permissions',
         )
         widgets = {
@@ -68,6 +68,7 @@ class CustomUserCreationForm(UserCreationForm):
             'is_superuser': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'groups': forms.SelectMultiple(attrs={'class': 'form-multiselect'}),
             'user_permissions': forms.SelectMultiple(attrs={'class': 'form-multiselect'}),
+            'rol_usuario': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -109,8 +110,8 @@ class CustomUserCreationForm(UserCreationForm):
 class CustomUserChangeForm(UserChangeForm):
     class Meta(UserChangeForm.Meta):
         model = CustomUser
-        fields = ('username', 'email', 'first_name', 'last_name', 'is_active', 
-                 'is_staff', 'is_superuser', 'groups', 'user_permissions', 'empresa')
+        fields = ('username', 'email', 'first_name', 'last_name', 'is_active',
+                 'is_staff', 'is_superuser', 'groups', 'user_permissions', 'empresa', 'rol_usuario')
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-input'}),
             'empresa': forms.Select(attrs={'class': 'form-select'}),
@@ -122,6 +123,7 @@ class CustomUserChangeForm(UserChangeForm):
             'is_superuser': forms.CheckboxInput(attrs={'class': 'form-checkbox h-5 w-5 text-blue-600 rounded'}),
             'groups': forms.SelectMultiple(attrs={'class': 'form-multiselect'}),
             'user_permissions': forms.SelectMultiple(attrs={'class': 'form-multiselect'}),
+            'rol_usuario': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -492,12 +494,20 @@ class CalibracionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.fecha_calibracion:
             self.fields['fecha_calibracion'].initial = self.instance.fecha_calibracion.strftime('%d/%m/%Y')
-        
-        # Filtrar proveedores por tipo de servicio
-        self.fields['proveedor'].queryset = Proveedor.objects.filter(tipo_servicio__in=['Calibración', 'Otro'])
+
+        # Filtrar proveedores por tipo de servicio y empresa
+        if empresa:
+            self.fields['proveedor'].queryset = Proveedor.objects.filter(
+                empresa=empresa,
+                tipo_servicio__in=['Calibración', 'Otro']
+            )
+        else:
+            # Fallback: sin proveedores si no hay empresa
+            self.fields['proveedor'].queryset = Proveedor.objects.none()
 
     def clean_fecha_calibracion(self):
         fecha = self.cleaned_data.get('fecha_calibracion')
@@ -539,12 +549,20 @@ class MantenimientoForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.fecha_mantenimiento:
             self.fields['fecha_mantenimiento'].initial = self.instance.fecha_mantenimiento.strftime('%d/%m/%Y')
-        
-        # Filtrar proveedores por tipo de servicio
-        self.fields['proveedor'].queryset = Proveedor.objects.filter(tipo_servicio__in=['Mantenimiento', 'Otro'])
+
+        # Filtrar proveedores por tipo de servicio y empresa
+        if empresa:
+            self.fields['proveedor'].queryset = Proveedor.objects.filter(
+                empresa=empresa,
+                tipo_servicio__in=['Mantenimiento', 'Otro']
+            )
+        else:
+            # Fallback: sin proveedores si no hay empresa
+            self.fields['proveedor'].queryset = Proveedor.objects.none()
 
     def clean_fecha_mantenimiento(self):
         fecha = self.cleaned_data.get('fecha_mantenimiento')
@@ -579,12 +597,20 @@ class ComprobacionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.fecha_comprobacion:
             self.fields['fecha_comprobacion'].initial = self.instance.fecha_comprobacion.strftime('%d/%m/%Y')
-        
-        # Filtrar proveedores por tipo de servicio
-        self.fields['proveedor'].queryset = Proveedor.objects.filter(tipo_servicio__in=['Comprobación', 'Otro'])
+
+        # Filtrar proveedores por tipo de servicio y empresa
+        if empresa:
+            self.fields['proveedor'].queryset = Proveedor.objects.filter(
+                empresa=empresa,
+                tipo_servicio__in=['Comprobación', 'Otro']
+            )
+        else:
+            # Fallback: sin proveedores si no hay empresa
+            self.fields['proveedor'].queryset = Proveedor.objects.none()
 
     def clean_fecha_comprobacion(self):
         fecha = self.cleaned_data.get('fecha_comprobacion')

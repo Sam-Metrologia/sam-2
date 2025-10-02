@@ -1,0 +1,491 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Gerencia SAM{% endblock %}
+
+{% block extra_css %}
+<!-- Bootstrap CSS para compatibilidad -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.min.css" rel="stylesheet">
+<style>
+    /* Paleta de colores: Blanco, Azul (#1e3a8a, #3b82f6), Gris (#6b7280, #f8fafc) */
+    .sam-dashboard {
+        background-color: #f8fafc;
+        min-height: 100vh;
+    }
+
+    .sam-header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+    }
+
+    .metric-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        border-left: 4px solid #3b82f6;
+        transition: transform 0.2s ease;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.1);
+    }
+
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1e3a8a;
+        margin-bottom: 0.5rem;
+    }
+
+    .metric-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 500;
+    }
+
+    .metric-change {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+
+    .metric-change.positive {
+        color: #10b981;
+    }
+
+    .metric-change.negative {
+        color: #ef4444;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        height: 400px;
+    }
+
+    .chart-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .client-table {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    .client-table table {
+        width: 100%;
+    }
+
+    .client-table th {
+        background-color: #1e3a8a;
+        color: white;
+        padding: 1rem;
+        font-weight: 600;
+        text-align: left;
+    }
+
+    .client-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .client-table tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-excellent {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-good {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-warning {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+
+    .filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1);
+    }
+
+    .btn-sam {
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: background-color 0.2s ease;
+    }
+
+    .btn-sam:hover {
+        background-color: #1e3a8a;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sam-dashboard">
+    <!-- Header SAM -->
+    <div class="sam-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-0">📊 Dashboard Gerencia SAM</h1>
+                    <p class="mb-0 opacity-75">Análisis financiero y operativo del negocio metrológico</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="text-white">
+                        <div class="h5 mb-1">{{ current_year }}</div>
+                        <div class="small">Período de análisis</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Filtros -->
+        <div class="filter-section">
+            <form method="GET" class="row align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-muted">FILTRAR POR EMPRESA</label>
+                    <select name="empresa_id" class="form-select">
+                        <option value="">Todas las empresas</option>
+                        {% for empresa in empresas_disponibles %}
+                            <option value="{{ empresa.id }}"
+                                {% if empresa.id|stringformat:"s" == selected_company_id %}selected{% endif %}>
+                                {{ empresa.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-sam d-block">Filtrar</button>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="small text-muted">
+                        <strong>{{ num_empresas_activas }}</strong> empresas activas
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Métricas Financieras SAM -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ ingresos_anuales|default:0|floatformat:0 }}</div>
+                    <div class="metric-label">Ingresos Anuales</div>
+                    <div class="metric-change positive">
+                        +{{ current_year }} proyectado
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_totales|default:0|floatformat:0 }}</div>
+                    <div class="metric-label">Costos Operativos</div>
+                    <div class="metric-change {% if variacion_costos_porcentaje|default:0 >= 0 %}positive{% else %}negative{% endif %}">
+                        {% if variacion_costos_porcentaje|default:0 >= 0 %}+{% endif %}{{ variacion_costos_porcentaje|default:0 }}% vs {{ previous_year }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">{{ margen_porcentaje }}%</div>
+                    <div class="metric-label">Margen Bruto</div>
+                    <div class="metric-change positive">
+                        ${{ margen_bruto|floatformat:0 }} ganancia
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value">{{ total_equipos_gestionados }}</div>
+                    <div class="metric-label">Equipos Gestionados</div>
+                    <div class="metric-change positive">
+                        {{ actividades_realizadas_año }} actividades/año
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análisis de Costos por Actividad -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_calibracion|floatformat:0 }}</div>
+                    <div class="metric-label">💰 Calibraciones</div>
+                    <div class="small text-muted mt-2">
+                        Costos totales {{ current_year }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_mantenimiento_sam|floatformat:0 }}</div>
+                    <div class="metric-label">🔧 Mantenimientos</div>
+                    <div class="small text-muted mt-2">
+                        Costos internos SAM {{ current_year }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-value">${{ costos_comprobacion|floatformat:0 }}</div>
+                    <div class="metric-label">✅ Comprobaciones</div>
+                    <div class="small text-muted mt-2">
+                        Costos totales {{ current_year }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Eficiencia Operativa -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-value">{{ cumplimiento_general }}%</div>
+                    <div class="metric-label">⚡ Cumplimiento General</div>
+                    <div class="small mt-2">
+                        <span class="status-badge {% if cumplimiento_general >= 90 %}status-excellent{% elif cumplimiento_general >= 80 %}status-good{% else %}status-warning{% endif %}">
+                            {% if cumplimiento_general >= 90 %}EXCELENTE{% elif cumplimiento_general >= 80 %}BUENO{% else %}REQUIERE ATENCIÓN{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-value">{{ tiempo_promedio.calibracion }}h</div>
+                    <div class="metric-label">⏱️ Tiempo Prom. Calibración</div>
+                    <div class="small text-muted mt-2">
+                        Mantenimiento: {{ tiempo_promedio.mantenimiento }}h<br>
+                        Comprobación: {{ tiempo_promedio.comprobacion }}h
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-value">{{ equipos_al_dia }}</div>
+                    <div class="metric-label">🎯 Equipos al Día</div>
+                    <div class="small text-muted mt-2">
+                        {{ equipos_vencidos }} equipos vencidos
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-title">📈 Ingresos Mensuales</div>
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <div class="chart-title">🎯 Distribución de Costos</div>
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Clientes -->
+        {% if top_clientes %}
+        <div class="client-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>🏢 Cliente</th>
+                        <th>💰 Tarifa Mensual</th>
+                        <th>📊 Tipo Organismo</th>
+                        <th>📅 Nivel Servicio</th>
+                        <th>📋 Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cliente in top_clientes %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold">{{ cliente.nombre }}</div>
+                            <div class="small text-muted">{{ cliente.nit|default:"-" }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-success">
+                                ${{ cliente.tarifa_mensual_sam|floatformat:0|default:"-" }}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ cliente.tipo_organismo }}</span>
+                        </td>
+                        <td>
+                            <span class="badge {% if cliente.nivel_servicio_sam == 'Premium' %}bg-warning{% elif cliente.nivel_servicio_sam == 'Estándar' %}bg-info{% else %}bg-secondary{% endif %}">
+                                {{ cliente.nivel_servicio_sam }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge status-excellent">ACTIVO</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Información del Sistema -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h5 class="text-muted mb-3">🔍 Fuentes de Datos y Metodología</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="small text-muted">
+                                <strong>💰 Ingresos:</strong> Suma de tarifa_mensual_sam por empresa activa<br>
+                                <strong>📊 Costos:</strong> Campos costo_calibracion, costo_sam_interno, costo_comprobacion<br>
+                                <strong>⚡ Cumplimiento:</strong> (Equipos al día / Total equipos) × 100<br>
+                                <strong>⏱️ Tiempo Promedio:</strong> Promedio de tiempo_empleado_horas por actividad
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <div class="small text-muted">
+                                <strong>🔄 Última actualización:</strong> {{ now|date:"d/m/Y H:i" }}<br>
+                                <strong>📈 Período análisis:</strong> {{ current_year }}<br>
+                                <strong>🎯 Comparación:</strong> vs {{ previous_year }}<br>
+                                <strong>💼 Total clientes analizados:</strong> {{ total_clientes }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.0.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuración de colores SAM
+    const samColors = {
+        primary: '#1e3a8a',
+        secondary: '#3b82f6',
+        success: '#10b981',
+        warning: '#f59e0b',
+        danger: '#ef4444',
+        gray: '#6b7280'
+    };
+
+    // Gráfico de Ingresos Mensuales
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+            datasets: [{
+                label: 'Ingresos Mensuales',
+                data: {{ monthly_revenue_data|safe }},
+                borderColor: samColors.primary,
+                backgroundColor: samColors.secondary + '20',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: Math.max(...{{ monthly_revenue_data|safe }}) * 1.2,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                }
+            },
+            animation: {
+                duration: 1000
+            }
+        }
+    });
+
+    // Gráfico de Distribución de Costos
+    const costCtx = document.getElementById('costChart').getContext('2d');
+    new Chart(costCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ cost_labels|safe }},
+            datasets: [{
+                data: {{ cost_distribution|safe }},
+                backgroundColor: [
+                    samColors.primary,
+                    samColors.secondary,
+                    samColors.success
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+
+<!-- Bootstrap JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

@@ -14,25 +14,27 @@ class OptimizedQueries:
     def get_equipos_optimized(empresa=None, user=None):
         """
         Obtiene equipos con todos los relacionados prefetcheados
-        para evitar queries N+1
+        para evitar queries N+1. Solo equipos de empresas activas.
         """
         queryset = Equipo.objects.select_related(
             'empresa'
+        ).filter(
+            empresa__is_deleted=False  # Solo equipos de empresas activas
         ).prefetch_related(
             # Prefetch calibraciones con orden por fecha descendente
             Prefetch(
                 'calibraciones',
-                queryset=Calibracion.objects.select_related('realizada_por').order_by('-fecha_calibracion')
+                queryset=Calibracion.objects.select_related('proveedor').order_by('-fecha_calibracion')
             ),
             # Prefetch mantenimientos con orden por fecha descendente
             Prefetch(
                 'mantenimientos',
-                queryset=Mantenimiento.objects.select_related('realizado_por').order_by('-fecha_mantenimiento')
+                queryset=Mantenimiento.objects.select_related('proveedor').order_by('-fecha_mantenimiento')
             ),
             # Prefetch comprobaciones con orden por fecha descendente
             Prefetch(
                 'comprobaciones',
-                queryset=Comprobacion.objects.select_related('realizada_por').order_by('-fecha_comprobacion')
+                queryset=Comprobacion.objects.select_related('proveedor').order_by('-fecha_comprobacion')
             ),
             'baja_registro'
         )
@@ -51,10 +53,10 @@ class OptimizedQueries:
     @staticmethod
     def get_empresas_with_stats():
         """
-        Obtiene empresas con estadísticas pre-calculadas
+        Obtiene empresas activas (no eliminadas) con estadísticas pre-calculadas
         para mejorar performance en dashboard
         """
-        return Empresa.objects.annotate(
+        return Empresa.objects.filter(is_deleted=False).annotate(
             total_equipos=Count('equipos'),
             equipos_activos=Count('equipos', filter=Q(equipos__estado='Activo')),
             equipos_mantenimiento=Count('equipos', filter=Q(equipos__estado='En Mantenimiento')),
@@ -64,9 +66,10 @@ class OptimizedQueries:
     @staticmethod
     def get_dashboard_equipos(user, selected_company_id=None):
         """
-        Query optimizada para dashboard con todas las estadísticas necesarias
+        Query optimizada para dashboard con todas las estadísticas necesarias.
+        Solo equipos de empresas activas.
         """
-        base_query = Equipo.objects.select_related('empresa')
+        base_query = Equipo.objects.select_related('empresa').filter(empresa__is_deleted=False)
 
         if not user.is_superuser:
             if user.empresa:
@@ -81,14 +84,15 @@ class OptimizedQueries:
             except (ValueError, TypeError):
                 pass
 
-        return base_query, Empresa.objects.all().order_by('nombre')
+        return base_query, Empresa.objects.filter(is_deleted=False).order_by('nombre')
 
     @staticmethod
     def get_equipos_with_activities_count(empresa=None, user=None):
         """
-        Obtiene equipos con conteo de actividades para optimizar dashboard
+        Obtiene equipos con conteo de actividades para optimizar dashboard.
+        Solo equipos de empresas activas.
         """
-        queryset = Equipo.objects.select_related('empresa').annotate(
+        queryset = Equipo.objects.select_related('empresa').filter(empresa__is_deleted=False).annotate(
             total_calibraciones=Count('calibraciones'),
             total_mantenimientos=Count('mantenimientos'),
             total_comprobaciones=Count('comprobaciones'),
@@ -121,12 +125,15 @@ class OptimizedQueries:
     @staticmethod
     def get_proximas_actividades(user, days_ahead=30):
         """
-        Obtiene actividades próximas de forma optimizada
+        Obtiene actividades próximas de forma optimizada.
+        SOLO incluye actividades futuras (no vencidas).
         """
         today = date.today()
         fecha_limite = today + timedelta(days=days_ahead)
 
-        base_query = Equipo.objects.select_related('empresa').exclude(
+        base_query = Equipo.objects.select_related('empresa').filter(
+            empresa__is_deleted=False  # Solo equipos de empresas activas
+        ).exclude(
             estado__in=['De Baja', 'Inactivo']
         )
 
@@ -136,18 +143,22 @@ class OptimizedQueries:
             base_query = Equipo.objects.none()
 
         # Queries optimizadas para cada tipo de actividad
+        # IMPORTANTE: proxima_X__gte=today excluye actividades vencidas
         calibraciones_proximas = base_query.filter(
             proxima_calibracion__isnull=False,
+            proxima_calibracion__gte=today,  # Solo futuras (no vencidas)
             proxima_calibracion__lte=fecha_limite
         ).order_by('proxima_calibracion')
 
         mantenimientos_proximos = base_query.filter(
             proximo_mantenimiento__isnull=False,
+            proximo_mantenimiento__gte=today,  # Solo futuras (no vencidas)
             proximo_mantenimiento__lte=fecha_limite
         ).order_by('proximo_mantenimiento')
 
         comprobaciones_proximas = base_query.filter(
             proxima_comprobacion__isnull=False,
+            proxima_comprobacion__gte=today,  # Solo futuras (no vencidas)
             proxima_comprobacion__lte=fecha_limite
         ).order_by('proxima_comprobacion')
 
@@ -168,7 +179,8 @@ class OptimizedQueries:
         count = cache.get(cache_key)
 
         if count is None:
-            count = Equipo.objects.filter(empresa_id=empresa_id).count()
+            # Solo contar equipos de empresas activas
+            count = Equipo.objects.filter(empresa_id=empresa_id, empresa__is_deleted=False).count()
             # Cache por 5 minutos
             cache.set(cache_key, count, 300)
 
@@ -243,8 +255,8 @@ class CacheHelpers:
             try:
                 empresa = Empresa.objects.get(id=empresa_id)
                 stats = {
-                    'total_equipos': Equipo.objects.filter(empresa=empresa).count(),
-                    'equipos_activos': Equipo.objects.filter(empresa=empresa, estado='Activo').count(),
+                    'total_equipos': Equipo.objects.filter(empresa=empresa, empresa__is_deleted=False).count(),
+                    'equipos_activos': Equipo.objects.filter(empresa=empresa, estado='Activo', empresa__is_deleted=False).count(),
                     'storage_used': empresa.get_total_storage_used_mb(),
                     'storage_limit': empresa.limite_almacenamiento_mb,
                     'equipment_limit': empresa.get_limite_equipos()

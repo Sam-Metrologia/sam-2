@@ -15,6 +15,11 @@
                     Añadir Nueva Empresa
                 </a>
                 {% endif %}
+                {% if user.is_superuser %}
+                <a href="{% url 'core:deleted_companies' %}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    🗑️ Empresas Eliminadas
+                </a>
+                {% endif %}
                 <a href="{% url 'core:dashboard' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
                     Volver al Dashboard
                 </a>
@@ -98,10 +103,10 @@
                                 </a>
                                 {% endif %}
                                 {% if perms.core.delete_empresa %}
-                                <button onclick="showDeleteModal('{% url 'core:eliminar_empresa' pk=empresa.pk %}', '{{ empresa.nombre }}')" 
-                                        class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition duration-300 ease-in-out" title="Eliminar">
+                                <a href="{% url 'core:soft_delete_company' empresa.pk %}"
+                                   class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition duration-300 ease-in-out" title="Eliminar">
                                     <i class="fas fa-trash"></i>
-                                </button>
+                                </a>
                                 {% endif %}
                             </div>
                         </td>

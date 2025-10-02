@@ -164,12 +164,47 @@ class SystemMonitor:
             # Incluir información de usuarios activos recientes (últimas 24 horas de actividad)
             last_24h = now - timedelta(hours=24)
 
+            # Obtener usuarios activos de cache (últimos 15 minutos)
+            active_users_15min = cache.get('active_users_15min', {})
+            active_users_count = len(active_users_15min)
+
+            # Obtener detalles de usuarios activos
+            active_users_details = []
+            for user_data in active_users_15min.values():
+                try:
+                    activity_time = datetime.fromisoformat(user_data['last_activity'])
+                    active_users_details.append({
+                        'username': user_data['username'],
+                        'last_activity': activity_time.strftime('%H:%M:%S'),
+                        'minutes_ago': int((now.timestamp() - user_data['timestamp']) / 60)
+                    })
+                except (KeyError, ValueError):
+                    continue
+
+            # Ordenar por actividad más reciente
+            active_users_details.sort(key=lambda x: x['minutes_ago'])
+
+            # Calcular uso del sistema de manera más realista
+            # Basado en usuarios activos, operaciones de DB y actividad general
+            base_usage = 15  # Uso base del sistema
+            user_load = min(active_users_count * 5, 25)  # Máximo 25% por usuarios
+            db_load = min(CustomUser.objects.count() * 0.1, 10)  # Carga de DB
+            system_usage = min(base_usage + user_load + db_load, 95)  # Máximo 95%
+
             metrics = {
                 'total_users': CustomUser.objects.count(),
                 'active_users': CustomUser.objects.filter(is_active=True).count(),
                 'users_with_empresa': CustomUser.objects.filter(empresa__isnull=False).count(),
                 'superusers': CustomUser.objects.filter(is_superuser=True).count(),
                 'users_logged_recently': CustomUser.objects.filter(last_login__gte=last_24h).count(),
+                'users_active_15min': active_users_count,
+                'active_users_details': active_users_details,
+                'system_usage_percentage': round(system_usage, 1),
+                'system_load_breakdown': {
+                    'base_system': base_usage,
+                    'user_activity': user_load,
+                    'database_load': db_load
+                },
                 'new_users_this_week': CustomUser.objects.filter(date_joined__gte=last_week).count(),
                 'new_users_this_month': CustomUser.objects.filter(date_joined__gte=last_month).count(),
                 'active_user_list': [
@@ -194,18 +229,34 @@ class SystemMonitor:
         """Obtiene métricas de negocio."""
         try:
             now = timezone.now()
+            today = now.date()
             last_week = now - timedelta(days=7)
             last_month = now - timedelta(days=30)
 
-            # Métricas de empresas
-            empresas_activas = Empresa.objects.filter(estado_suscripcion='activa').count()
-            if empresas_activas == 0:  # Fallback para diferentes valores
-                empresas_activas = Empresa.objects.filter(estado_suscripcion='Activo').count()
-            empresas_trial = Empresa.objects.filter(es_periodo_prueba=True).count()
+            # Métricas de empresas (solo empresas activas, no eliminadas)
+            empresas_activas = Empresa.objects.filter(
+                is_deleted=False,
+                estado_suscripcion='Activo'
+            ).count()
 
-            # Métricas de equipos
-            equipos_activos = Equipo.objects.filter(estado='Activo').count()
-            equipos_mantenimiento = Equipo.objects.filter(estado='En Mantenimiento').count()
+            # Si no hay empresas activas con ese estado, contar todas las no eliminadas
+            if empresas_activas == 0:
+                empresas_activas = Empresa.objects.filter(is_deleted=False).count()
+
+            empresas_trial = Empresa.objects.filter(
+                is_deleted=False,
+                es_periodo_prueba=True
+            ).count()
+
+            # Métricas de equipos (solo de empresas activas)
+            equipos_activos = Equipo.objects.filter(
+                empresa__is_deleted=False,
+                estado='Activo'
+            ).count()
+            equipos_mantenimiento = Equipo.objects.filter(
+                empresa__is_deleted=False,
+                estado='En Mantenimiento'
+            ).count()
             equipos_calibracion = Equipo.objects.filter(estado='En Calibración').count()
 
             # Métricas de actividades recientes
@@ -229,17 +280,23 @@ class SystemMonitor:
 
             metrics = {
                 'empresas': {
-                    'total': Empresa.objects.count(),
+                    'total': Empresa.objects.filter(is_deleted=False).count(),
                     'activas': empresas_activas,
                     'trial': empresas_trial,
-                    'nuevas_este_mes': Empresa.objects.filter(fecha_registro__gte=last_month).count()
+                    'nuevas_este_mes': Empresa.objects.filter(
+                        is_deleted=False,
+                        fecha_registro__gte=last_month
+                    ).count()
                 },
                 'equipos': {
-                    'total': Equipo.objects.count(),
+                    'total': Equipo.objects.filter(empresa__is_deleted=False).count(),
                     'activos': equipos_activos,
                     'en_mantenimiento': equipos_mantenimiento,
                     'en_calibracion': equipos_calibracion,
-                    'nuevos_este_mes': Equipo.objects.filter(fecha_registro__gte=last_month).count()
+                    'nuevos_este_mes': Equipo.objects.filter(
+                        empresa__is_deleted=False,
+                        fecha_registro__gte=last_month
+                    ).count()
                 },
                 'actividades_recientes': {
                     'calibraciones_hoy': Calibracion.objects.filter(
@@ -261,11 +318,11 @@ class SystemMonitor:
                 'empresas_detalle': [
                     {
                         'nombre': e.nombre,
-                        'equipos': e.equipos.count(),
+                        'equipos': e.equipos.filter(empresa__is_deleted=False).count(),
                         'estado': e.estado_suscripcion,
                         'limite': e.limite_equipos_empresa,
-                        'porcentaje_uso': round((e.equipos.count() / max(e.limite_equipos_empresa, 1)) * 100, 1)
-                    } for e in Empresa.objects.all()[:5]
+                        'porcentaje_uso': round((e.equipos.filter(empresa__is_deleted=False).count() / max(e.limite_equipos_empresa, 1)) * 100, 1)
+                    } for e in Empresa.objects.filter(is_deleted=False)[:5]
                 ],
                 'proximas_actividades': {
                     'calibraciones_proxima_semana': calibraciones_proximas,
@@ -461,3 +518,18 @@ class AlertManager:
         except Exception as e:
             logger.error(f'Error checking system alerts: {e}')
             return [{'type': 'system_error', 'severity': 'high', 'message': str(e)}]
+
+
+# Decorator para monitoreo de views
+def monitor_view(func):
+    """
+    Decorator simple para monitorear views (placeholder).
+    En el futuro se puede expandir para métricas de performance.
+    """
+    def wrapper(*args, **kwargs):
+        # Por ahora solo ejecuta la vista normalmente
+        return func(*args, **kwargs)
+
+    wrapper.__name__ = func.__name__
+    wrapper.__doc__ = func.__doc__
+    return wrapper

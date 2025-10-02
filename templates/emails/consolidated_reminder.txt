@@ -3,61 +3,106 @@ RECORDATORIO CONSOLIDADO - {{ site_name }}
 
 Estimado cliente,
 
-Le informamos que {{ empresa.nombre }} tiene las siguientes actividades {{ urgency_text }}:
+Le informamos que {{ empresa.nombre }} tiene las siguientes actividades:
 
 === RESUMEN DE ACTIVIDADES ===
-Total de actividades: {{ total_actividades }}
-Fecha objetivo: {{ target_date|date:"d/m/Y" }}
+VENCIDAS: {{ total_vencidas }}
+PRÓXIMAS ({{ urgency_text }}): {{ total_proximas }}
+TOTAL: {{ total_actividades }}
 
-{% if equipos_calibracion %}
-CALIBRACIONES ({{ equipos_calibracion|length }}):
-{% for equipo in equipos_calibracion %}
+{% if total_vencidas > 0 %}
+========================================
+⚠️ ACTIVIDADES VENCIDAS ({{ total_vencidas }})
+========================================
+Las siguientes actividades ya están vencidas y requieren atención inmediata.
+
+{% endif %}
+{% if equipos_calibracion_vencidas %}
+CALIBRACIONES VENCIDAS ({{ equipos_calibracion_vencidas|length }}):
+{% for equipo in equipos_calibracion_vencidas %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha vencimiento: {{ equipo.proxima_calibracion|date:"d/m/Y" }}
+{% endfor %}
+
+{% endif %}
+{% if equipos_mantenimiento_vencidos %}
+MANTENIMIENTOS VENCIDOS ({{ equipos_mantenimiento_vencidos|length }}):
+{% for equipo in equipos_mantenimiento_vencidos %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha vencimiento: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}
+{% endfor %}
+
+{% endif %}
+{% if equipos_comprobacion_vencidas %}
+COMPROBACIONES VENCIDAS ({{ equipos_comprobacion_vencidas|length }}):
+{% for equipo in equipos_comprobacion_vencidas %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha vencimiento: {{ equipo.proxima_comprobacion|date:"d/m/Y" }}
+{% endfor %}
+
+{% endif %}
+{% if total_proximas > 0 %}
+========================================
+📅 ACTIVIDADES PRÓXIMAS
+========================================
+
+{% endif %}
+{% if equipos_calibracion_proximas %}
+CALIBRACIONES PRÓXIMAS ({{ equipos_calibracion_proximas|length }}):
+{% for equipo in equipos_calibracion_proximas %}
 - {{ equipo.codigo_interno }}: {{ equipo.nombre }}
   Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
   Fecha: {{ equipo.proxima_calibracion|date:"d/m/Y" }}
 {% endfor %}
 
 {% endif %}
-{% if equipos_mantenimiento %}
-MANTENIMIENTOS ({{ equipos_mantenimiento|length }}):
-{% for equipo in equipos_mantenimiento %}
+{% if equipos_mantenimiento_proximos %}
+MANTENIMIENTOS PRÓXIMOS ({{ equipos_mantenimiento_proximos|length }}):
+{% for equipo in equipos_mantenimiento_proximos %}
 - {{ equipo.codigo_interno }}: {{ equipo.nombre }}
   Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
   Fecha: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}
 {% endfor %}
 
 {% endif %}
-{% if equipos_comprobacion %}
-COMPROBACIONES ({{ equipos_comprobacion|length }}):
-{% for equipo in equipos_comprobacion %}
+{% if equipos_comprobacion_proximas %}
+COMPROBACIONES PRÓXIMAS ({{ equipos_comprobacion_proximas|length }}):
+{% for equipo in equipos_comprobacion_proximas %}
 - {{ equipo.codigo_interno }}: {{ equipo.nombre }}
   Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
   Fecha: {{ equipo.proxima_comprobacion|date:"d/m/Y" }}
 {% endfor %}
 
 {% endif %}
+{% if total_proximas > 0 %}
 {% if urgency_level == "critical" %}
-ATENCION CRITICA: Estas actividades VENCEN HOY.
-Es necesario tomar accion inmediata para mantener la conformidad.
+⚠️ ATENCIÓN CRÍTICA: Las actividades próximas VENCEN HOY.
+Es necesario tomar acción inmediata para mantener la conformidad.
 
 {% elif urgency_level == "high" %}
-URGENTE: Estas actividades vencen en {{ days_ahead }} dias.
+⚠️ URGENTE: Las actividades próximas vencen en {{ days_ahead }} días.
 Coordine lo antes posible para evitar vencimientos.
 
 {% elif urgency_level == "medium" %}
-PROGRAMADO: Estas actividades vencen en {{ days_ahead }} dias.
-Planifique con anticipacion para mantener la conformidad.
+📅 PROGRAMADO: Las actividades próximas vencen en {{ days_ahead }} días.
+Planifique con anticipación para mantener la conformidad.
 
 {% endif %}
+{% endif %}
 ACCIONES RECOMENDADAS:
-1. Revisar cada equipo listado
-2. Coordinar con proveedores de servicio
-3. Programar las actividades antes del vencimiento
-4. Mantener documentacion actualizada
+1. Revisar cada equipo listado y verificar su estado actual
+2. Coordinar con proveedores de servicio para programar las actividades
+3. Programar las actividades antes del vencimiento para evitar interrupciones
+4. Mantener documentación actualizada tras completar cada actividad
 
 ---
 {{ site_name }}
-Sistema de Gestion de Metrologia
+Sistema de Gestión de Metrología
 {{ empresa.nombre }}
 
 Fecha del reporte: {{ today|date:"d/m/Y" }}
+
+Este es un email automático. Las actividades se verifican diariamente y se envían recordatorios a los 15 días, 7 días y el día de vencimiento.

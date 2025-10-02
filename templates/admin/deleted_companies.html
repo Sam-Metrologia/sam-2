@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Empresas Eliminadas{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🗑️ Empresas Eliminadas</h1>
+        <p class="text-gray-600">Gestionar empresas eliminadas y restaurar si es necesario</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <nav class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:listar_empresas' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Empresas Activas</a>
+            <a href="{% url 'core:deleted_companies' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Eliminadas</a>
+            <a href="{% url 'core:cleanup_old_companies' %}" class="text-gray-600 hover:text-red-600 px-4 py-2 rounded-md">🧹 Limpieza</a>
+        </nav>
+    </div>
+
+    {% if deleted_companies %}
+        <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">
+                    Empresas Eliminadas ({{ deleted_companies.count }})
+                </h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Empresa
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Fecha Eliminación
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Eliminada Por
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Razón
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Días Transcurridos
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Acciones
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for empresa in deleted_companies %}
+                            {% with delete_info=empresa.get_delete_info %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{{ empresa.nombre }}</div>
+                                    <div class="text-sm text-gray-500">{{ empresa.email|default:"Sin email" }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ empresa.deleted_at|date:"d/m/Y H:i" }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ delete_info.deleted_by }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ delete_info.delete_reason }}">
+                                        {{ delete_info.delete_reason }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ delete_info.days_since_deletion }} días
+                                    {% if delete_info.will_be_permanently_deleted_soon %}
+                                        <div class="text-red-600 font-semibold text-xs mt-1">
+                                            ⚠️ Se eliminará en {{ delete_info.days_until_permanent_deletion }} días
+                                        </div>
+                                    {% elif delete_info.days_until_permanent_deletion > 0 %}
+                                        <div class="text-gray-500 text-xs mt-1">
+                                            Eliminación en {{ delete_info.days_until_permanent_deletion }} días
+                                        </div>
+                                    {% else %}
+                                        <div class="text-red-700 font-bold text-xs mt-1">
+                                            ⚠️ Lista para eliminación permanente
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <a href="{% url 'core:restore_company' empresa.id %}"
+                                       class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                        🔄 Restaurar
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="bg-white rounded-lg shadow-sm border p-8 text-center">
+            <div class="text-gray-400 text-6xl mb-4">🗑️</div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No hay empresas eliminadas</h3>
+            <p class="text-gray-600">Las empresas eliminadas aparecerán aquí para poder restaurarlas si es necesario.</p>
+
+            <div class="mt-6">
+                <a href="{% url 'core:listar_empresas' %}"
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Ver Empresas Activas
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Información adicional -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+        <div class="flex">
+            <div class="text-blue-400 mr-3">ℹ️</div>
+            <div class="text-sm text-blue-700">
+                <p class="font-medium">Información sobre eliminación de empresas:</p>
+                <ul class="mt-2 list-disc list-inside space-y-1">
+                    <li>Las empresas eliminadas conservan todos sus datos (equipos, calibraciones, etc.)</li>
+                    <li>Se pueden restaurar completamente con un clic</li>
+                    <li>Solo superusuarios pueden ver y restaurar empresas eliminadas</li>
+                    <li>Los backups incluyen empresas eliminadas para máxima seguridad</li>
+                    <li class="text-orange-700 font-medium">⚠️ Las empresas se eliminan permanentemente después de 6 meses (180 días)</li>
+                    <li class="text-red-700 font-medium">🗑️ La eliminación permanente es irreversible</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

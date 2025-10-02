@@ -42,10 +42,17 @@ class StorageLimitValidator:
         if uso_proyectado_mb > limite_mb:
             exceso_mb = uso_proyectado_mb - limite_mb
 
-            # Crear mensaje simple para el límite excedido
-            mensaje_simple = "🚨 LÍMITE DE ALMACENAMIENTO EXCEDIDO"
+            # Crear mensaje profesional para el límite excedido
+            if limite_mb >= 1000:  # Mostrar en GB si es apropiado
+                limite_display = f"{limite_mb / 1000:.1f} GB"
+                exceso_display = f"{exceso_mb / 1000:.1f} GB"
+            else:
+                limite_display = f"{limite_mb} MB"
+                exceso_display = f"{exceso_mb} MB"
 
-            raise ValidationError(mensaje_simple)
+            mensaje_profesional = f"Límite de almacenamiento superado. Su plan permite {limite_display}, pero este archivo requiere {exceso_display} adicionales. Por favor, libere espacio o actualice su plan."
+
+            raise ValidationError(mensaje_profesional)
 
         # Advertencia si está cerca del límite (90%+)
         porcentaje_uso = (uso_proyectado_mb / limite_mb) * 100

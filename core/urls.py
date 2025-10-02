@@ -3,6 +3,7 @@
 from django.urls import path
 from . import views
 from . import admin_views
+from . import zip_functions  # Import for ZIP system
 # Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
@@ -20,6 +21,11 @@ urlpatterns = [
 
     # Dashboard
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('dashboard-gerencia/', views.dashboard_gerencia, name='dashboard_gerencia'),
+    path('panel-decisiones/', views.panel_decisiones, name='panel_decisiones'),
+    path('api/equipos-salud-detalles/', views.get_equipos_salud_detalles, name='get_equipos_salud_detalles'),
+    path('exportar_analisis_financiero/', views.exportar_analisis_financiero_excel, name='exportar_analisis_financiero'),
+    path('api/chart-details/', views.get_chart_details, name='get_chart_details'),
 
     # Equipos
     path('', views.home, name='home'), # Listado de equipos como página principal
@@ -43,6 +49,7 @@ urlpatterns = [
     path('equipos/<int:equipo_pk>/mantenimientos/<int:pk>/editar/', views.editar_mantenimiento, name='editar_mantenimiento'),
     path('equipos/<int:equipo_pk>/mantenimientos/<int:pk>/eliminar/', views.eliminar_mantenimiento, name='eliminar_mantenimiento'),
     path('equipos/<int:equipo_pk>/mantenimientos/<int:pk>/detalle/', views.detalle_mantenimiento, name='detalle_mantenimiento'),
+    path('mantenimientos/<int:mantenimiento_pk>/archivo/', views.ver_archivo_mantenimiento, name='ver_archivo_mantenimiento'),
 
     # Comprobaciones
     path('equipos/<int:equipo_pk>/comprobaciones/añadir/', views.añadir_comprobacion, name='añadir_comprobacion'),
@@ -90,6 +97,13 @@ urlpatterns = [
     path('usuarios/toggle_active/', views.toggle_user_active_status, name='toggle_user_active_status'), # <--- AÑADIR ESTA LÍNEA
     path('usuarios/toggle_download_permission/', views.toggle_download_permission, name='toggle_download_permission'),
 
+    # API endpoints para progreso en tiempo real (Fase 3)
+    path('api/zip-progress/', views.zip_progress_api, name='zip_progress_api'),
+    path('api/notifications/', views.notifications_api, name='notifications_api'),
+
+    # Dashboard de monitoreo del sistema (solo superusuarios)
+    path('system-monitor/', views.system_monitor_dashboard, name='system_monitor'),
+
     # Informes
     path('informes/', views.informes, name='informes'),
     path('informes/generar_zip/', views.generar_informe_zip, name='generar_informe_zip'),
@@ -126,15 +140,21 @@ urlpatterns = [
     path('cache_diagnostics/', views.cache_diagnostics, name='cache_diagnostics'),
 
     # Sistema de Cola para ZIP
-    path('solicitar_zip/', views.solicitar_zip, name='solicitar_zip'),
-    path('zip_status/<int:request_id>/', views.zip_status, name='zip_status'),
-    path('download_zip/<int:request_id>/', views.download_zip, name='download_zip'),
-    path('cancel_zip/<int:request_id>/', views.cancel_zip_request, name='cancel_zip_request'),
-    path('my_zip_requests/', views.my_zip_requests, name='my_zip_requests'),
+    path('solicitar_zip/', zip_functions.solicitar_zip, name='solicitar_zip'),
+    path('zip_status/<int:request_id>/', zip_functions.zip_status, name='zip_status'),
+    path('download_zip/<int:request_id>/', zip_functions.download_zip, name='download_zip'),
+    path('cancel_zip/<int:request_id>/', zip_functions.cancel_zip_request, name='cancel_zip_request'),
+    path('my_zip_requests/', zip_functions.my_zip_requests, name='my_zip_requests'),
     # Endpoint para procesamiento compatible con Render
-    path('trigger_zip_processing/', views.trigger_zip_processing, name='trigger_zip_processing'),
+    path('trigger_zip_processing/', zip_functions.trigger_zip_processing, name='trigger_zip_processing'),
     # Procesamiento manual para superusuarios
-    path('manual_process_zip/', views.manual_process_zip, name='manual_process_zip'),
+    path('manual_process_zip/', zip_functions.manual_process_zip, name='manual_process_zip'),
+
+    # URLs para eliminación suave y restauración de empresas
+    path('admin/companies/deleted/', admin_views.deleted_companies, name='deleted_companies'),
+    path('admin/companies/<int:empresa_id>/restore/', admin_views.restore_company, name='restore_company'),
+    path('admin/companies/<int:empresa_id>/soft-delete/', admin_views.soft_delete_company, name='soft_delete_company'),
+    path('admin/companies/cleanup/', admin_views.cleanup_old_companies, name='cleanup_old_companies'),
 
     # === URLs DE DEBUG ELIMINADAS ===
     # Eliminadas rutas de debug: s3_diagnostics, file_upload_test, logo_diagnostics,

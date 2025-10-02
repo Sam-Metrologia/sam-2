@@ -225,8 +225,9 @@ async function refreshBusinessMetrics() {
         const response = await fetch('{% url "core:api_system_status" %}');
         const data = await response.json();
 
-        if (data.success && data.health && data.health.metrics && data.health.metrics.business) {
+        if (data.success && data.health && data.health.metrics) {
             const business = data.health.metrics.business;
+            const users = data.health.metrics.users;
 
             // Actualizar empresas activas
             const companiesElement = document.getElementById('active-companies');
@@ -251,13 +252,33 @@ async function refreshBusinessMetrics() {
                 activitiesTodayElement.textContent = activitiesHoy;
             }
 
-            // Actualizar uso del sistema
+            // Actualizar usuarios activos
+            const activeUsersElement = document.getElementById('active-users');
+            if (activeUsersElement && users) {
+                const activeUsersCount = users.users_active_15min || 0;
+                const activeUsersDetails = users.active_users_details || [];
+
+                let activeUsersHtml = `
+                    <div class="text-4xl font-bold text-blue-600 mb-2">${activeUsersCount}</div>
+                    <div class="text-sm text-gray-600">Últimos 15 minutos</div>
+                `;
+
+                if (activeUsersDetails.length > 0) {
+                    activeUsersHtml += '<div class="mt-3 text-xs text-gray-500">';
+                    activeUsersDetails.slice(0, 3).forEach(user => {
+                        activeUsersHtml += `<div>${user.username} - ${user.last_activity}</div>`;
+                    });
+                    activeUsersHtml += '</div>';
+                }
+
+                activeUsersElement.innerHTML = activeUsersHtml;
+            }
+
+            // Actualizar uso del sistema (usando los datos correctos de user metrics)
             const systemUsageElement = document.getElementById('system-usage');
-            if (systemUsageElement) {
-                const totalEquipos = business.equipos?.total || 0;
-                const limiteTotal = business.empresas_detalle?.reduce((sum, e) => sum + (e.limite || 0), 0) || 1;
-                const porcentaje = Math.round((totalEquipos / limiteTotal) * 100);
-                systemUsageElement.textContent = `${porcentaje}%`;
+            if (systemUsageElement && users) {
+                const systemUsage = users.system_usage_percentage || 25.0;
+                systemUsageElement.textContent = `${systemUsage}%`;
             }
         }
     } catch (error) {

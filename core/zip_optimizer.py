@@ -45,11 +45,9 @@ class OptimizedZipGenerator:
             )
             self.temp_files.append(temp_zip.name)
 
-            # Obtener equipos de la empresa
-            equipos = self.empresa.equipos.filter(
-                estado__in=['Activo', 'En Mantenimiento', 'En Calibración', 'En Comprobación']
-            ).select_related().prefetch_related(
-                'calibraciones__procedimiento',
+            # Obtener equipos de la empresa (TODOS los equipos, no solo activos)
+            equipos = self.empresa.equipos.all().select_related().prefetch_related(
+                'calibraciones',
                 'mantenimientos',
                 'comprobaciones'
             )
@@ -74,6 +72,10 @@ class OptimizedZipGenerator:
                 # Agregar archivos de empresa
                 self._add_empresa_files(zip_file)
 
+                # Agregar procedimientos de la empresa si está seleccionado
+                if 'procedimientos' in self.formatos_seleccionados:
+                    self._add_procedimientos(zip_file)
+
             # Retornar información del archivo generado
             file_size = os.path.getsize(temp_zip.name)
 
@@ -97,14 +99,14 @@ class OptimizedZipGenerator:
         """
         Procesa un chunk de equipos de forma optimizada.
         """
-        from core.views import generar_hoja_vida_pdf_content
+        from core.views.reports import _generate_equipment_hoja_vida_pdf_content
 
         for idx, equipo in enumerate(equipos_chunk):
             try:
                 equipo_folder = f"Equipos/{equipo.codigo_interno}_{equipo.nombre}/"
 
-                # Generar PDFs si están seleccionados
-                if 'pdf' in self.formatos_seleccionados:
+                # Generar Hoja de Vida PDF si está seleccionado
+                if 'hoja_vida' in self.formatos_seleccionados:
                     pdf_content = self._generate_pdf_optimized(equipo)
                     if pdf_content:
                         zip_file.writestr(
@@ -112,14 +114,23 @@ class OptimizedZipGenerator:
                             pdf_content
                         )
 
-                # Generar Excel si está seleccionado
-                if 'excel' in self.formatos_seleccionados:
+                # Generar Manual Excel si está seleccionado
+                if 'manual' in self.formatos_seleccionados:
                     excel_content = self._generate_excel_optimized(equipo)
                     if excel_content:
                         zip_file.writestr(
-                            f"{equipo_folder}Datos_{equipo.codigo_interno}.xlsx",
+                            f"{equipo_folder}Manual_Datos_{equipo.codigo_interno}.xlsx",
                             excel_content
                         )
+
+                # Agregar documentos de calibraciones con subcarpetas
+                self._add_calibraciones_subcarpetas(zip_file, equipo, equipo_folder)
+
+                # Agregar documentos de mantenimientos
+                self._add_mantenimientos(zip_file, equipo, equipo_folder)
+
+                # Agregar documentos de comprobaciones
+                self._add_comprobaciones(zip_file, equipo, equipo_folder)
 
                 # Liberar memoria cada 10 equipos
                 if (chunk_start + idx + 1) % 10 == 0:
@@ -134,11 +145,11 @@ class OptimizedZipGenerator:
         Genera PDF optimizado para el equipo.
         """
         try:
-            from core.views import generar_hoja_vida_pdf_content
+            from core.views.reports import _generate_equipment_hoja_vida_pdf_content
 
             # Generar PDF en memoria
             pdf_buffer = BytesIO()
-            pdf_content = generar_hoja_vida_pdf_content(equipo)
+            pdf_content = _generate_equipment_hoja_vida_pdf_content(None, equipo)
 
             # Si es exitoso, retornar el contenido
             if pdf_content:
@@ -258,6 +269,101 @@ Total de Equipos: {self.empresa.equipos.filter(estado__in=['Activo', 'En Manteni
         Cleanup cuando se destruye el objeto.
         """
         self.cleanup_temp_files()
+
+    def _add_calibraciones_subcarpetas(self, zip_file, equipo, equipo_folder):
+        """
+        Agrega documentos de calibraciones organizados en subcarpetas.
+        """
+        try:
+            calibraciones = equipo.calibraciones.all()
+            if calibraciones.exists():
+                for calibracion in calibraciones:
+                    # Carpeta base de calibraciones
+                    cal_folder = f"{equipo_folder}Calibraciones/"
+
+                    # Subcarpeta para certificados de calibración
+                    if calibracion.documento_calibracion:
+                        subfolder = f"{cal_folder}Certificados_Calibracion/"
+                        self._add_file_to_zip(zip_file, calibracion.documento_calibracion, subfolder)
+
+                    # Subcarpeta para confirmación metrológica
+                    if calibracion.confirmacion_metrologica_pdf:
+                        subfolder = f"{cal_folder}Confirmacion_Metrologica/"
+                        self._add_file_to_zip(zip_file, calibracion.confirmacion_metrologica_pdf, subfolder)
+
+                    # Subcarpeta para intervalos de calibración
+                    if calibracion.intervalos_calibracion_pdf:
+                        subfolder = f"{cal_folder}Intervalos_Calibracion/"
+                        self._add_file_to_zip(zip_file, calibracion.intervalos_calibracion_pdf, subfolder)
+        except Exception as e:
+            logger.warning(f"Error adding calibraciones for {equipo.codigo_interno}: {e}")
+
+    def _add_mantenimientos(self, zip_file, equipo, equipo_folder):
+        """
+        Agrega documentos de mantenimientos.
+        """
+        try:
+            mantenimientos = equipo.mantenimientos.all()
+            if mantenimientos.exists():
+                mant_folder = f"{equipo_folder}Mantenimientos/"
+                for mantenimiento in mantenimientos:
+                    if mantenimiento.documento_mantenimiento:
+                        self._add_file_to_zip(zip_file, mantenimiento.documento_mantenimiento, mant_folder)
+        except Exception as e:
+            logger.warning(f"Error adding mantenimientos for {equipo.codigo_interno}: {e}")
+
+    def _add_comprobaciones(self, zip_file, equipo, equipo_folder):
+        """
+        Agrega documentos de comprobaciones.
+        """
+        try:
+            comprobaciones = equipo.comprobaciones.all()
+            if comprobaciones.exists():
+                comp_folder = f"{equipo_folder}Comprobaciones/"
+                for comprobacion in comprobaciones:
+                    if comprobacion.documento_comprobacion:
+                        self._add_file_to_zip(zip_file, comprobacion.documento_comprobacion, comp_folder)
+        except Exception as e:
+            logger.warning(f"Error adding comprobaciones for {equipo.codigo_interno}: {e}")
+
+    def _add_procedimientos(self, zip_file):
+        """
+        Agrega procedimientos de la empresa.
+        """
+        try:
+            procedimientos = self.empresa.procedimientos.all()
+            if procedimientos.exists():
+                proc_folder = "Procedimientos/"
+                for procedimiento in procedimientos:
+                    if procedimiento.documento_pdf:
+                        self._add_file_to_zip(zip_file, procedimiento.documento_pdf, proc_folder)
+                        logger.info(f"Agregado procedimiento: {procedimiento.nombre}")
+                    else:
+                        logger.warning(f"Procedimiento sin archivo PDF: {procedimiento.nombre}")
+            else:
+                logger.info("No hay procedimientos para esta empresa")
+        except Exception as e:
+            logger.error(f"Error adding procedimientos: {e}")
+
+    def _add_file_to_zip(self, zip_file, file_field, folder_path):
+        """
+        Agrega un archivo al ZIP desde un FileField.
+        """
+        try:
+            if file_field and file_field.name:
+                # Obtener el nombre del archivo sin la ruta
+                filename = os.path.basename(file_field.name)
+                zip_path = f"{folder_path}{filename}"
+
+                # Leer el contenido del archivo
+                if default_storage.exists(file_field.name):
+                    with default_storage.open(file_field.name, 'rb') as f:
+                        zip_file.writestr(zip_path, f.read())
+                    logger.debug(f"Agregado archivo: {zip_path}")
+                else:
+                    logger.warning(f"Archivo no encontrado: {file_field.name}")
+        except Exception as e:
+            logger.warning(f"Error adding file {file_field.name}: {e}")
 
 
 class StreamingZipResponse:

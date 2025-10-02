@@ -54,9 +54,9 @@
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empresa</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
                             <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Activo</th> {# Cambiado a 'Estado Activo' y centrado #}
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff</th>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Permisos de Descarga</th>
                             <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th> {# Centrado #}
                         </tr>
                     </thead>
@@ -70,6 +70,20 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ user_obj.email|default:"N/A" }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ user_obj.empresa.nombre|default:"N/A" }}</td>
+                            {# CELDA PARA EL ROL #}
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if user_obj.is_superuser %}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Superusuario</span>
+                                {% elif user_obj.rol_usuario == 'GERENCIA' %}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Gerente</span>
+                                {% elif user_obj.rol_usuario == 'ADMINISTRADOR' %}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Administrador</span>
+                                {% elif user_obj.rol_usuario == 'TECNICO' %}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Técnico</span>
+                                {% else %}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">{{ user_obj.get_rol_usuario_display|default:"N/A" }}</span>
+                                {% endif %}
+                            </td>
                             {# CELDA PARA EL ESTADO ACTIVO CON EL TOGGLE #}
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                                 {% if user_obj.pk != request.user.pk %} {# Evita que un usuario se desactive a sí mismo #}
@@ -93,15 +107,6 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {% if user_obj.is_staff %}Sí{% else %}No{% endif %}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                {% if user_obj.is_superuser %}
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Superusuario</span>
-                                {% elif user_obj.has_export_permission %}
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Sí</span>
-                                {% else %}
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">No</span>
-                                {% endif %}
-                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-center"> {# Centrado #}
                                 <div class="flex item-center justify-center space-x-2">
                                     <a href="{% url 'core:detalle_usuario' user_obj.pk %}" class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition duration-300 ease-in-out" title="Ver Detalle">
@@ -112,17 +117,9 @@
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     {% endif %}
-                                    {% if user.is_superuser and user_obj.pk != request.user.pk %}
-                                    <button type="button"
-                                            onclick="toggleDownloadPermission({{ user_obj.pk }}, {% if user_obj.has_export_permission %}false{% else %}true{% endif %})"
-                                            class="w-8 h-8 rounded-full {% if user_obj.has_export_permission %}bg-red-100 text-red-600 hover:bg-red-200{% else %}bg-green-100 text-green-600 hover:bg-green-200{% endif %} flex items-center justify-center transition duration-300 ease-in-out"
-                                            title="{% if user_obj.has_export_permission %}Revocar{% else %}Otorgar{% endif %} permiso de descarga">
-                                        <i class="fas fa-{% if user_obj.has_export_permission %}user-times{% else %}user-check{% endif %}"></i>
-                                    </button>
-                                    {% endif %}
                                     {% if perms.core.delete_customuser and user_obj.pk != request.user.pk %} {# No permitir eliminar el usuario logueado #}
-                                    <button type="button" 
-                                            onclick="showDeleteModal('{% url 'core:eliminar_usuario' user_obj.pk %}', '{{ user_obj.username }}')" 
+                                    <button type="button"
+                                            onclick="showDeleteModal('{% url 'core:eliminar_usuario' user_obj.pk %}', '{{ user_obj.username }}')"
                                             class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition duration-300 ease-in-out" title="Eliminar">
                                         <i class="fas fa-trash"></i>
                                     </button>

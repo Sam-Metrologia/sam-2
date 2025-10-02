@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lista de Equipos{% endblock %}
+{% block header_title %}Lista de Equipos{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+            <h1 class="text-3xl font-bold text-gray-800">Lista de Equipos</h1>
+            <div class="flex flex-wrap space-x-2 gap-2">
+                {% if perms.core.add_equipo %}
+                <a href="{% url 'core:añadir_equipo' %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Añadir Nuevo Equipo
+                </a>
+                {% endif %}
+                <a href="{% url 'core:dashboard' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Volver al Dashboard
+                </a>
+            </div>
+        </div>
+
+        {# Mensajes de Django #}
+        {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                    <div class="p-3 rounded-md shadow-sm mb-2
+                        {% if message.tags == 'success' %}bg-green-100 text-green-800{% elif message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}"
+                        role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Filtros de Búsqueda #}
+        <div class="bg-gray-50 p-4 rounded-lg mb-6">
+            <h3 class="text-lg font-semibold mb-3">Filtros de Búsqueda</h3>
+            <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Búsqueda</label>
+                    <input type="text" name="q" value="{{ query }}"
+                           placeholder="Código, nombre, marca..."
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                    <select name="estado" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Todos los estados</option>
+                        {% for estado_value, estado_display in estados_choices %}
+                            <option value="{{ estado_value }}" {% if estado_filtro == estado_value %}selected{% endif %}>
+                                {{ estado_display }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% if empresas_disponibles %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+                    <select name="empresa_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Todas las empresas</option>
+                        {% for empresa in empresas_disponibles %}
+                            <option value="{{ empresa.id }}" {% if empresa_filtro|stringformat:"s" == empresa.id|stringformat:"s" %}selected{% endif %}>
+                                {{ empresa.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="flex items-end">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                        Buscar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {# Lista de Equipos #}
+        {% if equipos %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-300 rounded-lg">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Código</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Nombre</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Marca</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Modelo</th>
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Estado</th>
+                            {% if user.is_superuser %}
+                            <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Empresa</th>
+                            {% endif %}
+                            <th class="py-3 px-4 text-center text-sm font-medium text-gray-700 border-b">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for equipo in equipos %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.codigo_interno }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.nombre }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.marca|default:"-" }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.modelo|default:"-" }}</td>
+                            <td class="py-3 px-4 text-sm border-b">
+                                <span class="px-2 py-1 text-xs rounded-full
+                                    {% if equipo.estado == 'Activo' %}bg-green-100 text-green-800
+                                    {% elif equipo.estado == 'Inactivo' %}bg-gray-100 text-gray-800
+                                    {% elif equipo.estado == 'De Baja' %}bg-red-100 text-red-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ equipo.estado }}
+                                </span>
+                            </td>
+                            {% if user.is_superuser %}
+                            <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.empresa.nombre }}</td>
+                            {% endif %}
+                            <td class="py-3 px-4 text-center text-sm border-b">
+                                <div class="flex justify-center space-x-2">
+                                    <a href="{% url 'core:detalle_equipo' equipo.pk %}"
+                                       class="text-blue-600 hover:text-blue-800 font-medium">Ver</a>
+                                    {% if perms.core.change_equipo %}
+                                    <a href="{% url 'core:editar_equipo' equipo.pk %}"
+                                       class="text-green-600 hover:text-green-800 font-medium">Editar</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {# Paginación #}
+            {% if equipos.has_other_pages %}
+                <div class="flex justify-center mt-6">
+                    <nav class="flex space-x-2">
+                        {% if equipos.has_previous %}
+                            <a href="?page=1{% if query %}&q={{ query }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if empresa_filtro %}&empresa_id={{ empresa_filtro }}{% endif %}"
+                               class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Primera</a>
+                            <a href="?page={{ equipos.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if empresa_filtro %}&empresa_id={{ empresa_filtro }}{% endif %}"
+                               class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Anterior</a>
+                        {% endif %}
+
+                        <span class="px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-md">
+                            Página {{ equipos.number }} de {{ equipos.paginator.num_pages }}
+                        </span>
+
+                        {% if equipos.has_next %}
+                            <a href="?page={{ equipos.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if empresa_filtro %}&empresa_id={{ empresa_filtro }}{% endif %}"
+                               class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Siguiente</a>
+                            <a href="?page={{ equipos.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}{% if empresa_filtro %}&empresa_id={{ empresa_filtro }}{% endif %}"
+                               class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Última</a>
+                        {% endif %}
+                    </nav>
+                </div>
+            {% endif %}
+
+        {% else %}
+            <div class="text-center py-8">
+                <div class="text-gray-500 text-lg">
+                    {% if query or estado_filtro or empresa_filtro %}
+                        No se encontraron equipos que coincidan con los filtros aplicados.
+                    {% else %}
+                        No hay equipos registrados aún.
+                    {% endif %}
+                </div>
+                {% if perms.core.add_equipo and not query and not estado_filtro and not empresa_filtro %}
+                    <a href="{% url 'core:añadir_equipo' %}"
+                       class="inline-block mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                        Añadir Primer Equipo
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

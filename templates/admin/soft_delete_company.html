@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Empresa{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🗑️ Eliminar Empresa</h1>
+        <p class="text-gray-600">Confirmar eliminación de empresa (eliminación suave - se puede restaurar)</p>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border p-6 delete-company-card">
+        <div class="mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Información de la Empresa</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nombre</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.nombre }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">NIT</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.nit|default:"No especificado" }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.email|default:"No especificado" }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Teléfono</label>
+                    <p class="mt-1 text-sm text-gray-900">{{ empresa.telefono|default:"No especificado" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas de la empresa -->
+        <div class="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4 delete-company-stats">
+            <h3 class="text-lg font-medium text-blue-900 mb-3">Datos que se Eliminarán (Temporalmente)</h3>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ empresa.equipos.count }}</div>
+                    <div class="text-sm text-blue-700">Equipos</div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ empresa.usuarios_empresa.count }}</div>
+                    <div class="text-sm text-blue-700">Usuarios</div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">
+                        {% with cal_count=empresa.equipos.all.0.calibraciones.count %}
+                            {{ cal_count|default:0 }}
+                        {% endwith %}
+                    </div>
+                    <div class="text-sm text-blue-700">Calibraciones</div>
+                </div>
+
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ empresa.procedimientos.count }}</div>
+                    <div class="text-sm text-blue-700">Procedimientos</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de eliminación -->
+        <form method="POST" class="space-y-6">
+            {% csrf_token %}
+
+            <div>
+                <label for="delete_reason" class="block text-sm font-medium text-gray-700 mb-2">
+                    Razón de eliminación (opcional)
+                </label>
+                <textarea
+                    id="delete_reason"
+                    name="delete_reason"
+                    rows="3"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Explique brevemente por qué se elimina esta empresa..."></textarea>
+            </div>
+
+            <!-- Información sobre eliminación suave -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 delete-company-info">
+                <div class="flex">
+                    <div class="text-yellow-400 mr-3">⚠️</div>
+                    <div class="text-sm text-yellow-700">
+                        <p class="font-medium">Eliminación Suave</p>
+                        <p class="mt-1">Al eliminar la empresa:</p>
+                        <ul class="mt-2 list-disc list-inside space-y-1">
+                            <li>La empresa desaparecerá del listado principal</li>
+                            <li>Todos los datos se conservan en la base de datos</li>
+                            <li>Se puede restaurar completamente en cualquier momento</li>
+                            <li>Solo superusuarios pueden ver empresas eliminadas</li>
+                            <li>Los backups incluyen empresas eliminadas</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmación adicional -->
+            <div class="bg-red-50 border border-red-200 rounded-md p-4 delete-company-warning">
+                <div class="flex">
+                    <div class="text-red-400 mr-3">🚨</div>
+                    <div class="text-sm text-red-700">
+                        <p class="font-medium">Confirmación Requerida</p>
+                        <p class="mt-1">Esta acción ocultará la empresa del sistema principal. Asegúrese de que realmente desea proceder.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="flex space-x-4">
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        onclick="return confirm('¿Está seguro de que desea eliminar la empresa {{ empresa.nombre }}? Esta acción se puede revertir desde el panel de empresas eliminadas.')">
+                    🗑️ Confirmar Eliminación
+                </button>
+
+                <a href="{% url 'core:listar_empresas' %}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    ❌ Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

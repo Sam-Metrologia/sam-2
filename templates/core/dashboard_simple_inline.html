@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Gerencia SAM{% endblock %}
+
+{% block content %}
+<div style="background-color: #f8fafc; min-height: 100vh; padding: 20px; font-family: Arial, sans-serif;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px;">
+        <h1 style="font-size: 2.5rem; font-weight: bold; margin: 0;">📊 Dashboard Gerencia SAM</h1>
+        <p style="margin: 10px 0 0 0; opacity: 0.8;">Análisis financiero y operativo - Año {{ current_year }}</p>
+    </div>
+
+    <!-- Filtro de Empresas -->
+    {% if user.is_superuser %}
+    <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <form method="get">
+            <label style="font-weight: bold; color: #374151; margin-right: 15px;">Filtrar por empresa:</label>
+            <select name="empresa_id" style="border: 2px solid #d1d5db; border-radius: 8px; padding: 10px; margin-right: 15px;" onchange="this.form.submit()">
+                <option value="">📋 Todas las empresas</option>
+                {% for empresa in empresas_disponibles %}
+                <option value="{{ empresa.id }}" {% if empresa.id|stringformat:"s" == selected_company_id %}selected{% endif %}>
+                    🏢 {{ empresa.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Métricas Principales -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+
+        <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #10b981;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #1e3a8a; margin-bottom: 8px;">
+                ${{ ingresos_anuales|default:0|floatformat:0 }}
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.875rem; letter-spacing: 0.05em;">
+                💰 INGRESOS ANUALES
+            </div>
+            <div style="color: #10b981; font-size: 0.75rem; font-weight: 600; margin-top: 8px;">
+                ▲ +{{ current_year }} proyectado
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #f59e0b;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #1e3a8a; margin-bottom: 8px;">
+                ${{ costos_totales|default:0|floatformat:0 }}
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.875rem; letter-spacing: 0.05em;">
+                📊 COSTOS OPERATIVOS
+            </div>
+            <div style="color: #6b7280; font-size: 0.75rem; font-weight: 600; margin-top: 8px;">
+                📈 {{ actividades_realizadas_año }} actividades
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #3b82f6;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #1e3a8a; margin-bottom: 8px;">
+                {{ margen_porcentaje|default:0 }}%
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.875rem; letter-spacing: 0.05em;">
+                📈 MARGEN BRUTO
+            </div>
+            <div style="color: #10b981; font-size: 0.75rem; font-weight: 600; margin-top: 8px;">
+                💵 ${{ margen_bruto|default:0|floatformat:0 }} ganancia
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #8b5cf6;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #1e3a8a; margin-bottom: 8px;">
+                {{ num_empresas_activas }}
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.875rem; letter-spacing: 0.05em;">
+                🏢 CLIENTES ACTIVOS
+            </div>
+            <div style="color: #6b7280; font-size: 0.75rem; font-weight: 600; margin-top: 8px;">
+                ⚙️ {{ total_equipos_gestionados }} equipos gestionados
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Operativas -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #10b981;">
+            <div style="font-size: 2rem; font-weight: bold; color: #10b981; margin-bottom: 8px;">
+                {{ equipos_al_dia }}
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.75rem;">
+                ✅ EQUIPOS AL DÍA
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #ef4444;">
+            <div style="font-size: 2rem; font-weight: bold; color: #ef4444; margin-bottom: 8px;">
+                {{ equipos_vencidos }}
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.75rem;">
+                ⚠️ EQUIPOS VENCIDOS
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #3b82f6;">
+            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6; margin-bottom: 8px;">
+                {{ actividades_realizadas_año }}
+            </div>
+            <div style="color: #6b7280; font-weight: bold; text-transform: uppercase; font-size: 0.75rem;">
+                🔧 ACTIVIDADES {{ current_year }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas de Eficiencia Metrológica -->
+    {% if puntuacion_eficiencia_promedio %}
+    <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            📈 Eficiencia Metrológica General
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+            <!-- Puntuación General -->
+            <div style="text-align: center; padding: 20px; background: {% if estado_eficiencia_general == 'EXCELENTE' %}#d1fae5{% elif estado_eficiencia_general == 'BUENO' %}#bfdbfe{% elif estado_eficiencia_general == 'REGULAR' %}#fef3c7{% elif estado_eficiencia_general == 'DEFICIENTE' %}#fed7d7{% else %}#fee2e2{% endif %}; border-radius: 12px;">
+                <div style="font-size: 2.5rem; font-weight: bold; color: {% if estado_eficiencia_general == 'EXCELENTE' %}#059669{% elif estado_eficiencia_general == 'BUENO' %}#2563eb{% elif estado_eficiencia_general == 'REGULAR' %}#d97706{% elif estado_eficiencia_general == 'DEFICIENTE' %}#dc2626{% else %}#b91c1c{% endif %};">
+                    {{ puntuacion_eficiencia_promedio }}%
+                </div>
+                <div style="color: {% if estado_eficiencia_general == 'EXCELENTE' %}#047857{% elif estado_eficiencia_general == 'BUENO' %}#1d4ed8{% elif estado_eficiencia_general == 'REGULAR' %}#92400e{% elif estado_eficiencia_general == 'DEFICIENTE' %}#991b1b{% else %}#7f1d1d{% endif %}; font-weight: bold; font-size: 0.875rem;">
+                    🎯 EFICIENCIA {{ estado_eficiencia_general }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Empresas por Eficiencia -->
+        {% if metricas_eficiencia_empresas %}
+        <div style="margin-top: 20px;">
+            <h4 style="font-size: 1.1rem; font-weight: bold; color: #374151; margin-bottom: 15px;">
+                🏆 Top Empresas por Eficiencia Metrológica
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                {% for empresa_metrica in metricas_eficiencia_empresas %}
+                <div style="padding: 15px; background: #f9fafb; border-radius: 8px; border-left: 4px solid {% if empresa_metrica.estado == 'EXCELENTE' %}#10b981{% elif empresa_metrica.estado == 'BUENO' %}#3b82f6{% elif empresa_metrica.estado == 'REGULAR' %}#f59e0b{% else %}#ef4444{% endif %};">
+                    <div style="font-size: 0.875rem; font-weight: bold; color: #374151; margin-bottom: 5px;">
+                        {{ empresa_metrica.empresa }}
+                    </div>
+                    <div style="font-size: 1.25rem; font-weight: bold; color: {% if empresa_metrica.estado == 'EXCELENTE' %}#059669{% elif empresa_metrica.estado == 'BUENO' %}#2563eb{% elif empresa_metrica.estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %};">
+                        {{ empresa_metrica.puntuacion }}%
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 5px;">
+                        Calibraciones: {{ empresa_metrica.cumplimiento_calibraciones }}%<br>
+                        Disponibilidad: {{ empresa_metrica.disponibilidad_equipos }}%
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Explicación de Métricas -->
+        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #0ea5e9;">
+            <h4 style="font-size: 1rem; font-weight: bold; color: #0c4a6e; margin-bottom: 10px;">
+                📘 ¿Cómo se calcula la Eficiencia Metrológica?
+            </h4>
+            <div style="font-size: 0.875rem; color: #0c4a6e; line-height: 1.5;">
+                La puntuación de eficiencia se calcula considerando:
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Cumplimiento (40%):</strong> Calibraciones, mantenimientos y comprobaciones realizadas a tiempo</li>
+                    <li><strong>Eficiencia Operativa (35%):</strong>
+                        <ul style="margin-left: 15px; font-size: 0.8rem;">
+                            <li><strong>Trazabilidad:</strong> Equipos con procedimientos completos de calibración, mantenimiento y comprobación</li>
+                            <li><strong>Disponibilidad:</strong> Equipos que NO están fuera de servicio o de baja</li>
+                            <li><strong>Tiempo de Gestión:</strong> Días promedio ponderados (Cal. externas: 10 días, internas: 3 días, etc.)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Calidad (25%):</strong> Índice de conformidad y eficacia de procesos</li>
+                </ul>
+                <div style="margin-top: 10px;">
+                    <strong>Estados:</strong> Excelente (90-100%) | Bueno (75-89%) | Regular (60-74%) | Deficiente (40-59%) | Crítico (<40%)
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Resumen de Costos -->
+    <div style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3 style="font-size: 1.5rem; font-weight: bold; color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+            💰 Desglose de Costos {{ current_year }}
+        </h3>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+            <div style="text-align: center; padding: 15px; background: #fef3c7; border-radius: 8px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #d97706;">
+                    ${{ costos_calibracion|default:0|floatformat:0 }}
+                </div>
+                <div style="color: #92400e; font-weight: 600; font-size: 0.875rem;">
+                    🔧 Calibraciones
+                </div>
+            </div>
+
+            <div style="text-align: center; padding: 15px; background: #d1fae5; border-radius: 8px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #059669;">
+                    ${{ costos_mantenimiento_sam|default:0|floatformat:0 }}
+                </div>
+                <div style="color: #047857; font-weight: 600; font-size: 0.875rem;">
+                    🛠️ Mantenimientos
+                </div>
+            </div>
+
+            <div style="text-align: center; padding: 15px; background: #dbeafe; border-radius: 8px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #2563eb;">
+                    ${{ costos_comprobacion|default:0|floatformat:0 }}
+                </div>
+                <div style="color: #1d4ed8; font-weight: 600; font-size: 0.875rem;">
+                    ✅ Comprobaciones
+                </div>
+            </div>
+
+            <div style="text-align: center; padding: 15px; background: #1e3a8a; border-radius: 8px; color: white;">
+                <div style="font-size: 1.5rem; font-weight: bold;">
+                    ${{ costos_totales|default:0|floatformat:0 }}
+                </div>
+                <div style="font-weight: 600; font-size: 0.875rem; opacity: 0.9;">
+                    📊 TOTAL COSTOS
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Información -->
+    <div style="background: #1f2937; color: white; padding: 20px; border-radius: 12px; text-align: center;">
+        <p style="margin: 0; font-size: 0.875rem;">
+            ✅ Dashboard SAM completamente funcional | Datos actualizados: {{ now|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+
+</div>
+{% endblock %}

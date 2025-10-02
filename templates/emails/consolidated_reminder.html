@@ -38,30 +38,64 @@
 
     <div class="content">
         <p>Estimado cliente,</p>
-        
-        <p>Le informamos que <strong>{{ empresa.nombre }}</strong> tiene las siguientes actividades <strong>{{ urgency_text }}</strong>:</p>
+
+        <p>Le informamos que <strong>{{ empresa.nombre }}</strong> tiene las siguientes actividades:</p>
 
         <div class="summary">
             <h3>Resumen de Actividades</h3>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-around; align-items: center; text-align: center;">
                 <div>
-                    <strong>Total de actividades:</strong> {{ total_actividades }}
+                    <strong style="font-size: 24px; color: #dc3545;">{{ total_vencidas }}</strong><br>
+                    <span style="font-size: 12px;">VENCIDAS</span>
                 </div>
                 <div>
-                    <strong>Fecha objetivo:</strong> {{ target_date|date:"d/m/Y" }}
+                    <strong style="font-size: 24px; color: #28a745;">{{ total_proximas }}</strong><br>
+                    <span style="font-size: 12px;">{{ urgency_text }}</span>
+                </div>
+                <div>
+                    <strong style="font-size: 24px; color: #007bff;">{{ total_actividades }}</strong><br>
+                    <span style="font-size: 12px;">TOTAL</span>
                 </div>
             </div>
         </div>
 
-        {% if equipos_calibracion %}
-        <div class="section calibracion">
+        {% if total_vencidas > 0 %}
+        <div class="urgent-critical">
+            <h3 style="margin: 0;">⚠️ ACTIVIDADES VENCIDAS ({{ total_vencidas }})</h3>
+            <p style="margin: 10px 0 0 0;">Las siguientes actividades ya están vencidas y requieren atención inmediata.</p>
+        </div>
+        {% endif %}
+
+        {% if equipos_calibracion_vencidas %}
+        <div class="section calibracion" style="background: #fff5f5; border-left: 5px solid #dc3545;">
             <div class="section-title">
-                <span class="section-icon">CAL</span>
-                <h3 style="margin: 0;">CALIBRACIONES</h3>
-                <span class="count-badge">{{ equipos_calibracion|length }}</span>
+                <span class="section-icon">🔬</span>
+                <h3 style="margin: 0; color: #dc3545;">CALIBRACIONES VENCIDAS</h3>
+                <span class="count-badge" style="background: #dc3545;">{{ equipos_calibracion_vencidas|length }}</span>
             </div>
             <ul class="equipment-list">
-                {% for equipo in equipos_calibracion %}
+                {% for equipo in equipos_calibracion_vencidas %}
+                <li class="equipment-item" style="border-left: 3px solid #dc3545;">
+                    <div class="equipment-info">
+                        <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
+                        <small>{{ equipo.marca|default:"N/A" }} | {{ equipo.modelo|default:"N/A" }}</small>
+                    </div>
+                    <div class="equipment-date" style="background: #dc3545; color: white;">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if equipos_calibracion_proximas %}
+        <div class="section calibracion">
+            <div class="section-title">
+                <span class="section-icon">🔬</span>
+                <h3 style="margin: 0;">CALIBRACIONES PRÓXIMAS</h3>
+                <span class="count-badge">{{ equipos_calibracion_proximas|length }}</span>
+            </div>
+            <ul class="equipment-list">
+                {% for equipo in equipos_calibracion_proximas %}
                 <li class="equipment-item">
                     <div class="equipment-info">
                         <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
@@ -74,15 +108,36 @@
         </div>
         {% endif %}
 
-        {% if equipos_mantenimiento %}
-        <div class="section mantenimiento">
+        {% if equipos_mantenimiento_vencidos %}
+        <div class="section mantenimiento" style="background: #fff9f5; border-left: 5px solid #dc3545;">
             <div class="section-title">
-                <span class="section-icon">MNT</span>
-                <h3 style="margin: 0;">MANTENIMIENTOS</h3>
-                <span class="count-badge">{{ equipos_mantenimiento|length }}</span>
+                <span class="section-icon">🔧</span>
+                <h3 style="margin: 0; color: #dc3545;">MANTENIMIENTOS VENCIDOS</h3>
+                <span class="count-badge" style="background: #dc3545;">{{ equipos_mantenimiento_vencidos|length }}</span>
             </div>
             <ul class="equipment-list">
-                {% for equipo in equipos_mantenimiento %}
+                {% for equipo in equipos_mantenimiento_vencidos %}
+                <li class="equipment-item" style="border-left: 3px solid #dc3545;">
+                    <div class="equipment-info">
+                        <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
+                        <small>{{ equipo.marca|default:"N/A" }} | {{ equipo.modelo|default:"N/A" }}</small>
+                    </div>
+                    <div class="equipment-date" style="background: #dc3545; color: white;">{{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if equipos_mantenimiento_proximos %}
+        <div class="section mantenimiento">
+            <div class="section-title">
+                <span class="section-icon">🔧</span>
+                <h3 style="margin: 0;">MANTENIMIENTOS PRÓXIMOS</h3>
+                <span class="count-badge">{{ equipos_mantenimiento_proximos|length }}</span>
+            </div>
+            <ul class="equipment-list">
+                {% for equipo in equipos_mantenimiento_proximos %}
                 <li class="equipment-item">
                     <div class="equipment-info">
                         <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
@@ -95,15 +150,36 @@
         </div>
         {% endif %}
 
-        {% if equipos_comprobacion %}
-        <div class="section comprobacion">
+        {% if equipos_comprobacion_vencidas %}
+        <div class="section comprobacion" style="background: #f5fff5; border-left: 5px solid #dc3545;">
             <div class="section-title">
-                <span class="section-icon">CHK</span>
-                <h3 style="margin: 0;">COMPROBACIONES</h3>
-                <span class="count-badge">{{ equipos_comprobacion|length }}</span>
+                <span class="section-icon">✅</span>
+                <h3 style="margin: 0; color: #dc3545;">COMPROBACIONES VENCIDAS</h3>
+                <span class="count-badge" style="background: #dc3545;">{{ equipos_comprobacion_vencidas|length }}</span>
             </div>
             <ul class="equipment-list">
-                {% for equipo in equipos_comprobacion %}
+                {% for equipo in equipos_comprobacion_vencidas %}
+                <li class="equipment-item" style="border-left: 3px solid #dc3545;">
+                    <div class="equipment-info">
+                        <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
+                        <small>{{ equipo.marca|default:"N/A" }} | {{ equipo.modelo|default:"N/A" }}</small>
+                    </div>
+                    <div class="equipment-date" style="background: #dc3545; color: white;">{{ equipo.proxima_comprobacion|date:"d/m/Y" }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if equipos_comprobacion_proximas %}
+        <div class="section comprobacion">
+            <div class="section-title">
+                <span class="section-icon">✅</span>
+                <h3 style="margin: 0;">COMPROBACIONES PRÓXIMAS</h3>
+                <span class="count-badge">{{ equipos_comprobacion_proximas|length }}</span>
+            </div>
+            <ul class="equipment-list">
+                {% for equipo in equipos_comprobacion_proximas %}
                 <li class="equipment-item">
                     <div class="equipment-info">
                         <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }}<br>
@@ -116,21 +192,23 @@
         </div>
         {% endif %}
 
-        {% if urgency_level == "critical" %}
-        <div class="urgent-critical">
-            <h3>ATENCION CRITICA</h3>
-            <p><strong>Estas actividades VENCEN HOY.</strong> Es necesario tomar accion inmediata para mantener la conformidad de sus equipos.</p>
-        </div>
-        {% elif urgency_level == "high" %}
-        <div class="urgent-high">
-            <h3>URGENTE</h3>
-            <p><strong>Estas actividades vencen en {{ days_ahead }} dias.</strong> Coordine lo antes posible para evitar vencimientos.</p>
-        </div>
-        {% elif urgency_level == "medium" %}
-        <div class="urgent-medium">
-            <h3>PROGRAMADO</h3>
-            <p><strong>Estas actividades vencen en {{ days_ahead }} dias.</strong> Planifique con anticipacion para mantener la conformidad.</p>
-        </div>
+        {% if total_proximas > 0 %}
+            {% if urgency_level == "critical" %}
+            <div class="urgent-critical">
+                <h3>⚠️ ATENCIÓN CRÍTICA</h3>
+                <p><strong>Las actividades próximas VENCEN HOY.</strong> Es necesario tomar acción inmediata para mantener la conformidad de sus equipos.</p>
+            </div>
+            {% elif urgency_level == "high" %}
+            <div class="urgent-high">
+                <h3>⚠️ URGENTE</h3>
+                <p><strong>Las actividades próximas vencen en {{ days_ahead }} días.</strong> Coordine lo antes posible para evitar vencimientos.</p>
+            </div>
+            {% elif urgency_level == "medium" %}
+            <div class="urgent-medium">
+                <h3>📅 PROGRAMADO</h3>
+                <p><strong>Las actividades próximas vencen en {{ days_ahead }} días.</strong> Planifique con anticipación para mantener la conformidad.</p>
+            </div>
+            {% endif %}
         {% endif %}
 
         <div class="actions">

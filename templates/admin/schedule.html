@@ -81,6 +81,10 @@
                                 <input type="checkbox" value="maintenance" class="notifications-daily-type" {% if 'maintenance' in schedule_config.notifications_daily.types %}checked{% endif %}>
                                 <span class="ml-2 text-sm">Mantenimientos</span>
                             </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" value="comprobacion" class="notifications-daily-type" {% if 'comprobacion' in schedule_config.notifications_daily.types %}checked{% endif %}>
+                                <span class="ml-2 text-sm">Comprobaciones</span>
+                            </label>
                         </div>
                     </div>
                 </div>
