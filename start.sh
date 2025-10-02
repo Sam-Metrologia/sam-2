@@ -1,13 +1,15 @@
 #!/bin/bash
 
-# Este script se ejecuta al iniciar la aplicación en Render
+# Start script para Render - Solo inicia la aplicacion
 
-# Ejecuta las migraciones de la base de datos (opcional, pero recomendado)
-# Esto aplica cualquier cambio en el modelo de la base de datos
-python manage.py migrate
+echo "Iniciando servidor Gunicorn..."
 
-# Recoge los archivos estáticos para la producción
-python manage.py collectstatic --no-input
-
-# Inicia la aplicación con Gunicorn, apuntando al archivo wsgi correcto
-gunicorn proyecto_c.wsgi 
+# Inicia la aplicación con Gunicorn
+# --workers: Numero de workers (recomendado 2-4 para Render free tier)
+# --bind: Render usa la variable PORT automaticamente
+# --timeout: Tiempo de espera para requests largos
+gunicorn proyecto_c.wsgi:application \
+    --workers 2 \
+    --bind 0.0.0.0:$PORT \
+    --timeout 120 \
+    --log-level info 
