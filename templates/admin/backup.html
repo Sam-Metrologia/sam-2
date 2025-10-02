@@ -80,7 +80,7 @@
                     </label>
                 </div>
 
-                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 backup-warning-card">
                     <div class="flex">
                         <div class="text-yellow-400 mr-3">⚠️</div>
                         <div class="text-sm text-yellow-700">
@@ -235,7 +235,123 @@
                 </form>
             </div>
 
-            <!-- Available Backups -->
+            <!-- Restore Explanation -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">📖 ¿Cómo Funciona la Restauración?</h2>
+
+                <!-- Visual Timeline Example -->
+                <div class="space-y-6">
+                    <!-- Example Scenario -->
+                    <div class="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-3">📋 Ejemplo Práctico:</h3>
+
+                        <div class="space-y-3">
+                            <!-- Step 1: Today - Backup -->
+                            <div class="flex items-start">
+                                <div class="bg-green-500 dark:bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-3 flex-shrink-0">1</div>
+                                <div>
+                                    <div class="font-semibold text-gray-900 dark:text-gray-100">HOY (Lunes 01/10) - 10:00 AM</div>
+                                    <div class="text-sm text-gray-700 dark:text-gray-300">Haces un backup de "Empresa ABC"</div>
+                                    <div class="text-xs bg-white dark:bg-gray-800 border border-green-300 dark:border-green-700 rounded px-2 py-1 mt-1 inline-block">
+                                        <strong class="dark:text-green-200">Backup guardado:</strong> <span class="dark:text-gray-300">10 equipos, 5 usuarios, 20 actividades</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 2: Tomorrow Morning - Changes -->
+                            <div class="flex items-start">
+                                <div class="bg-yellow-500 dark:bg-yellow-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-3 flex-shrink-0">2</div>
+                                <div>
+                                    <div class="font-semibold text-gray-900 dark:text-gray-100">MAÑANA (Martes 02/10) - 09:00 AM</div>
+                                    <div class="text-sm text-gray-700 dark:text-gray-300">Haces cambios en la empresa:</div>
+                                    <ul class="text-xs text-gray-600 dark:text-gray-400 mt-1 ml-4 list-disc">
+                                        <li>Agregas 2 equipos nuevos (ahora tienes 12 equipos)</li>
+                                        <li>Eliminas 1 usuario (ahora tienes 4 usuarios)</li>
+                                        <li>Registras 5 mantenimientos nuevos (ahora tienes 25 actividades)</li>
+                                    </ul>
+                                    <div class="text-xs bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-700 rounded px-2 py-1 mt-1 inline-block">
+                                        <strong class="dark:text-yellow-200">Estado actual:</strong> <span class="dark:text-gray-300">12 equipos, 4 usuarios, 25 actividades</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 3: Tomorrow Afternoon - Restore -->
+                            <div class="flex items-start">
+                                <div class="bg-red-500 dark:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-3 flex-shrink-0">3</div>
+                                <div>
+                                    <div class="font-semibold text-gray-900 dark:text-gray-100">MAÑANA (Martes 02/10) - 03:00 PM</div>
+                                    <div class="text-sm text-gray-700 dark:text-gray-300">Restauras el backup de ayer</div>
+                                    <div class="text-xs bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-700 rounded px-2 py-1 mt-1 inline-block">
+                                        <strong class="text-red-900 dark:text-red-200">⚠️ RESULTADO:</strong> <span class="text-red-800 dark:text-red-300">Vuelves al estado de AYER (Lunes 10:00 AM)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 4: Final State -->
+                            <div class="flex items-start bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-800 rounded-lg p-3">
+                                <div class="bg-red-700 dark:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-3 flex-shrink-0">!</div>
+                                <div>
+                                    <div class="font-bold text-red-900 dark:text-red-100">Estado Final (después de restaurar):</div>
+                                    <div class="text-sm text-red-800 dark:text-red-200 mt-1">
+                                        <strong>10 equipos</strong> (perdiste los 2 nuevos)<br>
+                                        <strong>5 usuarios</strong> (el usuario eliminado vuelve)<br>
+                                        <strong>20 actividades</strong> (perdiste los 5 mantenimientos nuevos)
+                                    </div>
+                                    <div class="text-xs bg-red-200 dark:bg-red-900 border border-red-400 dark:border-red-600 rounded px-2 py-1 mt-2 font-bold text-red-900 dark:text-red-100">
+                                        ❌ TODOS los cambios de MAÑANA se PIERDEN
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Concept Box -->
+                    <div class="bg-purple-50 dark:bg-purple-950 border-2 border-purple-300 dark:border-purple-700 rounded-lg p-4">
+                        <h4 class="font-bold text-purple-900 dark:text-purple-100 text-center mb-3">💡 CONCEPTO CLAVE</h4>
+                        <div class="text-center text-purple-900 dark:text-purple-100">
+                            <p class="text-lg font-semibold">La restauración es como una MÁQUINA DEL TIEMPO</p>
+                            <p class="text-sm mt-2">Vuelves EXACTAMENTE al estado del momento en que se hizo el backup</p>
+                            <p class="text-xs mt-2 text-purple-700 dark:text-purple-300">Todo lo que hiciste DESPUÉS del backup desaparece</p>
+                        </div>
+                    </div>
+
+                    <!-- When to Use -->
+                    <div class="border-t dark:border-gray-700 pt-4">
+                        <h4 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">✅ ¿Cuándo usar restauración?</h4>
+                        <ul class="text-sm text-gray-700 dark:text-gray-300 space-y-1 ml-4 list-disc">
+                            <li><strong>Error grave:</strong> Eliminaste datos por error</li>
+                            <li><strong>Corrupción:</strong> Los datos están dañados</li>
+                            <li><strong>Pruebas:</strong> Quieres crear una copia de prueba (usa --new-name)</li>
+                            <li><strong>Migración:</strong> Recuperar datos después de un desastre</li>
+                        </ul>
+                    </div>
+
+                    <!-- When NOT to Use -->
+                    <div class="border-t dark:border-gray-700 pt-4">
+                        <h4 class="font-semibold text-red-900 dark:text-red-200 mb-2">❌ ¿Cuándo NO usar restauración?</h4>
+                        <ul class="text-sm text-red-700 dark:text-red-300 space-y-1 ml-4 list-disc">
+                            <li>Si ya agregaste datos nuevos que quieres conservar</li>
+                            <li>Si solo necesitas un dato específico (mejor búscalo en el backup manualmente)</li>
+                            <li>Si no estás 100% seguro de lo que estás haciendo</li>
+                        </ul>
+                    </div>
+
+                    <!-- Safety Tips -->
+                    <div class="bg-yellow-50 dark:bg-yellow-950 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3 mt-4">
+                        <h4 class="font-semibold text-yellow-900 dark:text-yellow-200 mb-2">🛡️ Consejos de Seguridad:</h4>
+                        <ol class="text-sm text-yellow-800 dark:text-yellow-300 space-y-1 ml-4 list-decimal">
+                            <li><strong>SIEMPRE</strong> usa "Simulación" primero</li>
+                            <li>Si tienes dudas, usa <code class="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">--new-name</code> para crear una NUEVA empresa</li>
+                            <li>Verifica la fecha del backup antes de restaurar</li>
+                            <li>Haz un backup NUEVO antes de restaurar (por si acaso)</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Backups Section -->
+        <div class="mt-8">
             <div class="bg-white rounded-lg shadow-sm border p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-xl font-semibold text-gray-900">Backups Disponibles</h2>

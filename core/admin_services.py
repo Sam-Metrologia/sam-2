@@ -61,30 +61,127 @@ class AdminService:
             return error_result
 
     @staticmethod
-    def execute_notifications(notification_type='all', dry_run=False):
+    def execute_notifications(notification_type='all', dry_run=False, empresa_id=None, days_ahead=15):
         """
         Ejecuta comandos de notificaciones y retorna resultados.
         """
         try:
-            output = io.StringIO()
+            from core.notifications import NotificationScheduler
+            from core.models import Empresa
 
-            call_command(
-                'send_notifications',
-                type=notification_type,
-                dry_run=dry_run,
-                stdout=output,
-                stderr=output
-            )
+            emails_sent = 0
+            empresas_processed = 0
+            output_messages = []
+
+            if empresa_id:
+                # Enviar solo a empresa específica
+                try:
+                    empresa = Empresa.objects.get(id=empresa_id)
+
+                    if dry_run:
+                        output_messages.append(f'[MODO PRUEBA] Se enviarían notificaciones a: {empresa.nombre}')
+                    else:
+                        if notification_type == 'consolidated':
+                            result = NotificationScheduler.send_consolidated_reminder(empresa, days_ahead)
+                            if result:
+                                emails_sent += 1
+                                output_messages.append(f'Email consolidado enviado a {empresa.nombre}')
+                        else:
+                            # Otros tipos de notificación individual
+                            result = NotificationScheduler.send_consolidated_reminder(empresa, days_ahead)
+                            if result:
+                                emails_sent += 1
+                                output_messages.append(f'Notificación {notification_type} enviada a {empresa.nombre}')
+
+                    empresas_processed = 1
+
+                except Empresa.DoesNotExist:
+                    raise Exception(f'Empresa con ID {empresa_id} no encontrada')
+
+            else:
+                # Enviar a todas las empresas
+                if notification_type == 'consolidated':
+                    if dry_run:
+                        empresas = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False)
+                        output_messages.append(f'[MODO PRUEBA] Se enviarían notificaciones consolidadas a {empresas.count()} empresas')
+                        empresas_processed = empresas.count()
+                    else:
+                        emails_sent = NotificationScheduler.check_all_reminders()
+                        empresas_processed = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False).count()
+                        output_messages.append(f'Notificaciones consolidadas enviadas: {emails_sent} emails')
+
+                elif notification_type == 'weekly':
+                    if dry_run:
+                        empresas = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False)
+                        output_messages.append(f'[MODO PRUEBA] Se enviarían resúmenes semanales a {empresas.count()} empresas')
+                        empresas_processed = empresas.count()
+                    else:
+                        emails_sent = NotificationScheduler.send_weekly_summaries()
+                        output_messages.append(f'Resúmenes semanales enviados: {emails_sent} emails')
+                        empresas_processed = emails_sent
+
+                elif notification_type == 'weekly_overdue':
+                    if dry_run:
+                        empresas = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False)
+                        # Count overdue equipment across all companies
+                        from datetime import date
+                        today = date.today()
+                        overdue_count = 0
+                        for empresa in empresas:
+                            overdue_count += empresa.equipos.filter(
+                                proxima_calibracion__lt=today,
+                                estado__in=['Activo', 'En Mantenimiento', 'En Comprobación']
+                            ).count()
+                            overdue_count += empresa.equipos.filter(
+                                proximo_mantenimiento__lt=today,
+                                estado__in=['Activo', 'En Calibración', 'En Comprobación']
+                            ).count()
+                            overdue_count += empresa.equipos.filter(
+                                proxima_comprobacion__lt=today,
+                                estado__in=['Activo', 'En Calibración', 'En Mantenimiento']
+                            ).count()
+                        output_messages.append(f'[MODO PRUEBA] Se enviarían recordatorios semanales para {overdue_count} actividades vencidas')
+                        empresas_processed = empresas.count()
+                    else:
+                        emails_sent = NotificationScheduler.send_weekly_overdue_reminders()
+                        output_messages.append(f'Recordatorios semanales vencidos enviados: {emails_sent} emails')
+                        empresas_processed = emails_sent
+
+                else:
+                    # Para otros tipos, usar el comando original
+                    output = io.StringIO()
+                    try:
+                        call_command(
+                            'send_notifications',
+                            type=notification_type,
+                            dry_run=dry_run,
+                            stdout=output,
+                            stderr=output
+                        )
+                        output_messages.append(output.getvalue())
+                    except:
+                        # Fallback para tipos específicos
+                        if notification_type == 'calibration':
+                            emails_sent = NotificationScheduler.check_calibration_reminders()
+                        elif notification_type == 'maintenance':
+                            emails_sent = NotificationScheduler.check_maintenance_reminders()
+                        output_messages.append(f'Notificaciones {notification_type} procesadas')
 
             result = {
                 'success': True,
-                'output': output.getvalue(),
+                'output': '\n'.join(output_messages),
                 'timestamp': timezone.now().isoformat(),
                 'notification_type': notification_type,
-                'dry_run': dry_run
+                'dry_run': dry_run,
+                'details': {
+                    'emails_sent': emails_sent,
+                    'empresas_processed': empresas_processed,
+                    'empresa_id': empresa_id,
+                    'days_ahead': days_ahead
+                }
             }
 
-            logger.info(f'Notifications executed from web interface: {notification_type}', extra=result)
+            logger.info(f'Notifications executed from web interface: {notification_type}, empresa_id: {empresa_id}', extra=result)
             return result
 
         except Exception as e:
@@ -139,6 +236,60 @@ class AdminService:
             }
 
             logger.error(f'Error executing backup from web: {e}', extra=error_result)
+            return error_result
+
+    @staticmethod
+    def execute_cleanup_backups(retention_months=6, dry_run=False):
+        """
+        Ejecuta limpieza de backups antiguos de S3 y retorna resultados.
+        """
+        try:
+            output = io.StringIO()
+
+            call_command(
+                'cleanup_old_backups',
+                retention_months=retention_months,
+                dry_run=dry_run,
+                verbose=True,
+                stdout=output,
+                stderr=output
+            )
+
+            output_text = output.getvalue()
+
+            # Extraer números de archivos eliminados y tamaño del output
+            import re
+            deleted_match = re.search(r'(\d+) archivos', output_text)
+            size_match = re.search(r'([\d.]+) MB', output_text)
+
+            deleted_count = int(deleted_match.group(1)) if deleted_match else 0
+            total_size_mb = float(size_match.group(1)) if size_match else 0.0
+
+            result = {
+                'success': True,
+                'output': output_text,
+                'timestamp': timezone.now().isoformat(),
+                'retention_months': retention_months,
+                'dry_run': dry_run,
+                'details': {
+                    'deleted_count': deleted_count,
+                    'total_size_mb': total_size_mb
+                }
+            }
+
+            logger.info(f'Backup cleanup executed from web interface: {deleted_count} files, {total_size_mb} MB')
+            return result
+
+        except Exception as e:
+            error_result = {
+                'success': False,
+                'error': str(e),
+                'timestamp': timezone.now().isoformat(),
+                'retention_months': retention_months,
+                'dry_run': dry_run
+            }
+
+            logger.error(f'Error executing backup cleanup from web: {e}', extra=error_result)
             return error_result
 
     @staticmethod

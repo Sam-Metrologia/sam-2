@@ -10,6 +10,8 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from core.admin_services import AdminService, ScheduleManager
 from core.models import Empresa
+from core.monitoring import monitor_view
+from core.views.base import superuser_required, access_check
 import json
 import logging
 
@@ -97,7 +99,8 @@ def system_maintenance(request):
             ('cache', 'Limpiar cache'),
             ('logs', 'Limpiar logs'),
             ('database', 'Optimizar base de datos'),
-            ('zip', 'Limpiar archivos ZIP')
+            ('zip', 'Limpiar archivos ZIP'),
+            ('backups', 'Limpiar backups antiguos (>6 meses)')
         ]
     }
 
@@ -146,8 +149,10 @@ def system_notifications(request):
 
     context = {
         'notification_history': notification_history,
+        'empresas_list': Empresa.objects.all().prefetch_related('equipos'),
         'notification_options': [
             ('consolidated', 'Consolidado (Recomendado) - UN email con todas las actividades'),
+            ('weekly_overdue', 'Recordatorios Semanales Vencidos (máx 3 por actividad)'),
             ('all', 'Todas las notificaciones'),
             ('calibration', 'Solo recordatorios de calibración'),
             ('maintenance', 'Solo recordatorios de mantenimiento'),
@@ -280,6 +285,7 @@ def system_monitoring(request):
         if system_status.get('success') and system_status.get('health'):
             health_data = system_status['health']
             business_metrics = health_data.get('metrics', {}).get('business', {})
+            user_metrics = health_data.get('metrics', {}).get('users', {})
 
             # Extraer los valores específicos que el template necesita
             stats = {
@@ -290,10 +296,14 @@ def system_monitoring(request):
                     business_metrics.get('actividades_recientes', {}).get('mantenimientos_hoy', 0) +
                     business_metrics.get('actividades_recientes', {}).get('comprobaciones_hoy', 0)
                 ),
-                'system_usage': round(
-                    (business_metrics.get('equipos', {}).get('total', 1) /
-                     max(sum(e.get('limite', 1) for e in business_metrics.get('empresas_detalle', [])), 1)) * 100, 1
-                )
+                'active_users': user_metrics.get('users_active_15min', 0),
+                'active_users_details': user_metrics.get('active_users_details', []),
+                'system_usage': user_metrics.get('system_usage_percentage', 25.0),
+                'system_load_breakdown': user_metrics.get('system_load_breakdown', {
+                    'base_system': 15,
+                    'user_activity': 5,
+                    'database_load': 5
+                })
             }
 
         context = {
@@ -515,13 +525,20 @@ def api_execute_command(request):
         elif command_type == 'notifications':
             result = AdminService.execute_notifications(
                 notification_type=params.get('notification_type', 'all'),
-                dry_run=params.get('dry_run', False)
+                dry_run=params.get('test_mode', params.get('dry_run', False)),
+                empresa_id=params.get('empresa_id'),
+                days_ahead=params.get('days_ahead', 15)
             )
         elif command_type == 'backup':
             result = AdminService.execute_backup(
                 empresa_id=params.get('empresa_id'),
                 include_files=params.get('include_files', False),
                 backup_format=params.get('format', 'both')
+            )
+        elif command_type == 'cleanup_backups':
+            result = AdminService.execute_cleanup_backups(
+                retention_months=params.get('retention_months', 6),
+                dry_run=params.get('dry_run', False)
             )
         elif command_type == 'save_schedule':
             # Guardar configuración de programación
@@ -535,14 +552,16 @@ def api_execute_command(request):
             # Probar conexión de email
             from core.models import EmailConfiguration
             config = EmailConfiguration.get_current_config()
-            result = config.test_connection()
+            success, message = config.test_connection()
+            result = {'success': success, 'message': message}
         elif command_type == 'send_test_email':
             # Enviar email de prueba
             from core.models import EmailConfiguration
             config = EmailConfiguration.get_current_config()
             recipient_email = params.get('recipient_email')
             if recipient_email:
-                result = config.send_test_email(recipient_email)
+                success, message = config.send_test_email(recipient_email)
+                result = {'success': success, 'message': message}
             else:
                 result = {'success': False, 'error': 'Email destinatario requerido'}
         else:
@@ -676,4 +695,205 @@ def download_backup(request, filename):
     except Exception as e:
         logger.error(f'Error downloading backup {filename}: {e}')
         messages.error(request, f'Error descargando backup: {e}')
-        return redirect('core:admin_backup')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def deleted_companies(request):
+    """
+    Lista las empresas eliminadas (soft deleted) con opción de restaurar.
+    """
+    try:
+        deleted_companies = Empresa.get_deleted_companies()
+
+        context = {
+            'deleted_companies': deleted_companies,
+            'current_time': timezone.now(),
+        }
+
+        return render(request, 'admin/deleted_companies.html', context)
+
+    except Exception as e:
+        logger.error(f'Error listing deleted companies: {e}')
+        messages.error(request, f'Error cargando empresas eliminadas: {e}')
+        return redirect('core:admin_dashboard')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def restore_company(request, empresa_id):
+    """
+    Restaura una empresa previamente eliminada.
+    """
+    try:
+        empresa = Empresa.objects.get(id=empresa_id, is_deleted=True)
+
+        if request.method == 'POST':
+            success, message = empresa.restore(user=request.user)
+
+            if success:
+                messages.success(request, f'Empresa {empresa.nombre} restaurada exitosamente')
+                logger.info(f'Company {empresa.nombre} restored by {request.user.username}')
+            else:
+                messages.error(request, f'Error restaurando empresa: {message}')
+
+            return redirect('core:deleted_companies')
+
+        context = {
+            'empresa': empresa,
+            'delete_info': empresa.get_delete_info(),
+        }
+
+        return render(request, 'admin/restore_company.html', context)
+
+    except Empresa.DoesNotExist:
+        messages.error(request, 'Empresa no encontrada o no está eliminada')
+        return redirect('core:deleted_companies')
+    except Exception as e:
+        logger.error(f'Error restoring company {empresa_id}: {e}')
+        messages.error(request, f'Error restaurando empresa: {e}')
+        return redirect('core:deleted_companies')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def soft_delete_company(request, empresa_id):
+    """
+    Elimina una empresa de forma suave (soft delete).
+    """
+    try:
+        empresa = Empresa.objects.get(id=empresa_id, is_deleted=False)
+
+        if request.method == 'POST':
+            reason = request.POST.get('delete_reason', '')
+            empresa.soft_delete(user=request.user, reason=reason)
+
+            messages.success(request, f'Empresa {empresa.nombre} eliminada exitosamente')
+            logger.info(f'Company {empresa.nombre} soft deleted by {request.user.username}')
+
+            return redirect('core:listar_empresas')
+
+        # Obtener estadísticas de la empresa
+        total_equipos = empresa.equipos.count()
+        equipos_activos = empresa.equipos.filter(estado='Activo').count()
+        usuarios_empresa = empresa.usuarios_empresa.count()
+
+        context = {
+            'empresa': empresa,
+            'total_equipos': total_equipos,
+            'equipos_activos': equipos_activos,
+            'usuarios_empresa': usuarios_empresa,
+        }
+
+        return render(request, 'admin/soft_delete_company.html', context)
+
+    except Empresa.DoesNotExist:
+        messages.error(request, 'Empresa no encontrada')
+        return redirect('core:listar_empresas')
+    except Exception as e:
+        logger.error(f'Error soft deleting company {empresa_id}: {e}')
+        messages.error(request, f'Error eliminando empresa: {e}')
+        return redirect('core:listar_empresas')
+
+
+@monitor_view
+@login_required
+@superuser_required
+def cleanup_old_companies(request):
+    """
+    Vista para ejecutar limpieza de empresas eliminadas antiguas (más de 6 meses).
+    Solo disponible para superusuarios.
+    """
+    context = {
+        'titulo_pagina': 'Limpieza de Empresas Eliminadas'
+    }
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'preview':
+            # Mostrar vista previa de qué se eliminaría
+            result = Empresa.cleanup_old_deleted_companies(dry_run=True)
+            context.update({
+                'preview_result': result,
+                'show_preview': True
+            })
+            messages.info(
+                request,
+                f'Encontradas {result["count"]} empresas para eliminación permanente.'
+            )
+
+        elif action == 'execute_all':
+            # Ejecutar la limpieza de TODAS las empresas listas
+            result = Empresa.cleanup_old_deleted_companies(dry_run=False)
+            context.update({
+                'execution_result': result,
+                'show_result': True
+            })
+
+            if result['count'] > 0:
+                messages.success(
+                    request,
+                    f'Eliminación completada. {len(result["deleted"])} empresas eliminadas permanentemente.'
+                )
+                logger.info(f'Limpieza manual de empresas ejecutada por {request.user.username}: {len(result["deleted"])} empresas eliminadas')
+            else:
+                messages.info(request, 'No hay empresas para eliminar permanentemente.')
+
+        elif action == 'execute_selected':
+            # Ejecutar limpieza de empresas seleccionadas
+            company_ids = request.POST.getlist('company_ids')
+
+            if not company_ids:
+                messages.warning(request, 'No seleccionaste ninguna empresa para eliminar.')
+            else:
+                # Obtener las empresas seleccionadas que están listas para eliminación
+                companies_for_deletion = Empresa.get_companies_for_permanent_deletion()
+                selected_companies = companies_for_deletion.filter(id__in=company_ids)
+
+                deleted_companies = []
+                for company in selected_companies:
+                    try:
+                        company_name = company.nombre
+                        company_id = company.id
+                        company.delete()  # Eliminación física
+                        deleted_companies.append({
+                            'id': company_id,
+                            'name': company_name,
+                            'deleted_at': timezone.now(),
+                            'days_since_deletion': 0
+                        })
+                        logger.info(f'Empresa {company_name} (ID: {company_id}) eliminada permanentemente por {request.user.username}')
+                    except Exception as e:
+                        logger.error(f'Error eliminando empresa {company.nombre}: {e}')
+                        messages.error(request, f'Error al eliminar {company.nombre}: {str(e)}')
+
+                result = {
+                    'count': len(deleted_companies),
+                    'deleted': deleted_companies
+                }
+
+                context.update({
+                    'execution_result': result,
+                    'show_result': True
+                })
+
+                if len(deleted_companies) > 0:
+                    messages.success(
+                        request,
+                        f'Eliminación completada. {len(deleted_companies)} empresa(s) eliminadas permanentemente.'
+                    )
+                else:
+                    messages.error(request, 'No se pudo eliminar ninguna empresa.')
+
+    # Obtener estadísticas generales
+    deleted_companies = Empresa.objects.filter(is_deleted=True)
+    companies_for_deletion = Empresa.get_companies_for_permanent_deletion()
+
+    context.update({
+        'total_deleted_companies': deleted_companies.count(),
+        'companies_ready_for_deletion': companies_for_deletion.count(),
+        'retention_days': 180
+    })
+
+    return render(request, 'admin/cleanup_old_companies.html', context)

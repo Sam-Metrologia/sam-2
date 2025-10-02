@@ -56,6 +56,7 @@
                                 <li><strong>Logs:</strong> Elimina archivos de log antiguos (>30 días)</li>
                                 <li><strong>Base de datos:</strong> Optimiza y actualiza registros</li>
                                 <li><strong>ZIP:</strong> Limpia archivos ZIP temporales</li>
+                                <li><strong>Backups:</strong> Limpia backups S3 antiguos (>6 meses)</li>
                                 <li><strong>Todas:</strong> Ejecuta todas las tareas anteriores</li>
                             </ul>
                         </div>
@@ -69,14 +70,45 @@
 
             <!-- Quick Actions -->
             <div class="mt-6 pt-6 border-t border-gray-200">
-                <h3 class="text-sm font-medium text-gray-700 mb-3">Acciones Rápidas</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="executeQuickMaintenance('cache')" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                <h3 class="text-sm font-medium text-gray-700 mb-3">🚀 Acciones Rápidas</h3>
+
+                <!-- Acción Principal -->
+                <div class="mb-4">
+                    <button onclick="executeMaintenanceAll()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-3 rounded-md text-sm font-bold transition-colors shadow-md">
+                        ⚡ EJECUTAR MANTENIMIENTO COMPLETO
+                    </button>
+                </div>
+
+                <!-- Acciones Individuales -->
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <button onclick="executeQuickMaintenance('cache')" class="bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-100 px-3 py-2 rounded text-sm font-medium transition-colors">
                         🗄️ Solo Cache
                     </button>
-                    <button onclick="executeQuickMaintenance('database')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                    <button onclick="executeQuickMaintenance('database')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-100 px-3 py-2 rounded text-sm font-medium transition-colors">
                         🗃️ Solo BD
                     </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <button onclick="executeQuickMaintenance('logs')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 dark:bg-yellow-900 dark:hover:bg-yellow-800 dark:text-yellow-100 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        📋 Solo Logs
+                    </button>
+                    <button onclick="executeQuickMaintenance('zip')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-800 dark:bg-indigo-900 dark:hover:bg-indigo-800 dark:text-indigo-100 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        🗜️ Solo ZIP
+                    </button>
+                </div>
+
+                <!-- Acciones de Backups -->
+                <div class="mt-4 p-3 bg-orange-50 border border-orange-200 dark:bg-orange-950 dark:border-orange-800 rounded-md">
+                    <h4 class="text-xs font-semibold text-orange-800 dark:text-orange-200 mb-2">💾 Limpieza de Backups</h4>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button onclick="executeBackupCleanup(false)" class="bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900 dark:hover:bg-orange-800 dark:text-orange-100 px-3 py-2 rounded text-xs font-medium transition-colors">
+                            🗑️ Limpiar Backups (>6 meses)
+                        </button>
+                        <button onclick="executeBackupCleanup(true)" class="bg-orange-50 hover:bg-orange-100 text-orange-700 dark:bg-orange-950 dark:hover:bg-orange-900 dark:text-orange-200 px-3 py-2 rounded text-xs font-medium transition-colors border border-orange-300 dark:border-orange-700">
+                            🔍 Simular Limpieza (dry-run)
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -189,6 +221,108 @@ async function executeQuickMaintenance(taskType) {
         hideLoading();
         showToast(`❌ Error: ${error.message}`, 'error');
     }
+}
+
+async function executeMaintenanceAll() {
+    const confirmed = confirm('⚡ ¿Ejecutar MANTENIMIENTO COMPLETO del sistema?\n\nEsto incluye:\n- Limpieza de cache\n- Limpieza de logs\n- Optimización de BD\n- Limpieza de ZIP\n- Limpieza de backups\n\n¿Continuar?');
+
+    if (!confirmed) return;
+
+    showLoading('⚡ Ejecutando mantenimiento completo del sistema...');
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'maintenance',
+                params: {
+                    task_type: 'all',
+                    dry_run: false
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            showSuccessNotification('⚡ ¡MANTENIMIENTO COMPLETO EXITOSO!\n\nTodas las tareas de limpieza y optimización han sido completadas.');
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            showToast(`❌ Error en mantenimiento completo: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+async function executeBackupCleanup(dryRun = false) {
+    const modeText = dryRun ? 'SIMULACIÓN' : 'REAL';
+    const confirmText = dryRun
+        ? '🔍 ¿Simular limpieza de backups antiguos?\n\nEsto mostrará qué backups se eliminarían sin borrarlos realmente.\n\n¿Continuar?'
+        : '🗑️ ¿ELIMINAR backups de S3 mayores a 6 meses?\n\n⚠️ ADVERTENCIA: Los backups eliminados NO se pueden recuperar.\n\nSe eliminarán backups con más de 180 días de antigüedad.\n\n¿Continuar?';
+
+    const confirmed = confirm(confirmText);
+
+    if (!confirmed) return;
+
+    showLoading(`${dryRun ? '🔍 Simulando' : '🗑️ Ejecutando'} limpieza de backups antiguos...`);
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'cleanup_backups',
+                params: {
+                    retention_months: 6,
+                    dry_run: dryRun
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            const count = result.details?.deleted_count || 0;
+            const sizeMB = result.details?.total_size_mb || 0;
+
+            if (dryRun) {
+                showToast(`🔍 Simulación completada: ${count} archivos serían eliminados (${sizeMB.toFixed(2)} MB)`, 'info');
+            } else {
+                showSuccessNotification(`🗑️ ¡LIMPIEZA DE BACKUPS COMPLETADA!\n\n${count} archivos eliminados\n${sizeMB.toFixed(2)} MB liberados en S3`);
+            }
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            showToast(`❌ Error en limpieza de backups: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+function showSuccessNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-8 py-4 rounded-lg shadow-2xl z-50 max-w-md text-center';
+    notification.style.animation = 'bounce 0.5s ease-in-out';
+    notification.innerHTML = `
+        <div class="font-bold text-lg whitespace-pre-line">${message}</div>
+        <div class="text-sm mt-2 opacity-90">La página se recargará en 3 segundos...</div>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
 }
 </script>
 {% endblock %}

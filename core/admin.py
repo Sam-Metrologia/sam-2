@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _ # Importar para las traducciones de fieldsets
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
-    BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest # Solo importar el modelo Proveedor general
+    BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest, MetricasEficienciaMetrologica # Solo importar el modelo Proveedor general
 )
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
@@ -14,15 +14,15 @@ class CustomUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
     form = CustomUserChangeForm
     model = CustomUser
-    list_display = ['username', 'email', 'first_name', 'last_name', 'is_staff', 'empresa']
-    list_filter = ['is_staff', 'is_superuser', 'empresa']
+    list_display = ['username', 'email', 'first_name', 'last_name', 'is_staff', 'empresa', 'rol_usuario']
+    list_filter = ['is_staff', 'is_superuser', 'empresa', 'rol_usuario']
     search_fields = ['username', 'first_name', 'last_name', 'email', 'empresa__nombre']
     ordering = ['username']
 
     # Definir fieldsets explícitamente para incluir 'empresa' sin duplicar 'groups'
     fieldsets = (
         (None, {"fields": ("username", "password")}),
-        (_("Personal info"), {"fields": ("first_name", "last_name", "email", "empresa")}), # Añadido 'empresa' aquí
+        (_("Personal info"), {"fields": ("first_name", "last_name", "email", "empresa", "rol_usuario")}), # Añadido 'empresa' y 'rol_usuario' aquí
         (
             _("Permissions"),
             {
@@ -40,7 +40,7 @@ class CustomUserAdmin(UserAdmin):
                 "fields": ("username", "password", "password2"),
             },
         ),
-        (_("Personal info"), {"fields": ("first_name", "last_name", "email", "empresa")}), # Añadido 'empresa' aquí
+        (_("Personal info"), {"fields": ("first_name", "last_name", "email", "empresa", "rol_usuario")}), # Añadido 'empresa' y 'rol_usuario' aquí
         (
             _("Permissions"),
             {
@@ -295,3 +295,17 @@ class ZipRequestAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """Solo superusuarios pueden eliminar solicitudes."""
         return request.user.is_superuser
+# Registro del modelo de Métricas de Eficiencia
+admin.site.register(MetricasEficienciaMetrologica)
+
+# Registro del modelo de Notificaciones de Vencimiento
+from .models import NotificacionVencimiento
+
+@admin.register(NotificacionVencimiento)
+class NotificacionVencimientoAdmin(admin.ModelAdmin):
+    list_display = ('equipo', 'tipo_actividad', 'fecha_vencimiento', 'numero_recordatorio', 'actividad_completada', 'fecha_notificacion')
+    list_filter = ('tipo_actividad', 'actividad_completada', 'numero_recordatorio', 'fecha_notificacion')
+    search_fields = ('equipo__codigo_interno', 'equipo__nombre')
+    date_hierarchy = 'fecha_notificacion'
+    readonly_fields = ('fecha_notificacion',)
+    ordering = ('-fecha_notificacion',)

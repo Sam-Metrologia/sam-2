@@ -32,6 +32,16 @@
                 {% csrf_token %}
 
                 <div>
+                    <label for="empresa_id" class="block text-sm font-medium text-gray-700 mb-2">Empresa (Opcional)</label>
+                    <select id="empresa_id" name="empresa_id" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="">Todas las empresas</option>
+                        {% for empresa in empresas_list %}
+                        <option value="{{ empresa.id }}">{{ empresa.nombre }} ({{ empresa.equipos.count }} equipos)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
                     <label for="notification_type" class="block text-sm font-medium text-gray-700 mb-2">Tipo de Notificación</label>
                     <select id="notification_type" name="notification_type" class="w-full border border-gray-300 rounded-md px-3 py-2">
                         {% for value, label in notification_options %}
@@ -43,6 +53,7 @@
                 <div>
                     <label for="days_ahead" class="block text-sm font-medium text-gray-700 mb-2">Días de Antelación</label>
                     <select id="days_ahead" name="days_ahead" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="0" style="background-color: #fee2e2; color: #dc2626; font-weight: bold;">🚨 AHORA MISMO (0 días) - Solo actividades que vencen HOY</option>
                         <option value="7">7 días</option>
                         <option value="15" selected>15 días</option>
                         <option value="30">30 días</option>
@@ -64,6 +75,7 @@
                             <p class="font-medium mb-1">Tipos de notificación:</p>
                             <ul class="list-disc list-inside space-y-1">
                                 <li><strong>Consolidado:</strong> UN SOLO email con calibraciones, mantenimientos y comprobaciones</li>
+                                <li><strong>Recordatorios Semanales Vencidos:</strong> ⚠️ NUEVO - Recordatorios para equipos vencidos, máximo 3 por actividad, mismo día cada semana</li>
                                 <li><strong>Calibraciones:</strong> Solo equipos próximos a calibrar (individual)</li>
                                 <li><strong>Mantenimientos:</strong> Solo equipos que requieren mantenimiento (individual)</li>
                                 <li><strong>Comprobaciones:</strong> Solo equipos que requieren comprobación (individual)</li>
@@ -74,7 +86,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
+                <button type="button" onclick="sendToSpecificCompany()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors">
                     📧 Enviar Notificaciones
                 </button>
             </form>
@@ -82,22 +94,35 @@
             <!-- Quick Actions -->
             <div class="mt-6 pt-6 border-t border-gray-200">
                 <h3 class="text-sm font-medium text-gray-700 mb-3">Acciones Rápidas</h3>
+
+                <!-- Botón de Envío Inmediato Destacado -->
+                <div class="mb-4">
+                    <button onclick="sendImmediateNotification()" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-md text-sm font-bold transition-colors animate-pulse">
+                        🚨 ENVIAR AHORA MISMO - Solo actividades que vencen HOY
+                    </button>
+                </div>
+
                 <div class="grid grid-cols-2 gap-3 mb-3">
-                    <button onclick="executeQuickNotification('consolidated')" class="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                    <button onclick="executeQuickNotification('consolidated')" class="bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-100 px-3 py-2 rounded text-sm font-medium transition-colors">
                         📋 Consolidado (Recomendado)
                     </button>
-                    <button onclick="executeQuickNotification('weekly')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 rounded text-sm font-medium transition-colors">
+                    <button onclick="executeQuickNotification('weekly_overdue')" class="bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-100 px-3 py-2 rounded text-sm font-medium transition-colors">
+                        ⚠️ Recordatorios Semanales Vencidos
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 gap-3 mb-3">
+                    <button onclick="executeQuickNotification('weekly')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-100 px-3 py-2 rounded text-sm font-medium transition-colors">
                         📊 Resúmenes Semanales
                     </button>
                 </div>
                 <div class="grid grid-cols-3 gap-2">
-                    <button onclick="executeQuickNotification('calibration')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-2 rounded text-xs font-medium transition-colors">
+                    <button onclick="executeQuickNotification('calibration')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100 px-2 py-2 rounded text-xs font-medium transition-colors">
                         CAL Solo Calibraciones
                     </button>
-                    <button onclick="executeQuickNotification('maintenance')" class="bg-orange-100 hover:bg-orange-200 text-orange-800 px-2 py-2 rounded text-xs font-medium transition-colors">
+                    <button onclick="executeQuickNotification('maintenance')" class="bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900 dark:hover:bg-orange-800 dark:text-orange-100 px-2 py-2 rounded text-xs font-medium transition-colors">
                         MNT Solo Mantenimientos
                     </button>
-                    <button onclick="executeQuickNotification('comprobacion')" class="bg-teal-100 hover:bg-teal-200 text-teal-800 px-2 py-2 rounded text-xs font-medium transition-colors">
+                    <button onclick="executeQuickNotification('comprobacion')" class="bg-teal-100 hover:bg-teal-200 text-teal-800 dark:bg-teal-900 dark:hover:bg-teal-800 dark:text-teal-100 px-2 py-2 rounded text-xs font-medium transition-colors">
                         CHK Solo Comprobaciones
                     </button>
                 </div>
@@ -185,7 +210,10 @@
 
 <script>
 async function executeQuickNotification(notificationType) {
-    showLoading(`Enviando notificaciones de ${notificationType}...`);
+    const empresaId = document.getElementById('empresa_id').value;
+    const empresaText = empresaId ? ` a ${document.getElementById('empresa_id').selectedOptions[0].text.split(' (')[0]}` : '';
+
+    showLoading(`Enviando notificaciones de ${notificationType}${empresaText}...`);
 
     try {
         const response = await fetch('{% url "core:api_execute_command" %}', {
@@ -199,7 +227,8 @@ async function executeQuickNotification(notificationType) {
                 params: {
                     notification_type: notificationType,
                     days_ahead: 15,
-                    test_mode: false
+                    test_mode: false,
+                    empresa_id: empresaId || null
                 }
             })
         });
@@ -209,8 +238,10 @@ async function executeQuickNotification(notificationType) {
 
         if (result.success) {
             const emailsSent = result.details?.emails_sent || 0;
-            showToast(`✅ ${emailsSent} notificaciones de ${notificationType} enviadas`, 'success');
-            setTimeout(() => location.reload(), 2000);
+            const empresasText = result.details?.empresas_processed ? ` a ${result.details.empresas_processed} empresas` : empresaText;
+            // Mostrar notificación visual prominente de éxito
+            showSuccessNotification(`🎉 ¡CORREO ENVIADO EXITOSAMENTE! ${emailsSent} notificaciones de ${notificationType} enviadas${empresasText}`);
+            setTimeout(() => location.reload(), 3000);
         } else {
             showToast(`❌ Error enviando notificaciones: ${result.error}`, 'error');
         }
@@ -220,5 +251,171 @@ async function executeQuickNotification(notificationType) {
         showToast(`❌ Error: ${error.message}`, 'error');
     }
 }
+
+// Nueva función para el botón "Enviar a Empresa Específica"
+async function sendToSpecificCompany() {
+    const empresaId = document.getElementById('empresa_id').value;
+    if (!empresaId) {
+        showToast('❌ Por favor selecciona una empresa específica', 'error');
+        return;
+    }
+
+    const notificationType = document.getElementById('notification_type').value;
+    const daysAhead = document.getElementById('days_ahead').value;
+    const testMode = document.getElementById('test_mode').checked;
+
+    const empresaName = document.getElementById('empresa_id').selectedOptions[0].text.split(' (')[0];
+
+    showLoading(`Enviando notificaciones a ${empresaName}...`);
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'notifications',
+                params: {
+                    notification_type: notificationType,
+                    days_ahead: parseInt(daysAhead),
+                    test_mode: testMode,
+                    empresa_id: empresaId
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            const emailsSent = result.details?.emails_sent || 0;
+            if (testMode) {
+                showToast(`✅ Modo prueba: Se enviarían ${emailsSent} emails a ${empresaName}`, 'info');
+            } else {
+                // Mostrar notificación visual prominente de éxito
+                showSuccessNotification(`🎉 ¡CORREO ENVIADO EXITOSAMENTE! ${emailsSent} notificaciones enviadas a ${empresaName}`);
+            }
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            showToast(`❌ Error enviando notificaciones: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+// Nueva función para envío inmediato (0 días)
+async function sendImmediateNotification() {
+    const empresaId = document.getElementById('empresa_id').value;
+    const empresaText = empresaId ?
+        ` a ${document.getElementById('empresa_id').selectedOptions[0].text.split(' (')[0]}` :
+        ' a TODAS las empresas';
+
+    // Confirmar envío inmediato
+    const confirmed = confirm(`🚨 ¿ENVIAR AHORA MISMO?\n\nSe enviará notificación consolidada${empresaText} solo para actividades que VENCEN HOY.\n\n¿Continuar?`);
+
+    if (!confirmed) return;
+
+    showLoading(`🚨 Enviando notificación INMEDIATA${empresaText}...`);
+
+    try {
+        const response = await fetch('{% url "core:api_execute_command" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                command_type: 'notifications',
+                params: {
+                    notification_type: 'consolidated',
+                    days_ahead: 0,  // AHORA MISMO
+                    test_mode: false,
+                    empresa_id: empresaId || null
+                }
+            })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (result.success) {
+            const emailsSent = result.details?.emails_sent || 0;
+            if (emailsSent > 0) {
+                // Mostrar notificación de éxito grande y prominente
+                showImmediateSuccessNotification(`🚨 ¡CORREO ENVIADO INMEDIATAMENTE!
+${emailsSent} notificaciones URGENTES enviadas${empresaText}
+📧 Solo actividades que VENCEN HOY`);
+            } else {
+                showToast(`ℹ️ No hay actividades que venzan hoy${empresaText}`, 'info');
+            }
+            setTimeout(() => location.reload(), 4000);
+        } else {
+            showToast(`❌ Error enviando notificación inmediata: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        hideLoading();
+        showToast(`❌ Error: ${error.message}`, 'error');
+    }
+}
+
+// Función para mostrar notificación de éxito prominente
+function showSuccessNotification(message) {
+    // Crear elemento de notificación grande
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-8 py-4 rounded-lg shadow-2xl z-50 max-w-md text-center';
+    notification.style.animation = 'bounce 0.5s ease-in-out';
+    notification.innerHTML = `
+        <div class="font-bold text-lg">${message}</div>
+        <div class="text-sm mt-2 opacity-90">La página se recargará en 3 segundos...</div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Remover después de 3 segundos
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+// Función para mostrar notificación de éxito INMEDIATO (más grande)
+function showImmediateSuccessNotification(message) {
+    // Crear elemento de notificación extra grande para envío inmediato
+    const notification = document.createElement('div');
+    notification.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    notification.innerHTML = `
+        <div class="bg-gradient-to-r from-red-600 to-red-700 text-white p-8 rounded-xl shadow-2xl max-w-lg text-center transform scale-105">
+            <div class="text-2xl font-bold mb-4">${message.replace(/\n/g, '<br>')}</div>
+            <div class="text-sm opacity-90">La página se recargará en 4 segundos...</div>
+            <div class="mt-4">
+                <div class="animate-pulse text-3xl">✅</div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Remover después de 4 segundos
+    setTimeout(() => {
+        notification.remove();
+    }, 4000);
+}
+
+// CSS adicional para animaciones
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes bounce {
+        0%, 20%, 53%, 80%, 100% { transform: translate(-50%, 0); }
+        40%, 43% { transform: translate(-50%, -10px); }
+        70% { transform: translate(-50%, -5px); }
+        90% { transform: translate(-50%, -2px); }
+    }
+`;
+document.head.appendChild(style);
 </script>
 {% endblock %}

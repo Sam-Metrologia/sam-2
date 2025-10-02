@@ -15,7 +15,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--type',
             type=str,
-            choices=['consolidated', 'calibration', 'maintenance', 'comprobacion', 'weekly', 'all'],
+            choices=['consolidated', 'calibration', 'maintenance', 'comprobacion', 'weekly', 'weekly_overdue', 'all'],
             default='consolidated',
             help='Tipo de notificaciones a enviar (consolidated es recomendado - incluye calibraciones, mantenimientos y comprobaciones en UN email)'
         )
@@ -106,6 +106,17 @@ class Command(BaseCommand):
                     )
                 else:
                     self.stdout.write('   [SIMULADO] Resumenes semanales')
+
+            if notification_type in ['weekly_overdue', 'all']:
+                self.stdout.write('Enviando recordatorios semanales de equipos vencidos...')
+                if not options['dry_run']:
+                    sent = NotificationScheduler.send_weekly_overdue_reminders()
+                    total_sent += sent
+                    self.stdout.write(
+                        self.style.SUCCESS(f'Recordatorios semanales vencidos enviados: {sent}')
+                    )
+                else:
+                    self.stdout.write('   [SIMULADO] Recordatorios semanales vencidos')
 
             if not options['dry_run']:
                 self.stdout.write(

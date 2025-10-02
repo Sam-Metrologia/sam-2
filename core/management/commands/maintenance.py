@@ -20,7 +20,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--task',
             type=str,
-            choices=['cache', 'logs', 'files', 'database', 'zip', 'all'],
+            choices=['cache', 'logs', 'files', 'database', 'zip', 'backups', 'all'],
             default='all',
             help='Tipo de mantenimiento a ejecutar'
         )
@@ -38,7 +38,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options['dry_run']:
             self.stdout.write(
-                self.style.WARNING('🔍 MODO SIMULACIÓN - No se harán cambios reales')
+                self.style.WARNING('MODO SIMULACION - No se haran cambios reales')
             )
 
         task_type = options['task']
@@ -68,24 +68,28 @@ class Command(BaseCommand):
                 cleaned = self.clean_zip_files(dry_run, verbose)
                 total_cleaned += cleaned
 
+            if task_type in ['backups', 'all']:
+                cleaned = self.clean_old_backups(dry_run, verbose)
+                total_cleaned += cleaned
+
             if not dry_run:
                 self.stdout.write(
-                    self.style.SUCCESS(f'🎯 Mantenimiento completado. Items procesados: {total_cleaned}')
+                    self.style.SUCCESS(f'Mantenimiento completado. Items procesados: {total_cleaned}')
                 )
             else:
                 self.stdout.write(
-                    self.style.WARNING('🔍 Simulación completada. Para ejecutar real, quitar --dry-run')
+                    self.style.WARNING('Simulacion completada. Para ejecutar real, quitar --dry-run')
                 )
 
         except Exception as e:
             logger.error(f'Error in maintenance command: {e}')
             self.stdout.write(
-                self.style.ERROR(f'❌ Error durante mantenimiento: {e}')
+                self.style.ERROR(f'Error durante mantenimiento: {e}')
             )
 
     def clean_cache(self, dry_run=False, verbose=False):
         """Limpia entradas obsoletas del cache."""
-        self.stdout.write('🧹 Limpiando cache obsoleto...')
+        self.stdout.write('Limpiando cache obsoleto...')
 
         if verbose:
             self.stdout.write('   - Verificando conexión de cache...')
@@ -112,14 +116,14 @@ class Command(BaseCommand):
                 self.stdout.write(f'   - Cache entries limpiadas: {cleaned}')
 
             self.stdout.write(
-                self.style.SUCCESS(f'✅ Cache limpiado: {cleaned} entradas')
+                self.style.SUCCESS(f'OK Cache limpiado: {cleaned} entradas')
             )
             return cleaned
 
         except Exception as e:
             logger.error(f'Error cleaning cache: {e}')
             self.stdout.write(
-                self.style.ERROR(f'❌ Error limpiando cache: {e}')
+                self.style.ERROR(f'ERROR Error limpiando cache: {e}')
             )
             return 0
 
@@ -157,14 +161,14 @@ class Command(BaseCommand):
                             cleaned += 1
 
             self.stdout.write(
-                self.style.SUCCESS(f'✅ Logs limpiados: {cleaned} archivos')
+                self.style.SUCCESS(f'OK Logs limpiados: {cleaned} archivos')
             )
             return cleaned
 
         except Exception as e:
             logger.error(f'Error cleaning logs: {e}')
             self.stdout.write(
-                self.style.ERROR(f'❌ Error limpiando logs: {e}')
+                self.style.ERROR(f'ERROR Error limpiando logs: {e}')
             )
             return 0
 
@@ -232,14 +236,14 @@ class Command(BaseCommand):
             optimized = empresas_procesadas + equipos_actualizados
 
             self.stdout.write(
-                self.style.SUCCESS(f'✅ Base de datos optimizada: {optimized} registros')
+                self.style.SUCCESS(f'OK Base de datos optimizada: {optimized} registros')
             )
             return optimized
 
         except Exception as e:
             logger.error(f'Error optimizing database: {e}')
             self.stdout.write(
-                self.style.ERROR(f'❌ Error optimizando BD: {e}')
+                self.style.ERROR(f'ERROR Error optimizando BD: {e}')
             )
             return 0
 
@@ -265,13 +269,112 @@ class Command(BaseCommand):
                 old_requests.delete()
 
             self.stdout.write(
-                self.style.SUCCESS(f'✅ Sistema ZIP limpiado: {cleaned} solicitudes')
+                self.style.SUCCESS(f'OK Sistema ZIP limpiado: {cleaned} solicitudes')
             )
             return cleaned
 
         except Exception as e:
             logger.error(f'Error cleaning ZIP system: {e}')
             self.stdout.write(
-                self.style.ERROR(f'❌ Error limpiando ZIP: {e}')
+                self.style.ERROR(f'ERROR Error limpiando ZIP: {e}')
+            )
+            return 0
+
+    def clean_old_backups(self, dry_run=False, verbose=False):
+        """Limpia backups de S3 mayores a 6 meses."""
+        self.stdout.write('💾 Limpiando backups antiguos de S3 (>6 meses)...')
+
+        # Verificar si AWS está configurado
+        if not all([
+            settings.AWS_ACCESS_KEY_ID,
+            settings.AWS_SECRET_ACCESS_KEY,
+            settings.AWS_STORAGE_BUCKET_NAME
+        ]):
+            self.stdout.write(
+                self.style.WARNING('AWS S3 no configurado - Saltando limpieza de backups')
+            )
+            return 0
+
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+        except ImportError:
+            self.stdout.write(
+                self.style.WARNING('boto3 no instalado - Saltando limpieza de backups')
+            )
+            return 0
+
+        cleaned = 0
+
+        try:
+            # Calcular fecha límite (6 meses)
+            cutoff_date = timezone.now() - timedelta(days=180)
+
+            # Conectar a S3
+            s3_client = boto3.client(
+                's3',
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-2')
+            )
+
+            bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+            backup_prefix = 'backups/'
+
+            # Listar objetos en el bucket
+            paginator = s3_client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=bucket_name, Prefix=backup_prefix)
+
+            for page in pages:
+                if 'Contents' not in page:
+                    continue
+
+                for obj in page['Contents']:
+                    file_key = obj['Key']
+                    last_modified = obj['LastModified']
+
+                    # Verificar si es más antiguo que 6 meses
+                    if last_modified < cutoff_date.replace(tzinfo=last_modified.tzinfo):
+                        if verbose:
+                            age_days = (timezone.now() - last_modified).days
+                            self.stdout.write(
+                                f'   - {"[SIMULAR]" if dry_run else "[ELIMINAR]"} {file_key} '
+                                f'({age_days} días)'
+                            )
+
+                        if not dry_run:
+                            s3_client.delete_object(Bucket=bucket_name, Key=file_key)
+                            logger.info(f'Backup eliminado de S3: {file_key}')
+
+                        cleaned += 1
+
+            self.stdout.write(
+                self.style.SUCCESS(f'OK Backups antiguos limpiados: {cleaned} archivos')
+            )
+            return cleaned
+
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            if error_code == 'NoSuchBucket':
+                logger.error(f'S3 bucket does not exist: {settings.AWS_STORAGE_BUCKET_NAME}')
+                self.stdout.write(
+                    self.style.ERROR(f'ERROR Bucket S3 no existe')
+                )
+            elif error_code == 'AccessDenied':
+                logger.error('Access denied to S3 - check IAM permissions')
+                self.stdout.write(
+                    self.style.ERROR(f'ERROR Acceso denegado a S3')
+                )
+            else:
+                logger.error(f'S3 error cleaning backups: {e}')
+                self.stdout.write(
+                    self.style.ERROR(f'ERROR Error S3: {e}')
+                )
+            return 0
+
+        except Exception as e:
+            logger.error(f'Error cleaning old backups: {e}')
+            self.stdout.write(
+                self.style.ERROR(f'ERROR Error limpiando backups: {e}')
             )
             return 0

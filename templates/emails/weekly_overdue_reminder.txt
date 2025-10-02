@@ -1,0 +1,65 @@
+⚠️ RECORDATORIO SEMANAL - ACTIVIDADES VENCIDAS - {{ site_name }}
+==============================================
+
+Estimado cliente,
+
+Le recordamos que {{ empresa.nombre }} tiene actividades VENCIDAS que requieren atención inmediata.
+
+Este es un recordatorio semanal automático para asegurar que estas actividades sean completadas a la brevedad.
+
+========================================
+⚠️ ACTIVIDADES VENCIDAS ({{ total_vencidos }})
+========================================
+Las siguientes actividades ya están vencidas y requieren atención URGENTE.
+
+{% if equipos_calibracion_vencidas %}
+CALIBRACIONES VENCIDAS ({{ equipos_calibracion_vencidas|length }}):
+{% for equipo in equipos_calibracion_vencidas %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha vencimiento: {{ equipo.proxima_calibracion|date:"d/m/Y" }}
+  Días vencidos: {{ equipo.dias_hasta_calibracion|default:"N/A" }}
+{% endfor %}
+
+{% endif %}
+{% if equipos_mantenimiento_vencidos %}
+MANTENIMIENTOS VENCIDOS ({{ equipos_mantenimiento_vencidos|length }}):
+{% for equipo in equipos_mantenimiento_vencidos %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha vencimiento: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}
+  Días vencidos: {{ equipo.dias_hasta_mantenimiento|default:"N/A" }}
+{% endfor %}
+
+{% endif %}
+{% if equipos_comprobacion_vencidas %}
+COMPROBACIONES VENCIDAS ({{ equipos_comprobacion_vencidas|length }}):
+{% for equipo in equipos_comprobacion_vencidas %}
+- {{ equipo.codigo_interno }}: {{ equipo.nombre }}
+  Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}
+  Fecha vencimiento: {{ equipo.proxima_comprobacion|date:"d/m/Y" }}
+  Días vencidos: {{ equipo.dias_hasta_comprobacion|default:"N/A" }}
+{% endfor %}
+
+{% endif %}
+========================================
+🚨 ACCIONES URGENTES REQUERIDAS
+========================================
+
+1. Coordinar INMEDIATAMENTE con proveedores de servicio
+2. Programar las actividades vencidas lo antes posible
+3. Actualizar el sistema SAM una vez completadas las actividades
+4. Mantener documentación de cumplimiento actualizada
+
+⚠️ IMPORTANTE: Este recordatorio se enviará semanalmente (mismo día cada semana)
+hasta que las actividades sean completadas. Máximo 3 recordatorios.
+
+---
+{{ site_name }}
+Sistema de Gestión de Metrología
+{{ empresa.nombre }}
+
+Fecha del recordatorio: {{ today|date:"d/m/Y" }}
+
+Este es un email automático del sistema de recordatorios semanales.
+Para dejar de recibir este recordatorio, complete las actividades vencidas.
