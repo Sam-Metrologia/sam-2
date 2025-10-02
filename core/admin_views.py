@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from core.admin_services import AdminService, ScheduleManager
 from core.models import Empresa
-from core.monitoring import monitor_view
+# from core.monitoring import monitor_view  # Removido - decorator no existe
 from core.views.base import superuser_required, access_check
 import json
 import logging
@@ -796,7 +796,7 @@ def soft_delete_company(request, empresa_id):
         return redirect('core:listar_empresas')
 
 
-@monitor_view
+# @monitor_view  # Removido - decorator no existe
 @login_required
 @superuser_required
 def cleanup_old_companies(request):
