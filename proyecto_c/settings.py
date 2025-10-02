@@ -346,25 +346,20 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
 
     # Usar storage personalizado para archivos media (Django 5.2+ style)
+    # IMPORTANTE: Usar WhiteNoise para static files (mejor performance y confiabilidad)
+    # S3 solo para media files (uploads de usuarios)
     STORAGES = {
         "default": {
             "BACKEND": "proyecto_c.storages.S3MediaStorage",
         },
         "staticfiles": {
-            "BACKEND": "proyecto_c.storages.S3StaticStorage" if RENDER_EXTERNAL_HOSTNAME else "whitenoise.storage.CompressedManifestStaticFilesStorage",
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
 
     # Backward compatibility
     DEFAULT_FILE_STORAGE = 'proyecto_c.storages.S3MediaStorage'
-    
-    # Para archivos estáticos, usar S3 solo en producción
-    if RENDER_EXTERNAL_HOSTNAME:
-        STATICFILES_STORAGE = 'proyecto_c.storages.S3StaticStorage'
-        AWS_STATIC_LOCATION = 'static'
-        STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_STATIC_LOCATION}/'
-    else:
-        STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
     
     # Configurar timeout y reintentos para S3
     AWS_S3_MAX_POOL_CONNECTIONS = 10
