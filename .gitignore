@@ -61,9 +61,19 @@ logs/
 # Backup files
 *.bak
 backup_*.json
+backup_*.zip
 db_backup.sqlite3
+backups/*.zip
+backups/*.json
+*_backup.py
+*_old.py
 
 # Test files
+test_*.py
+debug_*.py
+diagnostico_*.py
+crear_*.py
+demo_*.py
 test_uploads/
 test_images/
 
@@ -73,3 +83,18 @@ test_images/
 
 # PDF generation temporary files
 *.pdf.tmp
+
+# Temporary and misc files
+cookies.txt
+*.xlsx
+plantilla_*.xlsx
+get-pip.py
+process_*.py
+
+# Documentation files for development (keep only main docs)
+DEBUG_*.md
+REFACTORING_*.md
+GUION_*.md
+
+# Report files
+ARCHIVOS_A_ELIMINAR.txt
