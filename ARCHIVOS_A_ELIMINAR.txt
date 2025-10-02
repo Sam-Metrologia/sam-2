@@ -1,0 +1,109 @@
+================================================================
+REPORTE: ARCHIVOS INNECESARIOS PARA DESPLIEGUE EN RENDER
+================================================================
+
+❌ CATEGORÍA 1: SCRIPTS DE PRUEBA Y DEBUG (Raíz)
+--------------------------------------------------
+✗ test_baja_equipo.py
+✗ test_formularios_corregido.py
+✗ test_formularios_final.py
+✗ test_formularios_guardado.py
+✗ test_formularios_simple.py
+✗ test_limites_debug.py
+✗ test_plan_expirado.py
+✗ test_platform.py
+✗ test_regex_fix.py
+✗ test_restriccion_final.py
+✗ test_simple.py
+✗ test_simple_plan_expirado.py
+✗ test_sistema_completo.py
+✗ test_zip_hybrid.py
+✗ debug_estado.py
+✗ diagnostico_equipo.py
+✗ pre_deployment_check.py
+✗ process_zip_manual.py
+
+❌ CATEGORÍA 2: SCRIPTS DEMO Y GENERACIÓN DE DATOS
+--------------------------------------------------
+✗ crear_actividades_demo.py
+✗ crear_datos_demo.py
+✗ crear_datos_demo_simple.py
+✗ demo_cola_mejorada.py
+✗ generate_test_data.py
+
+❌ CATEGORÍA 3: ARCHIVOS DE DOCUMENTACIÓN DE DESARROLLO
+--------------------------------------------------
+✗ DEBUG_FORMULARIOS.md
+✗ REFACTORING_SUMMARY.md
+✗ GUION_VIDEO_PROMOCIONAL_SAM.md
+
+NOTA: Mantener README.md y DEPLOYMENT_INSTRUCTIONS.md
+
+❌ CATEGORÍA 4: BACKUPS DE CÓDIGO EN CORE/
+--------------------------------------------------
+✗ core/models_backup_20250926_1346.py
+✗ core/views_monolitico_backup.py
+✗ core/views_old_backup.py
+
+❌ CATEGORÍA 5: ARCHIVOS TEMPORALES
+--------------------------------------------------
+✗ cookies.txt
+✗ plantilla_equipos_actualizada_20250928_135642.xlsx
+✗ plantilla_equipos_actualizada_20250928_135711.xlsx
+✗ get-pip.py (si no se usa)
+
+❌ CATEGORÍA 6: BACKUPS DE BD (backups/) - ~24MB
+--------------------------------------------------
+✗ backups/backup_234_*.zip (múltiples archivos)
+✗ backups/backup_234_*.json
+✗ backups/backup_CALIBRACIONES_*.zip
+✗ backups/backup_Control_*.zip
+✗ backups/backup_PRUEBA*.zip
+✗ backups/backup_SAM_*.zip
+✗ backups/backup_Prueba*.zip
+
+NOTA: Estos backups son de desarrollo local, no necesarios en Render
+
+❌ CATEGORÍA 7: BASE DE DATOS DE DESARROLLO
+--------------------------------------------------
+✗ db.sqlite3 (si existe)
+
+NOTA: Render usará PostgreSQL, no SQLite
+
+❌ CATEGORÍA 8: ARCHIVOS PYTHON EXPERIMENTALES/TEMPORALES EN CORE/
+--------------------------------------------------
+✗ core/async_zip_improved.py (si no se usa)
+✗ core/async_zip_system.py (si no se usa)
+✗ core/cdn_zip_optimization.py (si no se usa)
+✗ core/direct_streaming_zip.py (si no se usa)
+✗ core/streaming_zip_views.py (si no se usa)
+
+NOTA: Verificar si estos archivos están en uso antes de eliminar
+
+================================================================
+✅ ARCHIVOS A MANTENER (IMPORTANTES PARA FUNCIONAMIENTO)
+================================================================
+
+✓ manage.py - REQUERIDO
+✓ requirements.txt - REQUERIDO
+✓ proyecto_c/ - REQUERIDO
+✓ core/ (sin backups) - REQUERIDO
+✓ templates/ - REQUERIDO
+✓ static/ - REQUERIDO
+✓ staticfiles/ - REQUERIDO
+✓ media/ (estructura, no archivos locales) - REQUERIDO
+✓ CLAUDE.md - ÚTIL
+✓ README.md - ÚTIL
+✓ DEPLOYMENT_INSTRUCTIONS.md - ÚTIL
+✓ .gitignore - REQUERIDO
+✓ render.yaml (si existe) - REQUERIDO
+✓ start.sh (script de inicio) - REQUERIDO
+
+================================================================
+TAMAÑO APROXIMADO A LIBERAR: ~25-30 MB
+================================================================
+
+RECOMENDACIÓN:
+1. Eliminar categorías 1-7 (son 100% seguras de eliminar)
+2. Revisar categoría 8 antes de eliminar
+3. Actualizar .gitignore para prevenir futuros archivos innecesarios
