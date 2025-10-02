@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def force_create_cache_table(apps, schema_editor):
     """Forzar creación de tabla de cache."""
-    print("🚀 FORZANDO CREACIÓN DE TABLA DE CACHE...")
+    logger.info("FORZANDO CREACION DE TABLA DE CACHE...")
 
     try:
         # Verificar si la tabla ya existe
@@ -22,12 +22,12 @@ def force_create_cache_table(apps, schema_editor):
             """)
             table_exists = cursor.fetchone()[0]
 
-        print(f"📊 Estado actual: Tabla existe = {table_exists}")
+        logger.info(f"Estado actual: Tabla existe = {table_exists}")
 
         if not table_exists:
-            print("🔨 Creando tabla de cache...")
+            logger.info("Creando tabla de cache...")
             call_command('createcachetable', 'sam_cache_table', verbosity=2)
-            print("✅ Comando createcachetable ejecutado")
+            logger.info("Comando createcachetable ejecutado")
 
             # Verificar nuevamente
             with connection.cursor() as cursor:
@@ -40,15 +40,14 @@ def force_create_cache_table(apps, schema_editor):
                 table_created = cursor.fetchone()[0]
 
             if table_created:
-                print("🎉 ¡TABLA DE CACHE CREADA EXITOSAMENTE!")
+                logger.info("TABLA DE CACHE CREADA EXITOSAMENTE!")
             else:
-                print("❌ FALLO: Tabla no existe después de creación")
+                logger.error("FALLO: Tabla no existe despues de creacion")
         else:
-            print("ℹ️  Tabla ya existe - no es necesario crearla")
+            logger.info("Tabla ya existe - no es necesario crearla")
 
     except Exception as e:
-        print(f"💥 ERROR EN MIGRACIÓN: {e}")
-        logger.error(f"Error forzando creación de tabla cache: {e}")
+        logger.error(f"ERROR EN MIGRACION: {e}")
 
 
 def reverse_force_create_cache_table(apps, schema_editor):
@@ -56,9 +55,9 @@ def reverse_force_create_cache_table(apps, schema_editor):
     try:
         with connection.cursor() as cursor:
             cursor.execute("DROP TABLE IF EXISTS sam_cache_table;")
-        print("🗑️  Tabla de cache eliminada (rollback)")
+        logger.info("Tabla de cache eliminada (rollback)")
     except Exception as e:
-        print(f"⚠️  Error en rollback: {e}")
+        logger.warning(f"Error en rollback: {e}")
 
 
 class Migration(migrations.Migration):

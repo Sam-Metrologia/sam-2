@@ -21,12 +21,12 @@ def create_cache_table(apps, schema_editor):
             table_exists = cursor.fetchone()[0]
 
         if table_exists:
-            print("ℹ️  Tabla de cache 'sam_cache_table' ya existe - saltando creación")
+            logger.info("Tabla de cache 'sam_cache_table' ya existe - saltando creacion")
             return
 
         # Crear la tabla si no existe
         call_command('createcachetable', 'sam_cache_table', verbosity=1)
-        print("✅ Tabla de cache 'sam_cache_table' creada exitosamente")
+        logger.info("Tabla de cache 'sam_cache_table' creada exitosamente")
 
         # Verificar que se creó correctamente
         with connection.cursor() as cursor:
@@ -39,13 +39,12 @@ def create_cache_table(apps, schema_editor):
             table_created = cursor.fetchone()[0]
 
         if table_created:
-            print("✅ Verificación: Tabla de cache creada y confirmada")
+            logger.info("Verificacion: Tabla de cache creada y confirmada")
         else:
-            print("❌ Error: Tabla de cache no se pudo verificar después de creación")
+            logger.error("Error: Tabla de cache no se pudo verificar despues de creacion")
 
     except Exception as e:
-        logger.error(f"Error en migración de cache: {e}")
-        print(f"⚠️  Error creando tabla de cache: {e}")
+        logger.error(f"Error en migracion de cache: {e}")
         # No fallar la migración por esto
         pass
 
@@ -55,10 +54,9 @@ def delete_cache_table(apps, schema_editor):
     try:
         with connection.cursor() as cursor:
             cursor.execute("DROP TABLE IF EXISTS sam_cache_table;")
-        print("🗑️  Tabla de cache 'sam_cache_table' eliminada")
+        logger.info("Tabla de cache 'sam_cache_table' eliminada")
     except Exception as e:
         logger.warning(f"Error eliminando tabla de cache: {e}")
-        print(f"⚠️  Error eliminando tabla de cache: {e}")
 
 
 class Migration(migrations.Migration):
