@@ -195,6 +195,11 @@ class NotificationService:
         }
 
         try:
+            # Configurar email dinámicamente
+            if not configure_email_settings():
+                logger.error("Failed to configure email settings for weekly summary")
+                return False
+
             subject = f"RESUMEN SEMANAL - {empresa.nombre}"
             text_content = render_to_string('emails/weekly_summary.txt', context)
             html_content = render_to_string('emails/weekly_summary.html', context)
