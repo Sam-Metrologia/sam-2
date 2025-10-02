@@ -163,33 +163,74 @@ class SystemMonitor:
 
             # Incluir información de usuarios activos recientes (últimas 24 horas de actividad)
             last_24h = now - timedelta(hours=24)
+            last_15min = now - timedelta(minutes=15)
 
-            # Obtener usuarios activos de cache (últimos 15 minutos)
-            active_users_15min = cache.get('active_users_15min', {})
-            active_users_count = len(active_users_15min)
+            # Obtener usuarios activos usando sesiones de Django
+            from django.contrib.sessions.models import Session
+            from importlib import import_module
+            from django.conf import settings as django_settings
 
-            # Obtener detalles de usuarios activos
             active_users_details = []
-            for user_data in active_users_15min.values():
-                try:
-                    activity_time = datetime.fromisoformat(user_data['last_activity'])
+            active_user_ids = set()
+
+            try:
+                # Obtener todas las sesiones activas
+                active_sessions = Session.objects.filter(expire_date__gte=now)
+                engine = import_module(django_settings.SESSION_ENGINE)
+
+                for session in active_sessions:
+                    try:
+                        session_data = engine.SessionStore(session.session_key)
+                        user_id = session_data.get('_auth_user_id')
+
+                        if user_id:
+                            active_user_ids.add(int(user_id))
+
+                            # Obtener información del usuario
+                            try:
+                                user = CustomUser.objects.get(id=user_id)
+                                # Usar last_login como proxy de actividad reciente
+                                if user.last_login and user.last_login >= last_15min:
+                                    minutes_ago = int((now - user.last_login).total_seconds() / 60)
+                                    active_users_details.append({
+                                        'username': user.username,
+                                        'last_activity': user.last_login.strftime('%H:%M:%S'),
+                                        'minutes_ago': minutes_ago
+                                    })
+                            except CustomUser.DoesNotExist:
+                                continue
+
+                    except Exception:
+                        continue
+
+            except Exception as e:
+                logger.warning(f'Could not read sessions for active users: {e}')
+                # Fallback: usar usuarios con login reciente
+                recent_users = CustomUser.objects.filter(
+                    last_login__gte=last_15min
+                ).order_by('-last_login')
+
+                for user in recent_users:
+                    active_user_ids.add(user.id)
+                    minutes_ago = int((now - user.last_login).total_seconds() / 60)
                     active_users_details.append({
-                        'username': user_data['username'],
-                        'last_activity': activity_time.strftime('%H:%M:%S'),
-                        'minutes_ago': int((now.timestamp() - user_data['timestamp']) / 60)
+                        'username': user.username,
+                        'last_activity': user.last_login.strftime('%H:%M:%S'),
+                        'minutes_ago': minutes_ago
                     })
-                except (KeyError, ValueError):
-                    continue
+
+            active_users_count = len(active_user_ids)
 
             # Ordenar por actividad más reciente
             active_users_details.sort(key=lambda x: x['minutes_ago'])
 
             # Calcular uso del sistema de manera más realista
             # Basado en usuarios activos, operaciones de DB y actividad general
-            base_usage = 15  # Uso base del sistema
-            user_load = min(active_users_count * 5, 25)  # Máximo 25% por usuarios
-            db_load = min(CustomUser.objects.count() * 0.1, 10)  # Carga de DB
-            system_usage = min(base_usage + user_load + db_load, 95)  # Máximo 95%
+            base_usage = 10  # Uso base del sistema
+            user_load = min(active_users_count * 8, 30)  # Máximo 30% por usuarios
+            db_load = min(CustomUser.objects.count() * 0.2, 15)  # Carga de DB
+            recent_activity_load = min(Calibracion.objects.filter(fecha_calibracion__gte=last_24h).count() * 0.5, 20)
+            system_usage = min(base_usage + user_load + db_load + recent_activity_load, 95)  # Máximo 95%
 
             metrics = {
                 'total_users': CustomUser.objects.count(),

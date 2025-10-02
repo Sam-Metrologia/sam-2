@@ -280,6 +280,54 @@ async function refreshBusinessMetrics() {
                 const systemUsage = users.system_usage_percentage || 25.0;
                 systemUsageElement.textContent = `${systemUsage}%`;
             }
+
+            // Actualizar métricas de rendimiento
+            const performanceElement = document.getElementById('performance-metrics');
+            if (performanceElement && users && users.system_load_breakdown) {
+                const breakdown = users.system_load_breakdown;
+                const totalUsage = users.system_usage_percentage || 0;
+
+                performanceElement.innerHTML = `
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Uso Total</span>
+                                <span class="font-semibold text-gray-900">${totalUsage.toFixed(1)}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: ${totalUsage}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Sistema Base</span>
+                                <span class="font-semibold text-gray-900">${breakdown.base_system}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: ${breakdown.base_system}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Actividad Usuarios</span>
+                                <span class="font-semibold text-gray-900">${breakdown.user_activity}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: ${breakdown.user_activity}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">Base de Datos</span>
+                                <span class="font-semibold text-gray-900">${breakdown.database_load}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-orange-500 h-2 rounded-full" style="width: ${breakdown.database_load}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }
     } catch (error) {
         console.error('Error refreshing business metrics:', error);
