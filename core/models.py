@@ -2655,3 +2655,188 @@ class NotificacionVencimiento(models.Model):
             fecha_vencimiento=fecha_vencimiento_anterior,
             actividad_completada=False
         ).update(actividad_completada=True)
+
+
+# ==============================================================================
+# MODELOS PARA TÉRMINOS Y CONDICIONES
+# ==============================================================================
+
+class TerminosYCondiciones(models.Model):
+    """
+    Modelo para almacenar las diferentes versiones de Términos y Condiciones.
+    Solo puede haber una versión activa a la vez.
+    """
+    version = models.CharField(
+        max_length=20,
+        unique=True,
+        verbose_name="Versión",
+        help_text="Ejemplo: 1.0, 1.1, 2.0"
+    )
+    fecha_vigencia = models.DateField(
+        verbose_name="Fecha de Vigencia",
+        help_text="Fecha desde la cual estos términos están vigentes"
+    )
+    titulo = models.CharField(
+        max_length=255,
+        verbose_name="Título",
+        default="Contrato de Licencia de Uso y Provisión de Servicios SaaS"
+    )
+    contenido_html = models.TextField(
+        verbose_name="Contenido HTML",
+        help_text="Contenido de los términos en formato HTML",
+        blank=True,
+        null=True
+    )
+    archivo_pdf = models.FileField(
+        upload_to='contratos/',
+        verbose_name="Archivo PDF",
+        help_text="PDF del contrato firmado",
+        blank=True,
+        null=True
+    )
+    activo = models.BooleanField(
+        default=False,
+        verbose_name="Activo",
+        help_text="Solo una versión puede estar activa a la vez"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última Actualización")
+
+    class Meta:
+        verbose_name = "Términos y Condiciones"
+        verbose_name_plural = "Términos y Condiciones"
+        ordering = ['-fecha_vigencia', '-version']
+
+    def __str__(self):
+        estado = "Activo" if self.activo else "Inactivo"
+        return f"Términos v{self.version} ({estado})"
+
+    def save(self, *args, **kwargs):
+        """
+        Si se marca como activo, desactiva todas las demás versiones.
+        """
+        if self.activo:
+            # Desactivar todas las demás versiones
+            TerminosYCondiciones.objects.exclude(pk=self.pk).update(activo=False)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_terminos_activos(cls):
+        """
+        Retorna los términos y condiciones actualmente activos.
+        """
+        return cls.objects.filter(activo=True).first()
+
+
+class AceptacionTerminos(models.Model):
+    """
+    Modelo para registrar la aceptación de términos y condiciones por parte de los usuarios.
+    Cumple con requisitos legales de trazabilidad (Cláusula 11.1 del contrato).
+    """
+    usuario = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.CASCADE,
+        related_name='aceptaciones_terminos',
+        verbose_name="Usuario"
+    )
+    terminos = models.ForeignKey(
+        TerminosYCondiciones,
+        on_delete=models.PROTECT,
+        related_name='aceptaciones',
+        verbose_name="Términos y Condiciones"
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='aceptaciones_terminos',
+        verbose_name="Empresa",
+        null=True,
+        blank=True
+    )
+    fecha_aceptacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Aceptación"
+    )
+    ip_address = models.GenericIPAddressField(
+        verbose_name="Dirección IP",
+        help_text="IP desde la cual se aceptaron los términos"
+    )
+    user_agent = models.TextField(
+        verbose_name="User Agent",
+        help_text="Información del navegador utilizado",
+        blank=True,
+        null=True
+    )
+    aceptado = models.BooleanField(
+        default=True,
+        verbose_name="Aceptado",
+        help_text="Indica si el usuario aceptó los términos"
+    )
+
+    class Meta:
+        verbose_name = "Aceptación de Términos"
+        verbose_name_plural = "Aceptaciones de Términos"
+        ordering = ['-fecha_aceptacion']
+        unique_together = ['usuario', 'terminos']
+        indexes = [
+            models.Index(fields=['usuario', 'terminos']),
+            models.Index(fields=['fecha_aceptacion']),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario.username} aceptó v{self.terminos.version} el {self.fecha_aceptacion.strftime('%Y-%m-%d %H:%M')}"
+
+    @classmethod
+    def usuario_acepto_terminos_actuales(cls, usuario):
+        """
+        Verifica si un usuario ha aceptado los términos y condiciones actualmente activos.
+
+        Retorna:
+            bool: True si el usuario aceptó los términos actuales, False en caso contrario.
+        """
+        terminos_activos = TerminosYCondiciones.get_terminos_activos()
+        if not terminos_activos:
+            # Si no hay términos activos, no se requiere aceptación
+            return True
+
+        return cls.objects.filter(
+            usuario=usuario,
+            terminos=terminos_activos,
+            aceptado=True
+        ).exists()
+
+    @classmethod
+    def crear_aceptacion(cls, usuario, ip_address, user_agent=None):
+        """
+        Crea un registro de aceptación de términos para un usuario.
+
+        Args:
+            usuario: Instancia de CustomUser
+            ip_address: Dirección IP del usuario
+            user_agent: User agent del navegador (opcional)
+
+        Returns:
+            AceptacionTerminos: Instancia creada o None si no hay términos activos
+        """
+        terminos_activos = TerminosYCondiciones.get_terminos_activos()
+        if not terminos_activos:
+            logger.warning("No hay términos y condiciones activos para aceptar")
+            return None
+
+        # Verificar si ya aceptó estos términos
+        if cls.usuario_acepto_terminos_actuales(usuario):
+            logger.info(f"Usuario {usuario.username} ya aceptó los términos v{terminos_activos.version}")
+            return None
+
+        # Crear nueva aceptación
+        aceptacion = cls.objects.create(
+            usuario=usuario,
+            terminos=terminos_activos,
+            empresa=usuario.empresa if hasattr(usuario, 'empresa') else None,
+            ip_address=ip_address,
+            user_agent=user_agent or '',
+            aceptado=True
+        )
+
+        logger.info(f"Usuario {usuario.username} aceptó términos v{terminos_activos.version} desde IP {ip_address}")
+        return aceptacion

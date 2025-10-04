@@ -5,7 +5,8 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _ # Importar para las traducciones de fieldsets
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
-    BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest, MetricasEficienciaMetrologica # Solo importar el modelo Proveedor general
+    BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest, MetricasEficienciaMetrologica,
+    TerminosYCondiciones, AceptacionTerminos # Nuevos modelos para términos y condiciones
 )
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
@@ -309,3 +310,73 @@ class NotificacionVencimientoAdmin(admin.ModelAdmin):
     date_hierarchy = 'fecha_notificacion'
     readonly_fields = ('fecha_notificacion',)
     ordering = ('-fecha_notificacion',)
+
+
+# Admin para Términos y Condiciones
+@admin.register(TerminosYCondiciones)
+class TerminosYCondicionesAdmin(admin.ModelAdmin):
+    list_display = ('version', 'titulo', 'fecha_vigencia', 'activo', 'created_at')
+    list_filter = ('activo', 'fecha_vigencia')
+    search_fields = ('version', 'titulo')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-fecha_vigencia', '-version')
+
+    fieldsets = (
+        ('Información General', {
+            'fields': ('version', 'titulo', 'fecha_vigencia', 'activo')
+        }),
+        ('Contenido', {
+            'fields': ('contenido_html', 'archivo_pdf')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def save_model(self, request, obj, form, change):
+        """
+        Si se marca como activo, desactiva todas las demás versiones.
+        Esto ya está manejado en el método save() del modelo, pero se puede loguear aquí.
+        """
+        if obj.activo and not change:
+            # Log cuando se crea una nueva versión activa
+            self.message_user(request, f"Términos v{obj.version} marcados como activos. Versiones anteriores desactivadas.")
+        super().save_model(request, obj, form, change)
+
+
+# Admin para Aceptación de Términos
+@admin.register(AceptacionTerminos)
+class AceptacionTerminosAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'get_terminos_version', 'empresa', 'fecha_aceptacion', 'ip_address', 'aceptado')
+    list_filter = ('aceptado', 'fecha_aceptacion', 'terminos__version')
+    search_fields = ('usuario__username', 'usuario__email', 'empresa__nombre', 'ip_address')
+    readonly_fields = ('usuario', 'terminos', 'empresa', 'fecha_aceptacion', 'ip_address', 'user_agent', 'aceptado')
+    date_hierarchy = 'fecha_aceptacion'
+    ordering = ('-fecha_aceptacion',)
+
+    fieldsets = (
+        ('Usuario', {
+            'fields': ('usuario', 'empresa')
+        }),
+        ('Términos Aceptados', {
+            'fields': ('terminos', 'aceptado', 'fecha_aceptacion')
+        }),
+        ('Información Técnica', {
+            'fields': ('ip_address', 'user_agent'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_terminos_version(self, obj):
+        """Mostrar versión de términos aceptados."""
+        return f"v{obj.terminos.version}"
+    get_terminos_version.short_description = 'Versión'
+
+    def has_add_permission(self, request):
+        """No permitir agregar aceptaciones manualmente desde admin."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """No permitir eliminar aceptaciones (registro legal)."""
+        return False

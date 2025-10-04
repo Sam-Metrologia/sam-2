@@ -418,7 +418,10 @@
 
         <footer class="main-footer">
             <p>&copy; {% now "Y" %} SAM. Todos los derechos reservados.</p>
-            <p>Desarrollado por <a href="https://www.google.com" target="_blank">SAM METROLOGIA S.A.S</a></p>
+            <p>
+                <a href="{% url 'core:mi_aceptacion_terminos' %}">Términos y Condiciones</a> •
+                Desarrollado por <a href="https://www.google.com" target="_blank">SAM METROLOGIA S.A.S</a>
+            </p>
         </footer>
     </div>
 

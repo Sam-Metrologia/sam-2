@@ -176,3 +176,68 @@ class FileUploadSecurityMiddleware(MiddlewareMixin):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class TerminosCondicionesMiddleware(MiddlewareMixin):
+    """
+    Middleware que verifica si el usuario ha aceptado los términos y condiciones actuales.
+    Si no los ha aceptado, redirige a la página de aceptación.
+
+    Implementa el requisito legal del contrato (Cláusula 11.1) de que todos los usuarios
+    deben aceptar los términos antes de usar la plataforma.
+    """
+
+    # Rutas que NO requieren verificación de términos
+    RUTAS_EXCLUIDAS = [
+        '/core/login/',
+        '/core/logout/',
+        '/core/terminos-condiciones/',
+        '/login/',
+        '/logout/',
+        '/static/',
+        '/media/',
+        '/admin/login/',
+        '/admin/logout/',
+        '/admin/',
+    ]
+
+    def process_request(self, request):
+        """
+        Verifica en cada request si el usuario debe aceptar términos.
+        """
+        # Si el usuario no está autenticado, no verificar
+        if not request.user.is_authenticated:
+            return None
+
+        # Verificar si la ruta actual está excluida
+        for ruta_excluida in self.RUTAS_EXCLUIDAS:
+            if request.path.startswith(ruta_excluida):
+                return None
+
+        # Importar modelos aquí para evitar circular imports
+        from core.models import AceptacionTerminos, TerminosYCondiciones
+
+        # Verificar si hay términos activos
+        terminos_activos = TerminosYCondiciones.get_terminos_activos()
+        if not terminos_activos:
+            # Si no hay términos configurados, no forzar aceptación
+            # (útil durante desarrollo o si el admin aún no configuró términos)
+            return None
+
+        # Verificar si el usuario ya aceptó los términos actuales
+        if AceptacionTerminos.usuario_acepto_terminos_actuales(request.user):
+            # Usuario ya aceptó, permitir acceso
+            return None
+
+        # Usuario NO ha aceptado términos actuales
+        # Redirigir a página de aceptación (excepto si ya está ahí)
+        from django.shortcuts import redirect
+
+        if not request.path.startswith('/core/terminos-condiciones/'):
+            logger.info(
+                f'Usuario {request.user.username} redirigido a términos. '
+                f'Intentaba acceder: {request.path}'
+            )
+            return redirect('core:aceptar_terminos')
+
+        return None

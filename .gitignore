@@ -38,9 +38,8 @@ venv.bak/
 media/
 !media/.gitkeep
 
-# Static files collected
+# Static files collected (NO ignorar core/static/ - son archivos fuente)
 staticfiles/
-static/
 
 # IDE
 .vscode/
