@@ -28,15 +28,15 @@ class Command(BaseCommand):
             TerminosYCondiciones.objects.filter(version='1.0').delete()
             self.stdout.write(self.style.WARNING('[OK] Version 1.0 eliminada'))
 
-        # Ruta al PDF del contrato
+        # Ruta al PDF del contrato (OPCIONAL)
         pdf_path = os.path.join('media', 'contratos', 'CONTRATO_SAM_v1.0_2025-10-01.pdf')
+        pdf_exists = os.path.exists(pdf_path)
 
-        if not os.path.exists(pdf_path):
-            self.stdout.write(self.style.ERROR(f'\n[ERROR] No se encontro el archivo PDF en: {pdf_path}'))
-            self.stdout.write(self.style.WARNING('Asegurese de que el archivo existe en esa ubicacion.'))
-            return
-
-        self.stdout.write(self.style.SUCCESS(f'\n[OK] Archivo PDF encontrado: {pdf_path}'))
+        if pdf_exists:
+            self.stdout.write(self.style.SUCCESS(f'\n[OK] Archivo PDF encontrado: {pdf_path}'))
+        else:
+            self.stdout.write(self.style.WARNING(f'\n[!] No se encontro archivo PDF en: {pdf_path}'))
+            self.stdout.write(self.style.WARNING('[!] Se crearan los terminos solo con contenido HTML (sin PDF)'))
 
         # Crear términos y condiciones
         terminos = TerminosYCondiciones()
@@ -46,9 +46,10 @@ class Command(BaseCommand):
         terminos.contenido_html = self.get_contenido_html()
         terminos.activo = True
 
-        # Abrir y asignar el archivo PDF
-        with open(pdf_path, 'rb') as pdf_file:
-            terminos.archivo_pdf.save('CONTRATO_SAM_v1.0_2025-10-01.pdf', File(pdf_file), save=False)
+        # Asignar PDF solo si existe
+        if pdf_exists:
+            with open(pdf_path, 'rb') as pdf_file:
+                terminos.archivo_pdf.save('CONTRATO_SAM_v1.0_2025-10-01.pdf', File(pdf_file), save=False)
 
         terminos.save()
 
@@ -59,7 +60,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Titulo: {terminos.titulo}'))
         self.stdout.write(self.style.SUCCESS(f'Fecha de vigencia: {terminos.fecha_vigencia}'))
         self.stdout.write(self.style.SUCCESS(f'Estado: {"Activo" if terminos.activo else "Inactivo"}'))
-        self.stdout.write(self.style.SUCCESS(f'PDF: {terminos.archivo_pdf.name}'))
+        pdf_info = terminos.archivo_pdf.name if terminos.archivo_pdf else 'Sin PDF (solo HTML)'
+        self.stdout.write(self.style.SUCCESS(f'PDF: {pdf_info}'))
         self.stdout.write(self.style.SUCCESS('\n' + '=' * 70))
         self.stdout.write(self.style.WARNING('\n[!] IMPORTANTE: Todos los usuarios (nuevos y existentes) deberan'))
         self.stdout.write(self.style.WARNING('    aceptar estos terminos antes de poder usar el sistema.'))
