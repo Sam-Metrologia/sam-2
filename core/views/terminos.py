@@ -111,7 +111,7 @@ def rechazar_terminos(request):
             'debes aceptarlos. Si tienes dudas, contacta a soporte.'
         )
 
-        return redirect('login')
+        return redirect('core:login')
 
     # Si llega por GET, redirigir a términos
     return redirect('core:aceptar_terminos')

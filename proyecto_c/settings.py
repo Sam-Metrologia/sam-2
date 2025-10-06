@@ -487,7 +487,7 @@ if not DEBUG:
     
     # Lista de administradores para notificaciones de error
     ADMINS = [
-        ('Admin SAM', os.environ.get('ADMIN_EMAIL', 'admin@sammetrologia.com')),
+        ('Admin SAM', os.environ.get('ADMIN_EMAIL', 'metrologiasam@gmail.com')),
     ]
     MANAGERS = ADMINS
 else:
