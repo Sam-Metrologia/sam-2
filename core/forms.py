@@ -407,11 +407,19 @@ class EquipoForm(forms.ModelForm):
     def clean_codigo_interno(self):
         codigo = self.cleaned_data.get('codigo_interno')
         if codigo:
-            # Usar el servicio de validación
+            # Validar formato del código
+            if not re.match(r'^[A-Z0-9\-_]{3,20}$', codigo):
+                raise ValidationError("El código interno debe tener 3-20 caracteres alfanuméricos, guiones o guiones bajos")
+
+            # Verificar unicidad del código interno por empresa
             empresa = self.cleaned_data.get('empresa') or (self.request.user.empresa if self.request else None)
-            errors = ValidationService.validate_equipment_data({'codigo_interno': codigo}, empresa)
-            if errors:
-                raise ValidationError(errors[0])
+            if empresa:
+                qs = Equipo.objects.filter(codigo_interno=codigo, empresa=empresa)
+                if self.instance.pk:
+                    # CORRECCIÓN: Excluir el equipo actual al editar
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise ValidationError(f"Ya existe un equipo con código '{codigo}' en {empresa.nombre}")
         return codigo
 
     def clean_numero_serie(self):
@@ -718,16 +726,19 @@ class ProcedimientoForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        if self.request and not self.request.user.is_superuser:
+        # SEGURIDAD: Todos los usuarios solo pueden ver/seleccionar su propia empresa
+        if self.request and self.request.user.empresa:
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
                 self.fields['empresa'].initial = self.request.user.empresa
             else:
                 self.fields['empresa'].initial = self.instance.empresa
             self.fields['empresa'].required = False
-        elif self.request and self.request.user.is_superuser:
-            self.fields['empresa'].queryset = Empresa.objects.all()
-            self.fields['empresa'].required = True
+        elif self.request:
+            # Usuario sin empresa asignada no puede crear procedimientos
+            self.fields['empresa'].queryset = Empresa.objects.none()
+            self.fields['empresa'].widget = forms.HiddenInput()
+            self.fields['empresa'].required = False
 
         if self.instance and self.instance.fecha_emision:
             self.fields['fecha_emision'].initial = self.instance.fecha_emision.strftime('%d/%m/%Y')
@@ -774,15 +785,19 @@ class ProveedorForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        if self.request and not self.request.user.is_superuser:
+        # SEGURIDAD: Todos los usuarios solo pueden ver/seleccionar su propia empresa
+        if self.request and self.request.user.empresa:
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
                 self.fields['empresa'].initial = self.request.user.empresa
             else:
                 self.fields['empresa'].initial = self.instance.empresa
             self.fields['empresa'].required = False
-        elif self.request and self.request.user.is_superuser:
-            self.fields['empresa'].required = True
+        elif self.request:
+            # Usuario sin empresa asignada no puede crear proveedores
+            self.fields['empresa'].queryset = Empresa.objects.none()
+            self.fields['empresa'].widget = forms.HiddenInput()
+            self.fields['empresa'].required = False
 
     def clean_nombre_empresa(self):
         nombre_empresa = self.cleaned_data.get('nombre_empresa')

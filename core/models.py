@@ -1426,6 +1426,16 @@ class Calibracion(models.Model):
     def __str__(self):
         return f"Calibración de {self.equipo.nombre} ({self.fecha_calibracion})"
 
+    @property
+    def proxima_actividad_para_este_registro(self):
+        """
+        Calcula la próxima fecha de calibración basada en la fecha de esta calibración
+        y la frecuencia de calibración del equipo.
+        """
+        if not self.equipo.frecuencia_calibracion_meses:
+            return None
+        return self.fecha_calibracion + relativedelta(months=self.equipo.frecuencia_calibracion_meses)
+
 class Mantenimiento(models.Model):
     """Modelo para registrar los mantenimientos de un equipo."""
     TIPO_MANTENIMIENTO_CHOICES = [
@@ -1486,6 +1496,16 @@ class Mantenimiento(models.Model):
     def __str__(self):
         return f"Mantenimiento de {self.equipo.nombre} ({self.fecha_mantenimiento})"
 
+    @property
+    def proxima_actividad_para_este_registro(self):
+        """
+        Calcula la próxima fecha de mantenimiento basada en la fecha de este mantenimiento
+        y la frecuencia de mantenimiento del equipo.
+        """
+        if not self.equipo.frecuencia_mantenimiento_meses:
+            return None
+        return self.fecha_mantenimiento + relativedelta(months=self.equipo.frecuencia_mantenimiento_meses)
+
 class Comprobacion(models.Model):
     """Modelo para registrar las comprobaciones (verificaciones intermedias) de un equipo."""
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='comprobaciones')
@@ -1536,6 +1556,16 @@ class Comprobacion(models.Model):
 
     def __str__(self):
         return f"Comprobación de {self.equipo.nombre} ({self.fecha_comprobacion})"
+
+    @property
+    def proxima_actividad_para_este_registro(self):
+        """
+        Calcula la próxima fecha de comprobación basada en la fecha de esta comprobación
+        y la frecuencia de comprobación del equipo.
+        """
+        if not self.equipo.frecuencia_comprobacion_meses:
+            return None
+        return self.fecha_comprobacion + relativedelta(months=self.equipo.frecuencia_comprobacion_meses)
 
 
 class BajaEquipo(models.Model):

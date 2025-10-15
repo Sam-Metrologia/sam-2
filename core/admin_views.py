@@ -973,41 +973,88 @@ def run_tests_panel(request):
             import sys
             import os
             from datetime import datetime
+            from django.conf import settings
 
-            # Construir comando pytest
-            cmd = [sys.executable, '-m', 'pytest', 'tests/']
+            # Detectar si estamos en producción
+            is_production = hasattr(settings, 'RENDER_EXTERNAL_HOSTNAME') and settings.RENDER_EXTERNAL_HOSTNAME
 
-            # Agregar filtros por categoría
-            if test_category != 'all':
-                cmd.extend(['-m', test_category])
-
-            # Agregar opciones
-            if verbose:
-                cmd.append('-v')
-            else:
-                cmd.append('-q')
-
-            if parallel:
-                cmd.extend(['-n', 'auto'])
-
-            if coverage:
-                cmd.extend(['--cov=core', '--cov-report=html', '--cov-report=term'])
-
-            # Agregar formato de salida
-            cmd.extend(['--tb=short'])  # Removido --no-header para tener output
+            # Obtener directorio raíz del proyecto
+            current_file = os.path.abspath(__file__)
+            core_dir = os.path.dirname(current_file)
+            project_root = os.path.dirname(core_dir)
 
             # Ejecutar tests
             start_time = datetime.now()
 
-            # Obtener directorio raíz del proyecto donde está manage.py
-            # Subimos 2 niveles desde core/admin_views.py
-            current_file = os.path.abspath(__file__)
-            core_dir = os.path.dirname(current_file)  # C:\.../sam-2/core
-            project_root = os.path.dirname(core_dir)  # C:\.../sam-2
+            if is_production:
+                # EN PRODUCCIÓN: Usar Django test runner (NO requiere pytest)
+                cmd = [sys.executable, 'manage.py', 'test', 'core']
 
-            logger.info(f'[DEBUG TEST] Directorio del proyecto: {project_root}')
-            logger.info(f'[DEBUG TEST] Existe manage.py?: {os.path.exists(os.path.join(project_root, "manage.py"))}')
-            logger.info(f'[DEBUG TEST] Existe tests/?: {os.path.exists(os.path.join(project_root, "tests"))}')
+                # Agregar opciones de Django
+                if verbose:
+                    cmd.append('--verbosity=2')
+                else:
+                    cmd.append('--verbosity=1')
+
+                # Agregar parallel si está disponible
+                if parallel:
+                    cmd.extend(['--parallel', 'auto'])
+
+                # Filtros por categoría (convertir a formato Django)
+                if test_category != 'all':
+                    # Django usa etiquetas con --tag
+                    category_mapping = {
+                        'unit': 'unit',
+                        'integration': 'integration',
+                        'views': 'views',
+                        'services': 'services'
+                    }
+                    tag = category_mapping.get(test_category, test_category)
+                    cmd.extend(['--tag', tag])
+
+                logger.info(f'[PRODUCCIÓN] Ejecutando tests con Django runner: {" ".join(cmd)}')
+
+            else:
+                # EN DESARROLLO: Intentar usar pytest si está disponible
+                try:
+                    import pytest
+                    use_pytest = True
+                except ImportError:
+                    use_pytest = False
+                    logger.info('[DESARROLLO] pytest no disponible, usando Django test runner')
+
+                if use_pytest:
+                    # Usar pytest en desarrollo
+                    cmd = [sys.executable, '-m', 'pytest', 'tests/']
+
+                    # Agregar filtros por categoría
+                    if test_category != 'all':
+                        cmd.extend(['-m', test_category])
+
+                    # Agregar opciones
+                    if verbose:
+                        cmd.append('-v')
+                    else:
+                        cmd.append('-q')
+
+                    if parallel:
+                        cmd.extend(['-n', 'auto'])
+
+                    if coverage:
+                        cmd.extend(['--cov=core', '--cov-report=html', '--cov-report=term'])
+
+                    cmd.extend(['--tb=short'])
+
+                    logger.info(f'[DESARROLLO] Ejecutando tests con pytest: {" ".join(cmd)}')
+                else:
+                    # Fallback a Django test runner
+                    cmd = [sys.executable, 'manage.py', 'test', 'core']
+                    if verbose:
+                        cmd.append('--verbosity=2')
+                    logger.info(f'[DESARROLLO] Ejecutando tests con Django runner: {" ".join(cmd)}')
+
+            logger.info(f'[TEST] Directorio del proyecto: {project_root}')
+            logger.info(f'[TEST] Existe manage.py?: {os.path.exists(os.path.join(project_root, "manage.py"))}')
 
             result = subprocess.run(
                 cmd,
@@ -1032,24 +1079,67 @@ def run_tests_panel(request):
             logger.info(f'[DEBUG TEST] Output primeros 500 chars: {output[:500]}')
             logger.info(f'[DEBUG TEST] Comando ejecutado: {" ".join(cmd)}')
 
-            # Extraer estadísticas del output
+            # Extraer estadísticas del output (compatible con pytest y Django)
             import re
+
+            # Intentar formato pytest primero
             passed_match = re.search(r'(\d+) passed', output)
             failed_match = re.search(r'(\d+) failed', output)
             skipped_match = re.search(r'(\d+) skipped', output)
             warnings_match = re.search(r'(\d+) warnings', output)
 
-            stats = {
-                'passed': int(passed_match.group(1)) if passed_match else 0,
-                'failed': int(failed_match.group(1)) if failed_match else 0,
-                'skipped': int(skipped_match.group(1)) if skipped_match else 0,
-                'warnings': int(warnings_match.group(1)) if warnings_match else 0,
-                'total': 0,
-                'duration': round(duration, 2),
-                'success_rate': 0
-            }
+            # Si no encuentra formato pytest, intentar formato Django
+            if not passed_match:
+                # Formato Django: "Ran X tests in Y.Ys" y "OK" o "FAILED (failures=X)"
+                ran_match = re.search(r'Ran (\d+) test', output)
+                ok_match = re.search(r'\nOK\n', output)
+                django_failed = re.search(r'FAILED \((?:failures=(\d+)|errors=(\d+))', output)
 
-            stats['total'] = stats['passed'] + stats['failed'] + stats['skipped']
+                if ran_match:
+                    total = int(ran_match.group(1))
+                    if ok_match:
+                        passed = total
+                        failed = 0
+                    elif django_failed:
+                        failed = int(django_failed.group(1) or django_failed.group(2) or 0)
+                        passed = total - failed
+                    else:
+                        passed = 0
+                        failed = total
+
+                    stats = {
+                        'passed': passed,
+                        'failed': failed,
+                        'skipped': 0,
+                        'warnings': 0,
+                        'total': total,
+                        'duration': round(duration, 2),
+                        'success_rate': 0
+                    }
+                else:
+                    # Fallback: si no hay resultados
+                    stats = {
+                        'passed': 0,
+                        'failed': 0,
+                        'skipped': 0,
+                        'warnings': 0,
+                        'total': 0,
+                        'duration': round(duration, 2),
+                        'success_rate': 0
+                    }
+            else:
+                # Formato pytest
+                stats = {
+                    'passed': int(passed_match.group(1)) if passed_match else 0,
+                    'failed': int(failed_match.group(1)) if failed_match else 0,
+                    'skipped': int(skipped_match.group(1)) if skipped_match else 0,
+                    'warnings': int(warnings_match.group(1)) if warnings_match else 0,
+                    'total': 0,
+                    'duration': round(duration, 2),
+                    'success_rate': 0
+                }
+                stats['total'] = stats['passed'] + stats['failed'] + stats['skipped']
+
             if stats['total'] > 0:
                 stats['success_rate'] = round((stats['passed'] / stats['total']) * 100, 1)
 
