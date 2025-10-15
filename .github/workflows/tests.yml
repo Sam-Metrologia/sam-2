@@ -1,0 +1,139 @@
+name: Tests y Cobertura
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_sam
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: 📦 Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov pytest-xdist factory-boy faker
+
+      - name: 🔍 Verificar instalación
+        run: |
+          python --version
+          pip list | grep pytest
+          python manage.py check --deploy
+
+      - name: 🧪 Ejecutar tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_sam
+          DJANGO_SETTINGS_MODULE: proyecto_c.settings
+          SECRET_KEY: test-secret-key-for-ci-only
+          DEBUG_VALUE: 'False'
+        run: |
+          pytest \
+            --cov=core \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --verbose \
+            --tb=short \
+            --maxfail=5 \
+            -n auto
+
+      - name: 📊 Subir cobertura a Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-sam
+          fail_ci_if_error: false
+
+      - name: 💾 Guardar reporte HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+
+      - name: 📈 Comentar cobertura en PR
+        if: github.event_name == 'pull_request'
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 80
+          MINIMUM_ORANGE: 60
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: 📦 Instalar linters
+        run: |
+          pip install flake8 black isort
+
+      - name: 🔍 Verificar formato con Black
+        run: |
+          black --check --diff core/ tests/ || echo "⚠️ Ejecuta 'black core/ tests/' para formatear"
+
+      - name: 🔍 Verificar imports con isort
+        run: |
+          isort --check-only --diff core/ tests/ || echo "⚠️ Ejecuta 'isort core/ tests/' para ordenar imports"
+
+      - name: 🔍 Verificar estilo con flake8
+        run: |
+          flake8 core/ tests/ --max-line-length=120 --exclude=migrations --ignore=E203,W503
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: 🔒 Verificar dependencias con Safety
+        run: |
+          pip install safety
+          safety check --json || true
+
+      - name: 🔒 Verificar vulnerabilidades con Bandit
+        run: |
+          pip install bandit
+          bandit -r core/ -ll || true

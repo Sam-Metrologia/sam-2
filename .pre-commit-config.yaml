@@ -1,0 +1,108 @@
+# Pre-commit hooks para SAM Metrología
+# Instalación: pip install pre-commit && pre-commit install
+
+repos:
+  # Formateo de código con Black
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        name: Black - Formateo de código Python
+        language_version: python3.13
+        args: ['--line-length=120']
+        exclude: ^migrations/
+
+  # Ordenamiento de imports con isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort - Ordenar imports
+        args: ['--profile=black', '--line-length=120']
+        exclude: ^migrations/
+
+  # Lint con flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        name: flake8 - Lint de Python
+        args: ['--max-line-length=120', '--ignore=E203,W503']
+        exclude: ^migrations/
+
+  # Validaciones generales de archivos
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Eliminar espacios al final de líneas
+      - id: end-of-file-fixer
+        name: Asegurar nueva línea al final de archivos
+      - id: check-yaml
+        name: Validar sintaxis de YAML
+      - id: check-json
+        name: Validar sintaxis de JSON
+      - id: check-added-large-files
+        name: Prevenir archivos grandes (>500KB)
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+        name: Detectar marcas de merge conflict
+      - id: debug-statements
+        name: Detectar debuggers olvidados
+      - id: check-docstring-first
+        name: Verificar que docstring esté primero
+
+  # Validaciones de seguridad con Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        name: Bandit - Análisis de seguridad
+        args: ['-ll', '--skip=B101']
+        exclude: ^tests/
+
+  # Django specific checks
+  - repo: local
+    hooks:
+      - id: django-check
+        name: Django - Verificar configuración
+        entry: python manage.py check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: django-makemigrations-check
+        name: Django - Detectar migraciones pendientes
+        entry: python manage.py makemigrations --check --dry-run
+        language: system
+        pass_filenames: false
+        files: \.py$
+        exclude: ^migrations/
+
+  # Ejecutar tests rápidos
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: Pytest - Tests rápidos
+        entry: pytest
+        language: system
+        args: ['-m', 'not slow', '--maxfail=3', '-x', '-q']
+        pass_filenames: false
+        always_run: true
+
+# Configuración de pre-commit
+default_stages: [commit]
+fail_fast: false  # Continuar ejecutando hooks aunque uno falle
+
+# Archivos a excluir globalmente
+exclude: |
+  (?x)^(
+      migrations/|
+      \.git/|
+      \.pytest_cache/|
+      __pycache__/|
+      htmlcov/|
+      \.coverage|
+      db\.sqlite3|
+      \.env
+  )$
