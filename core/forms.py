@@ -332,7 +332,7 @@ class EquipoForm(forms.ModelForm):
         widgets = {
             'codigo_interno': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
             'nombre': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '200'}),
-            'empresa': forms.Select(attrs={'class': 'form-select w-full'}),
+            # 'empresa' widget se configura dinámicamente en __init__ (HiddenInput para seguridad)
             'tipo_equipo': forms.Select(attrs={'class': 'form-select'}),
             'marca': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
             'modelo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
@@ -659,7 +659,7 @@ class UbicacionForm(forms.ModelForm):
         model = Ubicacion
         fields = '__all__'
         widgets = {
-            'empresa': forms.Select(attrs={'class': 'form-select'}),
+            # 'empresa' widget se configura dinámicamente en __init__ (HiddenInput para seguridad)
             'nombre': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '255'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'maxlength': '500'}),
         }
@@ -712,7 +712,7 @@ class ProcedimientoForm(forms.ModelForm):
             'version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
             'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'maxlength': '1000'}),
             'documento_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
-            'empresa': forms.Select(attrs={'class': 'form-select w-full'}),
+            # 'empresa' widget se configura dinámicamente en __init__ (HiddenInput para seguridad)
         }
 
     def __init__(self, *args, **kwargs):
@@ -763,7 +763,7 @@ class ProveedorForm(forms.ModelForm):
         model = Proveedor
         fields = '__all__'
         widgets = {
-            'empresa': forms.Select(attrs={'class': 'form-select w-full'}),
+            # 'empresa' widget se configura dinámicamente en __init__ (HiddenInput para seguridad)
             'tipo_servicio': forms.Select(attrs={'class': 'form-select'}),
             'nombre_contacto': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '200'}),
             'numero_contacto': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
@@ -850,7 +850,7 @@ class DocumentoForm(forms.ModelForm):
         widgets = {
             'nombre_archivo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '255'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'maxlength': '500'}),
-            'empresa': forms.Select(attrs={'class': 'form-select'}),
+            # 'empresa' widget se configura dinámicamente en __init__ (HiddenInput para seguridad)
         }
     
     def __init__(self, *args, **kwargs):
