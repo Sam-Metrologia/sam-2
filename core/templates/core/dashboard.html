@@ -90,6 +90,94 @@
             background-color: #f0f4f8; /* Light Blue Gray */
             border-color: #cbd5e0;
         }
+
+        /* ===== MODO OSCURO: Adaptación de info-cards ===== */
+        [data-theme="dark"] .info-card {
+            background-color: #1f2937 !important; /* gray-800 */
+            border-color: #374151 !important; /* gray-700 */
+        }
+
+        [data-theme="dark"] .info-card h3 {
+            color: #d1d5db !important; /* gray-300 */
+        }
+
+        [data-theme="dark"] .info-card p {
+            color: #ffffff !important; /* white */
+        }
+
+        /* Info-cards con colores específicos en modo oscuro */
+        [data-theme="dark"] .info-card.total-equipos {
+            background-color: rgba(6, 182, 212, 0.15) !important; /* cyan con transparencia */
+            border-color: rgba(6, 182, 212, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.equipos-activos {
+            background-color: rgba(34, 197, 94, 0.15) !important; /* green con transparencia */
+            border-color: rgba(34, 197, 94, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.equipos-inactivos {
+            background-color: rgba(251, 191, 36, 0.15) !important; /* yellow con transparencia */
+            border-color: rgba(251, 191, 36, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.equipos-de-baja {
+            background-color: rgba(236, 72, 153, 0.15) !important; /* pink con transparencia */
+            border-color: rgba(236, 72, 153, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.calibraciones-vencidas {
+            background-color: rgba(239, 68, 68, 0.2) !important; /* red con transparencia */
+            border-color: rgba(239, 68, 68, 0.4) !important;
+        }
+
+        [data-theme="dark"] .info-card.calibraciones-proximas {
+            background-color: rgba(251, 191, 36, 0.15) !important; /* yellow con transparencia */
+            border-color: rgba(251, 191, 36, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.mantenimientos-vencidos {
+            background-color: rgba(239, 68, 68, 0.2) !important; /* red con transparencia */
+            border-color: rgba(239, 68, 68, 0.4) !important;
+        }
+
+        [data-theme="dark"] .info-card.mantenimientos-proximas {
+            background-color: rgba(251, 191, 36, 0.15) !important; /* yellow con transparencia */
+            border-color: rgba(251, 191, 36, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.comprobaciones-vencidas {
+            background-color: rgba(239, 68, 68, 0.2) !important; /* red con transparencia */
+            border-color: rgba(239, 68, 68, 0.4) !important;
+        }
+
+        [data-theme="dark"] .info-card.comprobaciones-proximas {
+            background-color: rgba(251, 191, 36, 0.15) !important; /* yellow con transparencia */
+            border-color: rgba(251, 191, 36, 0.3) !important;
+        }
+
+        [data-theme="dark"] .info-card.storage-usage {
+            background-color: rgba(59, 130, 246, 0.15) !important; /* blue con transparencia */
+            border-color: rgba(59, 130, 246, 0.3) !important;
+        }
+
+        /* Adaptación de textos con clases Tailwind en modo oscuro */
+        [data-theme="dark"] .text-red-700 {
+            color: #f87171 !important; /* red-400 */
+        }
+
+        [data-theme="dark"] .text-yellow-700 {
+            color: #fbbf24 !important; /* yellow-400 */
+        }
+
+        [data-theme="dark"] .text-gray-600 {
+            color: #9ca3af !important; /* gray-400 */
+        }
+
+        [data-theme="dark"] .text-gray-800 {
+            color: #e5e7eb !important; /* gray-200 */
+        }
+
         .storage-progress-bar {
             width: 100%;
             height: 12px;

@@ -5,9 +5,54 @@
 
 {% block extra_css %}
 <style>
-    /* Estilos para Panel de Decisiones en modo oscuro */
+    /* Estilos para Panel de Decisiones */
 
-    /* Badges de estado - colores visibles en modo oscuro */
+    /* ===== BADGES DE ESTADO - MODO CLARO ===== */
+    .estado-badge {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        display: inline-block;
+    }
+
+    /* Modo Claro */
+    .estado-badge.estado-CRÍTICO {
+        background-color: #fed7d7; /* Light Red */
+        color: #dc2626; /* Red-600 */
+    }
+
+    .estado-badge.estado-EN\ RIESGO {
+        background-color: #fef3c7; /* Light Yellow */
+        color: #d97706; /* Orange-600 */
+    }
+
+    .estado-badge.estado-BUENO {
+        background-color: #dbeafe; /* Light Blue */
+        color: #2563eb; /* Blue-600 */
+    }
+
+    .estado-badge.estado-ÓPTIMO {
+        background-color: #d1fae5; /* Light Green */
+        color: #059669; /* Green-600 */
+    }
+
+    .estado-badge.estado-EXCELENTE {
+        background-color: #d1fae5; /* Light Green */
+        color: #059669; /* Green-600 */
+    }
+
+    .estado-badge.estado-REGULAR {
+        background-color: #fef3c7; /* Light Yellow */
+        color: #d97706; /* Orange-600 */
+    }
+
+    .estado-badge.estado-DEFICIENTE {
+        background-color: #fed7d7; /* Light Red */
+        color: #dc2626; /* Red-600 */
+    }
+
+    /* ===== BADGES DE ESTADO - MODO OSCURO ===== */
     [data-theme="dark"] .estado-badge.estado-CRÍTICO {
         background-color: rgba(239, 68, 68, 0.2) !important;
         color: #f87171 !important; /* red-400 */
@@ -164,7 +209,7 @@
         <div class="decisiones-pilar-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid {% if salud_general_estado == 'ÓPTIMO' %}#10b981{% elif salud_general_estado == 'BUENO' %}#3b82f6{% elif salud_general_estado == 'EN RIESGO' %}#f59e0b{% else %}#ef4444{% endif %};">
             <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
                 <h3 style="font-size: 1.2rem; font-weight: bold; color: #1f2937; margin: 0;">🏥 Condición General de Equipos</h3>
-                <span class="estado-badge estado-{{ salud_general_estado }}" style="background: {% if salud_general_estado == 'ÓPTIMO' %}#d1fae5{% elif salud_general_estado == 'BUENO' %}#dbeafe{% elif salud_general_estado == 'EN RIESGO' %}#fef3c7{% else %}#fed7d7{% endif %}; color: {% if salud_general_estado == 'ÓPTIMO' %}#059669{% elif salud_general_estado == 'BUENO' %}#2563eb{% elif salud_general_estado == 'EN RIESGO' %}#d97706{% else %}#dc2626{% endif %}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">{{ salud_general_estado }}</span>
+                <span class="estado-badge estado-{{ salud_general_estado }}">{{ salud_general_estado }}</span>
             </div>
 
             <div style="text-align: center; margin-bottom: 20px;">
@@ -248,7 +293,7 @@
         <div class="decisiones-pilar-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid {% if cumplimiento_estado == 'EXCELENTE' %}#10b981{% elif cumplimiento_estado == 'BUENO' %}#3b82f6{% elif cumplimiento_estado == 'REGULAR' %}#f59e0b{% else %}#ef4444{% endif %};">
             <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
                 <h3 style="font-size: 1.2rem; font-weight: bold; color: #1f2937; margin: 0;">📊 Puntualidad en Actividades</h3>
-                <span style="background: {% if cumplimiento_estado == 'EXCELENTE' %}#d1fae5{% elif cumplimiento_estado == 'BUENO' %}#dbeafe{% elif cumplimiento_estado == 'REGULAR' %}#fef3c7{% else %}#fed7d7{% endif %}; color: {% if cumplimiento_estado == 'EXCELENTE' %}#059669{% elif cumplimiento_estado == 'BUENO' %}#2563eb{% elif cumplimiento_estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">{{ cumplimiento_estado }}</span>
+                <span class="estado-badge estado-{{ cumplimiento_estado }}">{{ cumplimiento_estado }}</span>
             </div>
 
             <div style="text-align: center; margin-bottom: 20px;">
@@ -308,7 +353,7 @@
         <div class="decisiones-pilar-card" style="background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid {% if eficiencia_estado == 'ÓPTIMO' %}#10b981{% elif eficiencia_estado == 'BUENO' %}#3b82f6{% elif eficiencia_estado == 'REGULAR' %}#f59e0b{% else %}#ef4444{% endif %};">
             <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
                 <h3 style="font-size: 1.2rem; font-weight: bold; color: #1f2937; margin: 0;">⚡ Disponibilidad de Equipos</h3>
-                <span style="background: {% if eficiencia_estado == 'ÓPTIMO' %}#d1fae5{% elif eficiencia_estado == 'BUENO' %}#dbeafe{% elif eficiencia_estado == 'REGULAR' %}#fef3c7{% else %}#fed7d7{% endif %}; color: {% if eficiencia_estado == 'ÓPTIMO' %}#059669{% elif eficiencia_estado == 'BUENO' %}#2563eb{% elif eficiencia_estado == 'REGULAR' %}#d97706{% else %}#dc2626{% endif %}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold;">{{ eficiencia_estado }}</span>
+                <span class="estado-badge estado-{{ eficiencia_estado }}">{{ eficiencia_estado }}</span>
             </div>
 
             <div style="text-align: center; margin-bottom: 20px;">

@@ -317,14 +317,166 @@ def manual_process_zip(request):
     })
 
 
+def generar_readme_parte(empresa_nombre, parte_numero, total_partes, equipos_count, rango_inicio, rango_fin):
+    """Genera el contenido del archivo README.txt para cada parte."""
+
+    fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M')
+
+    readme_content = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 DESCARGA MULTI-PARTE - SAM METROLOGÍA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Esta es la PARTE {parte_numero} de {total_partes} de la descarga completa de sus equipos.
+
+Su empresa tiene {equipos_count} equipos, divididos en {total_partes} partes de máximo 35 equipos
+cada una para optimizar el proceso de descarga.
+
+📋 CONTENIDO DE ESTA PARTE:
+   • Equipos del {rango_inicio} al {rango_fin}
+"""
+
+    if parte_numero == total_partes:
+        readme_content += """
+   • 📊 Informe Consolidado Excel con TODOS los equipos (completo)
+   • 📁 Carpeta de Procedimientos de la empresa (completa)
+"""
+    else:
+        readme_content += f"""
+   • 📊 Informe Consolidado Excel con TODOS los equipos ({equipos_count} equipos completos)
+"""
+
+    readme_content += f"""
+📦 OTRAS PARTES:
+"""
+
+    for p in range(1, total_partes + 1):
+        if p != parte_numero:
+            inicio = ((p - 1) * 35) + 1
+            fin = min(p * 35, equipos_count)
+            if p == total_partes:
+                readme_content += f"   • Parte {p}: Equipos {inicio} a {fin} + Procedimientos\n"
+            else:
+                readme_content += f"   • Parte {p}: Equipos {inicio} a {fin}\n"
+
+    readme_content += f"""
+⚠️ IMPORTANTE:
+   Para tener la documentación completa de su empresa, todas las partes
+   fueron descargadas automáticamente.
+
+   El Informe Consolidado Excel está incluido en TODAS las partes para
+   su comodidad, conteniendo la información de los {equipos_count} equipos.
+
+   La carpeta de Procedimientos completa se encuentra en la PARTE {total_partes} (última).
+
+Fecha de generación: {fecha_actual}
+Empresa: {empresa_nombre}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+    return readme_content
+
+
+def generar_descarga_multipartes(request, empresa, equipos_count, max_equipos_por_parte):
+    """
+    Genera sistema de descarga multi-partes para empresas con >35 equipos.
+    Retorna JSON con información de todas las partes a generar.
+    """
+    import math
+
+    total_partes = math.ceil(equipos_count / max_equipos_por_parte)
+
+    logger.info(f"🔄 Sistema multi-partes activado: {equipos_count} equipos → {total_partes} partes")
+
+    # Crear solicitudes ZIP para todas las partes
+    max_position = ZipRequest.objects.aggregate(max_pos=Max('position_in_queue'))['max_pos'] or 0
+
+    partes_info = []
+
+    for parte_num in range(1, total_partes + 1):
+        # Calcular rango de equipos para esta parte
+        inicio = ((parte_num - 1) * max_equipos_por_parte) + 1
+        fin = min(parte_num * max_equipos_por_parte, equipos_count)
+
+        # Crear solicitud de ZIP para esta parte
+        zip_request = ZipRequest.objects.create(
+            user=request.user,
+            empresa=empresa,
+            status='pending',
+            position_in_queue=max_position + parte_num,
+            parte_numero=parte_num,
+            total_partes=total_partes,
+            rango_equipos_inicio=inicio,
+            rango_equipos_fin=fin,
+            total_equipos=fin - inicio + 1,
+            expires_at=timezone.now() + timedelta(hours=6)
+        )
+
+        partes_info.append({
+            'parte_numero': parte_num,
+            'total_partes': total_partes,
+            'request_id': zip_request.id,
+            'rango_inicio': inicio,
+            'rango_fin': fin,
+            'equipos_en_parte': fin - inicio + 1,
+            'tiene_procedimientos': (parte_num == total_partes),
+            'tiene_excel': True,  # Todas las partes tienen Excel
+            'status': 'pending'
+        })
+
+    logger.info(f"✅ Creadas {total_partes} solicitudes ZIP para empresa {empresa.nombre}")
+
+    # Iniciar procesamiento asíncrono si está disponible
+    try:
+        from .async_zip_improved import start_async_processor, add_zip_request_to_queue
+        start_async_processor()
+
+        # Agregar a cola en orden optimizado: Parte 3 primero (tiene procedimientos)
+        # Luego Parte 1, Parte 2, etc.
+        orden_optimizado = [total_partes] + list(range(1, total_partes))
+
+        for parte_num in orden_optimizado:
+            zip_req = ZipRequest.objects.get(
+                user=request.user,
+                empresa=empresa,
+                parte_numero=parte_num,
+                status='pending'
+            )
+            add_zip_request_to_queue(zip_req)
+            logger.info(f"📦 Parte {parte_num} agregada a cola asíncrona")
+
+    except Exception as e:
+        logger.warning(f"No se pudo iniciar procesamiento asíncrono: {e}")
+
+    return JsonResponse({
+        'status': 'multi_part',
+        'total_partes': total_partes,
+        'equipos_totales': equipos_count,
+        'max_equipos_por_parte': max_equipos_por_parte,
+        'partes': partes_info,
+        'mensaje': f'Su empresa tiene {equipos_count} equipos. Se dividió en {total_partes} partes de máximo {max_equipos_por_parte} equipos. Las descargas se iniciarán automáticamente.',
+        'empresa_nombre': empresa.nombre,
+        'auto_download': True  # Flag para que frontend descargue automáticamente
+    })
+
+
 def descarga_directa_rapida(request, empresa):
     """
-    DESCARGA DIRECTA INMEDIATA - Restaura funcionalidad de producción
-    Para empresas con ≤15 equipos, genera y descarga ZIP inmediatamente (como producción).
+    DESCARGA DIRECTA INMEDIATA con LÍMITE de 35 EQUIPOS POR PARTE
+    Para empresas con ≤20 equipos, genera y descarga ZIP inmediatamente.
+    Para empresas >20 equipos pero usando descarga directa, implementa sistema multi-partes.
     """
     try:
-        logger.info(f"Descarga INMEDIATA para empresa {empresa.nombre} con {empresa.equipos.count()} equipos (todos los estados)")
+        MAX_EQUIPOS_POR_PARTE = 35
+        equipos_count = empresa.equipos.count()
 
+        logger.info(f"Descarga INMEDIATA para empresa {empresa.nombre} con {equipos_count} equipos")
+
+        # Si hay más de 35 equipos, dividir en partes
+        if equipos_count > MAX_EQUIPOS_POR_PARTE:
+            return generar_descarga_multipartes(request, empresa, equipos_count, MAX_EQUIPOS_POR_PARTE)
+
+        # Si hay 35 o menos equipos, descarga normal directa
         # Obtener TODOS los equipos (activos + dados de baja + inactivos) con prefetch optimizado
         equipos_empresa = Equipo.objects.filter(
             empresa=empresa
@@ -582,9 +734,20 @@ def solicitar_zip_fallback(request, empresa, error_directo):
 def solicitar_zip_asincrono(request, empresa):
     """
     Nueva función para procesamiento asíncrono de ZIPs grandes.
-    Mantiene la misma estructura ZIP pero sin bloquear la aplicación.
+    Implementa sistema multi-partes para empresas >35 equipos.
     """
     try:
+        MAX_EQUIPOS_POR_PARTE = 35
+        equipos_count = empresa.equipos.count()
+
+        logger.info(f"🔄 Procesamiento asíncrono para {empresa.nombre}: {equipos_count} equipos")
+
+        # Si hay más de 35 equipos, usar sistema multi-partes
+        if equipos_count > MAX_EQUIPOS_POR_PARTE:
+            logger.info(f"📦 Activando sistema multi-partes para {empresa.nombre}")
+            return generar_descarga_multipartes(request, empresa, equipos_count, MAX_EQUIPOS_POR_PARTE)
+
+        # Si hay 35 o menos equipos, procesamiento asíncrono simple
         # Verificar si ya tiene una solicitud pendiente o procesándose
         existing = ZipRequest.objects.filter(
             user=request.user,
@@ -602,21 +765,22 @@ def solicitar_zip_asincrono(request, empresa):
                 'message': f'Ya tienes una solicitud: {existing.get_detailed_status_message()}'
             })
 
-        # Obtener número de parte desde parámetros
-        parte_numero = int(request.GET.get('parte', 1))
-
         # Obtener próxima posición en cola
         max_position = ZipRequest.objects.aggregate(
             max_pos=Max('position_in_queue')
         )['max_pos'] or 0
 
-        # Crear nueva solicitud
+        # Crear nueva solicitud para procesamiento simple
         zip_request = ZipRequest.objects.create(
             user=request.user,
             empresa=empresa,
             status='pending',
             position_in_queue=max_position + 1,
-            parte_numero=parte_numero,
+            parte_numero=1,
+            total_partes=1,
+            rango_equipos_inicio=1,
+            rango_equipos_fin=equipos_count,
+            total_equipos=equipos_count,
             expires_at=timezone.now() + timedelta(hours=6)
         )
 
@@ -629,7 +793,6 @@ def solicitar_zip_asincrono(request, empresa):
         # Agregar a cola asíncrona
         add_zip_request_to_queue(zip_request)
 
-        equipos_count = empresa.equipos.count()
         tiempo_estimado = _calcular_tiempo_estimado_equipos(equipos_count)
 
         return JsonResponse({
@@ -641,10 +804,9 @@ def solicitar_zip_asincrono(request, empresa):
             'detailed_message': zip_request.get_detailed_status_message(),
             'equipos_count': equipos_count,
             'empresa_name': empresa.nombre,
-            'parte_numero': parte_numero,
+            'parte_numero': 1,
             'message': f'Su archivo ZIP está siendo procesado en segundo plano. {tiempo_estimado} estimado.',
-            'async_processing': True,
-            'no_limits': True
+            'async_processing': True
         })
 
     except Exception as e:
