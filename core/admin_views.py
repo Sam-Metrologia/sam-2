@@ -988,7 +988,8 @@ def run_tests_panel(request):
 
             if is_production:
                 # EN PRODUCCIÓN: Usar Django test runner (NO requiere pytest)
-                cmd = [sys.executable, 'manage.py', 'test', 'core']
+                # Usar directorio tests/ en raíz para evitar conflictos con core/tests
+                cmd = [sys.executable, 'manage.py', 'test']
 
                 # Agregar opciones de Django
                 if verbose:
@@ -1048,7 +1049,7 @@ def run_tests_panel(request):
                     logger.info(f'[DESARROLLO] Ejecutando tests con pytest: {" ".join(cmd)}')
                 else:
                     # Fallback a Django test runner
-                    cmd = [sys.executable, 'manage.py', 'test', 'core']
+                    cmd = [sys.executable, 'manage.py', 'test']
                     if verbose:
                         cmd.append('--verbosity=2')
                     logger.info(f'[DESARROLLO] Ejecutando tests con Django runner: {" ".join(cmd)}')
