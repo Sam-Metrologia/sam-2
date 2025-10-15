@@ -479,7 +479,7 @@ def añadir_procedimiento(request):
     Añade un nuevo procedimiento.
     """
     if request.method == 'POST':
-        form = ProcedimientoForm(request.POST, request.FILES)
+        form = ProcedimientoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             try:
                 procedimiento = form.save(commit=False)
@@ -498,7 +498,7 @@ def añadir_procedimiento(request):
         else:
             messages.error(request, 'Por favor corrige los errores del formulario.')
     else:
-        form = ProcedimientoForm()
+        form = ProcedimientoForm(request=request)
 
     context = {
         'form': form,
@@ -523,7 +523,7 @@ def editar_procedimiento(request, pk):
         return redirect('core:listar_procedimientos')
 
     if request.method == 'POST':
-        form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento)
+        form = ProcedimientoForm(request.POST, request.FILES, instance=procedimiento, request=request)
         if form.is_valid():
             try:
                 form.save()
@@ -536,7 +536,7 @@ def editar_procedimiento(request, pk):
         else:
             messages.error(request, 'Por favor corrige los errores del formulario.')
     else:
-        form = ProcedimientoForm(instance=procedimiento)
+        form = ProcedimientoForm(instance=procedimiento, request=request)
 
     context = {
         'form': form,
@@ -643,7 +643,7 @@ def añadir_proveedor(request):
     Añade un nuevo proveedor.
     """
     if request.method == 'POST':
-        form = ProveedorForm(request.POST)
+        form = ProveedorForm(request.POST, request=request)
         if form.is_valid():
             try:
                 proveedor = form.save(commit=False)
@@ -662,7 +662,7 @@ def añadir_proveedor(request):
         else:
             messages.error(request, 'Por favor corrige los errores del formulario.')
     else:
-        form = ProveedorForm()
+        form = ProveedorForm(request=request)
 
     context = {
         'form': form,
@@ -687,7 +687,7 @@ def editar_proveedor(request, pk):
         return redirect('core:listar_proveedores')
 
     if request.method == 'POST':
-        form = ProveedorForm(request.POST, instance=proveedor)
+        form = ProveedorForm(request.POST, instance=proveedor, request=request)
         if form.is_valid():
             try:
                 form.save()
@@ -700,7 +700,7 @@ def editar_proveedor(request, pk):
         else:
             messages.error(request, 'Por favor corrige los errores del formulario.')
     else:
-        form = ProveedorForm(instance=proveedor)
+        form = ProveedorForm(instance=proveedor, request=request)
 
     context = {
         'form': form,

@@ -989,7 +989,7 @@ def run_tests_panel(request):
             if is_production:
                 # EN PRODUCCIÓN: Usar Django test runner (NO requiere pytest)
                 # Usar directorio tests/ en raíz para evitar conflictos con core/tests
-                cmd = [sys.executable, 'manage.py', 'test']
+                cmd = [sys.executable, 'manage.py', 'test', '--keepdb']
 
                 # Agregar opciones de Django
                 if verbose:
