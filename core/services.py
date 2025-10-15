@@ -418,4 +418,6 @@ class ValidationService:
             freq = data.get(campo)
             if freq is not None and freq <= 0:
                 errors.append(f"La {campo.replace('_', ' ')} debe ser positiva")
+
+        return errors
         

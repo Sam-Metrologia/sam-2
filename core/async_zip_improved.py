@@ -138,13 +138,24 @@ class AsyncZipProcessor:
     def _generate_zip_with_original_structure(self, zip_request):
         """
         Genera ZIP con la MISMA estructura exacta que el sistema original.
+        Implementa límite de 35 equipos por parte.
         Basado en descarga_directa_rapida() pero optimizado para background.
         """
         try:
             empresa = zip_request.empresa
             user = zip_request.user
+            parte_numero = zip_request.parte_numero
+            total_partes = zip_request.total_partes
 
-            # Obtener datos con las MISMAS consultas optimizadas del original
+            MAX_EQUIPOS_POR_PARTE = 35
+
+            # Calcular rango de equipos para esta parte específica
+            start_idx = (parte_numero - 1) * MAX_EQUIPOS_POR_PARTE
+            end_idx = parte_numero * MAX_EQUIPOS_POR_PARTE
+
+            logger.info(f"🔄 Generando Parte {parte_numero} de {total_partes} - Equipos {start_idx + 1} a {min(end_idx, empresa.equipos.count())}")
+
+            # Obtener SOLO los equipos de esta parte usando slicing
             equipos_empresa = Equipo.objects.filter(
                 empresa=empresa
             ).select_related(
@@ -154,7 +165,7 @@ class AsyncZipProcessor:
                 'mantenimientos',
                 'comprobaciones',
                 'baja_registro'
-            ).order_by('codigo_interno')
+            ).order_by('codigo_interno')[start_idx:end_idx]
 
             proveedores_empresa = Proveedor.objects.filter(
                 empresa=empresa
@@ -188,48 +199,81 @@ class AsyncZipProcessor:
 
             with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=compresslevel) as zf:
 
-                # 1. Excel consolidado (MISMO proceso)
+                # 0. README.txt con información de la parte
+                from .zip_functions import generar_readme_parte
+                equipos_totales = empresa.equipos.count()
+                rango_inicio = start_idx + 1
+                rango_fin = min(end_idx, equipos_totales)
+
+                readme_content = generar_readme_parte(
+                    empresa_nombre,
+                    parte_numero,
+                    total_partes,
+                    equipos_totales,
+                    rango_inicio,
+                    rango_fin
+                )
+                zf.writestr(f"{empresa_nombre}/LEEME.txt", readme_content)
+                logger.info(f"✅ README.txt agregado para Parte {parte_numero}")
+
+                # 1. Excel consolidado con TODOS los equipos (en todas las partes)
                 try:
                     from .views.reports import _generate_consolidated_excel_content
+
+                    # Obtener TODOS los equipos de la empresa para el Excel (no solo los de esta parte)
+                    todos_equipos_empresa = Equipo.objects.filter(
+                        empresa=empresa
+                    ).select_related('empresa').prefetch_related(
+                        'calibraciones',
+                        'mantenimientos',
+                        'comprobaciones',
+                        'baja_registro'
+                    ).order_by('codigo_interno')
+
                     excel_consolidado = _generate_consolidated_excel_content(
-                        equipos_empresa, proveedores_empresa, procedimientos_empresa
+                        todos_equipos_empresa, proveedores_empresa, procedimientos_empresa
                     )
                     zf.writestr(f"{empresa_nombre}/Informe_Consolidado.xlsx", excel_consolidado)
-                    logger.info("✅ Excel consolidado agregado")
+                    logger.info(f"✅ Excel consolidado agregado (con {todos_equipos_empresa.count()} equipos totales)")
                 except Exception as e:
                     logger.error(f"Error generando Excel consolidado: {e}")
                     zf.writestr(f"{empresa_nombre}/ERROR_Excel.txt", f"Error generando Excel: {e}")
 
-                # 2. Carpeta de Procedimientos (MISMA estructura)
-                procedimientos_count = procedimientos_empresa.count()
-                logger.info(f"Procesando {procedimientos_count} procedimientos")
+                # 2. Carpeta de Procedimientos (SOLO en la última parte)
+                if parte_numero == total_partes:
+                    procedimientos_count = procedimientos_empresa.count()
+                    logger.info(f"📁 Procesando {procedimientos_count} procedimientos (última parte)")
 
-                procedimientos_agregados = 0
-                for idx, procedimiento in enumerate(procedimientos_empresa, 1):
-                    if procedimiento.documento_pdf:
-                        try:
-                            # MISMO nombrado del original
-                            safe_codigo = procedimiento.codigo.replace('/', '_').replace('\\', '_')
-                            safe_nombre = procedimiento.nombre.replace('/', '_').replace('\\', '_')[:50]
-                            filename = f"{safe_codigo}_{safe_nombre}.pdf"
+                    procedimientos_agregados = 0
+                    for idx, procedimiento in enumerate(procedimientos_empresa, 1):
+                        if procedimiento.documento_pdf:
+                            try:
+                                # MISMO nombrado del original
+                                safe_codigo = procedimiento.codigo.replace('/', '_').replace('\\', '_')
+                                safe_nombre = procedimiento.nombre.replace('/', '_').replace('\\', '_')[:50]
+                                filename = f"{safe_codigo}_{safe_nombre}.pdf"
 
-                            # Usar la MISMA función de streaming del original
-                            if stream_file_to_zip_local(
-                                zf,
-                                procedimiento.documento_pdf.name,
-                                f"{empresa_nombre}/Procedimientos/{filename}"
-                            ):
-                                procedimientos_agregados += 1
-                                logger.debug(f"✅ Procedimiento agregado: {filename}")
-                        except Exception as e:
-                            logger.error(f"❌ Error añadiendo procedimiento {procedimiento.codigo}: {e}")
+                                # Usar la MISMA función de streaming del original
+                                if stream_file_to_zip_local(
+                                    zf,
+                                    procedimiento.documento_pdf.name,
+                                    f"{empresa_nombre}/Procedimientos/{filename}"
+                                ):
+                                    procedimientos_agregados += 1
+                                    logger.debug(f"✅ Procedimiento agregado: {filename}")
+                            except Exception as e:
+                                logger.error(f"❌ Error añadiendo procedimiento {procedimiento.codigo}: {e}")
 
-                # Crear README si no hay procedimientos (IGUAL que original)
-                if procedimientos_agregados == 0:
-                    zf.writestr(
-                        f"{empresa_nombre}/Procedimientos/README.txt",
-                        "No hay procedimientos con documentos PDF disponibles para esta empresa."
-                    )
+                    # Crear README si no hay procedimientos (IGUAL que original)
+                    if procedimientos_agregados == 0:
+                        zf.writestr(
+                            f"{empresa_nombre}/Procedimientos/README.txt",
+                            "No hay procedimientos con documentos PDF disponibles para esta empresa."
+                        )
+                    else:
+                        logger.info(f"✅ {procedimientos_agregados} procedimientos agregados en última parte")
+                else:
+                    logger.info(f"⏭️ Procedimientos omitidos (Parte {parte_numero}, se incluirán en Parte {total_partes})")
 
                 # 3. Procesar cada equipo con la MISMA estructura exacta
                 for idx, equipo in enumerate(equipos_empresa, 1):
@@ -364,8 +408,15 @@ class AsyncZipProcessor:
                         logger.error(f"Error procesando equipo {equipo.codigo_interno}: {e}")
                         continue
 
-            # Subir archivo final a storage
-            final_path = self._upload_to_storage(temp_zip_path, empresa)
+            # Subir archivo final a storage con nombre que incluye parte y rango
+            final_path = self._upload_to_storage(
+                temp_zip_path,
+                empresa,
+                parte_numero,
+                total_partes,
+                rango_inicio,
+                rango_fin
+            )
 
             # Obtener tamaño
             file_size = os.path.getsize(temp_zip_path)
@@ -395,11 +446,22 @@ class AsyncZipProcessor:
                 'error': str(e)
             }
 
-    def _upload_to_storage(self, temp_path, empresa):
-        """Sube el ZIP a storage (S3 o local)"""
+    def _upload_to_storage(self, temp_path, empresa, parte_numero=1, total_partes=1, rango_inicio=1, rango_fin=1):
+        """Sube el ZIP a storage (S3 o local) con nombre descriptivo"""
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-            file_name = f"zips/SAM_Equipos_{empresa.nombre}_{timestamp}.zip"
+
+            # Generar nombre de archivo descriptivo con rango de equipos
+            if total_partes > 1:
+                # Formato: SAM_Equipos_EmpresaX_P1de3_EQ001-035_20251014_1530.zip
+                if parte_numero == total_partes:
+                    # Última parte incluye "_COMPLETO"
+                    file_name = f"zips/SAM_Equipos_{empresa.nombre}_P{parte_numero}de{total_partes}_EQ{rango_inicio:03d}-{rango_fin:03d}_COMPLETO_{timestamp}.zip"
+                else:
+                    file_name = f"zips/SAM_Equipos_{empresa.nombre}_P{parte_numero}de{total_partes}_EQ{rango_inicio:03d}-{rango_fin:03d}_{timestamp}.zip"
+            else:
+                # Descarga normal (sin partes)
+                file_name = f"zips/SAM_Equipos_{empresa.nombre}_{timestamp}.zip"
 
             # Subir a storage configurado
             with open(temp_path, 'rb') as f:

@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verificación del Sistema - SAM{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">
+            <i class="fas fa-check-circle mr-2"></i>
+            Verificación del Sistema
+        </h1>
+        <a href="{% url 'core:admin_dashboard' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Volver al Panel
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} mb-4">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Información sobre verificación -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">
+                    ¿Qué hace esta herramienta?
+                </h3>
+                <div class="mt-2 text-sm text-blue-700">
+                    <p>
+                        Esta herramienta revisa automáticamente que todo el sistema esté funcionando correctamente.
+                        Es como hacer una inspección completa para asegurarnos de que no haya problemas.
+                    </p>
+                    <p class="mt-2">
+                        <strong>Importante:</strong> La revisión puede tardar varios minutos. Le recomendamos
+                        hacer revisiones específicas durante el horario de trabajo normal.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de ejecución -->
+    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">
+            <i class="fas fa-play-circle mr-2"></i>
+            Iniciar Revisión
+        </h2>
+
+        <form method="post" id="testForm">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Categoría de verificación -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        ¿Qué desea revisar?
+                    </label>
+                    {% for value, label, description in test_categories %}
+                        <div class="mb-3 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                            <label class="flex items-start cursor-pointer">
+                                <input type="radio" name="test_category" value="{{ value }}"
+                                       {% if forloop.first %}checked{% endif %}
+                                       class="mt-1 mr-3">
+                                <div>
+                                    <div class="font-medium text-gray-900">{{ label }}</div>
+                                    <div class="text-sm text-gray-600">{{ description }}</div>
+                                </div>
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Opciones -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Opciones de Revisión
+                    </label>
+
+                    <div class="space-y-3">
+                        <label class="flex items-center p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" name="verbose" class="mr-3">
+                            <div>
+                                <div class="font-medium text-gray-900">Mostrar Detalles Completos</div>
+                                <div class="text-sm text-gray-600">Ver información paso a paso de cada verificación</div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" name="parallel" checked class="mr-3">
+                            <div>
+                                <div class="font-medium text-gray-900">Revisar Más Rápido (Recomendado)</div>
+                                <div class="text-sm text-gray-600">Hace varias verificaciones al mismo tiempo</div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" name="coverage" class="mr-3">
+                            <div>
+                                <div class="font-medium text-gray-900">Medición Profunda</div>
+                                <div class="text-sm text-gray-600">Calcula qué tan bien está verificado el sistema (tarda más)</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="mt-6">
+                        <button type="submit" id="runButton"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                            <i class="fas fa-play mr-2"></i>
+                            Iniciar Revisión
+                        </button>
+                    </div>
+
+                    <div id="loadingMessage" class="hidden mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-700">
+                        <div class="flex items-center">
+                            <i class="fas fa-spinner fa-spin mr-3"></i>
+                            <div>
+                                <strong>Revisando el sistema...</strong>
+                                <p class="text-sm">Esto puede tardar varios minutos. Por favor espere.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if test_executed %}
+        <!-- Resultados -->
+        <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-chart-bar mr-2"></i>
+                Resultados de la Revisión
+            </h2>
+
+            <!-- Estadísticas -->
+            {% if test_stats %}
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div class="bg-green-50 p-4 rounded-lg text-center">
+                        <div class="text-3xl font-bold text-green-600">{{ test_stats.passed }}</div>
+                        <div class="text-sm text-gray-600">✅ Correctos</div>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg text-center">
+                        <div class="text-3xl font-bold text-red-600">{{ test_stats.failed }}</div>
+                        <div class="text-sm text-gray-600">❌ Con Problemas</div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg text-center">
+                        <div class="text-3xl font-bold text-gray-600">{{ test_stats.skipped }}</div>
+                        <div class="text-sm text-gray-600">⏭️ No Revisados</div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <div class="text-3xl font-bold text-blue-600">{{ test_stats.total }}</div>
+                        <div class="text-sm text-gray-600">Total Revisado</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg text-center">
+                        <div class="text-3xl font-bold text-purple-600">{{ test_stats.success_rate }}%</div>
+                        <div class="text-sm text-gray-600">Salud del Sistema</div>
+                    </div>
+                </div>
+
+                <!-- Barra de progreso -->
+                <div class="mb-6">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Estado General del Sistema</span>
+                        <span class="text-sm font-medium text-gray-700">{{ test_stats.success_rate }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div class="{% if test_stats.success_rate >= 90 %}bg-green-600{% elif test_stats.success_rate >= 70 %}bg-yellow-600{% else %}bg-red-600{% endif %} h-4 rounded-full"
+                             style="width: {{ test_stats.success_rate }}%"></div>
+                    </div>
+                </div>
+
+                <!-- Información adicional -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="border rounded p-3">
+                        <div class="text-sm text-gray-600">Tiempo de Revisión</div>
+                        <div class="text-lg font-semibold">{{ test_stats.duration }} segundos</div>
+                    </div>
+                    <div class="border rounded p-3">
+                        <div class="text-sm text-gray-600">Tipo de Revisión</div>
+                        <div class="text-lg font-semibold">{{ test_category|title }}</div>
+                    </div>
+                </div>
+
+                {% if test_stats.warnings > 0 %}
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+                        <p class="text-yellow-800">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <strong>{{ test_stats.warnings }} avisos</strong> encontrados durante la revisión
+                        </p>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+            <!-- Output de revisión -->
+            <div class="mt-6">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-lg font-semibold">Reporte Técnico Completo</h3>
+                    <button onclick="copyOutput()" class="text-blue-600 hover:text-blue-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i>
+                        Copiar
+                    </button>
+                </div>
+                <pre id="testOutput" class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm max-h-96 overflow-y-auto">{{ test_output }}</pre>
+            </div>
+
+            {% if test_command %}
+                <div class="mt-4 p-3 bg-gray-100 rounded text-sm">
+                    <strong>Información técnica (para soporte):</strong><br>
+                    <code class="text-gray-700">{{ test_command }}</code>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- Información adicional -->
+    <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4">
+            <i class="fas fa-question-circle mr-2"></i>
+            Información sobre las Revisiones
+        </h2>
+
+        <div class="space-y-4">
+            <div>
+                <h3 class="font-semibold text-gray-800 mb-2">📊 Estado actual del sistema</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-1">
+                    <li><strong>253 verificaciones</strong> en total</li>
+                    <li><strong>243 funcionando bien</strong> (96% de salud del sistema)</li>
+                    <li><strong>Sistema verificado al 70%</strong> - muy buena cobertura</li>
+                    <li>15 áreas diferentes del sistema están siendo revisadas</li>
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="font-semibold text-gray-800 mb-2">🔧 ¿Qué revisa cada opción?</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-1">
+                    <li><strong>Base de Datos:</strong> Que la información se guarde y lea correctamente</li>
+                    <li><strong>Procesos Completos:</strong> Que los flujos de trabajo funcionen de inicio a fin</li>
+                    <li><strong>Pantallas:</strong> Que todas las páginas web se muestren bien</li>
+                    <li><strong>Funciones del Sistema:</strong> Que las operaciones principales trabajen bien</li>
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="font-semibold text-gray-800 mb-2">⏱️ ¿Cuánto tarda?</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-1">
+                    <li><strong>Revisar Todo:</strong> 20-30 segundos (rápido), ~2 minutos (normal)</li>
+                    <li><strong>Base de Datos:</strong> 5-10 segundos</li>
+                    <li><strong>Procesos Completos:</strong> 10-15 segundos</li>
+                    <li><strong>Con Medición Profunda:</strong> 50% más tiempo (pero da más información)</li>
+                </ul>
+            </div>
+
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                <p class="text-blue-800">
+                    <i class="fas fa-lightbulb mr-2"></i>
+                    <strong>Recomendación:</strong> Para un chequeo rápido, revise solo "Base de Datos".
+                    Para una validación completa antes de actualizar el sistema, ejecute "Revisar Todo" con "Medición Profunda".
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Mostrar mensaje de carga al enviar formulario
+document.getElementById('testForm').addEventListener('submit', function() {
+    document.getElementById('loadingMessage').classList.remove('hidden');
+    document.getElementById('runButton').disabled = true;
+    document.getElementById('runButton').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Revisando...';
+});
+
+// Función para copiar reporte
+function copyOutput() {
+    const output = document.getElementById('testOutput').textContent;
+    navigator.clipboard.writeText(output).then(() => {
+        alert('Reporte copiado exitosamente');
+    }).catch(err => {
+        console.error('Error copiando:', err);
+        alert('No se pudo copiar el reporte. Por favor, seleccione y copie manualmente.');
+    });
+}
+
+// Auto-scroll al reporte si existe
+{% if test_executed %}
+    window.addEventListener('load', function() {
+        document.getElementById('testOutput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+{% endif %}
+</script>
+
+<style>
+/* Estilos adicionales para el output de tests */
+#testOutput {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    scrollbar-width: thin;
+    scrollbar-color: #4B5563 #1F2937;
+}
+
+#testOutput::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#testOutput::-webkit-scrollbar-track {
+    background: #1F2937;
+}
+
+#testOutput::-webkit-scrollbar-thumb {
+    background: #4B5563;
+    border-radius: 4px;
+}
+
+#testOutput::-webkit-scrollbar-thumb:hover {
+    background: #6B7280;
+}
+
+/* Animación para la barra de progreso */
+.rounded-full {
+    transition: width 1s ease-in-out;
+}
+</style>
+{% endblock %}

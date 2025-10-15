@@ -115,31 +115,60 @@
 
         <!-- Maintenance History -->
         <div class="bg-white rounded-lg shadow-sm border p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-6">Historial de Mantenimiento</h2>
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Historial de Mantenimiento</h2>
+                <div class="text-sm text-gray-600">
+                    <span class="font-medium">Total:</span> {{ total_tasks }}
+                    <span class="ml-3 font-medium">Completadas:</span>
+                    <span class="text-green-600">{{ completed_tasks }}</span>
+                </div>
+            </div>
 
-            {% if maintenance_history %}
+            {% if recent_tasks %}
                 <div class="space-y-4 max-h-96 overflow-y-auto">
-                    {% for execution in maintenance_history %}
-                    <div class="border border-gray-200 rounded-md p-4">
+                    {% for task in recent_tasks %}
+                    <div class="border border-gray-200 rounded-md p-4 hover:border-blue-300 transition-colors" data-task-status="{{ task.status }}">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center">
-                                {% if execution.success %}
+                                {% if task.status == 'completed' %}
                                     <span class="text-green-500 mr-2">✅</span>
-                                {% else %}
+                                {% elif task.status == 'failed' %}
                                     <span class="text-red-500 mr-2">❌</span>
+                                {% elif task.status == 'running' %}
+                                    <span class="text-blue-500 mr-2">🔄</span>
+                                {% else %}
+                                    <span class="text-gray-500 mr-2">⏳</span>
                                 {% endif %}
-                                <span class="font-medium text-gray-900">{{ execution.summary }}</span>
+                                <span class="font-medium text-gray-900">{{ task.get_task_type_display }}</span>
+                                {% if task.status == 'running' %}
+                                    <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">En ejecución</span>
+                                {% elif task.status == 'pending' %}
+                                    <span class="ml-2 text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">Pendiente</span>
+                                {% elif task.status == 'completed' %}
+                                    <span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Completado</span>
+                                {% elif task.status == 'failed' %}
+                                    <span class="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Fallido</span>
+                                {% endif %}
                             </div>
-                            <span class="text-xs text-gray-500">{{ execution.timestamp|date:"d/m H:i" }}</span>
+                            <span class="text-xs text-gray-500">{{ task.created_at|date:"d/m H:i" }}</span>
                         </div>
                         <div class="text-sm text-gray-600">
-                            <span class="font-medium">Usuario:</span> {{ execution.user }}
+                            <span class="font-medium">Usuario:</span> {{ task.created_by.get_full_name|default:task.created_by.username }}
+                            {% if task.duration_seconds %}
+                                <span class="ml-3 font-medium">Duración:</span> {{ task.duration_seconds|floatformat:1 }}s
+                            {% endif %}
                         </div>
-                        {% if not execution.success and execution.error %}
+                        {% if task.error_message %}
                         <div class="text-sm text-red-600 mt-1">
-                            <span class="font-medium">Error:</span> {{ execution.error }}
+                            <span class="font-medium">Error:</span> {{ task.error_message }}
                         </div>
                         {% endif %}
+                        <div class="mt-2">
+                            <a href="{% url 'core:maintenance_task_detail' task.id %}"
+                               class="text-xs text-blue-600 hover:text-blue-800 hover:underline">
+                                Ver detalles y logs →
+                            </a>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -188,129 +217,59 @@
 </div>
 
 <script>
-async function executeQuickMaintenance(taskType) {
-    showLoading(`Ejecutando limpieza de ${taskType}...`);
-
-    try {
-        const response = await fetch('{% url "core:api_execute_command" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({
-                command_type: 'maintenance',
-                params: {
-                    task_type: taskType,
-                    dry_run: false
-                }
-            })
-        });
-
-        const result = await response.json();
-        hideLoading();
-
-        if (result.success) {
-            showToast(`✅ Limpieza de ${taskType} completada`, 'success');
-            setTimeout(() => location.reload(), 2000);
-        } else {
-            showToast(`❌ Error en limpieza: ${result.error}`, 'error');
-        }
-
-    } catch (error) {
-        hideLoading();
-        showToast(`❌ Error: ${error.message}`, 'error');
+// Auto-refresh para ver actualizaciones de estado
+setInterval(() => {
+    const runningTasks = document.querySelectorAll('[data-task-status="running"]');
+    if (runningTasks.length > 0) {
+        location.reload();
     }
+}, 5000); // Refresh cada 5 segundos si hay tareas corriendo
+
+async function executeQuickMaintenance(taskType) {
+    if (!confirm(`¿Ejecutar limpieza de ${taskType}?`)) return;
+
+    const form = document.querySelector('form');
+    const taskSelect = form.querySelector('#task_type');
+    const dryRunCheckbox = form.querySelector('#dry_run');
+
+    taskSelect.value = taskType;
+    dryRunCheckbox.checked = false;
+
+    form.submit();
 }
 
 async function executeMaintenanceAll() {
-    const confirmed = confirm('⚡ ¿Ejecutar MANTENIMIENTO COMPLETO del sistema?\n\nEsto incluye:\n- Limpieza de cache\n- Limpieza de logs\n- Optimización de BD\n- Limpieza de ZIP\n- Limpieza de backups\n\n¿Continuar?');
+    const confirmed = confirm('⚡ ¿Ejecutar MANTENIMIENTO COMPLETO del sistema?\n\nEsto incluye:\n- Verificar sistema\n- Limpiar cache\n- Optimización de BD\n- Limpieza de archivos\n\n¿Continuar?');
 
     if (!confirmed) return;
 
-    showLoading('⚡ Ejecutando mantenimiento completo del sistema...');
+    const form = document.querySelector('form');
+    const taskSelect = form.querySelector('#task_type');
+    const dryRunCheckbox = form.querySelector('#dry_run');
 
-    try {
-        const response = await fetch('{% url "core:api_execute_command" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({
-                command_type: 'maintenance',
-                params: {
-                    task_type: 'all',
-                    dry_run: false
-                }
-            })
-        });
+    taskSelect.value = 'all';
+    dryRunCheckbox.checked = false;
 
-        const result = await response.json();
-        hideLoading();
-
-        if (result.success) {
-            showSuccessNotification('⚡ ¡MANTENIMIENTO COMPLETO EXITOSO!\n\nTodas las tareas de limpieza y optimización han sido completadas.');
-            setTimeout(() => location.reload(), 3000);
-        } else {
-            showToast(`❌ Error en mantenimiento completo: ${result.error}`, 'error');
-        }
-
-    } catch (error) {
-        hideLoading();
-        showToast(`❌ Error: ${error.message}`, 'error');
-    }
+    form.submit();
 }
 
 async function executeBackupCleanup(dryRun = false) {
-    const modeText = dryRun ? 'SIMULACIÓN' : 'REAL';
     const confirmText = dryRun
         ? '🔍 ¿Simular limpieza de backups antiguos?\n\nEsto mostrará qué backups se eliminarían sin borrarlos realmente.\n\n¿Continuar?'
-        : '🗑️ ¿ELIMINAR backups de S3 mayores a 6 meses?\n\n⚠️ ADVERTENCIA: Los backups eliminados NO se pueden recuperar.\n\nSe eliminarán backups con más de 180 días de antigüedad.\n\n¿Continuar?';
+        : '🗑️ ¿ELIMINAR backups antiguos?\n\n⚠️ ADVERTENCIA: Los backups eliminados NO se pueden recuperar.\n\nSe eliminarán backups antiguos según configuración.\n\n¿Continuar?';
 
     const confirmed = confirm(confirmText);
 
     if (!confirmed) return;
 
-    showLoading(`${dryRun ? '🔍 Simulando' : '🗑️ Ejecutando'} limpieza de backups antiguos...`);
+    const form = document.querySelector('form');
+    const taskSelect = form.querySelector('#task_type');
+    const dryRunCheckbox = form.querySelector('#dry_run');
 
-    try {
-        const response = await fetch('{% url "core:api_execute_command" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({
-                command_type: 'cleanup_backups',
-                params: {
-                    retention_months: 6,
-                    dry_run: dryRun
-                }
-            })
-        });
+    taskSelect.value = 'backups';
+    dryRunCheckbox.checked = dryRun;
 
-        const result = await response.json();
-        hideLoading();
-
-        if (result.success) {
-            const count = result.details?.deleted_count || 0;
-            const sizeMB = result.details?.total_size_mb || 0;
-
-            if (dryRun) {
-                showToast(`🔍 Simulación completada: ${count} archivos serían eliminados (${sizeMB.toFixed(2)} MB)`, 'info');
-            } else {
-                showSuccessNotification(`🗑️ ¡LIMPIEZA DE BACKUPS COMPLETADA!\n\n${count} archivos eliminados\n${sizeMB.toFixed(2)} MB liberados en S3`);
-            }
-            setTimeout(() => location.reload(), 3000);
-        } else {
-            showToast(`❌ Error en limpieza de backups: ${result.error}`, 'error');
-        }
-
-    } catch (error) {
-        hideLoading();
-        showToast(`❌ Error: ${error.message}`, 'error');
-    }
+    form.submit();
 }
 
 function showSuccessNotification(message) {
@@ -324,5 +283,12 @@ function showSuccessNotification(message) {
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 3000);
 }
+
+// Mostrar mensaje de éxito si viene de redirección
+{% if messages %}
+    {% for message in messages %}
+        showSuccessNotification('{{ message|escapejs }}');
+    {% endfor %}
+{% endif %}
 </script>
 {% endblock %}

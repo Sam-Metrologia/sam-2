@@ -25,5 +25,18 @@ from ..zip_functions import (
     manual_process_zip
 )
 
+# Sistema de Mantenimiento Web
+from .maintenance import (
+    maintenance_dashboard,
+    create_maintenance_task,
+    maintenance_task_detail,
+    maintenance_task_list,
+    run_system_health_check,
+    system_health_detail,
+    system_health_history,
+    task_status_api,
+    task_logs_api
+)
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

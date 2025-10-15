@@ -1781,6 +1781,9 @@ class ZipRequest(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Estado")
     position_in_queue = models.IntegerField(verbose_name="Posición en Cola")
     parte_numero = models.IntegerField(default=1, verbose_name="Número de Parte")
+    total_partes = models.IntegerField(default=1, verbose_name="Total de Partes")
+    rango_equipos_inicio = models.IntegerField(null=True, blank=True, verbose_name="Código Equipo Inicio")
+    rango_equipos_fin = models.IntegerField(null=True, blank=True, verbose_name="Código Equipo Fin")
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado en")
@@ -2840,3 +2843,231 @@ class AceptacionTerminos(models.Model):
 
         logger.info(f"Usuario {usuario.username} aceptó términos v{terminos_activos.version} desde IP {ip_address}")
         return aceptacion
+
+
+# ==============================================================================
+# MODELOS PARA SISTEMA DE MANTENIMIENTO Y ADMINISTRACIÓN
+# ==============================================================================
+
+class MaintenanceTask(models.Model):
+    """
+    Modelo para tareas de mantenimiento ejecutables desde la web.
+    Permite a administradores ejecutar comandos sin acceso SSH.
+    """
+    TASK_STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('running', 'Ejecutando'),
+        ('completed', 'Completado'),
+        ('failed', 'Fallido'),
+    ]
+
+    TASK_TYPE_CHOICES = [
+        ('backup_db', 'Backup de Base de Datos'),
+        ('clear_cache', 'Limpiar Cache'),
+        ('cleanup_files', 'Limpiar Archivos Temporales'),
+        ('run_tests', 'Ejecutar Tests'),
+        ('check_system', 'Verificar Estado del Sistema'),
+        ('optimize_db', 'Optimizar Base de Datos'),
+        ('collect_static', 'Recolectar Archivos Estáticos'),
+        ('migrate_db', 'Aplicar Migraciones'),
+        ('custom', 'Comando Personalizado'),
+    ]
+
+    task_type = models.CharField(
+        max_length=50,
+        choices=TASK_TYPE_CHOICES,
+        verbose_name="Tipo de Tarea"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=TASK_STATUS_CHOICES,
+        default='pending',
+        verbose_name="Estado"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Creación"
+    )
+    started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Inicio de Ejecución"
+    )
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fin de Ejecución"
+    )
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='maintenance_tasks_created',
+        verbose_name="Creado por"
+    )
+    command = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Comando Personalizado",
+        help_text="Solo para tipo 'custom'"
+    )
+    parameters = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Parámetros",
+        help_text="Parámetros adicionales en formato JSON"
+    )
+    output = models.TextField(
+        blank=True,
+        verbose_name="Salida del Comando"
+    )
+    error_message = models.TextField(
+        blank=True,
+        verbose_name="Mensaje de Error"
+    )
+    duration_seconds = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="Duración (segundos)"
+    )
+
+    class Meta:
+        verbose_name = "Tarea de Mantenimiento"
+        verbose_name_plural = "Tareas de Mantenimiento"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['task_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_task_type_display()} - {self.get_status_display()}"
+
+    def get_duration_display(self):
+        """Retorna duración en formato legible"""
+        if self.duration_seconds is None:
+            return "N/A"
+        if self.duration_seconds < 60:
+            return f"{self.duration_seconds:.1f}s"
+        minutes = int(self.duration_seconds // 60)
+        seconds = int(self.duration_seconds % 60)
+        return f"{minutes}m {seconds}s"
+
+
+class CommandLog(models.Model):
+    """
+    Log detallado de ejecución de comandos de mantenimiento.
+    Guarda historial completo para auditoría.
+    """
+    task = models.ForeignKey(
+        MaintenanceTask,
+        on_delete=models.CASCADE,
+        related_name='logs',
+        verbose_name="Tarea"
+    )
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Timestamp"
+    )
+    level = models.CharField(
+        max_length=10,
+        choices=[
+            ('DEBUG', 'Debug'),
+            ('INFO', 'Info'),
+            ('WARNING', 'Advertencia'),
+            ('ERROR', 'Error'),
+        ],
+        default='INFO',
+        verbose_name="Nivel"
+    )
+    message = models.TextField(
+        verbose_name="Mensaje"
+    )
+
+    class Meta:
+        verbose_name = "Log de Comando"
+        verbose_name_plural = "Logs de Comandos"
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['task', '-timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.level} - {self.message[:50]}"
+
+
+class SystemHealthCheck(models.Model):
+    """
+    Registro de verificaciones de salud del sistema.
+    Se genera automáticamente o manualmente.
+    """
+    checked_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Verificación"
+    )
+    checked_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Verificado por"
+    )
+    overall_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('healthy', 'Saludable'),
+            ('warning', 'Advertencia'),
+            ('critical', 'Crítico'),
+        ],
+        default='healthy',
+        verbose_name="Estado General"
+    )
+    database_status = models.CharField(max_length=20, default='unknown')
+    cache_status = models.CharField(max_length=20, default='unknown')
+    storage_status = models.CharField(max_length=20, default='unknown')
+
+    database_response_time = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="Tiempo de Respuesta DB (ms)"
+    )
+    cache_response_time = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="Tiempo de Respuesta Cache (ms)"
+    )
+
+    total_empresas = models.IntegerField(default=0)
+    total_equipos = models.IntegerField(default=0)
+    total_usuarios = models.IntegerField(default=0)
+
+    disk_usage_mb = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="Uso de Disco (MB)"
+    )
+
+    details = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Detalles Adicionales"
+    )
+
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Notas"
+    )
+
+    class Meta:
+        verbose_name = "Verificación de Salud"
+        verbose_name_plural = "Verificaciones de Salud"
+        ordering = ['-checked_at']
+        indexes = [
+            models.Index(fields=['-checked_at']),
+            models.Index(fields=['overall_status']),
+        ]
+
+    def __str__(self):
+        return f"Health Check - {self.checked_at.strftime('%Y-%m-%d %H:%M')} - {self.get_overall_status_display()}"

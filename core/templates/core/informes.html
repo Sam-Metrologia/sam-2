@@ -362,12 +362,24 @@
                                 return null; // No procesar como JSON
                             });
                         } else {
-                            // Es una respuesta JSON (cola)
+                            // Es una respuesta JSON (cola o multi-partes)
                             return response.json();
                         }
                     })
                     .then(data => {
-                        if (data && (data.status === 'queued' || data.status === 'already_pending')) {
+                        if (!data) return; // Ya procesado como blob
+
+                        // NUEVO: Sistema Multi-Partes
+                        if (data.status === 'multi_part' && data.auto_download) {
+                            mostrarModalDescargaMultipartes(data);
+                            procesarDescargasAutomaticas(data.partes);
+                            btn.innerHTML = '<i class="fas fa-clock mr-2"></i>Solicitar ZIP Completo';
+                            btn.disabled = false;
+                            return;
+                        }
+
+                        // Sistema de cola normal (single part)
+                        if (data && (data.status === 'queued' || data.status === 'already_pending' || data.status === 'queued_async')) {
                             currentRequestId = data.request_id;
                             showZipStatus(data);
                             if (window.startZipMonitoring) {
@@ -557,8 +569,198 @@
             }
         });
 
+        // ================================
+        // SISTEMA MULTI-PARTES (NUEVO)
+        // ================================
+
+        function mostrarModalDescargaMultipartes(data) {
+            // Crear modal si no existe
+            let modal = document.getElementById('zipMultipartModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'zipMultipartModal';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+                document.body.appendChild(modal);
+            }
+
+            const content = `
+                <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4 shadow-2xl">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">
+                        📦 Descarga Automática en Progreso
+                    </h3>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                        <p class="text-blue-800"><strong>Su empresa tiene ${data.equipos_totales} equipos</strong></p>
+                        <p class="text-blue-700">Se dividió en ${data.total_partes} partes de máximo ${data.max_equipos_por_parte} equipos</p>
+                    </div>
+
+                    <div id="partes-progreso" class="space-y-3 mb-6">
+                        ${data.partes.map(parte => `
+                            <div class="parte-item border rounded-lg p-4 flex items-center gap-3 bg-gray-50"
+                                 data-parte="${parte.parte_numero}"
+                                 data-request-id="${parte.request_id}">
+                                <span class="parte-icon text-2xl">⏳</span>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-800">
+                                        Parte ${parte.parte_numero}/${data.total_partes}: Equipos ${parte.rango_inicio}-${parte.rango_fin}
+                                        ${parte.tiene_procedimientos ? '<span class="text-blue-600 text-sm ml-2">+ Procedimientos</span>' : ''}
+                                    </div>
+                                    <div class="text-sm text-gray-600">${parte.equipos_en_parte} equipos</div>
+                                </div>
+                                <span class="parte-status text-sm font-medium text-gray-500">Pendiente</span>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex justify-between mb-2 text-sm text-gray-700">
+                            <span>Progreso general</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div class="w-full h-6 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="progress-fill" class="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <p id="progress-text" class="text-center text-gray-700 mb-4">Iniciando descarga automática...</p>
+
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 text-center">
+                        <p class="text-yellow-800 font-semibold">⚠️ No cierre esta ventana hasta completar todas las descargas</p>
+                    </div>
+                </div>
+            `;
+
+            modal.innerHTML = content;
+            modal.style.display = 'flex';
+        }
+
+        async function procesarDescargasAutomaticas(partes) {
+            let completadas = 0;
+            const total = partes.length;
+
+            console.log(`Procesando ${total} partes automáticamente`);
+
+            // Polling para cada parte
+            for (const parte of partes) {
+                await esperarYDescargarParte(parte, (progress) => {
+                    // Actualizar progreso de la parte individual
+                    actualizarProgresoParte(parte.parte_numero, progress);
+
+                    // Actualizar progreso total
+                    const progresoTotal = Math.floor((completadas + (progress / 100)) / total * 100);
+                    const progressFill = document.getElementById('progress-fill');
+                    const progressPercentage = document.getElementById('progress-percentage');
+
+                    if (progressFill) progressFill.style.width = `${progresoTotal}%`;
+                    if (progressPercentage) progressPercentage.textContent = `${progresoTotal}%`;
+
+                    const progressText = document.getElementById('progress-text');
+                    if (progressText) {
+                        progressText.textContent = `Descargando parte ${parte.parte_numero} de ${total}... (${progress}%)`;
+                    }
+                });
+
+                completadas++;
+            }
+
+            // Todas las partes descargadas
+            const progressText = document.getElementById('progress-text');
+            if (progressText) {
+                progressText.textContent = `✅ Descarga completa: ${total} archivos descargados exitosamente`;
+                progressText.className = 'text-center text-green-700 font-bold mb-4';
+            }
+
+            // Cerrar modal después de 5 segundos
+            setTimeout(() => {
+                const modal = document.getElementById('zipMultipartModal');
+                if (modal) {
+                    modal.style.display = 'none';
+                    modal.remove();
+                }
+                alert(`✅ Descarga completada: ${total} archivos ZIP descargados en su carpeta de Descargas`);
+            }, 5000);
+        }
+
+        async function esperarYDescargarParte(parte, onProgress) {
+            const requestId = parte.request_id;
+
+            return new Promise((resolve, reject) => {
+                const interval = setInterval(async () => {
+                    try {
+                        const response = await fetch(`/core/zip_status/${requestId}/`);
+                        const status = await response.json();
+
+                        // Actualizar progreso
+                        onProgress(status.progress_percentage || 0);
+
+                        // Actualizar icono y estado de la parte
+                        const parteEl = document.querySelector(`[data-request-id="${requestId}"]`);
+                        if (parteEl) {
+                            const icon = parteEl.querySelector('.parte-icon');
+                            const statusText = parteEl.querySelector('.parte-status');
+
+                            if (status.status === 'processing') {
+                                icon.textContent = '🔄';
+                                statusText.textContent = `Generando... ${status.progress_percentage || 0}%`;
+                                statusText.className = 'parte-status text-sm font-medium text-blue-600';
+                            }
+
+                            if (status.status === 'completed') {
+                                clearInterval(interval);
+
+                                // Descargar automáticamente
+                                icon.textContent = '⬇️';
+                                statusText.textContent = 'Descargando...';
+                                statusText.className = 'parte-status text-sm font-medium text-green-600';
+
+                                const downloadUrl = status.download_url;
+                                const a = document.createElement('a');
+                                a.href = downloadUrl;
+                                a.download = '';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+
+                                // Esperar 1 segundo antes de marcar como completado
+                                await new Promise(r => setTimeout(r, 1000));
+
+                                icon.textContent = '✅';
+                                statusText.textContent = 'Completado';
+                                statusText.className = 'parte-status text-sm font-medium text-green-700';
+
+                                resolve();
+                            }
+
+                            if (status.status === 'failed') {
+                                clearInterval(interval);
+                                icon.textContent = '❌';
+                                statusText.textContent = 'Error';
+                                statusText.className = 'parte-status text-sm font-medium text-red-600';
+                                reject(new Error(status.error || 'Error desconocido'));
+                            }
+                        }
+
+                    } catch (error) {
+                        clearInterval(interval);
+                        reject(error);
+                    }
+                }, 3000); // Polling cada 3 segundos
+            });
+        }
+
+        function actualizarProgresoParte(parteNumero, progress) {
+            const parteEl = document.querySelector(`[data-parte="${parteNumero}"]`);
+            if (parteEl) {
+                const statusText = parteEl.querySelector('.parte-status');
+                if (statusText && progress < 100) {
+                    statusText.textContent = `${progress}%`;
+                }
+            }
+        }
+
         // Hacer función global para poder usar desde HTML
         window.cancelZipRequest = cancelZipRequest;
+        window.mostrarModalDescargaMultipartes = mostrarModalDescargaMultipartes;
+        window.procesarDescargasAutomaticas = procesarDescargasAutomaticas;
     });
 </script>
 {% endblock %}

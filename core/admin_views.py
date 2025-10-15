@@ -55,52 +55,97 @@ def admin_dashboard(request):
 @user_passes_test(is_superuser)
 def system_maintenance(request):
     """
-    Página para ejecutar tareas de mantenimiento.
+    Página unificada para ejecutar tareas de mantenimiento.
+    Combina sistema antiguo (AdminService) y nuevo (MaintenanceTask).
     """
+    from core.models import MaintenanceTask, CommandLog, SystemHealthCheck
+    import subprocess
+    import sys
+
     if request.method == 'POST':
-        task_type = request.POST.get('task_type', 'all')
+        task_type = request.POST.get('task_type')
         dry_run = request.POST.get('dry_run') == 'on'
 
-        try:
-            result = AdminService.execute_maintenance(task_type, dry_run)
+        if not task_type:
+            messages.error(request, 'Debe seleccionar un tipo de tarea')
+            return redirect('core:admin_maintenance')
 
-            # Guardar en historial
-            AdminService.save_execution_to_history(
-                f'maintenance_{task_type}',
-                result,
-                request.user
+        # Mapeo de tareas antiguas a nuevas
+        task_mapping = {
+            'cache': 'clear_cache',
+            'database': 'optimize_db',
+            'zip': 'cleanup_files',
+            'logs': 'cleanup_files',
+            'backups': 'backup_db',
+            'all': 'check_system'  # "All" ejecutará verificación completa
+        }
+
+        new_task_type = task_mapping.get(task_type, 'check_system')
+
+        # Si es dry_run, solo mostrar mensaje
+        if dry_run:
+            messages.info(request, f'[SIMULACIÓN] Se ejecutaría: {task_type}. No se han hecho cambios.')
+            return redirect('core:admin_maintenance')
+
+        try:
+            # Crear tarea en la base de datos
+            task = MaintenanceTask.objects.create(
+                task_type=new_task_type,
+                created_by=request.user,
+                status='pending'
             )
 
-            if result['success']:
-                if dry_run:
-                    messages.success(request, '✅ Simulación de mantenimiento completada')
-                else:
-                    messages.success(request, '✅ Mantenimiento ejecutado correctamente')
-            else:
-                messages.error(request, f'❌ Error en mantenimiento: {result.get("error", "Error desconocido")}')
+            logger.info(f"Tarea de mantenimiento creada: {task.id} - {new_task_type} por {request.user.username}")
+
+            # Ejecutar tarea en segundo plano
+            try:
+                python_path = sys.executable
+                subprocess.Popen(
+                    [python_path, 'manage.py', 'run_maintenance_task', str(task.id)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+
+                messages.success(request, f'Tarea "{task.get_task_type_display()}" iniciada (ID: {task.id})')
+
+            except Exception as e:
+                logger.error(f"Error al iniciar tarea {task.id}: {e}")
+                task.status = 'failed'
+                task.error_message = f'Error al iniciar: {str(e)}'
+                task.save()
+                messages.error(request, f'Error al iniciar tarea: {str(e)}')
 
         except Exception as e:
-            logger.error(f'Error executing maintenance: {e}')
-            messages.error(request, f'❌ Error ejecutando mantenimiento: {e}')
+            logger.error(f'Error creating maintenance task: {e}')
+            messages.error(request, f'Error creando tarea: {e}')
 
         return redirect('core:admin_maintenance')
 
-    # Obtener historial de mantenimientos
-    history = AdminService.get_execution_history()
-    maintenance_history = [
-        h for h in history.get('history', [])
-        if 'maintenance' in h.get('action', '')
-    ][-10:]  # Últimos 10
+    # Obtener historial desde base de datos (últimas 10 tareas)
+    recent_tasks = MaintenanceTask.objects.select_related('created_by').order_by('-created_at')[:10]
+
+    # Estadísticas
+    total_tasks = MaintenanceTask.objects.count()
+    completed_tasks = MaintenanceTask.objects.filter(status='completed').count()
+    failed_tasks = MaintenanceTask.objects.filter(status='failed').count()
+    running_tasks = MaintenanceTask.objects.filter(status='running').count()
+
+    # Última verificación de salud
+    last_health_check = SystemHealthCheck.objects.order_by('-checked_at').first()
 
     context = {
-        'maintenance_history': maintenance_history,
+        'recent_tasks': recent_tasks,
+        'total_tasks': total_tasks,
+        'completed_tasks': completed_tasks,
+        'failed_tasks': failed_tasks,
+        'running_tasks': running_tasks,
+        'last_health_check': last_health_check,
         'task_options': [
-            ('all', 'Todas las tareas'),
             ('cache', 'Limpiar cache'),
-            ('logs', 'Limpiar logs'),
             ('database', 'Optimizar base de datos'),
-            ('zip', 'Limpiar archivos ZIP'),
-            ('backups', 'Limpiar backups antiguos (>6 meses)')
+            ('zip', 'Limpiar archivos ZIP y temporales'),
+            ('backups', 'Crear backup de base de datos'),
+            ('all', 'Verificar estado del sistema'),
         ]
     }
 
@@ -897,3 +942,164 @@ def cleanup_old_companies(request):
     })
 
     return render(request, 'admin/cleanup_old_companies.html', context)
+
+
+@login_required
+@user_passes_test(is_superuser)
+def run_tests_panel(request):
+    """
+    Panel para ejecutar tests desde la interfaz web.
+    Solo accesible para superusuarios.
+    """
+    context = {
+        'titulo_pagina': 'Verificación del Sistema',
+        'test_categories': [
+            ('all', 'Revisar Todo', 'Revisa completamente que el sistema funcione bien'),
+            ('unit', 'Revisar Base de Datos', 'Verifica que la información se guarde correctamente'),
+            ('integration', 'Revisar Procesos Completos', 'Prueba flujos de trabajo de principio a fin'),
+            ('views', 'Revisar Pantallas', 'Verifica que todas las páginas funcionen bien'),
+            ('services', 'Revisar Funciones del Sistema', 'Prueba las operaciones principales del sistema'),
+        ]
+    }
+
+    if request.method == 'POST':
+        test_category = request.POST.get('test_category', 'all')
+        verbose = request.POST.get('verbose') == 'on'
+        parallel = request.POST.get('parallel') == 'on'
+        coverage = request.POST.get('coverage') == 'on'
+
+        try:
+            import subprocess
+            import sys
+            import os
+            from datetime import datetime
+
+            # Construir comando pytest
+            cmd = [sys.executable, '-m', 'pytest', 'tests/']
+
+            # Agregar filtros por categoría
+            if test_category != 'all':
+                cmd.extend(['-m', test_category])
+
+            # Agregar opciones
+            if verbose:
+                cmd.append('-v')
+            else:
+                cmd.append('-q')
+
+            if parallel:
+                cmd.extend(['-n', 'auto'])
+
+            if coverage:
+                cmd.extend(['--cov=core', '--cov-report=html', '--cov-report=term'])
+
+            # Agregar formato de salida
+            cmd.extend(['--tb=short'])  # Removido --no-header para tener output
+
+            # Ejecutar tests
+            start_time = datetime.now()
+
+            # Obtener directorio raíz del proyecto donde está manage.py
+            # Subimos 2 niveles desde core/admin_views.py
+            current_file = os.path.abspath(__file__)
+            core_dir = os.path.dirname(current_file)  # C:\.../sam-2/core
+            project_root = os.path.dirname(core_dir)  # C:\.../sam-2
+
+            logger.info(f'[DEBUG TEST] Directorio del proyecto: {project_root}')
+            logger.info(f'[DEBUG TEST] Existe manage.py?: {os.path.exists(os.path.join(project_root, "manage.py"))}')
+            logger.info(f'[DEBUG TEST] Existe tests/?: {os.path.exists(os.path.join(project_root, "tests"))}')
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=600,  # 10 minutos timeout
+                cwd=project_root
+            )
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+
+            # Procesar resultados - manejar valores None
+            stdout_text = result.stdout if result.stdout else ""
+            stderr_text = result.stderr if result.stderr else ""
+            output = stdout_text + stderr_text
+            success = result.returncode == 0
+
+            # DEBUG: Log del output para diagnóstico
+            logger.info(f'[DEBUG TEST] Return code: {result.returncode}')
+            logger.info(f'[DEBUG TEST] Stdout length: {len(stdout_text)} caracteres')
+            logger.info(f'[DEBUG TEST] Stderr length: {len(stderr_text)} caracteres')
+            logger.info(f'[DEBUG TEST] Output primeros 500 chars: {output[:500]}')
+            logger.info(f'[DEBUG TEST] Comando ejecutado: {" ".join(cmd)}')
+
+            # Extraer estadísticas del output
+            import re
+            passed_match = re.search(r'(\d+) passed', output)
+            failed_match = re.search(r'(\d+) failed', output)
+            skipped_match = re.search(r'(\d+) skipped', output)
+            warnings_match = re.search(r'(\d+) warnings', output)
+
+            stats = {
+                'passed': int(passed_match.group(1)) if passed_match else 0,
+                'failed': int(failed_match.group(1)) if failed_match else 0,
+                'skipped': int(skipped_match.group(1)) if skipped_match else 0,
+                'warnings': int(warnings_match.group(1)) if warnings_match else 0,
+                'total': 0,
+                'duration': round(duration, 2),
+                'success_rate': 0
+            }
+
+            stats['total'] = stats['passed'] + stats['failed'] + stats['skipped']
+            if stats['total'] > 0:
+                stats['success_rate'] = round((stats['passed'] / stats['total']) * 100, 1)
+
+            # Guardar resultado en contexto
+            context.update({
+                'test_executed': True,
+                'test_success': success,
+                'test_output': output,
+                'test_stats': stats,
+                'test_command': ' '.join(cmd),
+                'test_category': test_category,
+            })
+
+            # Mensaje de éxito o error
+            if success:
+                messages.success(
+                    request,
+                    f'✅ Tests completados exitosamente: {stats["passed"]}/{stats["total"]} pasaron ({stats["success_rate"]}%)'
+                )
+            else:
+                messages.warning(
+                    request,
+                    f'⚠️ Tests completados con fallos: {stats["failed"]} tests fallaron de {stats["total"]} ejecutados'
+                )
+
+            # Guardar en historial de admin
+            AdminService.save_execution_to_history(
+                f'run_tests_{test_category}',
+                {
+                    'success': success,
+                    'stats': stats,
+                    'category': test_category,
+                    'duration': duration
+                },
+                request.user
+            )
+
+            logger.info(f'Tests ejecutados por {request.user.username}: {test_category}, {stats["passed"]}/{stats["total"]} pasaron')
+
+        except subprocess.TimeoutExpired:
+            messages.error(request, '❌ Tests excedieron el tiempo límite de 10 minutos')
+            context['test_executed'] = True
+            context['test_success'] = False
+            context['test_output'] = 'ERROR: Tests excedieron el tiempo límite de ejecución'
+
+        except Exception as e:
+            logger.error(f'Error ejecutando tests: {e}')
+            messages.error(request, f'❌ Error ejecutando tests: {str(e)}')
+            context['test_executed'] = True
+            context['test_success'] = False
+            context['test_output'] = f'ERROR: {str(e)}'
+
+    return render(request, 'admin/run_tests.html', context)

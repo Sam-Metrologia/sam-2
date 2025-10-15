@@ -137,6 +137,7 @@ urlpatterns = [
     path('admin/system/schedule/', admin_views.system_schedule, name='admin_schedule'),
     path('admin/system/email/', admin_views.email_configuration, name='admin_email_config'),
     path('admin/system/history/', admin_views.execution_history, name='admin_history'),
+    path('admin/system/tests/', admin_views.run_tests_panel, name='run_tests_panel'),
 
     # API endpoints para el panel de administración
     path('api/admin/status/', admin_views.api_system_status, name='api_system_status'),
@@ -165,4 +166,19 @@ urlpatterns = [
     # === URLs DE DEBUG ELIMINADAS ===
     # Eliminadas rutas de debug: s3_diagnostics, file_upload_test, logo_diagnostics,
     # test_logo_upload, fix_mi_logo, lista_empresas_sin_logo
+
+    # ==============================================================================
+    # SISTEMA DE MANTENIMIENTO WEB (Solo Superusuarios)
+    # ==============================================================================
+    path('maintenance/', views.maintenance_dashboard, name='maintenance_dashboard'),
+    path('maintenance/task/create/', views.create_maintenance_task, name='create_maintenance_task'),
+    path('maintenance/task/<int:task_id>/', views.maintenance_task_detail, name='maintenance_task_detail'),
+    path('maintenance/tasks/', views.maintenance_task_list, name='maintenance_task_list'),
+    path('maintenance/health/check/', views.run_system_health_check, name='run_system_health_check'),
+    path('maintenance/health/<int:check_id>/', views.system_health_detail, name='system_health_detail'),
+    path('maintenance/health/history/', views.system_health_history, name='system_health_history'),
+
+    # APIs para auto-refresh
+    path('api/maintenance/task/<int:task_id>/status/', views.task_status_api, name='task_status_api'),
+    path('api/maintenance/task/<int:task_id>/logs/', views.task_logs_api, name='task_logs_api'),
 ]
