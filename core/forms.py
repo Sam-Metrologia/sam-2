@@ -350,9 +350,9 @@ class EquipoForm(forms.ModelForm):
             'imagen_equipo': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.jpg,.jpeg,.png'}),
             'version_formato': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
             'codificacion_formato': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
-            'frecuencia_calibracion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.1', 'max': '120', 'step': '0.1'}),
-            'frecuencia_mantenimiento_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.1', 'max': '120', 'step': '0.1'}),
-            'frecuencia_comprobacion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.1', 'max': '120', 'step': '0.1'}),
+            'frecuencia_calibracion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.01', 'max': '120', 'step': '0.01'}),
+            'frecuencia_mantenimiento_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.01', 'max': '120', 'step': '0.01'}),
+            'frecuencia_comprobacion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.01', 'max': '120', 'step': '0.01'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -423,14 +423,6 @@ class EquipoForm(forms.ModelForm):
             if qs.exists():
                 raise ValidationError("Ya existe un equipo con este número de serie.")
         return numero_serie
-
-    def clean_empresa(self):
-        if self.request and not self.request.user.is_superuser:
-            if self.instance and self.instance.pk:
-                return self.instance.empresa
-            elif self.request.user.empresa:
-                return self.request.user.empresa
-        return self.cleaned_data['empresa']
 
     def clean(self):
         cleaned_data = super().clean()
@@ -761,7 +753,7 @@ class ProcedimientoForm(forms.ModelForm):
                 return self.instance.empresa
             elif self.request.user.empresa:
                 return self.request.user.empresa
-        return self.cleaned_data['empresa']
+        return self.cleaned_data.get('empresa')
 
 
 class ProveedorForm(forms.ModelForm):
@@ -827,7 +819,7 @@ class ProveedorForm(forms.ModelForm):
                 return self.instance.empresa
             elif self.request.user.empresa:
                 return self.request.user.empresa
-        return self.cleaned_data['empresa']
+        return self.cleaned_data.get('empresa')
 
 
 # Formularios adicionales
