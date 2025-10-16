@@ -672,6 +672,8 @@ class UbicacionForm(forms.ModelForm):
 
         # SEGURIDAD: OCULTAR campo empresa para TODOS los usuarios
         if request and request.user.empresa:
+            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
+            self.fields['empresa'].queryset = Empresa.objects.filter(id=request.user.empresa.id)
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
                 self.fields['empresa'].initial = request.user.empresa
@@ -723,6 +725,8 @@ class ProcedimientoForm(forms.ModelForm):
 
         # SEGURIDAD: Todos los usuarios solo pueden ver/seleccionar su propia empresa
         if self.request and self.request.user.empresa:
+            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
+            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
                 self.fields['empresa'].initial = self.request.user.empresa
@@ -782,6 +786,8 @@ class ProveedorForm(forms.ModelForm):
 
         # SEGURIDAD: Todos los usuarios solo pueden ver/seleccionar su propia empresa
         if self.request and self.request.user.empresa:
+            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
+            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
                 self.fields['empresa'].initial = self.request.user.empresa
@@ -861,6 +867,8 @@ class DocumentoForm(forms.ModelForm):
 
         # SEGURIDAD: OCULTAR campo empresa para TODOS los usuarios
         if self.request and self.request.user.empresa:
+            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
+            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
                 self.fields['empresa'].initial = self.request.user.empresa
