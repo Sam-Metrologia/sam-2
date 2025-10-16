@@ -361,6 +361,8 @@ class EquipoForm(forms.ModelForm):
 
         # SEGURIDAD: OCULTAR campo empresa para TODOS los usuarios
         if self.request and self.request.user.empresa:
+            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
+            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
             # Ocultar campo empresa y asignarlo automáticamente
             self.fields['empresa'].widget = forms.HiddenInput()
             if not self.instance.pk:
