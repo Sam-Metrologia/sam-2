@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0002_add_limite_almacenamiento_mb'),
+        ('core', '0011_remove_empresa_is_trial_and_more'),
     ]
 
     operations = [
