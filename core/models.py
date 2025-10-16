@@ -1434,7 +1434,7 @@ class Calibracion(models.Model):
         """
         if not self.equipo.frecuencia_calibracion_meses or not self.fecha_calibracion:
             return None
-        return self.fecha_calibracion + relativedelta(months=self.equipo.frecuencia_calibracion_meses)
+        return self.fecha_calibracion + relativedelta(months=int(self.equipo.frecuencia_calibracion_meses))
 
 class Mantenimiento(models.Model):
     """Modelo para registrar los mantenimientos de un equipo."""
@@ -1504,7 +1504,7 @@ class Mantenimiento(models.Model):
         """
         if not self.equipo.frecuencia_mantenimiento_meses or not self.fecha_mantenimiento:
             return None
-        return self.fecha_mantenimiento + relativedelta(months=self.equipo.frecuencia_mantenimiento_meses)
+        return self.fecha_mantenimiento + relativedelta(months=int(self.equipo.frecuencia_mantenimiento_meses))
 
 class Comprobacion(models.Model):
     """Modelo para registrar las comprobaciones (verificaciones intermedias) de un equipo."""
@@ -1565,7 +1565,7 @@ class Comprobacion(models.Model):
         """
         if not self.equipo.frecuencia_comprobacion_meses or not self.fecha_comprobacion:
             return None
-        return self.fecha_comprobacion + relativedelta(months=self.equipo.frecuencia_comprobacion_meses)
+        return self.fecha_comprobacion + relativedelta(months=int(self.equipo.frecuencia_comprobacion_meses))
 
 
 class BajaEquipo(models.Model):

@@ -988,7 +988,45 @@ def run_tests_panel(request):
 
             if is_production:
                 # EN PRODUCCIÓN: Usar Django test runner (NO requiere pytest)
-                # Usar directorio tests/ en raíz para evitar conflictos con core/tests
+                # Primero eliminar base de datos de tests si existe (evita conflictos de esquema)
+                try:
+                    import psycopg2
+                    from urllib.parse import urlparse
+                    import os
+
+                    database_url = os.environ.get('DATABASE_URL', '')
+                    if database_url:
+                        parsed = urlparse(database_url)
+                        test_db_name = 'test_' + parsed.path[1:]  # Remove leading '/'
+
+                        # Conectar a base de datos postgres por defecto para eliminar test db
+                        conn = psycopg2.connect(
+                            host=parsed.hostname,
+                            port=parsed.port or 5432,
+                            user=parsed.username,
+                            password=parsed.password,
+                            database='postgres'
+                        )
+                        conn.autocommit = True
+                        cursor = conn.cursor()
+
+                        # Terminar conexiones activas a la base de datos de tests
+                        cursor.execute(f"""
+                            SELECT pg_terminate_backend(pg_stat_activity.pid)
+                            FROM pg_stat_activity
+                            WHERE pg_stat_activity.datname = '{test_db_name}'
+                            AND pid <> pg_backend_pid();
+                        """)
+
+                        # Eliminar base de datos de tests si existe
+                        cursor.execute(f"DROP DATABASE IF EXISTS {test_db_name};")
+                        cursor.close()
+                        conn.close()
+                        logger.info(f'Base de datos de tests {test_db_name} eliminada exitosamente')
+                except Exception as e:
+                    logger.warning(f'No se pudo eliminar base de datos de tests: {e} (se intentará crear de todos modos)')
+
+                # Ejecutar tests
                 cmd = [sys.executable, 'manage.py', 'test', '--noinput']
 
                 # Agregar opciones de Django
