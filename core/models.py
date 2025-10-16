@@ -1342,7 +1342,7 @@ class Equipo(models.Model):
 
             if base_date:
                 delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.ima_comprobacion = base_date + delta
+                self.proxima_comprobacion = base_date + delta
             else:
                 self.proxima_comprobacion = None
 
