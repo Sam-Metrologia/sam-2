@@ -359,22 +359,27 @@ class EquipoForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # SEGURIDAD: OCULTAR campo empresa para TODOS los usuarios
-        if self.request and self.request.user.empresa:
-            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
-            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
-            # Ocultar campo empresa y asignarlo automáticamente
-            self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk:
-                self.fields['empresa'].initial = self.request.user.empresa
+        # SEGURIDAD: Manejo diferenciado del campo empresa
+        if self.request:
+            if self.request.user.is_superuser:
+                # SUPERUSUARIO: Puede seleccionar cualquier empresa
+                self.fields['empresa'].queryset = Empresa.objects.all()
+                self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
+                self.fields['empresa'].required = True
+            elif self.request.user.empresa:
+                # USUARIO NORMAL: Campo oculto, solo su empresa
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].widget = forms.HiddenInput()
+                if not self.instance.pk:
+                    self.fields['empresa'].initial = self.request.user.empresa
+                else:
+                    self.fields['empresa'].initial = self.instance.empresa
+                self.fields['empresa'].required = False
             else:
-                self.fields['empresa'].initial = self.instance.empresa
-            self.fields['empresa'].required = False
-        elif self.request:
-            # Usuario sin empresa asignada no puede crear equipos
-            self.fields['empresa'].queryset = Empresa.objects.none()
-            self.fields['empresa'].widget = forms.HiddenInput()
-            self.fields['empresa'].required = False
+                # Usuario sin empresa asignada no puede crear equipos
+                self.fields['empresa'].queryset = Empresa.objects.none()
+                self.fields['empresa'].widget = forms.HiddenInput()
+                self.fields['empresa'].required = False
 
         # Inicializar fechas en formato DD/MM/YYYY
         if self.instance:
@@ -385,14 +390,19 @@ class EquipoForm(forms.ModelForm):
                     self.fields[field_name].initial = date_value.strftime('%d/%m/%Y')
 
     def clean_empresa(self):
-        # SEGURIDAD: Siempre asignar la empresa del usuario actual
+        # SEGURIDAD: Manejo diferenciado por tipo de usuario
         if self.request:
-            if self.instance and self.instance.pk:
-                # Al editar, mantener la empresa actual
-                return self.instance.empresa
-            elif self.request.user.empresa:
-                # Al crear, asignar empresa del usuario
-                return self.request.user.empresa
+            if self.request.user.is_superuser:
+                # Superusuario: retornar lo que seleccionó en el formulario
+                return self.cleaned_data.get('empresa')
+            else:
+                # Usuario normal: siempre asignar su empresa
+                if self.instance and self.instance.pk:
+                    # Al editar, mantener la empresa actual
+                    return self.instance.empresa
+                elif self.request.user.empresa:
+                    # Al crear, asignar empresa del usuario
+                    return self.request.user.empresa
         return self.cleaned_data.get('empresa')
 
     def clean_codigo_interno(self):
@@ -659,28 +669,35 @@ class UbicacionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        request = kwargs.pop('request', None)
+        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # SEGURIDAD: OCULTAR campo empresa para TODOS los usuarios
-        if request and request.user.empresa:
-            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
-            self.fields['empresa'].queryset = Empresa.objects.filter(id=request.user.empresa.id)
-            self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk:
-                self.fields['empresa'].initial = request.user.empresa
+        # SEGURIDAD: Manejo diferenciado del campo empresa
+        if self.request:
+            if self.request.user.is_superuser:
+                # SUPERUSUARIO: Puede seleccionar cualquier empresa
+                self.fields['empresa'].queryset = Empresa.objects.all()
+                self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
+                self.fields['empresa'].required = True
+            elif self.request.user.empresa:
+                # USUARIO NORMAL: Campo oculto, solo su empresa
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].widget = forms.HiddenInput()
+                if not self.instance.pk:
+                    self.fields['empresa'].initial = self.request.user.empresa
+                else:
+                    self.fields['empresa'].initial = self.instance.empresa
+                self.fields['empresa'].required = False
             else:
-                self.fields['empresa'].initial = self.instance.empresa
-            self.fields['empresa'].required = False
-        elif request:
-            self.fields['empresa'].queryset = Empresa.objects.none()
-            self.fields['empresa'].widget = forms.HiddenInput()
-            self.fields['empresa'].required = False
+                # Usuario sin empresa no puede crear ubicaciones
+                self.fields['empresa'].queryset = Empresa.objects.none()
+                self.fields['empresa'].widget = forms.HiddenInput()
+                self.fields['empresa'].required = False
 
     def clean_nombre(self):
         nombre = self.cleaned_data.get('nombre')
         empresa = self.cleaned_data.get('empresa')
-        
+
         if nombre and empresa:
             # Verificar unicidad por empresa
             qs = Ubicacion.objects.filter(nombre=nombre, empresa=empresa)
@@ -689,6 +706,20 @@ class UbicacionForm(forms.ModelForm):
             if qs.exists():
                 raise ValidationError(f"Ya existe una ubicación con el nombre '{nombre}' en {empresa.nombre}.")
         return nombre
+
+    def clean_empresa(self):
+        # SEGURIDAD: Manejo diferenciado por tipo de usuario
+        if self.request:
+            if self.request.user.is_superuser:
+                # Superusuario: retornar lo que seleccionó
+                return self.cleaned_data.get('empresa')
+            else:
+                # Usuario normal: siempre su empresa
+                if self.instance and self.instance.pk:
+                    return self.instance.empresa
+                elif self.request.user.empresa:
+                    return self.request.user.empresa
+        return self.cleaned_data.get('empresa')
 
 
 class ProcedimientoForm(forms.ModelForm):
@@ -715,21 +746,27 @@ class ProcedimientoForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # SEGURIDAD: Todos los usuarios solo pueden ver/seleccionar su propia empresa
-        if self.request and self.request.user.empresa:
-            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
-            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
-            self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk:
-                self.fields['empresa'].initial = self.request.user.empresa
+        # SEGURIDAD: Manejo diferenciado del campo empresa
+        if self.request:
+            if self.request.user.is_superuser:
+                # SUPERUSUARIO: Puede seleccionar cualquier empresa
+                self.fields['empresa'].queryset = Empresa.objects.all()
+                self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
+                self.fields['empresa'].required = True
+            elif self.request.user.empresa:
+                # USUARIO NORMAL: Campo oculto, solo su empresa
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].widget = forms.HiddenInput()
+                if not self.instance.pk:
+                    self.fields['empresa'].initial = self.request.user.empresa
+                else:
+                    self.fields['empresa'].initial = self.instance.empresa
+                self.fields['empresa'].required = False
             else:
-                self.fields['empresa'].initial = self.instance.empresa
-            self.fields['empresa'].required = False
-        elif self.request:
-            # Usuario sin empresa asignada no puede crear procedimientos
-            self.fields['empresa'].queryset = Empresa.objects.none()
-            self.fields['empresa'].widget = forms.HiddenInput()
-            self.fields['empresa'].required = False
+                # Usuario sin empresa no puede crear procedimientos
+                self.fields['empresa'].queryset = Empresa.objects.none()
+                self.fields['empresa'].widget = forms.HiddenInput()
+                self.fields['empresa'].required = False
 
         if self.instance and self.instance.fecha_emision:
             self.fields['fecha_emision'].initial = self.instance.fecha_emision.strftime('%d/%m/%Y')
@@ -776,21 +813,27 @@ class ProveedorForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # SEGURIDAD: Todos los usuarios solo pueden ver/seleccionar su propia empresa
-        if self.request and self.request.user.empresa:
-            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
-            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
-            self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk:
-                self.fields['empresa'].initial = self.request.user.empresa
+        # SEGURIDAD: Manejo diferenciado del campo empresa
+        if self.request:
+            if self.request.user.is_superuser:
+                # SUPERUSUARIO: Puede seleccionar cualquier empresa
+                self.fields['empresa'].queryset = Empresa.objects.all()
+                self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
+                self.fields['empresa'].required = True
+            elif self.request.user.empresa:
+                # USUARIO NORMAL: Campo oculto, solo su empresa
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].widget = forms.HiddenInput()
+                if not self.instance.pk:
+                    self.fields['empresa'].initial = self.request.user.empresa
+                else:
+                    self.fields['empresa'].initial = self.instance.empresa
+                self.fields['empresa'].required = False
             else:
-                self.fields['empresa'].initial = self.instance.empresa
-            self.fields['empresa'].required = False
-        elif self.request:
-            # Usuario sin empresa asignada no puede crear proveedores
-            self.fields['empresa'].queryset = Empresa.objects.none()
-            self.fields['empresa'].widget = forms.HiddenInput()
-            self.fields['empresa'].required = False
+                # Usuario sin empresa no puede crear proveedores
+                self.fields['empresa'].queryset = Empresa.objects.none()
+                self.fields['empresa'].widget = forms.HiddenInput()
+                self.fields['empresa'].required = False
 
     def clean_nombre_empresa(self):
         nombre_empresa = self.cleaned_data.get('nombre_empresa')
@@ -857,28 +900,40 @@ class DocumentoForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # SEGURIDAD: OCULTAR campo empresa para TODOS los usuarios
-        if self.request and self.request.user.empresa:
-            # Filtrar queryset para incluir SOLO la empresa del usuario (CRÍTICO para validación)
-            self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
-            self.fields['empresa'].widget = forms.HiddenInput()
-            if not self.instance.pk:
-                self.fields['empresa'].initial = self.request.user.empresa
+        # SEGURIDAD: Manejo diferenciado del campo empresa
+        if self.request:
+            if self.request.user.is_superuser:
+                # SUPERUSUARIO: Puede seleccionar cualquier empresa
+                self.fields['empresa'].queryset = Empresa.objects.all()
+                self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
+                self.fields['empresa'].required = True
+            elif self.request.user.empresa:
+                # USUARIO NORMAL: Campo oculto, solo su empresa
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].widget = forms.HiddenInput()
+                if not self.instance.pk:
+                    self.fields['empresa'].initial = self.request.user.empresa
+                else:
+                    self.fields['empresa'].initial = self.instance.empresa
+                self.fields['empresa'].required = False
             else:
-                self.fields['empresa'].initial = self.instance.empresa
-            self.fields['empresa'].required = False
-        elif self.request:
-            self.fields['empresa'].queryset = Empresa.objects.none()
-            self.fields['empresa'].widget = forms.HiddenInput()
-            self.fields['empresa'].required = False
+                # Usuario sin empresa no puede crear documentos
+                self.fields['empresa'].queryset = Empresa.objects.none()
+                self.fields['empresa'].widget = forms.HiddenInput()
+                self.fields['empresa'].required = False
 
     def clean_empresa(self):
-        # SEGURIDAD: Siempre asignar la empresa del usuario actual
+        # SEGURIDAD: Manejo diferenciado por tipo de usuario
         if self.request:
-            if self.instance and self.instance.pk:
-                return self.instance.empresa
-            elif self.request.user.empresa:
-                return self.request.user.empresa
+            if self.request.user.is_superuser:
+                # Superusuario: retornar lo que seleccionó
+                return self.cleaned_data.get('empresa')
+            else:
+                # Usuario normal: siempre su empresa
+                if self.instance and self.instance.pk:
+                    return self.instance.empresa
+                elif self.request.user.empresa:
+                    return self.request.user.empresa
         return self.cleaned_data.get('empresa')
 
 
