@@ -407,10 +407,7 @@ class EquipoForm(forms.ModelForm):
 
     def clean_codigo_interno(self):
         codigo = self.cleaned_data.get('codigo_interno')
-        if codigo:
-            # Validar formato del código
-            if not re.match(r'^[A-Z0-9\-_]{3,20}$', codigo):
-                raise ValidationError("El código interno debe tener 3-20 caracteres alfanuméricos, guiones o guiones bajos")
+        # Sin restricciones de formato - el cliente puede usar cualquier código
         return codigo
 
     def clean_numero_serie(self):
