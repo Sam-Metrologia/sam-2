@@ -21,6 +21,46 @@ import logging # Para logging en métodos de eliminación/restauración
 # Configurar logger para este módulo
 logger = logging.getLogger('core')
 
+
+# ==============================================================================
+# FUNCIONES AUXILIARES
+# ==============================================================================
+
+def meses_decimales_a_relativedelta(meses_decimal):
+    """
+    Convierte meses decimales a un objeto relativedelta con meses y días.
+
+    Permite frecuencias más precisas como 1.5 meses (1 mes + 15 días)
+    o 2.25 meses (2 meses + 7 días).
+
+    Ejemplos:
+        - 1.5 meses = 1 mes + 15 días
+        - 2.25 meses = 2 meses + 7 días
+        - 0.5 meses = 15 días
+        - 6.0 meses = 6 meses exactos
+
+    Args:
+        meses_decimal (Decimal): Número de meses (puede tener decimales)
+
+    Returns:
+        relativedelta: Objeto relativedelta con meses y días calculados
+    """
+    if meses_decimal is None:
+        return relativedelta(months=0)
+
+    # Convertir Decimal a float
+    meses_float = float(meses_decimal)
+
+    # Separar parte entera (meses) y decimal (fracción de mes)
+    meses_enteros = int(meses_float)
+    fraccion_mes = meses_float - meses_enteros
+
+    # Convertir fracción de mes a días (promedio de 30.44 días por mes)
+    dias_adicionales = round(fraccion_mes * 30.44)
+
+    return relativedelta(months=meses_enteros, days=dias_adicionales)
+
+
 # ==============================================================================
 # MODELO DE USUARIO PERSONALIZADO (AÑADIDO Y AJUSTADO)
 # ==============================================================================
@@ -1230,15 +1270,15 @@ class Equipo(models.Model):
 
         # Si hay una última calibración, calcular a partir de ella
         if latest_calibracion and latest_calibracion.fecha_calibracion:
-            # Convertir Decimal a int para relativedelta si es un número entero
-            freq = int(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = latest_calibracion.fecha_calibracion + relativedelta(months=freq)
+            # Usar función helper para manejar decimales correctamente
+            delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
+            self.proxima_calibracion = latest_calibracion.fecha_calibracion + delta
         else:
             # Si no hay calibraciones previas, proyectar desde la fecha de adquisición o registro del equipo
             base_date = self.fecha_adquisicion if self.fecha_adquisicion else self.fecha_registro.date()
             if base_date:
-                freq = int(self.frecuencia_calibracion_meses)
-                self.proxima_calibracion = base_date + relativedelta(months=freq)
+                delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
+                self.proxima_calibracion = base_date + delta
             else:
                 self.proxima_calibracion = None
 
@@ -1255,8 +1295,8 @@ class Equipo(models.Model):
         latest_mantenimiento = self.mantenimientos.order_by('-fecha_mantenimiento').first()
 
         if latest_mantenimiento and latest_mantenimiento.fecha_mantenimiento:
-            freq = int(self.frecuencia_mantenimiento_meses)
-            self.proximo_mantenimiento = latest_mantenimiento.fecha_mantenimiento + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = latest_mantenimiento.fecha_mantenimiento + delta
         else:
             # JERARQUÍA CORRECTA: 1. fecha_ultima_mantenimiento, 2. fecha_ultima_calibracion, 3. fecha_adquisicion, 4. fecha_registro
             if self.fecha_ultimo_mantenimiento:
@@ -1269,8 +1309,8 @@ class Equipo(models.Model):
                 base_date = self.fecha_registro.date()
 
             if base_date:
-                freq = int(self.frecuencia_mantenimiento_meses)
-                self.proximo_mantenimiento = base_date + relativedelta(months=freq)
+                delta = meses_decimales_a_relativedelta(self.frecuencia_mantenimiento_meses)
+                self.proximo_mantenimiento = base_date + delta
             else:
                 self.proximo_mantenimiento = None
 
@@ -1287,8 +1327,8 @@ class Equipo(models.Model):
         latest_comprobacion = self.comprobaciones.order_by('-fecha_comprobacion').first()
 
         if latest_comprobacion and latest_comprobacion.fecha_comprobacion:
-            freq = int(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = latest_comprobacion.fecha_comprobacion + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
+            self.ima_comprobacion = latest_comprobacion.fecha_comprobacion + delta
         else:
             # JERARQUÍA CORRECTA: 1. fecha_ultima_comprobacion, 2. fecha_ultima_calibracion, 3. fecha_adquisicion, 4. fecha_registro
             if self.fecha_ultima_comprobacion:
@@ -1301,8 +1341,8 @@ class Equipo(models.Model):
                 base_date = self.fecha_registro.date()
 
             if base_date:
-                freq = int(self.frecuencia_comprobacion_meses)
-                self.proxima_comprobacion = base_date + relativedelta(months=freq)
+                delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
+            self.ima_comprobacion = base_date + delta
             else:
                 self.proxima_comprobacion = None
 
@@ -1317,14 +1357,14 @@ class Equipo(models.Model):
             return
 
         if fecha_base:
-            freq = int(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = fecha_base + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
+            self.ima_calibracion = fecha_base + delta
         elif self.fecha_adquisicion:
-            freq = int(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = self.fecha_adquisicion + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
+            self.ima_calibracion = self.fecha_adquisicion + delta
         elif self.fecha_registro:
-            freq = int(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = self.fecha_registro.date() + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
+            self.ima_calibracion = self.fecha_registro.date() + delta
         else:
             self.proxima_calibracion = None
 
@@ -1339,14 +1379,14 @@ class Equipo(models.Model):
             return
 
         if fecha_base:
-            freq = int(self.frecuencia_mantenimiento_meses)
-            self.proximo_mantenimiento = fecha_base + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = fecha_base + delta
         elif self.fecha_adquisicion:
-            freq = int(self.frecuencia_mantenimiento_meses)
-            self.proximo_mantenimiento = self.fecha_adquisicion + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = self.fecha_adquisicion + delta
         elif self.fecha_registro:
-            freq = int(self.frecuencia_mantenimiento_meses)
-            self.proximo_mantenimiento = self.fecha_registro.date() + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_mantenimiento_meses)
+            self.proximo_mantenimiento = self.fecha_registro.date() + delta
         else:
             self.proximo_mantenimiento = None
 
@@ -1361,14 +1401,14 @@ class Equipo(models.Model):
             return
 
         if fecha_base:
-            freq = int(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = fecha_base + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
+            self.ima_comprobacion = fecha_base + delta
         elif self.fecha_adquisicion:
-            freq = int(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = self.fecha_adquisicion + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
+            self.ima_comprobacion = self.fecha_adquisicion + delta
         elif self.fecha_registro:
-            freq = int(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = self.fecha_registro.date() + relativedelta(months=freq)
+            delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
+            self.ima_comprobacion = self.fecha_registro.date() + delta
         else:
             self.proxima_comprobacion = None
 
@@ -1434,7 +1474,7 @@ class Calibracion(models.Model):
         """
         if not self.equipo.frecuencia_calibracion_meses or not self.fecha_calibracion:
             return None
-        return self.fecha_calibracion + relativedelta(months=int(self.equipo.frecuencia_calibracion_meses))
+        return self.fecha_calibracion + meses_decimales_a_relativedelta(self.equipo.frecuencia_calibracion_meses)
 
 class Mantenimiento(models.Model):
     """Modelo para registrar los mantenimientos de un equipo."""
@@ -1504,7 +1544,7 @@ class Mantenimiento(models.Model):
         """
         if not self.equipo.frecuencia_mantenimiento_meses or not self.fecha_mantenimiento:
             return None
-        return self.fecha_mantenimiento + relativedelta(months=int(self.equipo.frecuencia_mantenimiento_meses))
+        return self.fecha_mantenimiento + meses_decimales_a_relativedelta(self.equipo.frecuencia_mantenimiento_meses)
 
 class Comprobacion(models.Model):
     """Modelo para registrar las comprobaciones (verificaciones intermedias) de un equipo."""
@@ -1565,7 +1605,7 @@ class Comprobacion(models.Model):
         """
         if not self.equipo.frecuencia_comprobacion_meses or not self.fecha_comprobacion:
             return None
-        return self.fecha_comprobacion + relativedelta(months=int(self.equipo.frecuencia_comprobacion_meses))
+        return self.fecha_comprobacion + meses_decimales_a_relativedelta(self.equipo.frecuencia_comprobacion_meses)
 
 
 class BajaEquipo(models.Model):
