@@ -411,16 +411,6 @@ class EquipoForm(forms.ModelForm):
             # Validar formato del código
             if not re.match(r'^[A-Z0-9\-_]{3,20}$', codigo):
                 raise ValidationError("El código interno debe tener 3-20 caracteres alfanuméricos, guiones o guiones bajos")
-
-            # Verificar unicidad del código interno por empresa
-            empresa = self.cleaned_data.get('empresa') or (self.request.user.empresa if self.request else None)
-            if empresa:
-                qs = Equipo.objects.filter(codigo_interno=codigo, empresa=empresa)
-                if self.instance.pk:
-                    # CORRECCIÓN: Excluir el equipo actual al editar
-                    qs = qs.exclude(pk=self.instance.pk)
-                if qs.exists():
-                    raise ValidationError(f"Ya existe un equipo con código '{codigo}' en {empresa.nombre}")
         return codigo
 
     def clean_numero_serie(self):
@@ -436,7 +426,14 @@ class EquipoForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        
+
+        # Asegurar que empresa esté en cleaned_data antes de validaciones
+        if not cleaned_data.get('empresa'):
+            # Si empresa no está en cleaned_data, obtenerla del clean_empresa()
+            empresa = self.clean_empresa()
+            if empresa:
+                cleaned_data['empresa'] = empresa
+
         # Validar fechas lógicas
         fecha_adquisicion = cleaned_data.get('fecha_adquisicion')
         if fecha_adquisicion and fecha_adquisicion > timezone.now().date():
@@ -447,6 +444,18 @@ class EquipoForm(forms.ModelForm):
             freq = cleaned_data.get(field_name)
             if freq is not None and freq <= 0:
                 raise ValidationError(f"La {field_name.replace('_', ' ')} debe ser positiva.")
+
+        # Validar unicidad de codigo_interno con empresa
+        codigo = cleaned_data.get('codigo_interno')
+        empresa = cleaned_data.get('empresa')
+        if codigo and empresa:
+            qs = Equipo.objects.filter(codigo_interno=codigo, empresa=empresa)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError({
+                    'codigo_interno': f"Ya existe un equipo con el código '{codigo}' en {empresa.nombre}"
+                })
 
         return cleaned_data
 
