@@ -1432,7 +1432,7 @@ class Calibracion(models.Model):
         Calcula la próxima fecha de calibración basada en la fecha de esta calibración
         y la frecuencia de calibración del equipo.
         """
-        if not self.equipo.frecuencia_calibracion_meses:
+        if not self.equipo.frecuencia_calibracion_meses or not self.fecha_calibracion:
             return None
         return self.fecha_calibracion + relativedelta(months=self.equipo.frecuencia_calibracion_meses)
 
@@ -1502,7 +1502,7 @@ class Mantenimiento(models.Model):
         Calcula la próxima fecha de mantenimiento basada en la fecha de este mantenimiento
         y la frecuencia de mantenimiento del equipo.
         """
-        if not self.equipo.frecuencia_mantenimiento_meses:
+        if not self.equipo.frecuencia_mantenimiento_meses or not self.fecha_mantenimiento:
             return None
         return self.fecha_mantenimiento + relativedelta(months=self.equipo.frecuencia_mantenimiento_meses)
 
@@ -1563,7 +1563,7 @@ class Comprobacion(models.Model):
         Calcula la próxima fecha de comprobación basada en la fecha de esta comprobación
         y la frecuencia de comprobación del equipo.
         """
-        if not self.equipo.frecuencia_comprobacion_meses:
+        if not self.equipo.frecuencia_comprobacion_meses or not self.fecha_comprobacion:
             return None
         return self.fecha_comprobacion + relativedelta(months=self.equipo.frecuencia_comprobacion_meses)
 
