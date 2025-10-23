@@ -35,6 +35,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: 🗑️ Limpiar cache de pytest
+        run: |
+          rm -f pytest.ini .pytest_cache -rf || true
+          echo "Cache limpiado"
+
       - name: 📦 Instalar dependencias
         run: |
           python -m pip install --upgrade pip
