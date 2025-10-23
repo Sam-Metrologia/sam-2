@@ -3,13 +3,10 @@ Global pytest configuration and fixtures for SAM Platform tests.
 """
 import pytest
 from django.test import Client
-from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from datetime import timedelta
 import os
-
-User = get_user_model()
 
 
 # ============================================================================
