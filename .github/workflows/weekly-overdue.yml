@@ -1,0 +1,34 @@
+# GitHub Action: Notificaciones Vencidas Semanales
+# Se ejecuta los lunes a las 8:00 AM (hora Colombia = UTC-5 = 13:00 UTC)
+
+name: Notificaciones Vencidas Semanales
+
+on:
+  schedule:
+    # Lunes 13:00 UTC = Lunes 8:00 AM Colombia
+    - cron: '0 13 * * 1'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  send-overdue:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar notificaciones de actividades vencidas
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/notifications/weekly-overdue/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Notificaciones vencidas enviadas exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al enviar notificaciones vencidas"
+          exit 1

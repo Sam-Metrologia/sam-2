@@ -38,5 +38,16 @@ from .maintenance import (
     task_logs_api
 )
 
+# API para Tareas Programadas (GitHub Actions)
+from .scheduled_tasks_api import (
+    health_check as scheduled_health_check,
+    trigger_daily_notifications,
+    trigger_daily_maintenance,
+    trigger_cleanup_zips,
+    trigger_weekly_overdue,
+    trigger_check_trials,
+    trigger_cleanup_notifications
+)
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

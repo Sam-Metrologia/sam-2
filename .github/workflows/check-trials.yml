@@ -1,0 +1,34 @@
+# GitHub Action: Verificar Trials Expirados
+# Se ejecuta todos los días a las 5:00 AM (hora Colombia = UTC-5 = 10:00 UTC)
+
+name: Verificar Trials Expirados
+
+on:
+  schedule:
+    # 10:00 UTC = 5:00 AM Colombia
+    - cron: '0 10 * * *'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  check-trials:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar empresas con trial expirado
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/check-trials/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Trials verificados exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al verificar trials"
+          exit 1

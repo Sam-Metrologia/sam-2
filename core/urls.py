@@ -181,4 +181,15 @@ urlpatterns = [
     # APIs para auto-refresh
     path('api/maintenance/task/<int:task_id>/status/', views.task_status_api, name='task_status_api'),
     path('api/maintenance/task/<int:task_id>/logs/', views.task_logs_api, name='task_logs_api'),
+
+    # ==============================================================================
+    # API PARA TAREAS PROGRAMADAS (GitHub Actions)
+    # ==============================================================================
+    path('api/scheduled/health/', views.scheduled_health_check, name='scheduled_health_check'),
+    path('api/scheduled/notifications/daily/', views.trigger_daily_notifications, name='trigger_daily_notifications'),
+    path('api/scheduled/maintenance/daily/', views.trigger_daily_maintenance, name='trigger_daily_maintenance'),
+    path('api/scheduled/cleanup/zips/', views.trigger_cleanup_zips, name='trigger_cleanup_zips'),
+    path('api/scheduled/notifications/weekly-overdue/', views.trigger_weekly_overdue, name='trigger_weekly_overdue'),
+    path('api/scheduled/check-trials/', views.trigger_check_trials, name='trigger_check_trials'),
+    path('api/scheduled/cleanup/notifications/', views.trigger_cleanup_notifications, name='trigger_cleanup_notifications'),
 ]

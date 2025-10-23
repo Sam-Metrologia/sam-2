@@ -1,0 +1,34 @@
+# GitHub Action: Mantenimiento Diario
+# Se ejecuta todos los días a las 3:00 AM (hora Colombia = UTC-5 = 8:00 UTC)
+
+name: Mantenimiento Diario
+
+on:
+  schedule:
+    # 8:00 UTC = 3:00 AM Colombia
+    - cron: '0 8 * * *'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  run-maintenance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ejecutar mantenimiento diario
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/maintenance/daily/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Mantenimiento ejecutado exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error en mantenimiento diario"
+          exit 1

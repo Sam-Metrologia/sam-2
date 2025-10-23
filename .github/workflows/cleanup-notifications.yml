@@ -1,0 +1,34 @@
+# GitHub Action: Limpieza de Notificaciones Antiguas
+# Se ejecuta los domingos a las 4:00 AM (hora Colombia = UTC-5 = 9:00 UTC)
+
+name: Limpieza de Notificaciones Antiguas
+
+on:
+  schedule:
+    # Domingo 9:00 UTC = Domingo 4:00 AM Colombia
+    - cron: '0 9 * * 0'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  cleanup-notifications:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Limpiar notificaciones antiguas (>30 días)
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/cleanup/notifications/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Notificaciones antiguas limpiadas exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al limpiar notificaciones antiguas"
+          exit 1

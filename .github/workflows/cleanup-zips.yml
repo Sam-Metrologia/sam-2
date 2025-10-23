@@ -1,0 +1,34 @@
+# GitHub Action: Limpieza de Archivos ZIP
+# Se ejecuta cada 6 horas
+
+name: Limpieza de Archivos ZIP
+
+on:
+  schedule:
+    # Cada 6 horas (0:00, 6:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  cleanup-zips:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Limpiar archivos ZIP antiguos
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/cleanup/zips/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Archivos ZIP limpiados exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al limpiar archivos ZIP"
+          exit 1

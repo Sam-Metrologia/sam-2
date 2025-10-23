@@ -1,0 +1,34 @@
+# GitHub Action: Notificaciones Diarias
+# Se ejecuta todos los días a las 8:00 AM (hora Colombia = UTC-5 = 13:00 UTC)
+
+name: Notificaciones Diarias
+
+on:
+  schedule:
+    # 13:00 UTC = 8:00 AM Colombia
+    - cron: '0 13 * * *'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  send-notifications:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar notificaciones diarias
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/notifications/daily/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Notificaciones enviadas exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al enviar notificaciones"
+          exit 1
