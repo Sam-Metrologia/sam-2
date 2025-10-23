@@ -532,6 +532,12 @@ RATE_LIMIT_CONFIG = {
 }
 
 # ==============================================================================
+# CONFIGURACIÓN DE TAREAS PROGRAMADAS (GitHub Actions)
+# ==============================================================================
+# Token de seguridad para autenticar llamadas de GitHub Actions
+SCHEDULED_TASKS_TOKEN = os.environ.get('SCHEDULED_TASKS_TOKEN', 'change-this-secret-token-in-production')
+
+# ==============================================================================
 # CONFIGURACIÓN DE MONITOREO Y MÉTRICAS (OPCIONAL)
 # ==============================================================================
 if RENDER_EXTERNAL_HOSTNAME:
