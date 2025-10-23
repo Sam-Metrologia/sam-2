@@ -13,9 +13,19 @@ from django.db.models import Max
 from django.core.files.storage import default_storage
 from datetime import timedelta
 from core.models import ZipRequest, Empresa, Equipo, Proveedor, Procedimiento
-from .views.base import access_check
 
 logger = logging.getLogger(__name__)
+
+# Lazy import wrapper to avoid circular import (access_check imports from views)
+def access_check(view_func):
+    """Wrapper que hace lazy import de access_check para evitar importación circular."""
+    def wrapper(*args, **kwargs):
+        from .views.base import access_check as real_access_check
+        decorated = real_access_check(view_func)
+        return decorated(*args, **kwargs)
+    wrapper.__name__ = view_func.__name__
+    wrapper.__doc__ = view_func.__doc__
+    return wrapper
 
 # Función de streaming local para evitar importaciones circulares
 def stream_file_to_zip_local(zip_file, file_path, zip_path):
