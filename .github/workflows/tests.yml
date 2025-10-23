@@ -29,10 +29,10 @@ jobs:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar Python 3.13
+      - name: 🐍 Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
           cache: 'pip'
 
       - name: 📦 Instalar dependencias
@@ -46,6 +46,14 @@ jobs:
           pip list | grep pytest
           python manage.py check --deploy
 
+      - name: 🗄️ Esperar PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Esperando PostgreSQL..."
+            sleep 2
+          done
+          echo "PostgreSQL listo!"
+
       - name: 🧪 Ejecutar tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_sam
@@ -57,11 +65,9 @@ jobs:
             --cov=core \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-report=html \
             --verbose \
             --tb=short \
-            --maxfail=5 \
-            -n auto
+            --maxfail=5
 
       - name: 📊 Subir cobertura a Codecov
         uses: codecov/codecov-action@v4
@@ -95,10 +101,10 @@ jobs:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar Python 3.13
+      - name: 🐍 Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
 
       - name: 📦 Instalar linters
         run: |
@@ -126,10 +132,10 @@ jobs:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar Python 3.13
+      - name: 🐍 Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
 
       - name: 🔒 Verificar dependencias con Safety
         run: |
