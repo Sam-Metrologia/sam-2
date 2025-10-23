@@ -69,8 +69,17 @@ jobs:
           echo "=== Verificando estructura de tests ==="
           ls -la tests/
           echo ""
-          echo "=== Verificando pytest puede importar tests ==="
-          pytest --collect-only -v || echo "ERROR en collection"
+          echo "=== Verificando __init__.py en subcarpetas ==="
+          find tests/ -name "*.py" -type f | head -20
+          echo ""
+          echo "=== Verificando pytest puede importar tests (con traceback completo) ==="
+          pytest --collect-only -vv --tb=long 2>&1 || echo "ERROR en collection"
+          echo ""
+          echo "=== Intentando importar conftest directamente ==="
+          python -c "import sys; sys.path.insert(0, '.'); from tests import conftest; print('conftest importado OK')" || echo "ERROR importando conftest"
+          echo ""
+          echo "=== Intentando importar un test directamente ==="
+          python -c "import sys; sys.path.insert(0, '.'); from tests.test_models import test_empresa; print('test_empresa importado OK')" || echo "ERROR importando test"
 
       - name: 🧪 Ejecutar tests
         env:
