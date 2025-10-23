@@ -54,6 +54,19 @@ jobs:
           done
           echo "PostgreSQL listo!"
 
+      - name: 🔍 Verificar tests discovery
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_sam
+          DJANGO_SETTINGS_MODULE: proyecto_c.settings
+          SECRET_KEY: test-secret-key-for-ci-only
+          DEBUG_VALUE: 'False'
+        run: |
+          echo "=== Verificando estructura de tests ==="
+          ls -la tests/
+          echo ""
+          echo "=== Verificando pytest puede importar tests ==="
+          pytest --collect-only -v || echo "ERROR en collection"
+
       - name: 🧪 Ejecutar tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_sam
