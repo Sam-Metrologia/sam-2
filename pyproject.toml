@@ -1,0 +1,25 @@
+[tool.pytest.ini_options]
+# Configuración mínima de pytest para GitHub Actions
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Django configuration
+DJANGO_SETTINGS_MODULE = "proyecto_c.settings"
+addopts = [
+    "-v",
+    "--tb=short",
+]
+
+[tool.coverage.run]
+source = ["core"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
