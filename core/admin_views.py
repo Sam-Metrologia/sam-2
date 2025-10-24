@@ -100,6 +100,12 @@ def system_maintenance(request):
             # Ejecutar tarea en segundo plano
             try:
                 python_path = sys.executable
+
+                # MEJORADO: 2025-10-24 - Validar task.id es entero
+                # Aunque ya usa lista (seguro), validamos por precaución
+                if not isinstance(task.id, int):
+                    raise ValueError(f"task.id debe ser entero, recibido: {type(task.id)}")
+
                 subprocess.Popen(
                     [python_path, 'manage.py', 'run_maintenance_task', str(task.id)],
                     stdout=subprocess.PIPE,
@@ -1010,16 +1016,25 @@ def run_tests_panel(request):
                         conn.autocommit = True
                         cursor = conn.cursor()
 
+                        # CORREGIDO: 2025-10-24 - SQL Injection Prevention
+                        # Usar parametrización segura para prevenir inyección SQL
+                        from psycopg2 import sql
+
                         # Terminar conexiones activas a la base de datos de tests
-                        cursor.execute(f"""
+                        # Usar %s para valores, sql.Identifier para nombres de objetos
+                        cursor.execute("""
                             SELECT pg_terminate_backend(pg_stat_activity.pid)
                             FROM pg_stat_activity
-                            WHERE pg_stat_activity.datname = '{test_db_name}'
+                            WHERE pg_stat_activity.datname = %s
                             AND pid <> pg_backend_pid();
-                        """)
+                        """, [test_db_name])
 
                         # Eliminar base de datos de tests si existe
-                        cursor.execute(f"DROP DATABASE IF EXISTS {test_db_name};")
+                        # Para nombres de BD, usar sql.Identifier (no se puede parametrizar con %s)
+                        drop_query = sql.SQL("DROP DATABASE IF EXISTS {db_name}").format(
+                            db_name=sql.Identifier(test_db_name)
+                        )
+                        cursor.execute(drop_query)
                         cursor.close()
                         conn.close()
                         logger.info(f'Base de datos de tests {test_db_name} eliminada exitosamente')

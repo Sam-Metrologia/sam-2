@@ -157,6 +157,11 @@ def create_maintenance_task(request):
             # Obtener ruta de Python
             python_path = sys.executable
 
+            # MEJORADO: 2025-10-24 - Validar task.id es entero
+            # Aunque ya usa lista (seguro), validamos por precaución
+            if not isinstance(task.id, int):
+                raise ValueError(f"task.id debe ser entero, recibido: {type(task.id)}")
+
             # Ejecutar comando en background
             subprocess.Popen(
                 [python_path, 'manage.py', 'run_maintenance_task', str(task.id)],

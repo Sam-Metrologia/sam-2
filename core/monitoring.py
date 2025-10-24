@@ -425,6 +425,10 @@ class SystemMonitor:
                 # Contar total de registros en tablas principales
                 stats = {}
 
+                # CORREGIDO: 2025-10-24 - SQL Injection Prevention
+                # Usar sql.Identifier para nombres de tablas
+                from psycopg2 import sql
+
                 tables = [
                     'core_empresa', 'core_equipo', 'core_calibracion',
                     'core_mantenimiento', 'core_comprobacion', 'core_customuser'
@@ -432,7 +436,11 @@ class SystemMonitor:
 
                 for table in tables:
                     try:
-                        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                        # Usar sql.Identifier para nombres de tablas (no se puede usar %s)
+                        query = sql.SQL("SELECT COUNT(*) FROM {table}").format(
+                            table=sql.Identifier(table)
+                        )
+                        cursor.execute(query)
                         count = cursor.fetchone()[0]
                         stats[table] = count
                     except Exception:

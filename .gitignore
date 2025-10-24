@@ -26,7 +26,19 @@ MANIFEST
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+
+# CRÍTICO: Variables de entorno y secrets (NUNCA commitear)
 .env
+.env.*
+*.env
+!.env.example
+secrets.py
+credentials.json
+*.pem
+*.key
+*.crt
+
+# Virtual environments
 .venv
 env/
 venv/

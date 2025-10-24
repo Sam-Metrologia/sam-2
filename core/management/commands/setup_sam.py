@@ -245,14 +245,34 @@ if __name__ == '__main__':
     if not os.path.exists('manage.py'):
         print("❌ Error: Este script debe ejecutarse desde el directorio raíz del proyecto Django")
         sys.exit(1)
-    
+
+    # CORREGIDO: 2025-10-24 - Command Injection Prevention
+    # Usar subprocess.run con lista de argumentos (NO shell=True)
+    import subprocess
+
     # Ejecutar migraciones primero
     print("📦 Aplicando migraciones...")
-    os.system('python manage.py migrate')
-    
+    try:
+        subprocess.run(
+            [sys.executable, 'manage.py', 'migrate'],
+            check=True,
+            capture_output=False
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error ejecutando migraciones: {e}")
+        sys.exit(1)
+
     # Ejecutar recolección de archivos estáticos
     print("📦 Recolectando archivos estáticos...")
-    os.system('python manage.py collectstatic --noinput')
+    try:
+        subprocess.run(
+            [sys.executable, 'manage.py', 'collectstatic', '--noinput'],
+            check=True,
+            capture_output=False
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error ejecutando collectstatic: {e}")
+        sys.exit(1)
     
     # Ejecutar nuestro comando personalizado
     main()

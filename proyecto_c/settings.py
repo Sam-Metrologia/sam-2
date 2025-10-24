@@ -3,21 +3,52 @@
 import os
 from pathlib import Path
 from django.contrib.messages import constants as messages
+from django.core.exceptions import ImproperlyConfigured
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'un_valor_por_defecto_muy_largo_y_aleatorio_para_desarrollo_local_SOLO')
+# ============================================================================
+# SECRET_KEY CONFIGURATION - CRÍTICO PARA SEGURIDAD
+# ============================================================================
+# CORREGIDO: 2025-10-24 - Auditoría de Seguridad
+# ANTES: Tenía valor por defecto expuesto en código (VULNERABILIDAD CRÍTICA)
+# AHORA: Requiere configuración explícita desde variable de entorno
+# ============================================================================
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 
-# DEBUG se activa si no hay RENDER_EXTERNAL_HOSTNAME, o si DEBUG_VALUE es 'True'
-# SEGURIDAD: DEBUG deshabilitado en producción por defecto
+# Determinar si estamos en DEBUG antes de validar SECRET_KEY
 DEBUG = os.environ.get('DEBUG_VALUE', 'False') == 'True'
 if not RENDER_EXTERNAL_HOSTNAME:
     DEBUG = True  # Solo en desarrollo local
+
+# Obtener SECRET_KEY de variable de entorno
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+if not SECRET_KEY:
+    if DEBUG:
+        # En desarrollo local, permitir valor temporal pero advertir
+        import warnings
+        warnings.warn(
+            "⚠️ SECRET_KEY no configurado. Usando valor temporal de desarrollo.\n"
+            "Para desarrollo: crea archivo .env con SECRET_KEY=tu-clave-aquí\n"
+            "NUNCA uses esto en producción.",
+            RuntimeWarning
+        )
+        SECRET_KEY = 'django-insecure-dev-only-temporary-key-DO-NOT-USE-IN-PRODUCTION-' + str(hash(BASE_DIR))
+    else:
+        # En producción, BLOQUEAR el inicio de la aplicación
+        raise ImproperlyConfigured(
+            "SECRET_KEY no está configurado en variables de entorno.\n"
+            "Por seguridad, la aplicación no puede iniciar sin SECRET_KEY.\n"
+            "Configura la variable de entorno SECRET_KEY en Render/AWS:\n"
+            "1. Ve a tu dashboard de Render\n"
+            "2. Environment Variables → Add\n"
+            "3. SECRET_KEY = [valor-aleatorio-largo-y-seguro]\n"
+            "Puedes generar uno con: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
+        )
 
 ALLOWED_HOSTS = []
 
