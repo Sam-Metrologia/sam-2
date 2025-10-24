@@ -2,14 +2,27 @@
 # Configuración mínima de pytest para GitHub Actions
 minversion = "7.0"
 testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
 # Django configuration
 DJANGO_SETTINGS_MODULE = "proyecto_c.settings"
 addopts = [
     "-v",
     "--tb=short",
+]
+# Markers personalizados
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+    "models: marks tests for models",
+    "views: marks tests for views",
+    "services: marks tests for services",
+    "slow: marks tests as slow",
+    "smoke: marks tests as critical smoke tests",
+    "permissions: marks tests for permissions",
+    "notifications: marks tests for notification system",
+    "multitenancy: marks tests for multi-tenant isolation",
 ]
 
 [tool.coverage.run]

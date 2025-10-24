@@ -87,14 +87,16 @@ jobs:
           DJANGO_SETTINGS_MODULE: proyecto_c.settings
           SECRET_KEY: test-secret-key-for-ci-only
           DEBUG_VALUE: 'False'
+          PYTHONPATH: .
         run: |
-          pytest \
+          pytest tests/ \
             --cov=core \
             --cov-report=xml \
             --cov-report=term-missing \
             --verbose \
             --tb=short \
-            --maxfail=5
+            --maxfail=5 \
+            --ds=proyecto_c.settings
 
       - name: 📊 Subir cobertura a Codecov
         uses: codecov/codecov-action@v4
