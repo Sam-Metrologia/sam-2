@@ -398,6 +398,18 @@ def generar_descarga_multipartes(request, empresa, equipos_count, max_equipos_po
 
     logger.info(f"🔄 Sistema multi-partes activado: {equipos_count} equipos → {total_partes} partes")
 
+    # ✅ LIMPIAR solicitudes pendientes anteriores del usuario para esta empresa
+    # Esto evita duplicados si el usuario hace múltiples clicks
+    solicitudes_antiguas = ZipRequest.objects.filter(
+        user=request.user,
+        empresa=empresa,
+        status__in=['pending', 'queued']
+    )
+    count_antiguas = solicitudes_antiguas.count()
+    if count_antiguas > 0:
+        logger.info(f"🧹 Limpiando {count_antiguas} solicitudes antiguas pendientes de {request.user.username}")
+        solicitudes_antiguas.delete()
+
     # Crear solicitudes ZIP para todas las partes
     max_position = ZipRequest.objects.aggregate(max_pos=Max('position_in_queue'))['max_pos'] or 0
 
@@ -446,14 +458,20 @@ def generar_descarga_multipartes(request, empresa, equipos_count, max_equipos_po
         orden_optimizado = [total_partes] + list(range(1, total_partes))
 
         for parte_num in orden_optimizado:
-            zip_req = ZipRequest.objects.get(
+            # ✅ Usar filter().first() en lugar de get() para evitar MultipleObjectsReturned
+            # Ordenar por created_at descendente para tomar la más reciente
+            zip_req = ZipRequest.objects.filter(
                 user=request.user,
                 empresa=empresa,
                 parte_numero=parte_num,
                 status='pending'
-            )
-            add_zip_request_to_queue(zip_req)
-            logger.info(f"📦 Parte {parte_num} agregada a cola asíncrona")
+            ).order_by('-created_at').first()
+
+            if zip_req:
+                add_zip_request_to_queue(zip_req)
+                logger.info(f"📦 Parte {parte_num} agregada a cola asíncrona (ID: {zip_req.id})")
+            else:
+                logger.warning(f"⚠️ No se encontró solicitud ZIP para parte {parte_num}")
 
     except Exception as e:
         logger.warning(f"No se pudo iniciar procesamiento asíncrono: {e}")
