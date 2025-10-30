@@ -34,6 +34,10 @@ class AsyncZipProcessor:
         """Inicia el procesador en background si no está corriendo"""
         if not self.is_running:
             self.is_running = True
+
+            # 🔄 RECUPERAR solicitudes pendientes de la base de datos
+            self._recover_pending_requests()
+
             self.worker_thread = threading.Thread(
                 target=self._process_queue_worker,
                 daemon=True,
@@ -41,6 +45,33 @@ class AsyncZipProcessor:
             )
             self.worker_thread.start()
             logger.info("🚀 AsyncZipProcessor iniciado con estructura ZIP original")
+
+    def _recover_pending_requests(self):
+        """Recupera solicitudes pendientes de la DB y las agrega a la cola"""
+        try:
+            from core.models import ZipRequest
+            from django.utils import timezone
+
+            # Buscar solicitudes pendientes o en cola que no hayan expirado
+            pending_requests = ZipRequest.objects.filter(
+                status__in=['pending', 'queued'],
+                expires_at__gt=timezone.now()
+            ).order_by('position_in_queue', 'created_at')
+
+            count = pending_requests.count()
+            if count > 0:
+                logger.info(f"🔄 Recuperando {count} solicitudes pendientes de la base de datos")
+
+                for zip_req in pending_requests:
+                    self.processing_queue.put(zip_req)
+                    logger.info(f"📦 Solicitud recuperada: ID {zip_req.id} - Empresa: {zip_req.empresa.nombre} - Parte {zip_req.parte_numero}/{zip_req.total_partes}")
+
+                logger.info(f"✅ {count} solicitudes recuperadas y agregadas a la cola")
+            else:
+                logger.info("ℹ️ No hay solicitudes pendientes para recuperar")
+
+        except Exception as e:
+            logger.error(f"❌ Error recuperando solicitudes pendientes: {e}", exc_info=True)
 
     def stop_processor(self):
         """Detiene el procesador"""
