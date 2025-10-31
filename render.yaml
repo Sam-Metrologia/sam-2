@@ -72,6 +72,50 @@ services:
       mountPath: /opt/render/project/src/logs
       sizeGB: 1
 
+  # Procesador de Cola ZIP (Background Worker)
+  - type: worker
+    name: sam-zip-processor
+    runtime: python
+    plan: free
+    region: oregon
+
+    buildCommand: "./build.sh"
+    startCommand: "python manage.py process_zip_queue --check-interval 5 --cleanup-old"
+
+    # Compartir variables de entorno con el servicio web
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+      - key: SECRET_KEY
+        sync: false
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sam-metrologia-db
+          property: connectionString
+
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+
+      - key: AWS_S3_REGION_NAME
+        value: us-east-2
+
+      - key: DEBUG_VALUE
+        value: False
+
+      - key: RENDER_EXTERNAL_HOSTNAME
+        value: sam-9o6o.onrender.com
+
+    # Auto-deploy desde GitHub
+    autoDeploy: true
+
 # Base de datos PostgreSQL
 databases:
   - name: sam-metrologia-db
