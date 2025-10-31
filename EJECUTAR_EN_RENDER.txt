@@ -1,0 +1,63 @@
+═══════════════════════════════════════════════════════════
+🚨 COMANDOS CRÍTICOS PARA EJECUTAR EN RENDER SHELL
+═══════════════════════════════════════════════════════════
+
+PROBLEMA: Hay 35+ solicitudes huérfanas bloqueando la cola
+SOLUCIÓN: Ejecutar estos comandos EN ORDEN en Render Shell
+
+───────────────────────────────────────────────────────────
+1️⃣ VER ESTADO ACTUAL
+───────────────────────────────────────────────────────────
+python manage.py shell -c "from core.models import ZipRequest; pending = ZipRequest.objects.filter(status__in=['pending','queued','processing']).count(); print(f'🔍 Solicitudes bloqueando cola: {pending}')"
+
+───────────────────────────────────────────────────────────
+2️⃣ LIMPIAR TODAS LAS PENDIENTES (MARCAR COMO FALLIDAS)
+───────────────────────────────────────────────────────────
+python manage.py shell -c "from core.models import ZipRequest; from django.utils import timezone; count = ZipRequest.objects.filter(status__in=['pending','queued','processing']).update(status='failed', error_message='Limpieza pre-fix - procesador no estaba corriendo', completed_at=timezone.now()); print(f'✅ {count} solicitudes marcadas como fallidas')"
+
+───────────────────────────────────────────────────────────
+3️⃣ VERIFICAR QUE LA COLA QUEDÓ VACÍA
+───────────────────────────────────────────────────────────
+python manage.py shell -c "from core.models import ZipRequest; pending = ZipRequest.objects.filter(status__in=['pending','queued','processing']).count(); print(f'✅ Cola limpia: {pending} pendientes (debe ser 0)')"
+
+───────────────────────────────────────────────────────────
+4️⃣ VERIFICAR QUE EL PROCESADOR ESTÁ CORRIENDO
+───────────────────────────────────────────────────────────
+ps aux | grep process_zip_queue
+
+DEBES VER ALGO COMO:
+python manage.py process_zip_queue --check-interval 5 --cleanup-old
+
+Si NO lo ves, el servicio NO se reinició correctamente.
+
+───────────────────────────────────────────────────────────
+5️⃣ VER LOGS DEL PROCESADOR (si existe)
+───────────────────────────────────────────────────────────
+tail -20 logs/zip_processor.log
+
+DEBES VER:
+[INICIO] Procesador de cola ZIP iniciado (intervalo: 5s)
+[ESPERANDO] Iteración X: Cola vacía, esperando...
+
+───────────────────────────────────────────────────────────
+DESPUÉS DE LIMPIAR: PRUEBA NUEVA DESCARGA
+───────────────────────────────────────────────────────────
+1. Solicita nuevo ZIP de CERTIBOY
+2. Debe procesarse en 10-30 segundos
+3. En logs verás:
+   [PROCESANDO] Solicitud #X de CERTIBOY
+   [GENERANDO] Iniciando ZIP...
+   [EXITOSO] ZIP completado
+
+═══════════════════════════════════════════════════════════
+Si después de esto SIGUE sin funcionar:
+═══════════════════════════════════════════════════════════
+El problema es que start.sh NO se está ejecutando.
+
+Soluciones:
+A) En Render Dashboard → Settings → Restart Service
+B) Manual Deploy → Clear build cache & deploy
+C) Verificar que "Build Command" en Render settings esté vacío
+D) Verificar que "Start Command" sea: ./start.sh
+
+═══════════════════════════════════════════════════════════
