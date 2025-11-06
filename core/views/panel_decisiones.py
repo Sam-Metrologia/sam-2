@@ -22,6 +22,20 @@ from .dashboard import get_projected_activities_for_year
 import json
 
 
+def decimal_to_float(obj):
+    """
+    Convierte objetos Decimal a float para serialización JSON.
+    Mantiene otros tipos sin cambios.
+    """
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: decimal_to_float(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [decimal_to_float(item) for item in obj]
+    return obj
+
+
 @login_required
 @monitor_view
 def panel_decisiones(request):
@@ -565,13 +579,13 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
         'optimizacion_cronogramas': optimizacion_cronogramas,
 
         # Gráficos JSON
-        'salud_chart_data': json.dumps(salud_equipo_data.get('chart_data', [])),
-        'cumplimiento_chart_data': json.dumps(cumplimiento_data.get('chart_data', [])),
-        'costos_chart_data': json.dumps([
+        'salud_chart_data': json.dumps(decimal_to_float(salud_equipo_data.get('chart_data', []))),
+        'cumplimiento_chart_data': json.dumps(decimal_to_float(cumplimiento_data.get('chart_data', []))),
+        'costos_chart_data': json.dumps(decimal_to_float([
             analisis_financiero['costos_calibracion_ytd'],
             analisis_financiero['costos_mantenimiento_ytd'],
             analisis_financiero['costos_comprobacion_ytd']
-        ]),
+        ])),
         'tendencias_chart_data': json.dumps([{
             'mes': item['nombre_mes'],
             'gasto': float(item['gasto_total']),
@@ -863,9 +877,9 @@ def _panel_decisiones_sam(request, today, current_year):
         'optimizacion_cronogramas': optimizacion_cronogramas,
 
         # Gráficos JSON
-        'salud_consolidada_chart': json.dumps([salud_agregada['equipos_saludables'], salud_agregada['equipos_criticos']]),
-        'cumplimiento_consolidado_chart': json.dumps([cumplimiento_agregado['actividades_realizadas'], cumplimiento_agregado['actividades_programadas'] - cumplimiento_agregado['actividades_realizadas']]),
-        'crecimiento_ingresos_chart': json.dumps([metricas_financieras_sam['ingreso_año_anterior'], metricas_financieras_sam['ingreso_ytd_actual']]),
+        'salud_consolidada_chart': json.dumps(decimal_to_float([salud_agregada['equipos_saludables'], salud_agregada['equipos_criticos']])),
+        'cumplimiento_consolidado_chart': json.dumps(decimal_to_float([cumplimiento_agregado['actividades_realizadas'], cumplimiento_agregado['actividades_programadas'] - cumplimiento_agregado['actividades_realizadas']])),
+        'crecimiento_ingresos_chart': json.dumps(decimal_to_float([metricas_financieras_sam['ingreso_año_anterior'], metricas_financieras_sam['ingreso_ytd_actual']])),
     }
 
     return render(request, 'core/panel_decisiones.html', context)
