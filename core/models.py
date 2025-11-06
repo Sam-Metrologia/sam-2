@@ -270,9 +270,10 @@ class Empresa(models.Model):
     def calcular_tarifa_mensual_equivalente(self):
         """
         Calcula la tarifa mensual equivalente basándose en la modalidad de pago.
+        Retorna siempre Decimal para mantener precisión en cálculos financieros.
         """
         if not self.valor_pago_acordado:
-            return self.tarifa_mensual_sam or 0
+            return self.tarifa_mensual_sam or decimal.Decimal('0')
 
         modalidad_meses = {
             'MENSUAL': 1,
@@ -282,14 +283,15 @@ class Empresa(models.Model):
         }
 
         meses = modalidad_meses.get(self.modalidad_pago, 1)
-        return float(self.valor_pago_acordado) / meses
+        return self.valor_pago_acordado / decimal.Decimal(str(meses))
 
     def get_ingresos_anuales_reales(self):
         """
         Calcula los ingresos anuales reales que esta empresa genera para SAM.
+        Retorna Decimal para mantener precisión en cálculos financieros.
         """
         tarifa_mensual = self.calcular_tarifa_mensual_equivalente()
-        return tarifa_mensual * 12
+        return tarifa_mensual * decimal.Decimal('12')
 
     def dias_hasta_proximo_pago(self):
         """

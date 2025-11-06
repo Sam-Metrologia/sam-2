@@ -5,6 +5,7 @@
 from .base import *
 from datetime import date, timedelta
 from django.db.models import Sum, Avg, Count, Q
+from decimal import Decimal
 from ..utils.analisis_financiero import (
     calcular_analisis_financiero_empresa,
     calcular_proyeccion_costos_empresa,
@@ -657,9 +658,9 @@ def _panel_decisiones_sam(request, today, current_year):
         eficiencia_general_porcentaje = 0
 
     # Datos financieros básicos
-    ingresos_anuales = 0
-    costos_totales = 0
-    margen_bruto = 0
+    ingresos_anuales = Decimal('0')
+    costos_totales = Decimal('0')
+    margen_bruto = Decimal('0')
 
     try:
         # Calcular ingresos reales empresa por empresa
@@ -670,19 +671,19 @@ def _panel_decisiones_sam(request, today, current_year):
         costos_cal = Calibracion.objects.filter(
             equipo__empresa__in=empresas_queryset,
             fecha_calibracion__year=current_year
-        ).aggregate(total=Sum('costo_calibracion'))['total'] or 0
+        ).aggregate(total=Sum('costo_calibracion'))['total'] or Decimal('0')
 
         costos_mant = Mantenimiento.objects.filter(
             equipo__empresa__in=empresas_queryset,
             fecha_mantenimiento__year=current_year
-        ).aggregate(total=Sum('costo_sam_interno'))['total'] or 0
+        ).aggregate(total=Sum('costo_sam_interno'))['total'] or Decimal('0')
 
         costos_comp = Comprobacion.objects.filter(
             equipo__empresa__in=empresas_queryset,
             fecha_comprobacion__year=current_year
-        ).aggregate(total=Sum('costo_comprobacion'))['total'] or 0
+        ).aggregate(total=Sum('costo_comprobacion'))['total'] or Decimal('0')
 
-        costos_totales = float(costos_cal or 0) + float(costos_mant or 0) + float(costos_comp or 0)
+        costos_totales = costos_cal + costos_mant + costos_comp
         margen_bruto = ingresos_anuales - costos_totales
 
     except Exception as e:
