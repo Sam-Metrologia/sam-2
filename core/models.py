@@ -1328,7 +1328,7 @@ class Equipo(models.Model):
 
         if latest_comprobacion and latest_comprobacion.fecha_comprobacion:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.ima_comprobacion = latest_comprobacion.fecha_comprobacion + delta
+            self.proxima_comprobacion = latest_comprobacion.fecha_comprobacion + delta
         else:
             # JERARQUÍA CORRECTA: 1. fecha_ultima_comprobacion, 2. fecha_ultima_calibracion, 3. fecha_adquisicion, 4. fecha_registro
             if self.fecha_ultima_comprobacion:
@@ -1358,13 +1358,13 @@ class Equipo(models.Model):
 
         if fecha_base:
             delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
-            self.ima_calibracion = fecha_base + delta
+            self.proxima_calibracion = fecha_base + delta
         elif self.fecha_adquisicion:
             delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
-            self.ima_calibracion = self.fecha_adquisicion + delta
+            self.proxima_calibracion = self.fecha_adquisicion + delta
         elif self.fecha_registro:
             delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
-            self.ima_calibracion = self.fecha_registro.date() + delta
+            self.proxima_calibracion = self.fecha_registro.date() + delta
         else:
             self.proxima_calibracion = None
 
@@ -1402,13 +1402,13 @@ class Equipo(models.Model):
 
         if fecha_base:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.ima_comprobacion = fecha_base + delta
+            self.proxima_comprobacion = fecha_base + delta
         elif self.fecha_adquisicion:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.ima_comprobacion = self.fecha_adquisicion + delta
+            self.proxima_comprobacion = self.fecha_adquisicion + delta
         elif self.fecha_registro:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.ima_comprobacion = self.fecha_registro.date() + delta
+            self.proxima_comprobacion = self.fecha_registro.date() + delta
         else:
             self.proxima_comprobacion = None
 
