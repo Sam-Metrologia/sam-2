@@ -551,7 +551,7 @@ SAM_CONFIG = {
     'ALLOWED_DOCUMENT_FORMATS': ['pdf', 'xlsx', 'docx'],
     'CACHE_TIMEOUT_DASHBOARD': 300,  # 5 minutos
     'CACHE_TIMEOUT_REPORTS': 1800,   # 30 minutos
-    'PAGINATION_SIZE': 25,
+    'PAGINATION_SIZE': 100,
     'MAX_SEARCH_RESULTS': 100,
 }
 
