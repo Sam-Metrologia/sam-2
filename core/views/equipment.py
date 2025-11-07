@@ -158,7 +158,7 @@ def home(request):
             equipo.proxima_comprobacion_status = 'text-gray-500'
 
     # Paginación
-    paginator = Paginator(equipos_list, 25)
+    paginator = Paginator(equipos_list, settings.SAM_CONFIG['PAGINATION_SIZE'])
     page_number = request.GET.get('page')
 
     try:
@@ -226,7 +226,7 @@ def equipos(request):
         equipos_queryset = equipos_queryset.filter(empresa_id=empresa_filtro)
 
     # Paginación optimizada
-    paginator = Paginator(equipos_queryset, 25)
+    paginator = Paginator(equipos_queryset, settings.SAM_CONFIG['PAGINATION_SIZE'])
     page_number = request.GET.get('page')
     try:
         equipos_page = paginator.get_page(page_number)
