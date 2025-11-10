@@ -204,6 +204,7 @@
         <tr><td><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"d/m/Y"|default:"N/A" }}</td><td><strong>Fecha de Registro:</strong> {{ equipo.fecha_registro|date:"d/m/Y H:i"|default:"N/A" }}</td></tr>
         <tr><td><strong>Rango de Medida:</strong> {{ equipo.rango_medida|default:"N/A" }}</td><td><strong>Resolución:</strong> {{ equipo.resolucion|default:"N/A" }}</td></tr>
         <tr><td colspan="2"><strong>Error Máximo Permisible:</strong> {{ equipo.error_maximo_permisible|floatformat:"5"|default:"N/A" }}</td></tr>
+        <tr><td colspan="2"><strong>Puntos de Calibración:</strong> {{ equipo.puntos_calibracion|linebreaksbr|default:"N/A" }}</td></tr>
     </table>
 
     <h2 class="section-title">Observaciones Generales</h2>
