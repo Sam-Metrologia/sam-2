@@ -2518,13 +2518,14 @@ def _process_excel_import(excel_file, user):
             'O': 'rango_medida',
             'P': 'resolucion',
             'Q': 'error_maximo_permisible',
-            'R': 'observaciones',
-            'S': 'version_formato',
-            'T': 'fecha_version_formato',
-            'U': 'codificacion_formato',
-            'V': 'frecuencia_calibracion_meses',
-            'W': 'frecuencia_mantenimiento_meses',
-            'X': 'frecuencia_comprobacion_meses'
+            'R': 'puntos_calibracion',
+            'S': 'observaciones',
+            'T': 'version_formato',
+            'U': 'fecha_version_formato',
+            'V': 'codificacion_formato',
+            'W': 'frecuencia_calibracion_meses',
+            'X': 'frecuencia_mantenimiento_meses',
+            'Y': 'frecuencia_comprobacion_meses'
         }
 
         # Comenzar desde la fila 8 (después de headers)
@@ -2588,8 +2589,8 @@ def _process_excel_import(excel_file, user):
                     fecha_adquisicion = fecha_result['date']
 
                 fecha_version_formato = None
-                if row_data.get('fecha_version'):
-                    fecha_result = _parse_date(row_data['fecha_version'], 'Fecha de Versión')
+                if row_data.get('fecha_version_formato'):
+                    fecha_result = _parse_date(row_data['fecha_version_formato'], 'Fecha de Versión')
                     if fecha_result['error']:
                         errors.append(f"Fila {row_num}: {fecha_result['error']}")
                         continue
