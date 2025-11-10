@@ -1185,6 +1185,7 @@ class Equipo(models.Model):
     rango_medida = models.CharField(max_length=100, blank=True, null=True, verbose_name="Rango de Medida")
     resolucion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Resolución")
     error_maximo_permisible = models.CharField(max_length=100, blank=True, null=True, verbose_name="Error Máximo Permisible") # Ahora CharField
+    puntos_calibracion = models.TextField(blank=True, null=True, verbose_name="Puntos de Calibración")
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
 
     # Documentos del Equipo (usando get_upload_path)

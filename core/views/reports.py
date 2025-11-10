@@ -708,7 +708,7 @@ def _generate_excel_template():
         "codigo_interno", "nombre", "empresa_nombre", "tipo_equipo", "marca", "modelo",
         "numero_serie", "ubicacion_nombre", "responsable", "estado", "fecha_adquisicion",
         "fecha_ultima_calibracion", "fecha_ultimo_mantenimiento", "fecha_ultima_comprobacion",
-        "rango_medida", "resolucion", "error_maximo_permisible", "observaciones",
+        "rango_medida", "resolucion", "error_maximo_permisible", "puntos_calibracion", "observaciones",
         "version_formato", "fecha_version_formato", "codificacion_formato",
         "frecuencia_calibracion_meses", "frecuencia_mantenimiento_meses", "frecuencia_comprobacion_meses"
     ]
@@ -718,7 +718,7 @@ def _generate_excel_template():
         "Código Interno*", "Nombre del Equipo*", "Empresa*", "Tipo de Equipo*", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado*", "Fecha Adquisición",
         "Última Calibración", "Último Mantenimiento", "Última Comprobación",
-        "Rango de Medida", "Resolución", "Error Máx. Permisible", "Observaciones",
+        "Rango de Medida", "Resolución", "Error Máx. Permisible", "Puntos de Calibración", "Observaciones",
         "Versión Formato", "Fecha Versión", "Codificación Formato",
         "Freq. Cal. (meses)", "Freq. Mant. (meses)", "Freq. Comp. (meses)"
     ]
@@ -1690,7 +1690,7 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
     headers_equipos = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
         "Observaciones", "Fecha Última Calibración", "Próxima Calibración",
         "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
@@ -1714,7 +1714,7 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
             equipo.marca, equipo.modelo, equipo.numero_serie,
             equipo.ubicacion or "", equipo.responsable, equipo.estado,
             equipo.fecha_adquisicion, equipo.rango_medida, equipo.resolucion,
-            equipo.error_maximo_permisible, equipo.fecha_registro.replace(tzinfo=None) if equipo.fecha_registro else None, equipo.observaciones,
+            equipo.error_maximo_permisible, equipo.puntos_calibracion, equipo.fecha_registro.replace(tzinfo=None) if equipo.fecha_registro else None, equipo.observaciones,
             equipo.fecha_ultima_calibracion, equipo.proxima_calibracion, equipo.frecuencia_calibracion_meses,
             equipo.fecha_ultimo_mantenimiento, equipo.proximo_mantenimiento, equipo.frecuencia_mantenimiento_meses,
             equipo.fecha_ultima_comprobacion, equipo.proxima_comprobacion, equipo.frecuencia_comprobacion_meses
@@ -1896,7 +1896,7 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
         "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
         "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
         "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
@@ -1939,6 +1939,7 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.rango_medida,
             equipo.resolucion,
             equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+            equipo.puntos_calibracion if equipo.puntos_calibracion is not None else '',
             equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
             equipo.observaciones,
             equipo.version_formato,
@@ -2021,7 +2022,7 @@ def _generate_equipment_general_info_excel_content(equipo):
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
         "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
         "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
         "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
@@ -2336,7 +2337,7 @@ def _generate_general_equipment_list_excel_content_local(equipos_queryset):
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Fecha de Registro",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
         "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
         "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
         "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
@@ -2372,6 +2373,7 @@ def _generate_general_equipment_list_excel_content_local(equipos_queryset):
             equipo.rango_medida,
             equipo.resolucion,
             equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
+            equipo.puntos_calibracion if equipo.puntos_calibracion is not None else '',
             equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
             equipo.observaciones,
             equipo.version_formato,
@@ -2675,6 +2677,10 @@ def _process_excel_import(excel_file, user):
                                 equipo.error_maximo_permisible = row_data['error_maximo_permisible']
                                 campos_actualizados.append('error_maximo_permisible')
 
+                            if row_data.get('puntos_calibracion'):
+                                equipo.puntos_calibracion = row_data['puntos_calibracion']
+                                campos_actualizados.append('puntos_calibracion')
+
                             if row_data.get('observaciones'):
                                 equipo.observaciones = row_data['observaciones']
                                 campos_actualizados.append('observaciones')
@@ -2741,6 +2747,7 @@ def _process_excel_import(excel_file, user):
                                 rango_medida=row_data.get('rango_medida', ''),
                                 resolucion=row_data.get('resolucion', ''),
                                 error_maximo_permisible=row_data.get('error_maximo_permisible', ''),
+                                puntos_calibracion=row_data.get('puntos_calibracion', ''),
                                 observaciones=row_data.get('observaciones', ''),
                                 version_formato=row_data.get('version_formato', ''),
                                 fecha_version_formato=fecha_version_formato,

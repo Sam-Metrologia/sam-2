@@ -343,6 +343,7 @@ class EquipoForm(forms.ModelForm):
             'rango_medida': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
             'resolucion': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
             'error_maximo_permisible': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
+            'puntos_calibracion': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'placeholder': 'Ej: 0, 25, 50, 75, 100'}),
             'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'maxlength': '1000'}),
             'archivo_compra_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
             'manual_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
