@@ -1246,6 +1246,9 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
             'estado': equipo.estado,
             'last_calibration': equipo.calibraciones.first().fecha_calibracion.isoformat() if equipo.calibraciones.exists() else '',
             'last_maintenance': equipo.mantenimientos.first().fecha_mantenimiento.isoformat() if equipo.mantenimientos.exists() else '',
+            'codificacion_formato': equipo.codificacion_formato or '',
+            'version_formato': equipo.version_formato or '',
+            'fecha_version_formato': equipo.fecha_version_formato.isoformat() if equipo.fecha_version_formato else '',
         }
 
         # Crear hash único para esta configuración
