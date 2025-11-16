@@ -12,39 +12,45 @@ def calcular_analisis_financiero_empresa(empresa, current_year, today):
     Calcula los costos reales incurridos en el año fiscal actual
     """
     # Costos YTD por tipo de actividad
+    # CORRECCIÓN BUG 2025-11-16: Usar Decimal explícitamente para evitar TypeError
+    from decimal import Decimal
+
     costos_calibracion_ytd = Calibracion.objects.filter(
         equipo__empresa=empresa,
         fecha_calibracion__year=current_year,
         fecha_calibracion__lte=today
-    ).aggregate(total=Sum('costo_calibracion'))['total'] or 0
+    ).aggregate(total=Sum('costo_calibracion'))['total'] or Decimal('0')
 
     costos_mantenimiento_ytd = Mantenimiento.objects.filter(
         equipo__empresa=empresa,
         fecha_mantenimiento__year=current_year,
         fecha_mantenimiento__lte=today
-    ).aggregate(total=Sum('costo_sam_interno'))['total'] or 0
+    ).aggregate(total=Sum('costo_sam_interno'))['total'] or Decimal('0')
 
     costos_comprobacion_ytd = Comprobacion.objects.filter(
         equipo__empresa=empresa,
         fecha_comprobacion__year=current_year,
         fecha_comprobacion__lte=today
-    ).aggregate(total=Sum('costo_comprobacion'))['total'] or 0
+    ).aggregate(total=Sum('costo_comprobacion'))['total'] or Decimal('0')
 
-    total_gasto_ytd = float(costos_calibracion_ytd) + float(costos_mantenimiento_ytd) + float(costos_comprobacion_ytd)
+    # Mantener como Decimal para cálculos precisos
+    total_gasto_ytd = costos_calibracion_ytd + costos_mantenimiento_ytd + costos_comprobacion_ytd
 
     # Calcular porcentajes de distribución
     if total_gasto_ytd > 0:
-        porcentaje_calibracion = round((costos_calibracion_ytd / total_gasto_ytd) * 100, 1)
-        porcentaje_mantenimiento = round((costos_mantenimiento_ytd / total_gasto_ytd) * 100, 1)
-        porcentaje_comprobacion = round((costos_comprobacion_ytd / total_gasto_ytd) * 100, 1)
+        # Convertir a float solo para el cálculo de porcentaje
+        porcentaje_calibracion = round(float(costos_calibracion_ytd / total_gasto_ytd) * 100, 1)
+        porcentaje_mantenimiento = round(float(costos_mantenimiento_ytd / total_gasto_ytd) * 100, 1)
+        porcentaje_comprobacion = round(float(costos_comprobacion_ytd / total_gasto_ytd) * 100, 1)
     else:
         porcentaje_calibracion = porcentaje_mantenimiento = porcentaje_comprobacion = 0
 
+    # Convertir a float solo para JSON serialization
     return {
-        'gasto_ytd_total': total_gasto_ytd,
-        'costos_calibracion_ytd': costos_calibracion_ytd,
-        'costos_mantenimiento_ytd': costos_mantenimiento_ytd,
-        'costos_comprobacion_ytd': costos_comprobacion_ytd,
+        'gasto_ytd_total': float(total_gasto_ytd),
+        'costos_calibracion_ytd': float(costos_calibracion_ytd),
+        'costos_mantenimiento_ytd': float(costos_mantenimiento_ytd),
+        'costos_comprobacion_ytd': float(costos_comprobacion_ytd),
         'porcentaje_calibracion': porcentaje_calibracion,
         'porcentaje_mantenimiento': porcentaje_mantenimiento,
         'porcentaje_comprobacion': porcentaje_comprobacion,
