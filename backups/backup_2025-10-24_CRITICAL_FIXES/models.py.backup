@@ -270,10 +270,9 @@ class Empresa(models.Model):
     def calcular_tarifa_mensual_equivalente(self):
         """
         Calcula la tarifa mensual equivalente basándose en la modalidad de pago.
-        Retorna siempre Decimal para mantener precisión en cálculos financieros.
         """
         if not self.valor_pago_acordado:
-            return self.tarifa_mensual_sam or decimal.Decimal('0')
+            return self.tarifa_mensual_sam or 0
 
         modalidad_meses = {
             'MENSUAL': 1,
@@ -283,15 +282,14 @@ class Empresa(models.Model):
         }
 
         meses = modalidad_meses.get(self.modalidad_pago, 1)
-        return self.valor_pago_acordado / decimal.Decimal(str(meses))
+        return float(self.valor_pago_acordado) / meses
 
     def get_ingresos_anuales_reales(self):
         """
         Calcula los ingresos anuales reales que esta empresa genera para SAM.
-        Retorna Decimal para mantener precisión en cálculos financieros.
         """
         tarifa_mensual = self.calcular_tarifa_mensual_equivalente()
-        return tarifa_mensual * decimal.Decimal('12')
+        return tarifa_mensual * 12
 
     def dias_hasta_proximo_pago(self):
         """
@@ -955,19 +953,6 @@ class CustomUser(AbstractUser):
         return True
 
     @property
-    def puede_eliminar_equipos(self):
-        """
-        Verifica si el usuario puede eliminar equipos.
-        TÉCNICO: NO
-        ADMINISTRADOR: SÍ
-        GERENTE: SÍ
-        SUPERUSER: SÍ
-        """
-        if self.is_superuser:
-            return True
-        return self.rol_usuario in ['ADMINISTRADOR', 'GERENCIA']
-
-    @property
     def has_export_permission(self):
         """
         Verifica si el usuario tiene permiso para exportar informes.
@@ -1198,7 +1183,6 @@ class Equipo(models.Model):
     rango_medida = models.CharField(max_length=100, blank=True, null=True, verbose_name="Rango de Medida")
     resolucion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Resolución")
     error_maximo_permisible = models.CharField(max_length=100, blank=True, null=True, verbose_name="Error Máximo Permisible") # Ahora CharField
-    puntos_calibracion = models.TextField(blank=True, null=True, verbose_name="Puntos de Calibración")
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
 
     # Documentos del Equipo (usando get_upload_path)
@@ -1344,7 +1328,7 @@ class Equipo(models.Model):
 
         if latest_comprobacion and latest_comprobacion.fecha_comprobacion:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = latest_comprobacion.fecha_comprobacion + delta
+            self.ima_comprobacion = latest_comprobacion.fecha_comprobacion + delta
         else:
             # JERARQUÍA CORRECTA: 1. fecha_ultima_comprobacion, 2. fecha_ultima_calibracion, 3. fecha_adquisicion, 4. fecha_registro
             if self.fecha_ultima_comprobacion:
@@ -1374,13 +1358,13 @@ class Equipo(models.Model):
 
         if fecha_base:
             delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = fecha_base + delta
+            self.ima_calibracion = fecha_base + delta
         elif self.fecha_adquisicion:
             delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = self.fecha_adquisicion + delta
+            self.ima_calibracion = self.fecha_adquisicion + delta
         elif self.fecha_registro:
             delta = meses_decimales_a_relativedelta(self.frecuencia_calibracion_meses)
-            self.proxima_calibracion = self.fecha_registro.date() + delta
+            self.ima_calibracion = self.fecha_registro.date() + delta
         else:
             self.proxima_calibracion = None
 
@@ -1418,13 +1402,13 @@ class Equipo(models.Model):
 
         if fecha_base:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = fecha_base + delta
+            self.ima_comprobacion = fecha_base + delta
         elif self.fecha_adquisicion:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = self.fecha_adquisicion + delta
+            self.ima_comprobacion = self.fecha_adquisicion + delta
         elif self.fecha_registro:
             delta = meses_decimales_a_relativedelta(self.frecuencia_comprobacion_meses)
-            self.proxima_comprobacion = self.fecha_registro.date() + delta
+            self.ima_comprobacion = self.fecha_registro.date() + delta
         else:
             self.proxima_comprobacion = None
 

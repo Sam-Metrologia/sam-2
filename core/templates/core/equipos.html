@@ -81,10 +81,31 @@
 
         {# Lista de Equipos #}
         {% if equipos %}
+            {% if user.puede_eliminar_equipos %}
+            <!-- Boton de eliminacion masiva (NUEVO 2025-11-19) -->
+            <div class="mb-4 flex items-center justify-between">
+                <button type="button" id="btn-eliminar-seleccionados"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>
+                    <i class="fas fa-trash"></i> Eliminar Seleccionados (<span id="count-selected">0</span>)
+                </button>
+            </div>
+
+            <form id="form-equipos-masivo" method="POST" action="{% url 'core:equipos_eliminar_masivo' %}">
+                {% csrf_token %}
+            {% endif %}
+
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white border border-gray-300 rounded-lg">
                     <thead class="bg-gray-100">
                         <tr>
+                            {% if user.puede_eliminar_equipos %}
+                            <th class="py-3 px-2 text-center text-sm font-medium text-gray-700 border-b">
+                                <input type="checkbox" id="select-all"
+                                       class="w-5 h-5 text-blue-600 rounded"
+                                       title="Seleccionar todos">
+                            </th>
+                            {% endif %}
                             <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Código</th>
                             <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Nombre</th>
                             <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 border-b">Marca</th>
@@ -99,6 +120,13 @@
                     <tbody>
                         {% for equipo in equipos %}
                         <tr class="hover:bg-gray-50">
+                            {% if user.puede_eliminar_equipos %}
+                            <td class="py-3 px-2 text-center border-b">
+                                <input type="checkbox" name="equipos_ids[]"
+                                       value="{{ equipo.id }}"
+                                       class="equipo-checkbox w-5 h-5 text-blue-600 rounded">
+                            </td>
+                            {% endif %}
                             <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.codigo_interno }}</td>
                             <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.nombre }}</td>
                             <td class="py-3 px-4 text-sm text-gray-900 border-b">{{ equipo.marca|default:"-" }}</td>
@@ -130,6 +158,10 @@
                     </tbody>
                 </table>
             </div>
+
+            {% if user.puede_eliminar_equipos %}
+            </form>
+            {% endif %}
 
             {# Paginación #}
             {% if equipos.has_other_pages %}
@@ -175,4 +207,55 @@
         {% endif %}
     </div>
 </div>
+
+{% if user.puede_eliminar_equipos %}
+<!-- JavaScript para eliminacion masiva (NUEVO 2025-11-19) -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.equipo-checkbox');
+    const btnEliminar = document.getElementById('btn-eliminar-seleccionados');
+    const countSelected = document.getElementById('count-selected');
+    const form = document.getElementById('form-equipos-masivo');
+
+    // Seleccionar/deseleccionar todos
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateDeleteButton();
+        });
+    }
+
+    // Actualizar al cambiar checkboxes individuales
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateDeleteButton);
+    });
+
+    // Actualizar estado del botón de eliminar
+    function updateDeleteButton() {
+        const selected = document.querySelectorAll('.equipo-checkbox:checked').length;
+        countSelected.textContent = selected;
+        btnEliminar.disabled = selected === 0;
+
+        // Actualizar estado del select-all
+        if (selectAll) {
+            selectAll.checked = selected === checkboxes.length && selected > 0;
+        }
+    }
+
+    // Confirmar eliminación masiva
+    if (btnEliminar) {
+        btnEliminar.addEventListener('click', function() {
+            const selected = document.querySelectorAll('.equipo-checkbox:checked').length;
+            if (selected > 0) {
+                if (confirm(`¿Seguro que deseas eliminar ${selected} equipo(s)? Esta acción no se puede deshacer.`)) {
+                    form.submit();
+                }
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+
 {% endblock %}

@@ -16,6 +16,9 @@ urlpatterns = [
     path('password_change/', views.cambiar_password, name='password_change'),
     path('password_change/done/', views.password_change_done, name='password_change_done'),
 
+    # Sesión (NUEVO 2025-11-19)
+    path('session-heartbeat/', views.session_heartbeat, name='session_heartbeat'),
+
     # Términos y Condiciones
     path('terminos-condiciones/', views.aceptar_terminos, name='aceptar_terminos'),
     path('terminos-condiciones/rechazar/', views.rechazar_terminos, name='rechazar_terminos'),
@@ -39,6 +42,7 @@ urlpatterns = [
     path('equipos/<int:pk>/', views.detalle_equipo, name='detalle_equipo'),
     path('equipos/<int:pk>/editar/', views.editar_equipo, name='editar_equipo'),
     path('equipos/<int:pk>/eliminar/', views.eliminar_equipo, name='eliminar_equipo'),
+    path('equipos/eliminar-masivo/', views.equipos_eliminar_masivo, name='equipos_eliminar_masivo'),  # NUEVO 2025-11-19
     path('equipos/<int:equipo_pk>/dar_baja/', views.dar_baja_equipo, name='dar_baja_equipo'),
     path('equipos/<int:equipo_pk>/inactivar/', views.inactivar_equipo, name='inactivar_equipo'),
     path('equipos/<int:equipo_pk>/activar/', views.activar_equipo, name='activar_equipo'),

@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Eliminar Equipos Masivamente{% endblock %}
+
+{% block header_title %}Eliminar Equipos Masivamente{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="bg-white shadow-lg rounded-lg border-4 border-red-500 p-6">
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-triangle text-3xl mr-4"></i>
+                <div>
+                    <h3 class="text-2xl font-bold mb-2">Confirmar Eliminación Masiva</h3>
+                    <p>Esta acción NO se puede deshacer</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <p class="text-lg font-semibold text-gray-800 mb-4">
+                Estás a punto de eliminar <span class="text-red-600 font-bold text-2xl">{{ equipos.count }}</span> equipo(s):
+            </p>
+
+            <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <ul class="space-y-2">
+                    {% for equipo in equipos %}
+                    <li class="flex items-center bg-white p-3 rounded border border-gray-200 hover:border-red-300 transition">
+                        <i class="fas fa-toolbox text-gray-400 mr-3"></i>
+                        <div class="flex-grow">
+                            <strong class="text-gray-900">{{ equipo.codigo_interno }}</strong>
+                            <span class="text-gray-600"> - {{ equipo.nombre }}</span>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ equipo.empresa.nombre }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+            <h4 class="font-bold text-red-800 mb-2 flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                ADVERTENCIA IMPORTANTE:
+            </h4>
+            <ul class="text-red-700 space-y-1 ml-6">
+                <li><i class="fas fa-times-circle mr-2"></i>Esta acción es IRREVERSIBLE</li>
+                <li><i class="fas fa-times-circle mr-2"></i>Se eliminarán TODOS los datos asociados</li>
+                <li><i class="fas fa-times-circle mr-2"></i>Calibraciones, mantenimientos y comprobaciones</li>
+                <li><i class="fas fa-times-circle mr-2"></i>Documentos y certificados</li>
+            </ul>
+        </div>
+
+        <form method="POST" id="form-eliminar-masivo">
+            {% csrf_token %}
+            {% for equipo in equipos %}
+            <input type="hidden" name="equipos_ids[]" value="{{ equipo.id }}">
+            {% endfor %}
+
+            <div class="flex items-center justify-between">
+                <a href="{% url 'core:home' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out flex items-center">
+                    <i class="fas fa-times mr-2"></i> Cancelar
+                </a>
+
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out flex items-center">
+                    <i class="fas fa-trash mr-2"></i> Sí, Eliminar {{ equipos.count }} Equipo(s)
+                </button>
+            </div>
+        </form>
+
+        <!-- Confirmación adicional con JavaScript -->
+        <script>
+        document.getElementById('form-eliminar-masivo').addEventListener('submit', function(e) {
+            const count = {{ equipos.count }};
+            const confirmed = confirm(
+                `¿ESTÁS COMPLETAMENTE SEGURO?\n\n` +
+                `Se eliminarán ${count} equipo(s) y TODOS sus datos asociados.\n\n` +
+                `Esta acción NO se puede deshacer.`
+            );
+
+            if (!confirmed) {
+                e.preventDefault();
+            }
+        });
+        </script>
+    </div>
+</div>
+{% endblock %}

@@ -238,6 +238,14 @@ def equipos(request):
     # Datos para filtros
     empresas_disponibles = Empresa.objects.all().order_by('nombre') if user.is_superuser else []
 
+    # DEBUG: Verificar permisos del usuario (TEMPORAL 2025-11-19)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.error(f"DEBUG HOME - Usuario: {user.username}")
+    logger.error(f"DEBUG HOME - Es superuser: {user.is_superuser}")
+    logger.error(f"DEBUG HOME - Rol: {user.rol_usuario}")
+    logger.error(f"DEBUG HOME - Puede eliminar (propiedad): {user.puede_eliminar_equipos}")
+
     context = {
         'equipos': equipos_page,
         'query': query,
@@ -337,6 +345,24 @@ def detalle_equipo(request, pk):
     print(f"DEBUG Mantenimientos en BD: {mantenimientos_count}")
     print(f"DEBUG Comprobaciones en BD: {comprobaciones_count}")
 
+    # NUEVO: Obtener equipos anterior y siguiente (2025-11-19)
+    empresa = request.user.empresa if not request.user.is_superuser else equipo.empresa
+    equipos_empresa = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
+    equipos_ids = list(equipos_empresa.values_list('id', flat=True))
+
+    prev_equipo_id = None
+    next_equipo_id = None
+    current_position = None
+    total_equipos = len(equipos_ids)
+
+    try:
+        current_index = equipos_ids.index(equipo.id)
+        prev_equipo_id = equipos_ids[current_index - 1] if current_index > 0 else None
+        next_equipo_id = equipos_ids[current_index + 1] if current_index < len(equipos_ids) - 1 else None
+        current_position = current_index + 1
+    except ValueError:
+        pass
+
     context = {
         'equipo': equipo,
         'titulo_pagina': f'Detalle del Equipo: {equipo.codigo_interno}',
@@ -346,6 +372,11 @@ def detalle_equipo(request, pk):
         'calibraciones': equipo.calibraciones.all(),
         'mantenimientos': equipo.mantenimientos.all(),
         'comprobaciones': equipo.comprobaciones.all(),
+        # Navegación entre equipos (NUEVO 2025-11-19)
+        'prev_equipo_id': prev_equipo_id,
+        'next_equipo_id': next_equipo_id,
+        'current_position': current_position,
+        'total_equipos': total_equipos,
         **equipment_metrics,
         **file_urls,
         **next_activities
@@ -361,7 +392,7 @@ def detalle_equipo(request, pk):
 @monitor_view
 def editar_equipo(request, pk):
     """
-    Edita un equipo existente
+    Edita un equipo existente con navegación anterior/siguiente
     """
     equipo = get_object_or_404(Equipo, pk=pk)
 
@@ -371,15 +402,60 @@ def editar_equipo(request, pk):
             messages.error(request, 'No tienes permisos para editar este equipo.')
             return redirect('core:home')
 
+    # NUEVO: Obtener equipos anterior y siguiente de la misma empresa
+    empresa = request.user.empresa if not request.user.is_superuser else equipo.empresa
+    equipos_empresa = Equipo.objects.filter(
+        empresa=empresa
+    ).order_by('codigo_interno')  # Ordenar por código interno
+
+    # Buscar índice actual
+    equipos_ids = list(equipos_empresa.values_list('id', flat=True))
+    try:
+        current_index = equipos_ids.index(equipo.id)
+
+        # Equipo anterior
+        prev_equipo_id = equipos_ids[current_index - 1] if current_index > 0 else None
+
+        # Equipo siguiente
+        next_equipo_id = equipos_ids[current_index + 1] if current_index < len(equipos_ids) - 1 else None
+
+        current_position = current_index + 1
+    except ValueError:
+        prev_equipo_id = None
+        next_equipo_id = None
+        current_position = None
+
     if request.method == 'POST':
-        return _process_edit_equipment_form(request, equipo)
+        # Verificar qué botón se presionó
+        if 'save_and_next' in request.POST and next_equipo_id:
+            # Guardar y ir al siguiente
+            result = _process_edit_equipment_form(request, equipo)
+            if isinstance(result, HttpResponseRedirect):
+                # Si guardó correctamente, redirigir al siguiente
+                return redirect('core:editar_equipo', pk=next_equipo_id)
+            return result
+        elif 'save_and_prev' in request.POST and prev_equipo_id:
+            # Guardar y ir al anterior
+            result = _process_edit_equipment_form(request, equipo)
+            if isinstance(result, HttpResponseRedirect):
+                # Si guardó correctamente, redirigir al anterior
+                return redirect('core:editar_equipo', pk=prev_equipo_id)
+            return result
+        else:
+            # Guardado normal
+            return _process_edit_equipment_form(request, equipo)
     else:
         form = EquipoForm(instance=equipo, request=request)
 
     context = {
         'form': form,
         'equipo': equipo,
-        'titulo_pagina': f'Editar Equipo: {equipo.codigo_interno}'
+        'titulo_pagina': f'Editar Equipo: {equipo.codigo_interno}',
+        # NUEVO: Datos de navegación
+        'prev_equipo_id': prev_equipo_id,
+        'next_equipo_id': next_equipo_id,
+        'current_position': current_position,
+        'total_equipos': equipos_empresa.count(),
     }
 
     return render(request, 'core/editar_equipo.html', context)
@@ -388,28 +464,42 @@ def editar_equipo(request, pk):
 @access_check
 @login_required
 @trial_check
-@permission_required('core.delete_equipo', raise_exception=True)
-@require_POST
 @monitor_view
 def eliminar_equipo(request, pk):
     """
-    Elimina un equipo (solo superusuarios)
+    Elimina un equipo individual.
+    Solo ADMINISTRADOR, GERENCIA y SuperUsuario pueden eliminar.
+    MODIFICADO 2025-11-19: Usar permisos basados en roles
     """
-    if not request.user.is_superuser:
-        messages.error(request, 'Solo los administradores pueden eliminar equipos.')
+    # Verificar permisos usando la propiedad del modelo
+    if not request.user.puede_eliminar_equipos:
+        messages.error(request, 'No tienes permisos para eliminar equipos. Solo Administradores y Gerentes pueden hacerlo.')
         return redirect('core:home')
 
     equipo = get_object_or_404(Equipo, pk=pk)
 
-    try:
-        codigo_interno = equipo.codigo_interno
-        equipo.delete()
-        messages.success(request, f'Equipo {codigo_interno} eliminado exitosamente.')
-    except Exception as e:
-        logger.error(f"Error eliminando equipo {equipo.codigo_interno}: {e}")
-        messages.error(request, f'Error al eliminar equipo: {str(e)}')
+    # Verificar que el equipo pertenece a la empresa del usuario
+    if not request.user.is_superuser:
+        if equipo.empresa != request.user.empresa:
+            messages.error(request, 'No tienes permiso para eliminar este equipo.')
+            return redirect('core:home')
 
-    return redirect('core:home')
+    if request.method == 'POST':
+        try:
+            codigo_interno = equipo.codigo_interno
+            equipo.delete()
+            messages.success(request, f'Equipo {codigo_interno} eliminado exitosamente.')
+        except Exception as e:
+            logger.error(f"Error eliminando equipo {equipo.codigo_interno}: {e}")
+            messages.error(request, f'Error al eliminar equipo: {str(e)}')
+
+        return redirect('core:home')
+
+    # Vista GET - Confirmación
+    return render(request, 'core/eliminar_equipo.html', {
+        'equipo': equipo,
+        'titulo_pagina': f'Eliminar Equipo: {equipo.codigo_interno}'
+    })
 
 
 @access_check
@@ -865,3 +955,70 @@ def _get_next_activities(equipo):
         'mantenimiento_vencido': equipo.proximo_mantenimiento and equipo.proximo_mantenimiento < today,
         'comprobacion_vencida': equipo.proxima_comprobacion and equipo.proxima_comprobacion < today,
     }
+
+
+@access_check
+@login_required
+@trial_check
+@monitor_view
+def equipos_eliminar_masivo(request):
+    """
+    Vista para eliminar múltiples equipos a la vez.
+    Solo ADMINISTRADOR, GERENCIA y SuperUsuario pueden eliminar.
+    NUEVO 2025-11-19: Eliminación masiva
+    """
+    # Verificar permisos
+    if not request.user.puede_eliminar_equipos:
+        messages.error(request, 'No tienes permisos para eliminar equipos.')
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        # Obtener IDs de equipos a eliminar
+        equipos_ids = request.POST.getlist('equipos_ids[]')
+
+        if not equipos_ids:
+            messages.error(request, 'No se seleccionaron equipos para eliminar.')
+            return redirect('core:home')
+
+        # Verificar que todos los equipos pertenecen a la empresa del usuario
+        empresa = request.user.empresa
+
+        if request.user.is_superuser:
+            equipos = Equipo.objects.filter(id__in=equipos_ids)
+        else:
+            equipos = Equipo.objects.filter(
+                id__in=equipos_ids,
+                empresa=empresa
+            )
+
+        if not request.user.is_superuser and equipos.count() != len(equipos_ids):
+            messages.error(request, 'Algunos equipos no pertenecen a tu empresa.')
+            return redirect('core:home')
+
+        # Eliminar equipos
+        try:
+            cantidad = equipos.count()
+            equipos.delete()
+            messages.success(request, f'{cantidad} equipo(s) eliminado(s) correctamente.')
+        except Exception as e:
+            logger.error(f"Error en eliminación masiva: {e}")
+            messages.error(request, f'Error al eliminar equipos: {str(e)}')
+
+        return redirect('core:home')
+
+    # Vista GET - Confirmación
+    equipos_ids = request.GET.getlist('ids')
+    empresa = request.user.empresa
+
+    if request.user.is_superuser:
+        equipos = Equipo.objects.filter(id__in=equipos_ids)
+    else:
+        equipos = Equipo.objects.filter(
+            id__in=equipos_ids,
+            empresa=empresa
+        )
+
+    return render(request, 'core/equipos_eliminar_masivo.html', {
+        'equipos': equipos,
+        'titulo_pagina': 'Eliminar Equipos Masivamente'
+    })

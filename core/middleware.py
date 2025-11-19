@@ -241,3 +241,52 @@ class TerminosCondicionesMiddleware(MiddlewareMixin):
             return redirect('core:aceptar_terminos')
 
         return None
+
+
+class SessionActivityMiddleware(MiddlewareMixin):
+    """
+    Middleware que extiende la sesión automáticamente si hay actividad del usuario.
+
+    - Detecta requests del usuario (GET, POST)
+    - Actualiza 'last_activity' en la sesión
+    - Extiende la sesión si hay actividad reciente
+    - Sesión expira después de 30 minutos de INACTIVIDAD real
+    """
+
+    # Tiempo de inactividad antes de cerrar sesión (en segundos)
+    INACTIVE_TIMEOUT = 1800  # 30 minutos
+
+    def process_request(self, request):
+        if request.user.is_authenticated:
+            from django.utils import timezone
+            from datetime import timedelta
+
+            now = timezone.now()
+
+            # Obtener última actividad
+            last_activity = request.session.get('last_activity')
+
+            if last_activity:
+                try:
+                    # Convertir string ISO a datetime
+                    last_activity_time = timezone.datetime.fromisoformat(last_activity)
+                    inactive_time = now - last_activity_time
+
+                    # Si ha estado inactivo más de 30 minutos, dejar que expire
+                    if inactive_time.total_seconds() > self.INACTIVE_TIMEOUT:
+                        # No hacer nada, dejar que Django maneje la expiración
+                        logger.info(
+                            f"Sesión inactiva para usuario {request.user.username}. "
+                            f"Tiempo inactivo: {inactive_time}"
+                        )
+                    else:
+                        # Hay actividad reciente, extender sesión
+                        request.session.set_expiry(self.INACTIVE_TIMEOUT)
+                except (ValueError, TypeError) as e:
+                    # Error al parsear fecha, establecer nueva
+                    logger.warning(f"Error parsing last_activity: {e}")
+
+            # Actualizar última actividad
+            request.session['last_activity'] = now.isoformat()
+
+        return None

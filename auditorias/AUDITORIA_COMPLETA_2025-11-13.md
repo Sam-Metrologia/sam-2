@@ -1,9 +1,20 @@
 # AUDITORÍA DE CÓDIGO Y EVALUACIÓN DE PLATAFORMA
 ## Sistema de Metrología SAM
 **Fecha de Auditoría:** 13 de Noviembre de 2025
+**Última Actualización:** 19 de Noviembre de 2025
 **Ubicación:** C:\Users\LENOVO\OneDrive\Escritorio\sam-2
 **Auditor:** Especialista en Software
 **Versión del Sistema:** SAM Metrología v1.0 (Post-correcciones críticas Oct 2024)
+
+---
+
+## ⚠️ ACTUALIZACIÓN 19 NOV 2025
+
+**Bug Crítico Resuelto:** Panel de Decisiones - TypeError Decimal/Float
+- **Detectado:** 16 Nov 2025
+- **Corregido:** 18 Nov 2025
+- **Verificado:** 19 Nov 2025
+- **Detalles:** Ver `BUG_PANEL_DECISIONES_2025-11-16.md` y `HOTFIX_APLICADO_2025-11-16.md`
 
 ---
 

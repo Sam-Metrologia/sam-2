@@ -20,6 +20,15 @@
             </div>
         {% endif %}
 
+        <!-- Indicador de posicion (NUEVO 2025-11-19) -->
+        {% if current_position and total_equipos %}
+        <div class="mb-4 text-center">
+            <span class="inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-semibold">
+                <i class="fas fa-list-ol"></i> Equipo {{ current_position }} de {{ total_equipos }}
+            </span>
+        </div>
+        {% endif %}
+
         <form method="post" enctype="multipart/form-data" class="space-y-6">
             {% csrf_token %}
             
@@ -106,15 +115,68 @@
                 </div>
             {% endfor %}
 
-            <div class="flex items-center justify-end space-x-4">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
-                    Actualizar Equipo
+            <!-- Botones de navegacion mejorados (NUEVO 2025-11-19) -->
+            <div class="flex items-center justify-between mt-6">
+                <!-- Boton Anterior -->
+                {% if prev_equipo_id %}
+                <button type="submit" name="save_and_prev" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-arrow-left"></i> Guardar y Anterior
                 </button>
-                <a href="{% url 'core:detalle_equipo' equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
-                    Cancelar
-                </a>
+                {% else %}
+                <div></div> <!-- Spacer -->
+                {% endif %}
+
+                <!-- Botones centrales -->
+                <div class="flex items-center space-x-4">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                    <a href="{% url 'core:detalle_equipo' equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+
+                <!-- Boton Siguiente -->
+                {% if next_equipo_id %}
+                <button type="submit" name="save_and_next" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Guardar y Siguiente <i class="fas fa-arrow-right"></i>
+                </button>
+                {% else %}
+                <div></div> <!-- Spacer -->
+                {% endif %}
+            </div>
+
+            <!-- Tip de atajos de teclado -->
+            <div class="text-center mt-4">
+                <small class="text-gray-600">
+                    <i class="fas fa-keyboard"></i> Tip: Usa <kbd class="px-2 py-1 bg-gray-200 rounded">Ctrl</kbd> + <kbd class="px-2 py-1 bg-gray-200 rounded">←</kbd> para anterior,
+                    <kbd class="px-2 py-1 bg-gray-200 rounded">Ctrl</kbd> + <kbd class="px-2 py-1 bg-gray-200 rounded">→</kbd> para siguiente
+                </small>
             </div>
         </form>
     </div>
 </div>
+
+<!-- JavaScript para atajos de teclado (NUEVO 2025-11-19) -->
+<script>
+document.addEventListener('keydown', function(e) {
+    // Ctrl + Flecha Izquierda = Anterior
+    if (e.ctrlKey && e.key === 'ArrowLeft') {
+        const prevBtn = document.querySelector('button[name="save_and_prev"]');
+        if (prevBtn) {
+            e.preventDefault();
+            prevBtn.click();
+        }
+    }
+
+    // Ctrl + Flecha Derecha = Siguiente
+    if (e.ctrlKey && e.key === 'ArrowRight') {
+        const nextBtn = document.querySelector('button[name="save_and_next"]');
+        if (nextBtn) {
+            e.preventDefault();
+            nextBtn.click();
+        }
+    }
+});
+</script>
 {% endblock %}

@@ -883,6 +883,11 @@
         });
     </script>
 
+    <!-- Session Keepalive (Auto-logout inteligente) - NUEVO 2025-11-19 -->
+    {% if user.is_authenticated %}
+    <script src="{% static 'core/js/session_keepalive.js' %}?v=1.0"></script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -329,3 +329,44 @@ def access_denied(request):
     Renders the access denied page.
     """
     return render(request, 'core/access_denied.html', {'titulo_pagina': 'Acceso Denegado'})
+
+
+@login_required
+@require_POST
+def session_heartbeat(request):
+    """
+    Endpoint para recibir heartbeat del frontend y mantener sesión activa.
+
+    Este endpoint extiende la sesión por 30 minutos más cuando recibe
+    un ping del JavaScript de keepalive, indicando que el usuario está activo.
+    """
+    try:
+        # Extender sesión por 30 minutos más
+        request.session.set_expiry(1800)  # 1800 segundos = 30 minutos
+
+        # Parsear datos del heartbeat
+        try:
+            data = json.loads(request.body)
+            timestamp = data.get('timestamp')
+            inactive_time = data.get('inactive_time', 0)
+
+            logger.debug(
+                f"Heartbeat recibido de {request.user.username}. "
+                f"Tiempo inactivo: {inactive_time}s"
+            )
+        except (json.JSONDecodeError, AttributeError):
+            # Si no hay body o no se puede parsear, no es crítico
+            pass
+
+        return JsonResponse({
+            'status': 'ok',
+            'message': 'Session extended',
+            'expires_in': 1800  # segundos
+        })
+
+    except Exception as e:
+        logger.error(f"Error en session_heartbeat: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Failed to extend session'
+        }, status=500)

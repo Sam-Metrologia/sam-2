@@ -1,0 +1,99 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Media files (no incluir en producción)
+media/
+!media/.gitkeep
+
+# Static files collected (NO ignorar core/static/ - son archivos fuente)
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+nul
+
+# Logs
+logs/
+*.log
+
+# Backup files
+*.bak
+backup_*.json
+backup_*.zip
+db_backup.sqlite3
+backups/*.zip
+backups/*.json
+*_backup.py
+*_old.py
+
+# Test files
+test_*.py
+debug_*.py
+diagnostico_*.py
+crear_*.py
+demo_*.py
+test_uploads/
+test_images/
+
+# Cache
+.cache/
+*.cache
+
+# PDF generation temporary files
+*.pdf.tmp
+
+# Temporary and misc files
+cookies.txt
+*.xlsx
+plantilla_*.xlsx
+get-pip.py
+process_*.py
+
+# Documentation files for development (keep only main docs)
+DEBUG_*.md
+REFACTORING_*.md
+GUION_*.md
+
+# Report files
+ARCHIVOS_A_ELIMINAR.txt
