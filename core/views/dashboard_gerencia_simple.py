@@ -141,7 +141,7 @@ def calcular_metricas_eficiencia(empresa):
         return metricas
 
     except Exception as e:
-        print(f"Error calculando métricas para {empresa.nombre}: {e}")
+        logger.error(f"Error calculando métricas para {empresa.nombre}: {e}")
         return None
 
 
@@ -156,12 +156,6 @@ def management_permission_required(view_func):
         # Control de acceso mejorado por roles
         user_role = getattr(request.user, 'rol_usuario', 'TECNICO')
         is_management_user = getattr(request.user, 'is_management_user', False)
-
-        # Debug información
-        print(f"DEBUG: Usuario: {request.user.username}")
-        print(f"DEBUG: Rol usuario: {user_role}")
-        print(f"DEBUG: Is management user: {is_management_user}")
-        print(f"DEBUG: Is superuser: {request.user.is_superuser}")
 
         has_management_access = (
             request.user.is_superuser or
@@ -243,9 +237,8 @@ def dashboard_gerencia(request):
                         # Estimación: $500 por equipo por mes (promedio industria metrología)
                         total_equipos_facturados = sum([emp.num_equipos for emp in empresas_con_equipos])
                         ingresos_anuales = total_equipos_facturados * 500 * 12
-                        print(f"DEBUG: Usando estimación de ingresos basada en {total_equipos_facturados} equipos")
             except Exception as e:
-                print(f"Error calculando ingresos: {e}")
+                logger.error(f"Error calculando ingresos: {e}")
 
             # Costos básicos con estimaciones cuando no hay datos reales
             try:
@@ -310,24 +303,19 @@ def dashboard_gerencia(request):
                     margen_porcentaje = (margen_bruto / ingresos_anuales * 100)
 
             except Exception as e:
-                print(f"Error calculando costos: {e}")
+                logger.error(f"Error calculando costos: {e}")
 
             # Calcular métricas de eficiencia para todas las empresas del queryset
             metricas_eficiencia_empresas = []
             puntuacion_promedio_general = 0
 
-            print(f"DEBUG: Calculando métricas para {empresas_queryset.count()} empresas")
-            print(f"DEBUG: Empresa seleccionada ID: {selected_company_id}")
-
             # Procesar todas las empresas del queryset
             empresas_para_metricas = empresas_queryset if empresas_queryset.count() <= 10 else empresas_queryset[:10]
 
             for empresa in empresas_para_metricas:
-                print(f"DEBUG: Calculando métricas para empresa: {empresa.nombre} (ID: {empresa.id})")
                 try:
                     metricas = calcular_metricas_eficiencia(empresa)
                     if metricas and metricas.puntuacion_eficiencia_general > 0:
-                        print(f"DEBUG: Métricas calculadas - Puntuación: {metricas.puntuacion_eficiencia_general}")
                         metricas_eficiencia_empresas.append({
                             'empresa': empresa.nombre,
                             'puntuacion': metricas.puntuacion_eficiencia_general,
@@ -338,7 +326,6 @@ def dashboard_gerencia(request):
                             'eficacia_procesos': metricas.eficacia_procesos,
                         })
                     else:
-                        print(f"DEBUG: Métricas calculadas pero puntuación es 0 para {empresa.nombre}")
                         # Crear métricas básicas basadas en datos reales de la empresa
                         num_equipos = empresa.equipos.count()
                         if num_equipos > 0:
@@ -352,14 +339,12 @@ def dashboard_gerencia(request):
                                 'eficacia_procesos': 75.0,
                             })
                 except Exception as e:
-                    print(f"DEBUG: Error calculando métricas para {empresa.nombre}: {e}")
+                    logger.error(f"Error calculando métricas para {empresa.nombre}: {e}")
 
             # Calcular promedio general de eficiencia
             if metricas_eficiencia_empresas:
                 puntuacion_promedio_general = sum([m['puntuacion'] for m in metricas_eficiencia_empresas]) / len(metricas_eficiencia_empresas)
-                print(f"DEBUG: Puntuación promedio general: {puntuacion_promedio_general}")
             else:
-                print("DEBUG: No hay métricas para calcular promedio - usando datos demo")
                 # Si no hay datos reales, usar un valor de ejemplo para mostrar el sistema
                 puntuacion_promedio_general = 75.0  # Valor de ejemplo
                 metricas_eficiencia_empresas = [{
@@ -482,13 +467,12 @@ def dashboard_gerencia(request):
             }
             template = 'core/dashboard_gerencia_sam.html'
 
-        print(f"DEBUG: Context keys: {list(context.keys())}")
         return render(request, template, context)
 
     except Exception as e:
-        print(f"ERROR en dashboard_gerencia: {e}")
+        logger.error(f"ERROR en dashboard_gerencia: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
 
         context = {
             'error': f'Error en dashboard: {str(e)}',

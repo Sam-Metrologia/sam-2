@@ -111,7 +111,7 @@
         </div>
         <div class="text-sm text-gray-700 md:text-right mt-4 md:mt-0">
             <p><strong>Versión del Formato:</strong> {{ current_company_format_info.formato_version_empresa|default:"N/A" }}</p>
-            <p><strong>Fecha de Versión:</strong> {{ current_company_format_info.formato_fecha_version_empresa|date:"d/m/Y"|default:"N/A" }}</p>
+            <p><strong>Fecha de Versión:</strong> {{ current_company_format_info.formato_fecha_version_empresa|date:"Y-m-d"|default:"N/A" }}</p>
             <p><strong>Codificación del Formato:</strong> {{ current_company_format_info.formato_codificacion_empresa|default:"N/A" }}</p>
             {# Botón para editar la información de formato de la empresa #}
             {% if request.user.is_superuser or request.user.empresa == current_company_format_info %}
@@ -328,13 +328,13 @@
                         </span>
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm {{ equipo.proxima_calibracion_status }}">
-                        {{ equipo.proxima_calibracion|date:"d/m/Y"|default:"N/A" }}
+                        {{ equipo.proxima_calibracion|date:"Y-m-d"|default:"N/A" }}
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm {{ equipo.proximo_mantenimiento_status }}">
-                        {{ equipo.proximo_mantenimiento|date:"d/m/Y"|default:"N/A" }}
+                        {{ equipo.proximo_mantenimiento|date:"Y-m-d"|default:"N/A" }}
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm {{ equipo.proxima_comprobacion_status }}">
-                        {{ equipo.proxima_comprobacion|date:"d/m/Y"|default:"N/A" }}
+                        {{ equipo.proxima_comprobacion|date:"Y-m-d"|default:"N/A" }}
                     </td>
                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                         <div class="flex items-center space-x-2">

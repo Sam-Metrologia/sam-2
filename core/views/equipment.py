@@ -238,14 +238,6 @@ def equipos(request):
     # Datos para filtros
     empresas_disponibles = Empresa.objects.all().order_by('nombre') if user.is_superuser else []
 
-    # DEBUG: Verificar permisos del usuario (TEMPORAL 2025-11-19)
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.error(f"DEBUG HOME - Usuario: {user.username}")
-    logger.error(f"DEBUG HOME - Es superuser: {user.is_superuser}")
-    logger.error(f"DEBUG HOME - Rol: {user.rol_usuario}")
-    logger.error(f"DEBUG HOME - Puede eliminar (propiedad): {user.puede_eliminar_equipos}")
-
     context = {
         'equipos': equipos_page,
         'query': query,
@@ -282,6 +274,404 @@ def añadir_equipo(request):
         'limite_alcanzado': limite_alcanzado,
     }
     return render(request, 'core/añadir_equipo.html', context)
+
+
+def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
+    """
+    Genera gráfica SVG histórica de confirmaciones metrológicas.
+    Muestra múltiples calibraciones (hasta 5) con sus puntos y límites EMP.
+    Incluye barras de incertidumbre (±) en cada punto.
+    """
+    if not calibraciones_con_datos or len(calibraciones_con_datos) == 0:
+        return None
+
+    # Colores para cada calibración
+    colores = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
+
+    width, height = 700, 400
+    margin = {'top': 50, 'right': 20, 'bottom': 70, 'left': 70}
+    plot_width = width - margin['left'] - margin['right']
+    plot_height = height - margin['top'] - margin['bottom']
+
+    # Extraer todos los puntos nominales únicos de todas las calibraciones
+    nominales_unicos = set()
+    for cal in calibraciones_con_datos:
+        for punto in cal['puntos']:
+            nominales_unicos.add(punto['nominal'])
+    nominales_unicos = sorted(list(nominales_unicos))
+
+    if len(nominales_unicos) == 0:
+        return None
+
+    # Obtener EMPs del último registro (calibración más reciente)
+    ultima_cal = calibraciones_con_datos[0]
+    emp_por_nominal = {}
+    for punto in ultima_cal['puntos']:
+        emp_por_nominal[punto['nominal']] = punto.get('emp_absoluto', 0)
+
+    # Calcular rangos para ejes usando PORCENTAJE del nominal
+    # Esto permite que puntos con diferentes nominales se vean bien
+    todos_errores_porcentaje = []
+    for cal in calibraciones_con_datos:
+        for punto in cal['puntos']:
+            nominal = punto['nominal']
+            if nominal != 0:
+                error_porcentaje = (punto.get('error', 0) / abs(nominal)) * 100
+                todos_errores_porcentaje.append(error_porcentaje)
+            else:
+                todos_errores_porcentaje.append(punto.get('error', 0))
+
+    # También incluir EMPs como porcentaje
+    emps_porcentaje = []
+    for nominal, emp in emp_por_nominal.items():
+        if nominal != 0:
+            emp_porcentaje = (emp / abs(nominal)) * 100
+            emps_porcentaje.append(emp_porcentaje)
+        else:
+            emps_porcentaje.append(emp)
+
+    if len(todos_errores_porcentaje) == 0:
+        return None
+
+    max_error_pct = max(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
+    min_error_pct = min(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
+    rango = max_error_pct - min_error_pct
+    padding = rango * 0.20
+
+    y_max = max_error_pct + padding
+    y_min = min_error_pct - padding
+
+    def escala_y(valor):
+        return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height
+
+    def escala_x(index):
+        if len(nominales_unicos) == 1:
+            return margin['left'] + plot_width / 2
+        return margin['left'] + (index / (len(nominales_unicos) - 1)) * plot_width
+
+    # Comenzar SVG
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+
+    # Título
+    svg.append(f'<text x="{width/2}" y="25" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#2D3748">Historial de Confirmaciones Metrológicas (Últimas {len(calibraciones_con_datos)})</text>')
+
+    # Cuadrícula y ejes Y
+    num_ticks = 6
+    for i in range(num_ticks + 1):
+        valor = y_min + (y_max - y_min) * (i / num_ticks)
+        y = escala_y(valor)
+        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"] + plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
+        svg.append(f'<text x="{margin["left"] - 5}" y="{y + 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#6B7280">{valor:.3f}</text>')
+
+    # Ejes
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + plot_height}" x2="{margin["left"] + plot_width}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
+
+    # Línea de cero
+    y0 = escala_y(0)
+    svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
+
+    # Límites EMP (del último registro) - convertir a porcentaje
+    for i, nominal in enumerate(nominales_unicos):
+        x = escala_x(i)
+        emp = emp_por_nominal.get(nominal, 0)
+
+        # Convertir EMP a porcentaje del nominal
+        if nominal != 0:
+            emp_pct = (emp / abs(nominal)) * 100
+        else:
+            emp_pct = emp
+
+        y_sup = escala_y(emp_pct)
+        y_inf = escala_y(-emp_pct)
+
+        # Líneas verticales de límites
+        svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.3"/>')
+
+        if i < len(nominales_unicos) - 1:
+            x_next = escala_x(i + 1)
+            emp_next = emp_por_nominal.get(nominales_unicos[i + 1], emp)
+            nominal_next = nominales_unicos[i + 1]
+
+            if nominal_next != 0:
+                emp_next_pct = (emp_next / abs(nominal_next)) * 100
+            else:
+                emp_next_pct = emp_next
+
+            y_sup_next = escala_y(emp_next_pct)
+            y_inf_next = escala_y(-emp_next_pct)
+
+            # Líneas horizontales conectando límites
+            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
+            svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
+
+    # Dibujar líneas y puntos de cada calibración
+    for idx_cal, cal in enumerate(calibraciones_con_datos):
+        color = colores[idx_cal % len(colores)]
+
+        # Organizar puntos por nominal
+        puntos_por_nominal = {p['nominal']: p for p in cal['puntos']}
+
+        # Dibujar línea conectando puntos
+        path_points = []
+        for i, nominal in enumerate(nominales_unicos):
+            if nominal in puntos_por_nominal:
+                punto = puntos_por_nominal[nominal]
+                x = escala_x(i)
+
+                # Convertir error a porcentaje del nominal
+                error = punto.get('error', 0)
+                if nominal != 0:
+                    error_pct = (error / abs(nominal)) * 100
+                else:
+                    error_pct = error
+
+                y = escala_y(error_pct)
+                path_points.append(f"{x},{y}")
+
+        if len(path_points) > 1:
+            svg.append(f'<polyline points="{" ".join(path_points)}" fill="none" stroke="{color}" stroke-width="2" opacity="0.7"/>')
+
+        # Dibujar puntos con barras de incertidumbre
+        for i, nominal in enumerate(nominales_unicos):
+            if nominal in puntos_por_nominal:
+                punto = puntos_por_nominal[nominal]
+                x = escala_x(i)
+                error = punto.get('error', 0)
+                incertidumbre = punto.get('incertidumbre', 0)
+
+                # Convertir error e incertidumbre a porcentaje del nominal
+                if nominal != 0:
+                    error_pct = (error / abs(nominal)) * 100
+                    incertidumbre_pct = (incertidumbre / abs(nominal)) * 100
+                else:
+                    error_pct = error
+                    incertidumbre_pct = incertidumbre
+
+                y = escala_y(error_pct)
+                y_sup_inc = escala_y(error_pct + incertidumbre_pct)
+                y_inf_inc = escala_y(error_pct - incertidumbre_pct)
+
+                # Barra de incertidumbre
+                if incertidumbre_pct > 0:
+                    svg.append(f'<line x1="{x}" y1="{y_inf_inc}" x2="{x}" y2="{y_sup_inc}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
+                    svg.append(f'<line x1="{x-3}" y1="{y_sup_inc}" x2="{x+3}" y2="{y_sup_inc}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
+                    svg.append(f'<line x1="{x-3}" y1="{y_inf_inc}" x2="{x+3}" y2="{y_inf_inc}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
+
+                # Punto
+                svg.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="white" stroke-width="2"/>')
+
+    # Etiquetas eje X
+    for i, nominal in enumerate(nominales_unicos):
+        if i % max(1, len(nominales_unicos) // 8) == 0 or i == len(nominales_unicos) - 1:
+            x = escala_x(i)
+            svg.append(f'<text x="{x}" y="{margin["top"] + plot_height + 20}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">{nominal:.2f}</text>')
+
+    svg.append(f'<text x="{width/2}" y="{height - 15}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151">Valor Nominal</text>')
+    svg.append(f'<text x="20" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151" transform="rotate(-90 20 {height/2})">Error (%)</text>')
+
+    # Leyenda debajo de la gráfica (horizontal)
+    leyenda_y = height - 5
+    leyenda_x_start = margin['left']
+    svg.append(f'<text x="{leyenda_x_start}" y="{leyenda_y}" font-family="Arial" font-size="9" font-weight="bold" fill="#374151">Calibraciones:</text>')
+
+    x_offset = leyenda_x_start + 70
+    for idx_cal, cal in enumerate(calibraciones_con_datos):
+        color = colores[idx_cal % len(colores)]
+        svg.append(f'<circle cx="{x_offset}" cy="{leyenda_y - 3}" r="3" fill="{color}"/>')
+        fecha_str = cal['fecha'].strftime('%d/%m/%Y') if hasattr(cal['fecha'], 'strftime') else str(cal['fecha'])
+        svg.append(f'<text x="{x_offset + 8}" y="{leyenda_y}" font-family="Arial" font-size="8" fill="#4B5563">{fecha_str}</text>')
+        x_offset += 90
+
+    svg.append('</svg>')
+    return ''.join(svg)
+
+
+def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
+    """
+    Genera gráfica SVG histórica de comprobaciones.
+    Similar a confirmaciones pero sin barras de incertidumbre.
+    """
+    if not comprobaciones_con_datos or len(comprobaciones_con_datos) == 0:
+        return None
+
+    colores = ['#06b6d4', '#84cc16', '#f97316', '#a855f7', '#ec4899']
+
+    width, height = 700, 400
+    margin = {'top': 50, 'right': 20, 'bottom': 70, 'left': 70}
+    plot_width = width - margin['left'] - margin['right']
+    plot_height = height - margin['top'] - margin['bottom']
+
+    # Extraer nominales únicos
+    nominales_unicos = set()
+    for comp in comprobaciones_con_datos:
+        for punto in comp['puntos']:
+            nominales_unicos.add(punto['nominal'])
+    nominales_unicos = sorted(list(nominales_unicos))
+
+    if len(nominales_unicos) == 0:
+        return None
+
+    # EMPs del último registro
+    ultima_comp = comprobaciones_con_datos[0]
+    emp_por_nominal = {}
+    for punto in ultima_comp['puntos']:
+        emp_por_nominal[punto['nominal']] = punto.get('emp_absoluto', 0)
+
+    # Calcular rangos usando PORCENTAJE del nominal
+    todos_errores_porcentaje = []
+    for comp in comprobaciones_con_datos:
+        for punto in comp['puntos']:
+            nominal = punto['nominal']
+            if nominal != 0:
+                error_porcentaje = (punto.get('error', 0) / abs(nominal)) * 100
+                todos_errores_porcentaje.append(error_porcentaje)
+            else:
+                todos_errores_porcentaje.append(punto.get('error', 0))
+
+    # EMPs como porcentaje
+    emps_porcentaje = []
+    for nominal, emp in emp_por_nominal.items():
+        if nominal != 0:
+            emp_porcentaje = (emp / abs(nominal)) * 100
+            emps_porcentaje.append(emp_porcentaje)
+        else:
+            emps_porcentaje.append(emp)
+
+    if len(todos_errores_porcentaje) == 0:
+        return None
+
+    max_error_pct = max(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
+    min_error_pct = min(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
+    rango = max_error_pct - min_error_pct
+    padding = rango * 0.20
+
+    y_max = max_error_pct + padding
+    y_min = min_error_pct - padding
+
+    def escala_y(valor):
+        return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height
+
+    def escala_x(index):
+        if len(nominales_unicos) == 1:
+            return margin['left'] + plot_width / 2
+        return margin['left'] + (index / (len(nominales_unicos) - 1)) * plot_width
+
+    # SVG
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    svg.append(f'<text x="{width/2}" y="25" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#2D3748">Historial de Comprobaciones (Últimas {len(comprobaciones_con_datos)})</text>')
+
+    # Cuadrícula
+    num_ticks = 6
+    for i in range(num_ticks + 1):
+        valor = y_min + (y_max - y_min) * (i / num_ticks)
+        y = escala_y(valor)
+        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"] + plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
+        svg.append(f'<text x="{margin["left"] - 5}" y="{y + 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#6B7280">{valor:.3f}</text>')
+
+    # Ejes
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + plot_height}" x2="{margin["left"] + plot_width}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
+
+    # Línea cero
+    y0 = escala_y(0)
+    svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
+
+    # Límites EMP - convertir a porcentaje
+    for i, nominal in enumerate(nominales_unicos):
+        x = escala_x(i)
+        emp = emp_por_nominal.get(nominal, 0)
+
+        # Convertir a porcentaje
+        if nominal != 0:
+            emp_pct = (emp / abs(nominal)) * 100
+        else:
+            emp_pct = emp
+
+        y_sup = escala_y(emp_pct)
+        y_inf = escala_y(-emp_pct)
+
+        svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.3"/>')
+
+        if i < len(nominales_unicos) - 1:
+            x_next = escala_x(i + 1)
+            emp_next = emp_por_nominal.get(nominales_unicos[i + 1], emp)
+            nominal_next = nominales_unicos[i + 1]
+
+            if nominal_next != 0:
+                emp_next_pct = (emp_next / abs(nominal_next)) * 100
+            else:
+                emp_next_pct = emp_next
+
+            y_sup_next = escala_y(emp_next_pct)
+            y_inf_next = escala_y(-emp_next_pct)
+
+            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
+            svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
+
+    # Líneas y puntos de cada comprobación
+    for idx_comp, comp in enumerate(comprobaciones_con_datos):
+        color = colores[idx_comp % len(colores)]
+        puntos_por_nominal = {p['nominal']: p for p in comp['puntos']}
+
+        path_points = []
+        for i, nominal in enumerate(nominales_unicos):
+            if nominal in puntos_por_nominal:
+                punto = puntos_por_nominal[nominal]
+                x = escala_x(i)
+
+                # Convertir error a porcentaje
+                error = punto.get('error', 0)
+                if nominal != 0:
+                    error_pct = (error / abs(nominal)) * 100
+                else:
+                    error_pct = error
+
+                y = escala_y(error_pct)
+                path_points.append(f"{x},{y}")
+
+        if len(path_points) > 1:
+            svg.append(f'<polyline points="{" ".join(path_points)}" fill="none" stroke="{color}" stroke-width="2" opacity="0.7"/>')
+
+        for i, nominal in enumerate(nominales_unicos):
+            if nominal in puntos_por_nominal:
+                punto = puntos_por_nominal[nominal]
+                x = escala_x(i)
+                error = punto.get('error', 0)
+
+                # Convertir error a porcentaje
+                if nominal != 0:
+                    error_pct = (error / abs(nominal)) * 100
+                else:
+                    error_pct = error
+
+                y = escala_y(error_pct)
+                svg.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="white" stroke-width="2"/>')
+
+    # Etiquetas
+    for i, nominal in enumerate(nominales_unicos):
+        if i % max(1, len(nominales_unicos) // 8) == 0 or i == len(nominales_unicos) - 1:
+            x = escala_x(i)
+            svg.append(f'<text x="{x}" y="{margin["top"] + plot_height + 20}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">{nominal:.2f}</text>')
+
+    svg.append(f'<text x="{width/2}" y="{height - 15}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151">Valor Nominal</text>')
+    svg.append(f'<text x="20" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151" transform="rotate(-90 20 {height/2})">Error (%)</text>')
+
+    # Leyenda debajo de la gráfica (horizontal)
+    leyenda_y = height - 5
+    leyenda_x_start = margin['left']
+    svg.append(f'<text x="{leyenda_x_start}" y="{leyenda_y}" font-family="Arial" font-size="9" font-weight="bold" fill="#374151">Comprobaciones:</text>')
+
+    x_offset = leyenda_x_start + 85
+    for idx_comp, comp in enumerate(comprobaciones_con_datos):
+        color = colores[idx_comp % len(colores)]
+        svg.append(f'<circle cx="{x_offset}" cy="{leyenda_y - 3}" r="3" fill="{color}"/>')
+        fecha_str = comp['fecha'].strftime('%d/%m/%Y') if hasattr(comp['fecha'], 'strftime') else str(comp['fecha'])
+        svg.append(f'<text x="{x_offset + 8}" y="{leyenda_y}" font-family="Arial" font-size="8" fill="#4B5563">{fecha_str}</text>')
+        x_offset += 90
+
+    svg.append('</svg>')
+    return ''.join(svg)
 
 
 @access_check
@@ -335,15 +725,6 @@ def detalle_equipo(request, pk):
     except:
         pass
 
-    # DEBUG: Verificar cuántas actividades tiene el equipo
-    calibraciones_count = equipo.calibraciones.count()
-    mantenimientos_count = equipo.mantenimientos.count()
-    comprobaciones_count = equipo.comprobaciones.count()
-
-    print(f"DEBUG DEBUG DETALLE_EQUIPO - Equipo ID: {equipo.pk}")
-    print(f"DEBUG Calibraciones en BD: {calibraciones_count}")
-    print(f"DEBUG Mantenimientos en BD: {mantenimientos_count}")
-    print(f"DEBUG Comprobaciones en BD: {comprobaciones_count}")
 
     # NUEVO: Obtener equipos anterior y siguiente (2025-11-19)
     empresa = request.user.empresa if not request.user.is_superuser else equipo.empresa
@@ -363,6 +744,50 @@ def detalle_equipo(request, pk):
     except ValueError:
         pass
 
+    # ========== GRÁFICAS HISTÓRICAS ==========
+    # Obtener últimas 5 confirmaciones con datos JSON
+    calibraciones_con_datos = []
+    for cal in equipo.calibraciones.all()[:5]:
+        if hasattr(cal, 'confirmacion_metrologica_datos') and cal.confirmacion_metrologica_datos and cal.confirmacion_metrologica_datos.get('puntos_medicion'):
+            calibraciones_con_datos.append({
+                'fecha': cal.fecha_calibracion,
+                'puntos': cal.confirmacion_metrologica_datos['puntos_medicion']
+            })
+
+    # Obtener últimas 5 comprobaciones con datos JSON
+    comprobaciones_con_datos = []
+    for comp in equipo.comprobaciones.all()[:5]:
+        if hasattr(comp, 'datos_comprobacion') and comp.datos_comprobacion and comp.datos_comprobacion.get('puntos_medicion'):
+            comprobaciones_con_datos.append({
+                'fecha': comp.fecha_comprobacion,
+                'puntos': comp.datos_comprobacion['puntos_medicion']
+            })
+
+    # Generar gráficas SVG
+    grafica_hist_confirmaciones = None
+    mensaje_confirmaciones = None
+    if len(calibraciones_con_datos) > 0:
+        grafica_hist_confirmaciones = _generar_grafica_hist_confirmaciones(calibraciones_con_datos)
+    else:
+        # Verificar si hay calibraciones pero sin datos de plataforma
+        total_calibraciones = equipo.calibraciones.count()
+        if total_calibraciones > 0:
+            mensaje_confirmaciones = f"Este equipo tiene {total_calibraciones} calibración(es) registrada(s). Para visualizar el análisis histórico, es necesario registrar las confirmaciones metrológicas utilizando el formato de la plataforma."
+        else:
+            mensaje_confirmaciones = "No hay confirmaciones metrológicas registradas para este equipo."
+
+    grafica_hist_comprobaciones = None
+    mensaje_comprobaciones = None
+    if len(comprobaciones_con_datos) > 0:
+        grafica_hist_comprobaciones = _generar_grafica_hist_comprobaciones(comprobaciones_con_datos)
+    else:
+        # Verificar si hay comprobaciones pero sin datos de plataforma
+        total_comprobaciones = equipo.comprobaciones.count()
+        if total_comprobaciones > 0:
+            mensaje_comprobaciones = f"Este equipo tiene {total_comprobaciones} comprobación(es) registrada(s). Para visualizar el análisis histórico, es necesario registrar las comprobaciones utilizando el formato de la plataforma."
+        else:
+            mensaje_comprobaciones = "No hay comprobaciones registradas para este equipo."
+
     context = {
         'equipo': equipo,
         'titulo_pagina': f'Detalle del Equipo: {equipo.codigo_interno}',
@@ -377,6 +802,11 @@ def detalle_equipo(request, pk):
         'next_equipo_id': next_equipo_id,
         'current_position': current_position,
         'total_equipos': total_equipos,
+        # Gráficas históricas (NUEVO 2025-12-04)
+        'grafica_hist_confirmaciones': grafica_hist_confirmaciones,
+        'mensaje_confirmaciones': mensaje_confirmaciones,
+        'grafica_hist_comprobaciones': grafica_hist_comprobaciones,
+        'mensaje_comprobaciones': mensaje_comprobaciones,
         **equipment_metrics,
         **file_urls,
         **next_activities

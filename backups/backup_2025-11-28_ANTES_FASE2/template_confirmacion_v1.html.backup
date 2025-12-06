@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación Metrológica e Intervalos de Calibración - SAM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { background: white; }
+        }
+
+        .formula-cell {
+            background-color: #f0f9ff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .cumple {
+            background-color: #d1fae5;
+            color: #065f46;
+            font-weight: bold;
+        }
+
+        .no-cumple {
+            background-color: #fee2e2;
+            color: #991b1b;
+            font-weight: bold;
+        }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .tab-button.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .condicional {
+            background-color: #fef3c7;
+            color: #92400e;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-6">
+
+    <div class="max-w-7xl mx-auto">
+
+        <!-- Encabezado -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <div class="flex justify-between items-start gap-6">
+                <!-- Logo de la Empresa -->
+                <div class="flex-shrink-0">
+                    <div class="w-32 h-32 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                        <img id="logo-empresa" src="" alt="Logo Empresa" class="max-w-full max-h-full object-contain hidden">
+                        <div id="logo-placeholder" class="text-center text-gray-400">
+                            <i class="fas fa-building text-4xl mb-2"></i>
+                            <p class="text-xs">Logo<br>Empresa</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Título -->
+                <div class="flex-grow">
+                    <h1 class="text-3xl font-bold text-gray-800">CONFIRMACIÓN METROLÓGICA E INTERVALOS DE CALIBRACIÓN</h1>
+                    <p class="text-gray-600 mt-2">Sistema de Administración Metrológica - SAM</p>
+                    <p class="text-sm text-gray-500 mt-1" id="nombre-empresa-display">Empresa: [Se auto-completa desde base de datos]</p>
+                </div>
+
+                <!-- Información del Documento -->
+                <div class="text-right border-2 border-gray-300 p-3 rounded flex-shrink-0">
+                    <p class="text-sm"><strong>CÓDIGO:</strong> REG-SAM-008</p>
+                    <p class="text-sm"><strong>VERSIÓN:</strong> 2.0</p>
+                    <p class="text-sm"><strong>FECHA:</strong> <span id="fecha-actual">2025-11-27</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Objetivo -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+            <p class="text-sm text-gray-700">
+                <strong>Objetivo:</strong> Registrar y analizar las tendencias de calibración de los equipos de medición,
+                para identificar la estabilidad, deriva y comportamiento metrológico entre calibraciones y facilitar
+                la toma de decisiones sobre intervalos de calibración, ajustes, mantenimiento o retiro de servicio.
+            </p>
+        </div>
+
+        <!-- SECCIÓN 1: DATOS DEL EQUIPO -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-tools text-blue-600 mr-3"></i>
+                1. DATOS DEL EQUIPO
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Equipo</label>
+                    <input type="text" id="nombre-equipo" value="CINTA MÉTRICA" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Código Interno</label>
+                    <input type="text" id="codigo-interno" value="GOOD-CINTA-017" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número de Serie</label>
+                    <input type="text" id="numero-serie" value="NO PRESENTA" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                    <input type="text" id="marca" value="STANLEY" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                    <input type="text" id="modelo" value="34-107" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Análisis</label>
+                    <input type="date" id="fecha-analisis" value="2025-11-27" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">EMP (Error Máximo Permitido)</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="emp" value="0.005" step="0.001" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <select id="emp-unidad" class="px-3 py-2 border border-gray-300 rounded-md">
+                            <option value="mm" selected>mm</option>
+                            <option value="%">%</option>
+                            <option value="μm">μm</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Laboratorio</label>
+                    <input type="text" id="laboratorio" value="PINZUAR" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 2: LISTA DE CHEQUEO -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-clipboard-check text-green-600 mr-3"></i>
+                2. LISTA DE CHEQUEO CERTIFICADOS DE CALIBRACIÓN
+            </h2>
+            <div class="grid grid-cols-2 gap-6">
+                <!-- Columna 1 -->
+                <div>
+                    <table class="w-full border-collapse border border-gray-300">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-300 px-3 py-2 text-left text-sm">ITEM A VERIFICAR</th>
+                                <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✓</th>
+                                <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✗</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm">
+                            <tr><td class="border border-gray-300 px-3 py-2">Título "Certificado de Calibración"</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check1" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check1" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Número único del certificado</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check2" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check2" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Logo de acreditación (ONAC u otro)</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check3" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check3" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Nombre y dirección del laboratorio</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check4" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check4" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Nombre y dirección de la empresa</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check5" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check5" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Identificación del método de calibración</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check6" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check6" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Identificación del equipo calibrado</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check7" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check7" value="no"></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Columna 2 -->
+                <div>
+                    <table class="w-full border-collapse border border-gray-300">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-300 px-3 py-2 text-left text-sm">ITEM A VERIFICAR</th>
+                                <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✓</th>
+                                <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✗</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm">
+                            <tr><td class="border border-gray-300 px-3 py-2">Fechas de recepción, calibración y emisión</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check8" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check8" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Resultados de calibración (errores reportados)</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check9" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check9" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Incertidumbre de medición reportada</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check10" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check10" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Nombre y firma de responsable</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check11" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check11" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Declaración de trazabilidad</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check12" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check12" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Declaración sobre momento de calibración</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check13" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check13" value="no"></td></tr>
+                            <tr><td class="border border-gray-300 px-3 py-2">Restricciones de divulgación</td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check14" value="si" checked></td>
+                                <td class="border border-gray-300 text-center"><input type="radio" name="check14" value="no"></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: CONFIRMACIÓN METROLÓGICA -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-chart-line text-purple-600 mr-3"></i>
+                3. CONFIRMACIÓN METROLÓGICA
+            </h2>
+
+            <!-- Información del Certificado -->
+            <div class="grid grid-cols-2 gap-4 mb-6 pb-6 border-b border-gray-200">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha del Certificado</label>
+                    <input type="date" id="fecha-certificado" value="2025-06-26" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">N° Certificado</label>
+                    <input type="text" id="numero-certificado" value="L-34740-001 R0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <!-- Selector de Regla de Decisión ILAC G8 -->
+            <div class="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                <label class="block text-sm font-bold text-gray-800 mb-2">
+                    <i class="fas fa-gavel mr-2"></i> Regla de Decisión (ILAC G8:09/2019)
+                </label>
+                <select id="regla-decision" onchange="recalcularTodasFilas()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 font-medium">
+                    <option value="guard_band_U" selected>Guard Band con U (Recomendado ISO 17025 - PFA ≤ 2.5%)</option>
+                    <option value="simple_acceptance">Aceptación Simple (Sin guard band - Riesgo compartido 50%)</option>
+                    <option value="guard_band_half">Guard Band U/2 (Balance comercial - PFA ≈ 16%)</option>
+                    <option value="guard_band_sqrt">Guard Band Óptimo √(EMP² - U²) (PFA ≤ 2%)</option>
+                    <option value="conditional">Aceptación Condicional (Zona gris - Transparencia cliente)</option>
+                </select>
+                <p class="text-xs text-gray-600 mt-2" id="regla-descripcion">
+                    Verifica que el peor caso (Error + Incertidumbre) no supere el EMP. Minimiza riesgo de falso aceptado.
+                </p>
+            </div>
+
+            <!-- Tabla de Análisis de Mediciones -->
+            <div id="tabla-analisis" class="metodo-content">
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded">
+                    <p class="text-sm"><strong>Análisis de Mediciones:</strong> Tabla con cálculo automático de errores, bandas de incertidumbre y conformidad según regla ILAC G8 seleccionada.</p>
+                </div>
+
+                <!-- Tabla de Mediciones -->
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-300 text-xs" id="tabla-mediciones">
+                        <thead>
+                            <tr class="bg-gray-800 text-white">
+                                <th class="border border-gray-300 px-2 py-2">#</th>
+                                <th class="border border-gray-300 px-2 py-2">Nominal<br>(mm)</th>
+                                <th class="border border-gray-300 px-2 py-2">Lectura<br>(mm)</th>
+                                <th class="border border-gray-300 px-2 py-2">Incert. (U)<br>(mm)</th>
+                                <th class="border border-gray-300 px-2 py-2 bg-blue-900">Error<br>(mm)</th>
+                                <th class="border border-gray-300 px-2 py-2 bg-green-900">Error + U<br>(mm)</th>
+                                <th class="border border-gray-300 px-2 py-2 bg-green-900">Error - U<br>(mm)</th>
+                                <th class="border border-gray-300 px-2 py-2 bg-purple-900">Conformidad</th>
+                                <th class="border border-gray-300 px-2 py-2 no-print">
+                                    <button onclick="agregarFila()" class="text-green-400 hover:text-green-200">
+                                        <i class="fas fa-plus-circle"></i>
+                                    </button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-mediciones">
+                            <!-- Filas se generarán dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 no-print">
+                    <button onclick="agregarFila()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                        <i class="fas fa-plus mr-2"></i> Agregar Punto de Medición
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gráfica de Comportamiento por Año -->
+            <div class="mt-6 bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+                <h3 class="font-bold text-lg mb-3">
+                    <i class="fas fa-chart-area mr-2"></i> Gráfica de Comportamiento Histórico
+                </h3>
+                <p class="text-sm text-gray-700 mb-4">Visualización de errores con barras de incertidumbre a través de los años. Permite identificar deriva y tendencias.</p>
+
+                <div class="bg-white border-2 border-gray-300 rounded-lg p-4">
+                    <canvas id="grafico-historico" width="800" height="400"></canvas>
+                </div>
+
+                <div class="mt-3 text-xs text-gray-600">
+                    <p><strong>Leyenda:</strong></p>
+                    <p>• Puntos: Errores de medición | Barras: ± Incertidumbre (U) | Líneas separadas por año de calibración</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: INTERVALOS DE CALIBRACIÓN (NUEVA) -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-clock text-orange-600 mr-3"></i>
+                4. INTERVALOS DE CALIBRACIÓN (ILAC G-24)
+            </h2>
+
+            <!-- Selector de Método -->
+            <div class="mb-6">
+                <p class="text-sm font-medium text-gray-700 mb-3">Seleccione el método para determinar el intervalo de calibración:</p>
+                <div class="flex gap-4">
+                    <button onclick="mostrarMetodoIntervalo('metodo1')" id="btn-metodo1" class="tab-button active px-6 py-3 rounded-lg border-2 border-orange-500 font-semibold transition">
+                        <i class="fas fa-calculator mr-2"></i> Método 1: Índice de Calibración (IC)
+                    </button>
+                    <button onclick="mostrarMetodoIntervalo('metodo2')" id="btn-metodo2" class="tab-button px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold transition">
+                        <i class="fas fa-chart-line mr-2"></i> Método 2: Deriva Temporal
+                    </button>
+                </div>
+            </div>
+
+            <!-- MÉTODO 1: ÍNDICE DE CALIBRACIÓN (ILAC G-24) -->
+            <div id="intervalo-metodo1" class="metodo-intervalo">
+                <div class="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4 rounded">
+                    <p class="text-sm"><strong>Método 1 (ILAC G-24):</strong> Cálculo del intervalo basado en estabilidad, frecuencia de uso e impacto del lugar de trabajo.</p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6 mb-6">
+                    <!-- Estabilidad en Deriva (E) -->
+                    <div class="border-2 border-gray-200 rounded-lg p-4">
+                        <label class="block text-sm font-bold text-gray-800 mb-3">
+                            <i class="fas fa-balance-scale mr-2 text-blue-600"></i> Estabilidad en Deriva (E)
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input type="radio" name="estabilidad" value="1" checked class="mt-1 mr-2" onchange="calcularIC()">
+                                <div class="text-xs">
+                                    <strong>E = 1</strong><br>
+                                    Dentro del 80% del EMP
+                                </div>
+                            </label>
+                            <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input type="radio" name="estabilidad" value="2" class="mt-1 mr-2" onchange="calcularIC()">
+                                <div class="text-xs">
+                                    <strong>E = 2</strong><br>
+                                    Fuera del 80% del EMP<br>
+                                    <span class="text-red-600">(Requiere seguimiento)</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Frecuencia de Uso (F) -->
+                    <div class="border-2 border-gray-200 rounded-lg p-4">
+                        <label class="block text-sm font-bold text-gray-800 mb-3">
+                            <i class="fas fa-redo mr-2 text-green-600"></i> Frecuencia de Uso (F)
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input type="radio" name="frecuencia" value="1" checked class="mt-1 mr-2" onchange="calcularIC()">
+                                <div class="text-xs">
+                                    <strong>F = 1</strong><br>
+                                    1 a 5 veces/semana
+                                </div>
+                            </label>
+                            <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input type="radio" name="frecuencia" value="2" class="mt-1 mr-2" onchange="calcularIC()">
+                                <div class="text-xs">
+                                    <strong>F = 2</strong><br>
+                                    Más de 5 veces/semana
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Impacto Lugar de Trabajo (U) -->
+                    <div class="border-2 border-gray-200 rounded-lg p-4">
+                        <label class="block text-sm font-bold text-gray-800 mb-3">
+                            <i class="fas fa-industry mr-2 text-purple-600"></i> Impacto Lugar de Trabajo (U)
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input type="radio" name="impacto" value="1" checked class="mt-1 mr-2" onchange="calcularIC()">
+                                <div class="text-xs">
+                                    <strong>U = 1</strong><br>
+                                    Condiciones adecuadas y estables
+                                </div>
+                            </label>
+                            <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input type="radio" name="impacto" value="2" class="mt-1 mr-2" onchange="calcularIC()">
+                                <div class="text-xs">
+                                    <strong>U = 2</strong><br>
+                                    Condiciones variables<br>
+                                    <span class="text-orange-600">(Puede afectar medición)</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resultado del Cálculo -->
+                <div class="bg-gradient-to-r from-orange-100 to-yellow-100 border-2 border-orange-400 rounded-lg p-6">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 mb-2">Índice de Calibración (IC):</p>
+                            <p class="text-5xl font-bold text-orange-600" id="resultado-ic">3</p>
+                            <p class="text-xs text-gray-600 mt-1">IC = E + F + U</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 mb-2">Intervalo de Calibración Recomendado:</p>
+                            <p class="text-5xl font-bold text-green-600" id="intervalo-recomendado">36</p>
+                            <p class="text-xs text-gray-600 mt-1">meses (± 1 mes de tolerancia)</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-orange-300">
+                        <p class="text-xs text-gray-700">
+                            <strong>Tabla de referencia ILAC G-24:</strong><br>
+                            IC = 3 → 36 meses | IC = 4 → 24 meses | IC = 5 → 12 meses | IC = 6 → 6 meses
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MÉTODO 2: DERIVA TEMPORAL -->
+            <div id="intervalo-metodo2" class="metodo-intervalo hidden">
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded">
+                    <p class="text-sm"><strong>Método 2 (Deriva):</strong> Cálculo basado en la desviación observada entre calibraciones sucesivas.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Calibración Anterior (T1)</label>
+                        <input type="date" id="t1" value="2024-06-26" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="calcularDeriva()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Calibración Actual (T2)</label>
+                        <input type="date" id="t2" value="2025-06-26" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="calcularDeriva()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Desviación Observada (mm)</label>
+                        <input type="number" id="desviacion" value="0.10" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="calcularDeriva()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">EMP del Equipo (mm)</label>
+                        <input type="number" id="emp-deriva" value="0.005" step="0.001" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                    </div>
+                </div>
+
+                <!-- Resultado del Cálculo de Deriva -->
+                <div class="bg-gradient-to-r from-blue-100 to-cyan-100 border-2 border-blue-400 rounded-lg p-6">
+                    <div class="mb-4">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Cálculo de Deriva:</p>
+                        <p class="font-mono text-sm bg-white p-3 rounded border border-gray-300">
+                            Deriva = Desviación / |T1 - T2| = <span id="calculo-deriva">0.10 / 12 = 0.0083 mm/mes</span>
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 pt-4 border-t border-blue-300">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 mb-2">Deriva Calculada:</p>
+                            <p class="text-4xl font-bold text-blue-600" id="deriva-valor">0.0083</p>
+                            <p class="text-xs text-gray-600 mt-1">mm/mes</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 mb-2">Periodo de Calibración:</p>
+                            <p class="text-4xl font-bold text-green-600" id="periodo-calibracion">≈ 0.6</p>
+                            <p class="text-xs text-gray-600 mt-1">meses (Fórmula: ±EMP / Deriva)</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-blue-300">
+                        <p class="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
+                            <strong>⚠️ Nota:</strong> Si el resultado es muy bajo (&lt;6 meses), considere revisar las condiciones de uso o el método de calibración.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 5: CONCLUSIÓN Y DECISIÓN -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-check-circle text-green-600 mr-3"></i>
+                5. CONCLUSIÓN Y DECISIÓN
+            </h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Resultado del Análisis:</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="decision" value="apto" checked class="mr-2">
+                            <span class="text-green-700 font-semibold">✓ APTO - Equipo cumple con especificaciones</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="decision" value="ajuste" class="mr-2">
+                            <span class="text-yellow-700 font-semibold">⚠ REQUIERE AJUSTE - Dentro de límites pero cercano</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="decision" value="no-apto" class="mr-2">
+                            <span class="text-red-700 font-semibold">✗ NO APTO - Fuera de especificaciones</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones y Recomendaciones:</label>
+                    <textarea id="observaciones" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500" placeholder="Ingrese observaciones, recomendaciones o acciones a tomar...">El equipo presenta un comportamiento estable y dentro de especificaciones. Se recomienda mantener el intervalo de calibración actual de 12 meses.</textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Responsable del Análisis:</label>
+                    <input type="text" id="responsable" value="[Usuario Actual]" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex gap-4 no-print mb-6">
+            <button onclick="guardarFormulario()" class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg">
+                <i class="fas fa-save mr-2"></i> Guardar y Generar PDF
+            </button>
+            <button onclick="previsualizarPDF()" class="px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition shadow-lg">
+                <i class="fas fa-eye mr-2"></i> Previsualizar
+            </button>
+            <button onclick="window.print()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition shadow-lg">
+                <i class="fas fa-print mr-2"></i> Imprimir
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Datos iniciales de muestra
+        const datosIniciales = [
+            {nominal: 500, lectura: 499.47, incertidumbre: 0.10},
+            {nominal: 1000, lectura: 999.30, incertidumbre: 0.11},
+            {nominal: 1500, lectura: 1499.60, incertidumbre: 0.11},
+            {nominal: 2000, lectura: 1999.38, incertidumbre: 0.12},
+            {nominal: 2500, lectura: 2499.36, incertidumbre: 0.12},
+            {nominal: 3000, lectura: 2999.67, incertidumbre: 0.13}
+        ];
+
+        // Inicializar tabla con datos de muestra
+        function inicializarTabla() {
+            datosIniciales.forEach(dato => {
+                agregarFila(dato);
+            });
+        }
+
+        // Agregar fila a la tabla
+        function agregarFila(datos = null) {
+            const tbody = document.getElementById('tbody-mediciones');
+            const numFilas = tbody.children.length + 1;
+            const fila = tbody.insertRow();
+
+            const nominal = datos ? datos.nominal : '';
+            const lectura = datos ? datos.lectura : '';
+            const incertidumbre = datos ? datos.incertidumbre : '';
+
+            fila.innerHTML = `
+                <td class="border border-gray-300 px-2 py-2 text-center font-semibold">${numFilas}</td>
+                <td class="border border-gray-300 px-1 py-1">
+                    <input type="number" step="0.01" value="${nominal}"
+                           onchange="calcularFila(this)"
+                           class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+                </td>
+                <td class="border border-gray-300 px-1 py-1">
+                    <input type="number" step="0.01" value="${lectura}"
+                           onchange="calcularFila(this)"
+                           class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+                </td>
+                <td class="border border-gray-300 px-1 py-1">
+                    <input type="number" step="0.001" value="${incertidumbre}"
+                           onchange="calcularFila(this)"
+                           class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+                </td>
+                <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs" data-tipo="error">-</td>
+                <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs" data-tipo="error-mas-u">-</td>
+                <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs" data-tipo="error-menos-u">-</td>
+                <td class="border border-gray-300 px-2 py-2 text-center font-semibold text-xs" data-tipo="conformidad">-</td>
+                <td class="border border-gray-300 px-2 py-2 text-center no-print">
+                    <button onclick="eliminarFila(this)" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash text-xs"></i>
+                    </button>
+                </td>
+            `;
+
+            if (datos) {
+                calcularFila(fila.cells[1].querySelector('input'));
+            }
+        }
+
+        // Calcular error y conformidad según regla ILAC G8
+        function calcularFila(input) {
+            const fila = input.closest('tr');
+            const cells = fila.cells;
+
+            const nominal = parseFloat(cells[1].querySelector('input').value) || 0;
+            const lectura = parseFloat(cells[2].querySelector('input').value) || 0;
+            const incertidumbre = parseFloat(cells[3].querySelector('input').value) || 0;
+            const emp = parseFloat(document.getElementById('emp').value) || 0.005;
+            const regla = document.getElementById('regla-decision').value;
+
+            // Calcular error (Nominal - Lectura)
+            const error = parseFloat((nominal - lectura).toFixed(3));
+            const errorMasU = parseFloat((error + incertidumbre).toFixed(3));
+            const errorMenosU = parseFloat((error - incertidumbre).toFixed(3));
+
+            // Actualizar columnas de error
+            cells[4].textContent = error.toFixed(3);
+            cells[5].textContent = errorMasU.toFixed(3);
+            cells[6].textContent = errorMenosU.toFixed(3);
+
+            // Aplicar regla de decisión ILAC G8
+            let cumple = false;
+            let textoConformidad = '';
+            let claseConformidad = '';
+
+            const tolerancia = emp * nominal;
+            const errorAbs = Math.abs(error);
+
+            switch(regla) {
+                case 'simple_acceptance':
+                    // Regla 1: Sin guard band
+                    cumple = errorAbs <= tolerancia;
+                    textoConformidad = cumple ? 'Cumple' : 'No Cumple';
+                    claseConformidad = cumple ? 'cumple' : 'no-cumple';
+                    break;
+
+                case 'guard_band_U':
+                    // Regla 2: Guard band = U (RECOMENDADO)
+                    cumple = Math.abs(errorMasU) <= tolerancia;
+                    textoConformidad = cumple ? 'Cumple' : 'No Cumple';
+                    claseConformidad = cumple ? 'cumple' : 'no-cumple';
+                    break;
+
+                case 'guard_band_half':
+                    // Regla 3: Guard band = U/2
+                    const valorMedio = errorAbs + (incertidumbre / 2);
+                    cumple = valorMedio <= tolerancia;
+                    textoConformidad = cumple ? 'Cumple' : 'No Cumple';
+                    claseConformidad = cumple ? 'cumple' : 'no-cumple';
+                    break;
+
+                case 'guard_band_sqrt':
+                    // Regla 4: Guard band óptimo
+                    const toleranciaAjustada = Math.sqrt(Math.pow(tolerancia, 2) - Math.pow(incertidumbre, 2));
+                    cumple = errorAbs <= toleranciaAjustada;
+                    textoConformidad = cumple ? 'Cumple' : 'No Cumple';
+                    claseConformidad = cumple ? 'cumple' : 'no-cumple';
+                    break;
+
+                case 'conditional':
+                    // Regla 5: Aceptación condicional
+                    if (errorAbs <= tolerancia && Math.abs(errorMasU) <= tolerancia) {
+                        textoConformidad = 'Cumple';
+                        claseConformidad = 'cumple';
+                    } else if (errorAbs > tolerancia) {
+                        textoConformidad = 'No Cumple';
+                        claseConformidad = 'no-cumple';
+                    } else {
+                        textoConformidad = 'Condicional';
+                        claseConformidad = 'condicional';
+                    }
+                    break;
+            }
+
+            // Actualizar celda de conformidad
+            cells[7].textContent = textoConformidad;
+            cells[7].className = `border border-gray-300 px-2 py-2 text-center font-semibold text-xs ${claseConformidad}`;
+        }
+
+        // Recalcular todas las filas cuando cambia la regla de decisión
+        function recalcularTodasFilas() {
+            const tbody = document.getElementById('tbody-mediciones');
+            const filas = tbody.getElementsByTagName('tr');
+
+            for (let i = 0; i < filas.length; i++) {
+                const primerInput = filas[i].cells[1].querySelector('input');
+                if (primerInput) {
+                    calcularFila(primerInput);
+                }
+            }
+
+            // Actualizar descripción de la regla
+            actualizarDescripcionRegla();
+        }
+
+        // Actualizar descripción de la regla seleccionada
+        function actualizarDescripcionRegla() {
+            const regla = document.getElementById('regla-decision').value;
+            const descripcion = document.getElementById('regla-descripcion');
+
+            const descripciones = {
+                'simple_acceptance': 'Compara solo el error contra EMP, sin considerar incertidumbre. Riesgo compartido hasta 50%.',
+                'guard_band_U': 'Verifica que el peor caso (Error + Incertidumbre) no supere el EMP. Minimiza riesgo de falso aceptado (≤2.5%).',
+                'guard_band_half': 'Guard band de la mitad de la incertidumbre. Balance entre riesgo productor/consumidor (~16%).',
+                'guard_band_sqrt': 'Cálculo matemático óptimo usando √(EMP² - U²). Minimiza ambos riesgos (≤2%).',
+                'conditional': 'Identifica zona gris donde el equipo requiere decisión del cliente o revisión adicional.'
+            };
+
+            descripcion.textContent = descripciones[regla];
+        }
+
+        // Eliminar fila
+        function eliminarFila(button) {
+            const fila = button.closest('tr');
+            fila.remove();
+            renumerarFilas();
+        }
+
+        // Renumerar filas
+        function renumerarFilas() {
+            const tbody = document.getElementById('tbody-mediciones');
+            Array.from(tbody.children).forEach((fila, index) => {
+                fila.cells[0].textContent = index + 1;
+            });
+        }
+
+        // Calcular Índice de Calibración (IC) - Método 1 ILAC G-24
+        function calcularIC() {
+            const E = parseInt(document.querySelector('input[name="estabilidad"]:checked').value);
+            const F = parseInt(document.querySelector('input[name="frecuencia"]:checked').value);
+            const U = parseInt(document.querySelector('input[name="impacto"]:checked').value);
+
+            const IC = E + F + U;
+
+            // Tabla de intervalos según ILAC G-24
+            const intervalos = {
+                3: 36,
+                4: 24,
+                5: 12,
+                6: 6
+            };
+
+            const intervalo = intervalos[IC] || 12;
+
+            document.getElementById('resultado-ic').textContent = IC;
+            document.getElementById('intervalo-recomendado').textContent = intervalo;
+        }
+
+        // Calcular Deriva y Periodo - Método 2
+        function calcularDeriva() {
+            const t1 = new Date(document.getElementById('t1').value);
+            const t2 = new Date(document.getElementById('t2').value);
+            const desviacion = parseFloat(document.getElementById('desviacion').value) || 0;
+            const emp = parseFloat(document.getElementById('emp').value) || 0.005;
+
+            // Sincronizar EMP
+            document.getElementById('emp-deriva').value = emp;
+
+            // Calcular diferencia en meses
+            const diffTime = Math.abs(t2 - t1);
+            const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44); // Promedio días/mes
+
+            if (diffMonths === 0) {
+                document.getElementById('deriva-valor').textContent = '0';
+                document.getElementById('periodo-calibracion').textContent = '∞';
+                document.getElementById('calculo-deriva').textContent = 'División por cero - Fechas iguales';
+                return;
+            }
+
+            // Deriva = Desviación / Tiempo
+            const deriva = desviacion / diffMonths;
+
+            // Periodo = EMP / Deriva
+            const periodo = deriva !== 0 ? emp / deriva : Infinity;
+
+            document.getElementById('deriva-valor').textContent = deriva.toFixed(4);
+            document.getElementById('periodo-calibracion').textContent = periodo === Infinity ? '∞' : `≈ ${periodo.toFixed(1)}`;
+            document.getElementById('calculo-deriva').textContent = `${desviacion} / ${diffMonths.toFixed(1)} = ${deriva.toFixed(4)} mm/mes`;
+        }
+
+        // Mostrar método de intervalo de calibración
+        function mostrarMetodoIntervalo(metodo) {
+            const metodo1 = document.getElementById('intervalo-metodo1');
+            const metodo2 = document.getElementById('intervalo-metodo2');
+            const btnMetodo1 = document.getElementById('btn-metodo1');
+            const btnMetodo2 = document.getElementById('btn-metodo2');
+
+            if (metodo === 'metodo1') {
+                metodo1.classList.remove('hidden');
+                metodo2.classList.add('hidden');
+                btnMetodo1.classList.add('active');
+                btnMetodo2.classList.remove('active');
+            } else {
+                metodo1.classList.add('hidden');
+                metodo2.classList.remove('hidden');
+                btnMetodo1.classList.remove('active');
+                btnMetodo2.classList.add('active');
+                calcularDeriva();
+            }
+        }
+
+        // Dibujar gráfica histórica con barras de error
+        function dibujarGraficoHistorico() {
+            const canvas = document.getElementById('grafico-historico');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+
+            // Limpiar canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // Datos de ejemplo por año (en implementación real vendrán de la BD)
+            const datosPorAnio = {
+                '2023': [
+                    {nominal: 500, error: 0.53, incertidumbre: 0.10},
+                    {nominal: 1000, error: 0.70, incertidumbre: 0.11},
+                    {nominal: 1500, error: 0.40, incertidumbre: 0.11}
+                ],
+                '2024': [
+                    {nominal: 500, error: 0.60, incertidumbre: 0.10},
+                    {nominal: 1000, error: 0.55, incertidumbre: 0.11},
+                    {nominal: 1500, error: 0.50, incertidumbre: 0.11}
+                ],
+                '2025': [
+                    {nominal: 500, error: 0.53, incertidumbre: 0.10},
+                    {nominal: 1000, error: 0.70, incertidumbre: 0.11},
+                    {nominal: 1500, error: 0.40, incertidumbre: 0.11}
+                ]
+            };
+
+            const colores = {
+                '2023': '#3b82f6',  // Azul
+                '2024': '#10b981',  // Verde
+                '2025': '#f59e0b'   // Naranja
+            };
+
+            // Márgenes
+            const marginLeft = 60;
+            const marginRight = 100;
+            const marginTop = 40;
+            const marginBottom = 60;
+
+            // Área de gráfico
+            const chartWidth = width - marginLeft - marginRight;
+            const chartHeight = height - marginTop - marginBottom;
+
+            // Encontrar rango de valores
+            let maxError = 0;
+            Object.values(datosPorAnio).forEach(datos => {
+                datos.forEach(d => {
+                    const valorMax = Math.abs(d.error) + d.incertidumbre;
+                    if (valorMax > maxError) maxError = valorMax;
+                });
+            });
+
+            const escalaY = chartHeight / (maxError * 2);
+
+            // Dibujar ejes
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+
+            // Eje Y
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, marginTop);
+            ctx.lineTo(marginLeft, height - marginBottom);
+            ctx.stroke();
+
+            // Eje X
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, height - marginBottom);
+            ctx.lineTo(width - marginRight, height - marginBottom);
+            ctx.stroke();
+
+            // Línea de cero
+            ctx.strokeStyle = '#666';
+            ctx.setLineDash([3, 3]);
+            const yZero = marginTop + chartHeight / 2;
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, yZero);
+            ctx.lineTo(width - marginRight, yZero);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Etiqueta "0"
+            ctx.fillStyle = '#666';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText('0', marginLeft - 5, yZero + 3);
+
+            // Dibujar datos por año
+            const anios = Object.keys(datosPorAnio);
+            const numPuntos = datosPorAnio[anios[0]].length;
+            const espacioX = chartWidth / (numPuntos + 1);
+
+            anios.forEach((anio, indexAnio) => {
+                const datos = datosPorAnio[anio];
+                const color = colores[anio];
+                const offsetX = (indexAnio - 1) * 15; // Separar años horizontalmente
+
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                ctx.lineWidth = 2;
+
+                // Dibujar línea conectando puntos
+                ctx.beginPath();
+                datos.forEach((dato, i) => {
+                    const x = marginLeft + espacioX * (i + 1) + offsetX;
+                    const y = yZero - (dato.error * escalaY);
+
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+
+                // Dibujar puntos y barras de error
+                datos.forEach((dato, i) => {
+                    const x = marginLeft + espacioX * (i + 1) + offsetX;
+                    const y = yZero - (dato.error * escalaY);
+                    const yMasU = yZero - ((dato.error + dato.incertidumbre) * escalaY);
+                    const yMenosU = yZero - ((dato.error - dato.incertidumbre) * escalaY);
+
+                    // Barra de incertidumbre
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x, yMasU);
+                    ctx.lineTo(x, yMenosU);
+                    ctx.stroke();
+
+                    // Tapa superior e inferior
+                    ctx.beginPath();
+                    ctx.moveTo(x - 3, yMasU);
+                    ctx.lineTo(x + 3, yMasU);
+                    ctx.moveTo(x - 3, yMenosU);
+                    ctx.lineTo(x + 3, yMenosU);
+                    ctx.stroke();
+
+                    // Punto central
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            });
+
+            // Leyenda
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'left';
+            let yLeyenda = marginTop + 20;
+            anios.forEach(anio => {
+                const color = colores[anio];
+                ctx.fillStyle = color;
+                ctx.fillRect(width - marginRight + 10, yLeyenda - 8, 15, 3);
+                ctx.beginPath();
+                ctx.arc(width - marginRight + 17, yLeyenda - 6, 3, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.fillText(anio, width - marginRight + 30, yLeyenda);
+                yLeyenda += 20;
+            });
+
+            // Etiquetas del eje X
+            ctx.fillStyle = '#000';
+            ctx.textAlign = 'center';
+            ctx.font = '10px Arial';
+            for (let i = 0; i < numPuntos; i++) {
+                const nominal = datosPorAnio[anios[0]][i].nominal;
+                const x = marginLeft + espacioX * (i + 1);
+                ctx.fillText(`${nominal} mm`, x, height - marginBottom + 20);
+            }
+
+            // Etiqueta del eje Y
+            ctx.save();
+            ctx.translate(15, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.font = '12px Arial';
+            ctx.fillText('Error (mm)', 0, 0);
+            ctx.restore();
+        }
+
+        // Guardar formulario
+        function guardarFormulario() {
+            alert('Guardando formulario y generando PDF...\n\nEn la implementación final, esto:\n1. Guardará los datos en la base de datos\n2. Generará un PDF profesional\n3. Redirigirá al detalle del equipo');
+        }
+
+        // Previsualizar PDF
+        function previsualizarPDF() {
+            alert('Abriendo vista previa del PDF...\n\nEn la implementación final, mostrará:\n- Encabezado con logo de la empresa\n- Todos los datos capturados\n- Tabla de mediciones o gráfico según método\n- Conclusiones y decisión\n- Firma digital (opcional)');
+        }
+
+        // Inicializar al cargar
+        document.addEventListener('DOMContentLoaded', function() {
+            inicializarTabla();
+            document.getElementById('fecha-actual').textContent = new Date().toISOString().split('T')[0];
+            dibujarGraficoHistorico();
+            calcularIC();
+            calcularDeriva();
+        });
+    </script>
+
+</body>
+</html>

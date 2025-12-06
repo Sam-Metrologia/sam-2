@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Confirmación Metrológica - {{ equipo.nombre }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.2cm 1cm;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 8.5pt;
+            line-height: 1.3;
+            color: #2D3748;
+        }
+
+        /* ENCABEZADO CORPORATIVO - Estilo unificado con hoja de vida */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            border: 1px solid #000;
+        }
+
+        .header-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            vertical-align: middle;
+        }
+
+        .header-logo-cell {
+            width: 25%;
+            text-align: center;
+        }
+
+        .header-logo {
+            max-width: 70px;
+            max-height: 70px;
+        }
+
+        .header-title-cell {
+            width: 50%;
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2D3748;
+        }
+
+        .header-info-cell {
+            width: 25%;
+            font-size: 8pt;
+            color: #2D3748;
+        }
+
+        .header-info-cell p {
+            margin: 2px 0;
+        }
+
+        /* SECCIONES */
+        .section {
+            margin: 10px 0;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 11pt;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #4A5568 0%, #5A6C7D 100%);
+            padding: 5px 10px;
+            margin: 0 0 8px 0;
+            border-radius: 3px;
+            box-shadow: 0 1px 3px rgba(74, 85, 104, 0.3);
+        }
+
+        /* INFORMACIÓN EN GRID */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin: 6px 0;
+        }
+
+        .info-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin: 6px 0;
+        }
+
+        .info-item {
+            background: #F7FAFC;
+            padding: 4px 8px;
+            border-left: 2px solid #4A5568;
+            font-size: 8.5pt;
+        }
+
+        .info-item strong {
+            color: #4A5568;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 2px;
+            font-size: 8pt;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        /* HIGHLIGHT BOX */
+        .highlight-box {
+            background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+            border-left: 4px solid #f39c12;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .highlight-box strong {
+            color: #875a0c;
+            font-weight: 700;
+        }
+
+        /* TABLAS */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        table th {
+            background: linear-gradient(135deg, #4A5568 0%, #5A6C7D 100%);
+            color: white;
+            font-weight: 700;
+            text-align: center;
+            padding: 8px 5px;
+            font-size: 8.5pt;
+            border: 1px solid #155080;
+        }
+
+        table td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            font-size: 8.5pt;
+        }
+
+        /* TABLA DE CHECKLIST */
+        .checklist-table td {
+            font-size: 8pt;
+            padding: 4px 6px;
+        }
+
+        .checklist-table th {
+            font-size: 8.5pt;
+        }
+
+        .check-column {
+            text-align: center;
+            font-size: 11pt;
+            font-weight: 700;
+            width: 12%;
+        }
+
+        /* TABLA DE MEDICIONES */
+        .medicion-table th {
+            font-size: 8pt;
+            padding: 6px 3px;
+        }
+
+        .medicion-table td {
+            text-align: center;
+            font-size: 8.5pt;
+        }
+
+        /* ESTADOS DE CONFORMIDAD */
+        .cumple {
+            background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+            color: #155724;
+            font-weight: 700;
+        }
+
+        .no-cumple {
+            background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+            color: #721c24;
+            font-weight: 700;
+        }
+
+        .condicional {
+            background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+            color: #856404;
+            font-weight: 700;
+        }
+
+        /* CAJA DE DECISIÓN */
+        .decision-box {
+            background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
+            border: 3px solid #4A5568;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(26, 84, 144, 0.2);
+        }
+
+        .decision-box .label {
+            font-size: 10pt;
+            color: #0c5460;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .decision-box .value {
+            font-size: 16pt;
+            color: #4A5568;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* CAJA DE OBSERVACIONES */
+        .observation-box {
+            background: #f8f9fa;
+            border: 2px solid #4A5568;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .observation-box p {
+            margin: 6px 0;
+            font-size: 9pt;
+        }
+
+        .observation-box strong {
+            color: #4A5568;
+            font-weight: 700;
+        }
+
+        /* PIE DE PÁGINA */
+        .footer {
+            margin-top: 25px;
+            padding-top: 12px;
+            border-top: 2px solid #4A5568;
+            text-align: center;
+            font-size: 7.5pt;
+            color: #6c757d;
+        }
+
+        .footer p {
+            margin: 3px 0;
+        }
+
+        /* ESTILOS DE CALIDAD */
+        .quality-badge {
+            display: inline-block;
+            background: #4A5568;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 8pt;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- ==================== ENCABEZADO ==================== -->
+    <table class="header-table">
+        <tr>
+            <td class="header-logo-cell">
+                {% if logo_empresa_url %}
+                <img src="{{ logo_empresa_url }}" alt="Logo Empresa" class="header-logo">
+                {% endif %}
+            </td>
+            <td class="header-title-cell">
+                <div>CONFIRMACIÓN METROLÓGICA</div>
+                <div style="font-size: 10pt; font-weight: normal; margin-top: 4px;">{{ nombre_empresa }}</div>
+            </td>
+            <td class="header-info-cell">
+                <p><strong>CÓDIGO:</strong> {{ datos_confirmacion.formato.codigo }}</p>
+                <p><strong>VERSIÓN:</strong> {{ datos_confirmacion.formato.version }}</p>
+                <p><strong>FECHA:</strong> {{ datos_confirmacion.formato.fecha }}</p>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ==================== SECCIÓN 1: INFORMACIÓN DEL EQUIPO ==================== -->
+    <div class="section">
+        <h2 class="section-title">1. INFORMACIÓN DEL EQUIPO Y CERTIFICADO</h2>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>NOMBRE DEL EQUIPO</strong>
+                <div class="info-value">{{ datos_confirmacion.equipo.nombre }}</div>
+            </div>
+            <div class="info-item">
+                <strong>CÓDIGO INTERNO</strong>
+                <div class="info-value">{{ datos_confirmacion.equipo.codigo_interno }}</div>
+            </div>
+            <div class="info-item">
+                <strong>NÚMERO DE SERIE</strong>
+                <div class="info-value">{{ datos_confirmacion.equipo.numero_serie }}</div>
+            </div>
+            <div class="info-item">
+                <strong>MARCA</strong>
+                <div class="info-value">{{ datos_confirmacion.equipo.marca }}</div>
+            </div>
+            <div class="info-item">
+                <strong>MODELO</strong>
+                <div class="info-value">{{ datos_confirmacion.equipo.modelo }}</div>
+            </div>
+            <div class="info-item">
+                <strong>FECHA DE ANÁLISIS</strong>
+                <div class="info-value">{{ datos_confirmacion.equipo.fecha_analisis }}</div>
+            </div>
+        </div>
+
+        <div class="highlight-box">
+            <strong>📋 INFORMACIÓN DEL CERTIFICADO DE CALIBRACIÓN</strong>
+        </div>
+
+        <div class="info-grid-3">
+            <div class="info-item">
+                <strong>LABORATORIO</strong>
+                <div class="info-value">{{ datos_confirmacion.laboratorio }}</div>
+            </div>
+            <div class="info-item">
+                <strong>FECHA CALIBRACIÓN</strong>
+                <div class="info-value">{{ datos_confirmacion.fecha_certificado }}</div>
+            </div>
+            <div class="info-item">
+                <strong>N° CERTIFICADO</strong>
+                <div class="info-value">{{ datos_confirmacion.numero_certificado }}</div>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>ERROR MÁXIMO PERMISIBLE (EMP)</strong>
+                <div class="info-value">{{ datos_confirmacion.emp }} {{ datos_confirmacion.emp_unidad }}</div>
+            </div>
+            <div class="info-item">
+                <strong>UNIDAD DE MEDIDA</strong>
+                <div class="info-value">{{ datos_confirmacion.unidad_equipo }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 2: LISTA DE CHEQUEO ==================== -->
+    <div class="section">
+        <h2 class="section-title">2. LISTA DE CHEQUEO DEL CERTIFICADO DE CALIBRACIÓN</h2>
+
+        <table class="checklist-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 71%;">REQUISITO A VERIFICAR</th>
+                    <th class="check-column">CUMPLE</th>
+                    <th class="check-column">NO CUMPLE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">1</td>
+                    <td>Título "Certificado de Calibración"</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">2</td>
+                    <td>Número único del certificado</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">3</td>
+                    <td>Logo de acreditación (ONAC u otro organismo reconocido)</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">4</td>
+                    <td>Nombre y dirección completa del laboratorio</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">5</td>
+                    <td>Nombre y dirección de la empresa cliente</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">6</td>
+                    <td>Identificación clara del método de calibración utilizado</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">7</td>
+                    <td>Identificación completa del equipo calibrado</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">8</td>
+                    <td>Fechas de recepción, calibración y emisión del certificado</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">9</td>
+                    <td>Resultados de calibración con errores reportados</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">10</td>
+                    <td>Incertidumbre de medición reportada (±U)</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">11</td>
+                    <td>Nombre, cargo y firma del responsable técnico</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">12</td>
+                    <td>Declaración de trazabilidad metrológica</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">13</td>
+                    <td>Declaración sobre condiciones al momento de la calibración</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; font-weight: 700;">14</td>
+                    <td>Restricciones sobre divulgación y reproducción</td>
+                    <td class="check-column">✓</td>
+                    <td class="check-column"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ==================== SECCIÓN 3: CONFIRMACIÓN METROLÓGICA ==================== -->
+    <div class="section">
+        <h2 class="section-title">3. ANÁLISIS DE CONFIRMACIÓN METROLÓGICA</h2>
+
+        <div class="highlight-box">
+            <strong>📊 REGLA DE DECISIÓN ILAC G8:09/2019:</strong>
+            {% if datos_confirmacion.regla_decision == 'guard_band_U' %}
+                Banda de Guarda U Completa (Recomendado ISO/IEC 17025 - Riesgo ≤ 2.5%)
+            {% elif datos_confirmacion.regla_decision == 'simple_acceptance' %}
+                Aceptación Simple - Riesgo Compartido (Sin banda de guarda - 50% riesgo)
+            {% elif datos_confirmacion.regla_decision == 'guard_band_half' %}
+                Banda de Guarda U/2 (Balance comercial - Riesgo ≈ 16%)
+            {% elif datos_confirmacion.regla_decision == 'guard_band_sqrt' %}
+                Banda de Guarda Óptima √(EMP² - U²) (Rigor matemático - Riesgo ≤ 2%)
+            {% elif datos_confirmacion.regla_decision == 'conditional' %}
+                Aceptación Condicional (Identifica zona gris - Transparencia total)
+            {% else %}
+                {{ datos_confirmacion.regla_decision }}
+            {% endif %}
+        </div>
+
+        <table class="medicion-table">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">#</th>
+                    <th style="width: 10%;">Nominal<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 10%;">Lectura<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Incert. (U)<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%; background-color: #fff3cd;">EMP<br>Valor</th>
+                    <th style="width: 7%; background-color: #fff3cd;">EMP<br>Tipo</th>
+                    <th style="width: 9%; background-color: #ffc107;">EMP Abs<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Error<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%; background-color: #e0e7ff;">FC<br>(adimensional)</th>
+                    <th style="width: 9%;">Error + U<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Error - U<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 10%;">Conformidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for punto in datos_confirmacion.puntos_medicion %}
+                {% if punto.nominal %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ punto.nominal }}</td>
+                    <td>{{ punto.lectura|default:"-" }}</td>
+                    <td>{{ punto.incertidumbre|default:"-" }}</td>
+                    <td style="background-color: #fff9e6;">{{ punto.emp_valor|default:"-" }}</td>
+                    <td style="background-color: #fff9e6;">{{ punto.emp_tipo|default:"-" }}</td>
+                    <td style="background-color: #fff3cd; font-weight: bold;">{{ punto.emp_absoluto|floatformat:3|default:"-" }}</td>
+                    <td>{{ punto.error|floatformat:3|default:"-" }}</td>
+                    <td style="background-color: #eff6ff; font-weight: bold;">{{ punto.factor_correccion|floatformat:6|default:"-" }}</td>
+                    <td>{{ punto.error_mas_u|floatformat:3|default:"-" }}</td>
+                    <td>{{ punto.error_menos_u|floatformat:3|default:"-" }}</td>
+                    <td class="{% if punto.conformidad == 'Cumple' %}cumple{% elif punto.conformidad == 'No Cumple' %}no-cumple{% elif punto.conformidad == 'Condicionado' %}condicional{% endif %}">
+                        {{ punto.conformidad|default:"-" }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ==================== SECCIÓN 3.1: GRÁFICA DE COMPORTAMIENTO ==================== -->
+    {% if grafica_imagen %}
+    <div class="section" style="page-break-before: auto;">
+        <h2 class="section-title">3.1. GRÁFICA DE COMPORTAMIENTO METROLÓGICO</h2>
+        <div style="text-align: center; margin: 15px 0; padding: 10px; background: white; border: 2px solid #1a5490; border-radius: 4px;">
+            <img src="{{ grafica_imagen }}" alt="Gráfica de Comportamiento Histórico" style="max-width: 100%; height: auto;">
+        </div>
+        <p style="text-align: center; font-size: 8pt; color: #6c757d; font-style: italic;">
+            Gráfica generada automáticamente mostrando errores de medición con barras de incertidumbre (±U) y límites EMP
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- ==================== SECCIÓN 4: CONCLUSIÓN Y DECISIÓN ==================== -->
+    <div class="section">
+        <h2 class="section-title">4. CONCLUSIÓN Y DECISIÓN METROLÓGICA</h2>
+
+        <div class="decision-box">
+            <div class="label">DECISIÓN FINAL</div>
+            <div class="value">{{ datos_confirmacion.conclusion.decision|upper|default:"PENDIENTE" }}</div>
+        </div>
+
+        <div class="observation-box">
+            <p><strong>OBSERVACIONES:</strong></p>
+            <p>{{ datos_confirmacion.conclusion.observaciones|default:"Sin observaciones adicionales" }}</p>
+        </div>
+
+        <div class="info-grid" style="margin-top: 15px;">
+            <div class="info-item">
+                <strong>RESPONSABLE DEL ANÁLISIS</strong>
+                <div class="info-value">{{ datos_confirmacion.conclusion.responsable|default:"Por definir" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>FECHA DE EMISIÓN</strong>
+                <div class="info-value">{{ fecha_actual }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PIE DE PÁGINA ==================== -->
+    <div class="footer">
+        <p><strong>SAM - Sistema de Aseguramiento Metrológico</strong></p>
+        <p>Documento generado de acuerdo con los lineamientos de ILAC G8:09/2019</p>
+    </div>
+</body>
+</html>

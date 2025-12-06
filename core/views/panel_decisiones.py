@@ -701,7 +701,7 @@ def _panel_decisiones_sam(request, today, current_year):
         margen_bruto = ingresos_anuales - costos_totales
 
     except Exception as e:
-        print(f"Error calculando datos financieros: {e}")
+        logger.error(f"Error calculando datos financieros: {e}")
 
     # MÉTRICAS FINANCIERAS DEL NEGOCIO SAM (NUEVO)
     metricas_financieras_sam = calcular_metricas_financieras_sam(empresas_queryset, current_year, current_year - 1)

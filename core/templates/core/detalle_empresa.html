@@ -45,7 +45,7 @@
             <p class="mb-2"><strong>Dirección:</strong> {{ empresa.direccion|default:"N/A" }}</p>
             <p class="mb-2"><strong>Teléfono:</strong> {{ empresa.telefono|default:"N/A" }}</p>
             <p class="mb-2"><strong>Email:</strong> {{ empresa.email|default:"N/A" }}</p>
-            <p class="mb-2"><strong>Fecha de Registro:</strong> {{ empresa.fecha_registro|date:"d/m/Y H:i" }}</p>
+            <p class="mb-2"><strong>Fecha de Registro:</strong> {{ empresa.fecha_registro|date:"Y-m-d H:i" }}</p>
             {% empresa_logo_url empresa as logo_url %}
             {% if logo_url %}
                 <div class="mt-4">
@@ -64,11 +64,11 @@
             <h2 class="text-xl font-semibold text-gray-700 mb-4">Información del Plan</h2>
             <p class="mb-2"><strong>Límite de Equipos:</strong> {{ empresa.limite_equipos_empresa|default:"Ilimitado" }}</p>
             <p class="mb-2"><strong>Estado de Suscripción:</strong> {{ empresa.get_estado_suscripcion_display }}</p>
-            <p class="mb-2"><strong>Fecha de Inicio del Plan:</strong> {{ empresa.fecha_inicio_plan|date:"d/m/Y"|default:"N/A" }}</p>
+            <p class="mb-2"><strong>Fecha de Inicio del Plan:</strong> {{ empresa.fecha_inicio_plan|date:"Y-m-d"|default:"N/A" }}</p>
             <p class="mb-2"><strong>Duración Suscripción (meses):</strong> {{ empresa.duracion_suscripcion_meses|default:"N/A" }}</p>
             <p class="mb-2"><strong>Fecha Fin del Plan:</strong>
                 {% if empresa.get_fecha_fin_plan %}
-                    <span class="{{ empresa.fecha_fin_plan_status }}">{{ empresa.get_fecha_fin_plan|date:"d/m/Y" }}</span>
+                    <span class="{{ empresa.fecha_fin_plan_status }}">{{ empresa.get_fecha_fin_plan|date:"Y-m-d" }}</span>
                 {% else %}
                     N/A
                 {% endif %}
@@ -233,8 +233,8 @@
                             <td class="py-2 px-4 border-b">{{ equipo.nombre }}</td>
                             <td class="py-2 px-4 border-b">{{ equipo.get_tipo_equipo_display }}</td>
                             <td class="py-2 px-4 border-b">{{ equipo.estado }}</td>
-                            <td class="py-2 px-4 border-b">{{ equipo.proxima_calibracion|date:"d/m/Y"|default:"N/A" }}</td>
-                            <td class="py-2 px-4 border-b">{{ equipo.proximo_mantenimiento|date:"d/m/Y"|default:"N/A" }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.proxima_calibracion|date:"Y-m-d"|default:"N/A" }}</td>
+                            <td class="py-2 px-4 border-b">{{ equipo.proximo_mantenimiento|date:"Y-m-d"|default:"N/A" }}</td>
                             <td class="py-2 px-4 border-b">
                                 <a href="{% url 'core:detalle_equipo' pk=equipo.pk %}" class="text-blue-600 hover:underline">Ver Detalle</a>
                             </td>

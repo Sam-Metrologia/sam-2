@@ -9,7 +9,7 @@
             size: A4;
             margin: 2cm;
             @bottom-left {
-                content: "Generado el {{ today|date:"d/m/Y H:i" }}";
+                content: "Generado el {{ today|date:"Y-m-d H:i" }}";
                 font-size: 9pt;
                 color: #555;
             }
@@ -171,7 +171,7 @@
             <img src="{{ logo_empresa_url }}" alt="Logo Empresa">
         {% endif %}
         <h1>Informe de Metrología - Dashboard</h1>
-        <p>Fecha del Informe: {{ today|date:"d/m/Y" }}</p>
+        <p>Fecha del Informe: {{ today|date:"Y-m-d" }}</p>
         {% if selected_company_id %}
             <p>Empresa: {{ empresas_disponibles|get_item:selected_company_id|get_attribute:'nombre' }}</p>
         {% else %}
@@ -330,7 +330,7 @@
                     {% for mant in latest_corrective_maintenances %}
                     <tr>
                         <td>{{ mant.equipo.nombre }} ({{ mant.equipo.codigo_interno }})</td>
-                        <td>{{ mant.fecha_mantenimiento|date:"d/m/Y" }}</td>
+                        <td>{{ mant.fecha_mantenimiento|date:"Y-m-d" }}</td>
                         <td>{{ mant.descripcion }}</td>
                         <td>${{ mant.costo|floatformat:2 }}</td>
                     </tr>

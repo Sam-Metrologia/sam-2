@@ -23,7 +23,77 @@ logger = logging.getLogger('core')
 
 
 # ==============================================================================
-# FUNCIONES AUXILIARES
+# 📋 TABLA DE CONTENIDOS - NAVEGACIÓN RÁPIDA
+# ==============================================================================
+"""
+Este archivo contiene TODOS los modelos del sistema SAM Metrología (3,214 líneas).
+Use Ctrl+F para buscar rápidamente por número de línea o nombre de modelo.
+
+ESTRUCTURA DEL ARCHIVO:
+------------------------
+
+1. FUNCIONES AUXILIARES ................................. líneas 29-62
+   └─ meses_decimales_a_relativedelta()
+   └─ get_upload_path()
+
+2. EMPRESA Y SUSCRIPCIONES .............................. líneas 68-850
+   ├─ Empresa (línea 68) ................................. Multi-tenant principal
+   │  └─ Relaciones: usuarios, equipos, ubicaciones, procedimientos, proveedores
+   └─ PlanSuscripcion (línea 825) ........................ Planes de pago
+
+3. USUARIOS ............................................. líneas 852-1050
+   └─ CustomUser (línea 852) ............................. Usuario personalizado
+      └─ Roles: GERENCIA, OPERATIVO, VISUALIZADOR
+
+4. CATÁLOGOS BÁSICOS .................................... líneas 1053-1157
+   ├─ Unidad (línea 1053) ................................ Unidades de medida
+   ├─ Ubicacion (línea 1067) ............................. Ubicaciones físicas
+   ├─ Procedimiento (línea 1092) ......................... Procedimientos técnicos
+   └─ Proveedor (línea 1123) ............................. Proveedores de servicios
+
+5. EQUIPOS .............................................. líneas 1159-1428
+   └─ Equipo (línea 1159) ................................ Modelo principal de equipos
+      └─ Relaciones: calibraciones, mantenimientos, comprobaciones
+
+6. ACTIVIDADES METROLÓGICAS ............................. líneas 1430-1664
+   ├─ Calibracion (línea 1430) ........................... Certificados de calibración
+   ├─ Mantenimiento (línea 1494) ......................... Mantenimientos preventivos
+   └─ Comprobacion (línea 1585) .......................... Comprobaciones metrológicas
+
+7. DOCUMENTACIÓN Y BAJAS ................................ líneas 1666-1891
+   ├─ BajaEquipo (línea 1666) ............................ Registro de bajas
+   └─ Documento (línea 1693) ............................. Documentos generales
+
+8. SISTEMA DE ARCHIVOS ZIP .............................. líneas 1893-2006
+   ├─ ZipRequest (línea 1893) ............................ Solicitudes de ZIP
+   └─ NotificacionZip (línea 1973) ....................... Notificaciones de ZIP
+
+9. CONFIGURACIÓN DEL SISTEMA ............................ líneas 2008-2679
+   ├─ EmailConfiguration (línea 2008) .................... Config de emails
+   └─ SystemScheduleConfig (línea 2234) .................. Config de programación
+
+10. MÉTRICAS Y NOTIFICACIONES ........................... líneas 2437-2790
+    ├─ MetricasEficienciaMetrologica (línea 2437) ........ Métricas de eficiencia
+    └─ NotificacionVencimiento (línea 2681) .............. Notificaciones
+
+11. TÉRMINOS Y CONDICIONES .............................. líneas 2792-2975
+    ├─ TerminosYCondiciones (línea 2792) ................. T&C del sistema
+    └─ AceptacionTerminos (línea 2859) ................... Aceptación de usuarios
+
+12. SISTEMA Y MANTENIMIENTO ............................. líneas 2977-3214
+    ├─ MaintenanceTask (línea 2977) ...................... Tareas de mantenimiento
+    ├─ CommandLog (línea 3083) ........................... Log de comandos
+    └─ SystemHealthCheck (línea 3126) .................... Chequeos de salud
+
+TOTAL MODELOS: 24 clases
+TOTAL LÍNEAS: 3,214 líneas
+
+NOTA: Para refactorizar este archivo en módulos separados, ver:
+      auditorias/RESULTADO_REFACTORIZACION_2025-12-05.md
+"""
+
+# ==============================================================================
+# 1. FUNCIONES AUXILIARES
 # ==============================================================================
 
 def meses_decimales_a_relativedelta(meses_decimal):
@@ -62,8 +132,31 @@ def meses_decimales_a_relativedelta(meses_decimal):
 
 
 # ==============================================================================
-# MODELO DE USUARIO PERSONALIZADO (AÑADIDO Y AJUSTADO)
+# 2. EMPRESA Y SUSCRIPCIONES - Multi-Tenant Principal
 # ==============================================================================
+"""
+Sección: Modelos de empresa y planes de suscripción
+
+MODELOS:
+--------
+1. Empresa (línea 138)
+   - Modelo principal multi-tenant del sistema
+   - Cada empresa tiene sus propios: equipos, usuarios, ubicaciones, procedimientos
+   - Sistema de soft-delete con período de recuperación de 30 días
+   - Control de límites de equipos por plan
+
+2. PlanSuscripcion (más abajo)
+   - Planes FREE y PAGO
+   - Control de límites de equipos por plan
+
+RELACIONES PRINCIPALES:
+-----------------------
+Empresa --< CustomUser (usuarios de la empresa)
+Empresa --< Equipo (equipos de la empresa)
+Empresa --< Ubicacion (ubicaciones físicas)
+Empresa --< Procedimiento (procedimientos técnicos)
+Empresa --< Proveedor (proveedores de servicios)
+"""
 
 class Empresa(models.Model):
     # Constantes para planes
@@ -1441,6 +1534,12 @@ class Calibracion(models.Model):
     documento_calibracion = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento de Calibración (PDF)")
     confirmacion_metrologica_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Confirmación Metrológica (PDF)")
     intervalos_calibracion_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Intervalos de Calibración (PDF)") # Nuevo campo
+    confirmacion_metrologica_datos = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Datos de Confirmación Metrológica",
+        help_text="Datos JSON con puntos de medición, incertidumbres y cálculos"
+    )
     observaciones = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
@@ -1511,6 +1610,14 @@ class Mantenimiento(models.Model):
     costo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True, help_text="Descripción detallada del mantenimiento realizado.")
     documento_mantenimiento = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento de Mantenimiento (PDF)")
+    actividades_realizadas = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Actividades Realizadas",
+        help_text="Actividades detalladas del mantenimiento en formato JSON"
+    )
+    documento_externo = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento Externo (Proveedor)")
+    documento_interno = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento Interno (SAM)")
     observaciones = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
@@ -1573,6 +1680,15 @@ class Comprobacion(models.Model):
     resultado = models.CharField(max_length=100, choices=[('Aprobado', 'Aprobado'), ('No Aprobado', 'No Aprobado')])
     observaciones = models.TextField(blank=True, null=True)
     documento_comprobacion = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento de Comprobación (PDF)")
+    comprobacion_pdf = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="PDF de Comprobación Metrológica")
+    datos_comprobacion = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Datos de Comprobación Metrológica",
+        help_text="Datos JSON con puntos de medición, tolerancias y conformidad"
+    )
+    documento_externo = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento Externo (Proveedor)")
+    documento_interno = models.FileField(upload_to=get_upload_path, blank=True, null=True, verbose_name="Documento Interno (SAM)")
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     # Campos adicionales para Dashboard de Gerencia

@@ -33,8 +33,8 @@
         <p><strong>Empresa:</strong> {{ usuario.empresa.nombre|default:"N/A" }}</p>
         <p><strong>Es Staff:</strong> {% if usuario.is_staff %}Sí{% else %}No{% endif %}</p>
         <p><strong>Es Superusuario:</strong> {% if usuario.is_superuser %}Sí{% else %}No{% endif %}</p>
-        <p><strong>Fecha de Creación:</strong> {{ usuario.date_joined|date:"d M Y H:i" }}</p>
-        <p><strong>Último Inicio de Sesión:</strong> {{ usuario.last_login|date:"d M Y H:i"|default:"N/A" }}</p>
+        <p><strong>Fecha de Creación:</strong> {{ usuario.date_joined|date:"Y-m-d H:i" }}</p>
+        <p><strong>Último Inicio de Sesión:</strong> {{ usuario.last_login|date:"Y-m-d H:i"|default:"N/A" }}</p>
     </div>
 </div>
 {% endblock %}

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Mantenimiento - {{ equipo.nombre }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm 1.5cm;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #2D3748;
+        }
+
+        /* ENCABEZADO CORPORATIVO */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            border: 1px solid #000;
+        }
+
+        .header-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        .header-logo-cell {
+            width: 25%;
+            text-align: center;
+        }
+
+        .header-logo {
+            max-width: 80px;
+            max-height: 80px;
+        }
+
+        .header-title-cell {
+            width: 50%;
+            text-align: center;
+            font-size: 16pt;
+            font-weight: bold;
+            color: #2D3748;
+        }
+
+        .header-info-cell {
+            width: 25%;
+            font-size: 8pt;
+            color: #2D3748;
+        }
+
+        .header-info-cell p {
+            margin: 3px 0;
+        }
+
+        /* SECCIONES */
+        .section {
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 12pt;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #4A5568 0%, #5A6C7D 100%);
+            padding: 10px 15px;
+            margin: 0 0 12px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(74, 85, 104, 0.3);
+        }
+
+        /* INFORMACIÓN EN GRID */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        .info-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        .info-item {
+            background: #F7FAFC;
+            padding: 8px 12px;
+            border-left: 3px solid #4A5568;
+            font-size: 9pt;
+        }
+
+        .info-item strong {
+            color: #4A5568;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 3px;
+            font-size: 8pt;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        /* HIGHLIGHT BOX para tipo de mantenimiento */
+        .highlight-box {
+            background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
+            border: 3px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);
+        }
+
+        .highlight-box .label {
+            font-size: 10pt;
+            color: #1e40af;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .highlight-box .value {
+            font-size: 18pt;
+            color: #1f2937;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* CHECKLIST DE ACTIVIDADES */
+        .checklist {
+            margin: 15px 0;
+        }
+
+        .checklist-item {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            border-left: 4px solid #10b981;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .checklist-icon {
+            font-size: 14pt;
+            color: #10b981;
+            margin-right: 12px;
+            font-weight: bold;
+        }
+
+        .checklist-text {
+            flex: 1;
+            font-size: 10pt;
+            color: #374151;
+        }
+
+        .checklist-badge {
+            background: #10b981;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 7pt;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .checklist-badge.personalizada {
+            background: #3b82f6;
+        }
+
+        /* CAJA DE OBSERVACIONES */
+        .observation-box {
+            background: #f8f9fa;
+            border: 2px solid #4A5568;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .observation-box p {
+            margin: 8px 0;
+            font-size: 10pt;
+            line-height: 1.6;
+        }
+
+        .observation-box strong {
+            color: #4A5568;
+            font-weight: 700;
+        }
+
+        /* PIE DE PÁGINA */
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px solid #4A5568;
+            text-align: center;
+            font-size: 8pt;
+            color: #6B7280;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
+
+        /* ESTADÍSTICAS */
+        .stats-box {
+            background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+            border-left: 4px solid #f39c12;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stats-box strong {
+            color: #875a0c;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <!-- ENCABEZADO CORPORATIVO -->
+    <table class="header-table">
+        <tr>
+            <td class="header-logo-cell">
+                {% if empresa.logo_empresa %}
+                <img src="{{ empresa.logo_empresa.path }}" alt="Logo" class="header-logo">
+                {% else %}
+                <div style="font-size: 12pt; color: #999;">LOGO</div>
+                {% endif %}
+            </td>
+            <td class="header-title-cell">
+                REPORTE DE MANTENIMIENTO
+            </td>
+            <td class="header-info-cell">
+                <p><strong>Código:</strong> SAM-MANT-001</p>
+                <p><strong>Versión:</strong> 01</p>
+                <p><strong>Fecha:</strong> {{ mantenimiento.fecha_mantenimiento|date:"d/m/Y" }}</p>
+            </td>
+        </tr>
+    </table>
+
+    <!-- SECCIÓN 1: INFORMACIÓN DEL EQUIPO -->
+    <div class="section">
+        <div class="section-title">1. INFORMACIÓN DEL EQUIPO</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>Código Interno</strong>
+                <div class="info-value">{{ equipo.codigo_interno }}</div>
+            </div>
+            <div class="info-item">
+                <strong>Nombre del Equipo</strong>
+                <div class="info-value">{{ equipo.nombre }}</div>
+            </div>
+            <div class="info-item">
+                <strong>Marca</strong>
+                <div class="info-value">{{ equipo.marca|default:"N/A" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>Modelo</strong>
+                <div class="info-value">{{ equipo.modelo|default:"N/A" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>Serie</strong>
+                <div class="info-value">{{ equipo.numero_serie|default:"N/A" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>Ubicación</strong>
+                <div class="info-value">{{ equipo.ubicacion|default:"N/A" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: DATOS DEL MANTENIMIENTO -->
+    <div class="section">
+        <div class="section-title">2. DATOS DEL MANTENIMIENTO</div>
+
+        <!-- Tipo de Mantenimiento Destacado -->
+        <div class="highlight-box">
+            <div class="label">TIPO DE MANTENIMIENTO</div>
+            <div class="value">{{ datos_mantenimiento.tipo_mantenimiento }}</div>
+        </div>
+
+        <div class="info-grid-3">
+            <div class="info-item">
+                <strong>Fecha</strong>
+                <div class="info-value">{{ datos_mantenimiento.fecha_mantenimiento }}</div>
+            </div>
+            <div class="info-item">
+                <strong>Responsable</strong>
+                <div class="info-value">{{ datos_mantenimiento.responsable }}</div>
+            </div>
+            {% if datos_mantenimiento.documento %}
+            <div class="info-item">
+                <strong>Documento/Orden</strong>
+                <div class="info-value">{{ datos_mantenimiento.documento }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if datos_mantenimiento.descripcion %}
+        <div class="observation-box">
+            <p><strong>Descripción General:</strong></p>
+            <p>{{ datos_mantenimiento.descripcion }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- SECCIÓN 3: ACTIVIDADES REALIZADAS -->
+    <div class="section">
+        <div class="section-title">3. ACTIVIDADES REALIZADAS</div>
+
+        <div class="stats-box">
+            <strong>Total de Actividades:</strong> {{ datos_mantenimiento.actividades|length }}
+        </div>
+
+        <div class="checklist">
+            {% for actividad in datos_mantenimiento.actividades %}
+            <div class="checklist-item">
+                <div class="checklist-icon">✓</div>
+                <div class="checklist-text">{{ actividad.descripcion }}</div>
+                {% if actividad.personalizada %}
+                <span class="checklist-badge personalizada">PERSONALIZADA</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: OBSERVACIONES -->
+    {% if datos_mantenimiento.observaciones %}
+    <div class="section">
+        <div class="section-title">4. OBSERVACIONES Y RECOMENDACIONES</div>
+        <div class="observation-box">
+            <p>{{ datos_mantenimiento.observaciones|linebreaks }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- PIE DE PÁGINA -->
+    <div class="footer">
+        <p><strong>{{ empresa.nombre }}</strong></p>
+        <p>Documento generado el {{ fecha_generacion|date:"d/m/Y H:i" }}</p>
+        <p style="margin-top: 10px; font-size: 7pt; color: #9CA3AF;">
+            Este reporte fue generado automáticamente por SAM Metrología
+        </p>
+    </div>
+</body>
+</html>

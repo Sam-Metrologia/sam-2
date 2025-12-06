@@ -1,0 +1,1342 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Confirmación Metrológica - {{ equipo.nombre }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white; }
+        .sidebar { display: none !important; }
+        .navbar { display: none !important; }
+        .main-content { margin-left: 0 !important; width: 100% !important; }
+    }
+
+    .formula-cell {
+        background-color: #f0f9ff;
+        font-family: 'Courier New', monospace;
+    }
+
+    .cumple {
+        background-color: #d1fae5;
+        color: #065f46;
+        font-weight: bold;
+    }
+
+    .no-cumple {
+        background-color: #fee2e2;
+        color: #991b1b;
+        font-weight: bold;
+    }
+
+    .condicional {
+        background-color: #fef3c7;
+        color: #92400e;
+        font-weight: bold;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .tab-button.active {
+        background-color: #3b82f6;
+        color: white;
+    }
+
+    .metodo-intervalo {
+        display: block;
+    }
+
+    .metodo-intervalo.hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Encabezado -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex justify-between items-start gap-6">
+            <!-- Logo de la Empresa -->
+            <div class="flex-shrink-0">
+                <div class="w-32 h-32 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    {% if logo_empresa_url %}
+                    <img src="{{ logo_empresa_url }}" alt="Logo Empresa" class="max-w-full max-h-full object-contain">
+                    {% else %}
+                    <div class="text-center text-gray-400">
+                        <i class="fas fa-building text-4xl mb-2"></i>
+                        <p class="text-xs">Logo<br>Empresa</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Título -->
+            <div class="flex-grow">
+                <h1 class="text-3xl font-bold text-gray-800">CONFIRMACIÓN METROLÓGICA</h1>
+                <p class="text-gray-600 mt-2">Sistema de Aseguramiento Metrológico - SAM</p>
+                <p class="text-sm text-gray-500 mt-1">Empresa: {{ nombre_empresa }}</p>
+            </div>
+
+            <!-- Información del Documento EDITABLE -->
+            <div class="text-right border-2 border-blue-300 p-3 rounded flex-shrink-0 bg-blue-50">
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">CÓDIGO:</label>
+                    <input type="text" id="formato-codigo" value="{{ formato_codigo }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">VERSIÓN:</label>
+                    <input type="text" id="formato-version" value="{{ formato_version }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-700">FECHA:</label>
+                    <input type="date" id="formato-fecha" value="{% now 'Y-m-d' %}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Objetivo -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+        <p class="text-sm text-gray-700">
+            <strong>Objetivo:</strong> Registrar y analizar las tendencias de calibración de los equipos de medición,
+            para identificar la estabilidad, deriva y comportamiento metrológico entre calibraciones y facilitar
+            la toma de decisiones sobre intervalos de calibración, ajustes, mantenimiento o retiro de servicio.
+        </p>
+    </div>
+
+    <!-- SECCIÓN 1: DATOS DEL EQUIPO -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-tools text-blue-600 mr-3"></i>
+            1. DATOS DEL EQUIPO
+        </h2>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Equipo</label>
+                <input type="text" id="nombre-equipo" value="{{ equipo.nombre }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Código Interno</label>
+                <input type="text" id="codigo-interno" value="{{ equipo.codigo_interno }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Serie</label>
+                <input type="text" id="numero-serie" value="{{ equipo.numero_serie|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                <input type="text" id="marca" value="{{ equipo.marca|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                <input type="text" id="modelo" value="{{ equipo.modelo|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Análisis</label>
+                <input type="date" id="fecha-analisis" value="{% now 'Y-m-d' %}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Unidad del Equipo</label>
+                <input type="text" id="unidad-equipo" value="{{ emp_info.unidad|default:'lx' }}" placeholder="mm, lx, psi, °C, etc." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="actualizarEncabezadosTabla()">
+                <p class="text-xs text-gray-500 mt-1">Esta unidad se aplicará en toda la tabla de mediciones</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">EMP (Error Máximo Permitido)</label>
+                <div class="flex gap-2">
+                    <input type="number" id="emp" value="{{ emp_info.valor|default:'8' }}" step="0.01" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="recalcularTodasFilas(); dibujarGraficoHistoricoDebounced();">
+                    <input type="text" id="emp-unidad" value="{{ emp_info.unidad|default:'%' }}" placeholder="% o unidad" class="w-24 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="recalcularTodasFilas(); dibujarGraficoHistoricoDebounced();">
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Si es %, el valor se normalizará. Si es unidad absoluta, use la misma del equipo</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Laboratorio</label>
+                <input type="text" id="laboratorio" value="{{ ultima_calibracion.nombre_proveedor|default:'' }}" placeholder="Nombre del laboratorio de calibración" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Calibración</label>
+                <input type="date" id="fecha-certificado" value="{{ ultima_calibracion.fecha_calibracion|date:'Y-m-d' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Certificado</label>
+                <input type="text" id="numero-certificado" value="{{ ultima_calibracion.numero_certificado|default:'' }}" placeholder="N° del certificado" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: LISTA DE CHEQUEO -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-clipboard-check text-green-600 mr-3"></i>
+            2. LISTA DE CHEQUEO CERTIFICADOS DE CALIBRACIÓN
+        </h2>
+        <div class="grid grid-cols-2 gap-6">
+            <!-- Columna 1 -->
+            <div>
+                <table class="w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 px-3 py-2 text-left text-sm">ITEM A VERIFICAR</th>
+                            <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✓</th>
+                            <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✗</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr><td class="border border-gray-300 px-3 py-2">Título "Certificado de Calibración"</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check1" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check1" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Número único del certificado</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check2" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check2" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Logo de acreditación (ONAC u otro)</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check3" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check3" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Nombre y dirección del laboratorio</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check4" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check4" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Nombre y dirección de la empresa</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check5" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check5" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Identificación del método de calibración</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check6" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check6" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Identificación del equipo calibrado</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check7" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check7" value="no"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Columna 2 -->
+            <div>
+                <table class="w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 px-3 py-2 text-left text-sm">ITEM A VERIFICAR</th>
+                            <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✓</th>
+                            <th class="border border-gray-300 px-2 py-2 text-center text-sm w-16">✗</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr><td class="border border-gray-300 px-3 py-2">Fechas de recepción, calibración y emisión</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check8" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check8" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Resultados de calibración (errores reportados)</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check9" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check9" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Incertidumbre de medición reportada</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check10" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check10" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Nombre y firma de responsable</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check11" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check11" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Declaración de trazabilidad</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check12" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check12" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Declaración sobre momento de calibración</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check13" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check13" value="no"></td></tr>
+                        <tr><td class="border border-gray-300 px-3 py-2">Restricciones de divulgación</td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check14" value="si" checked></td>
+                            <td class="border border-gray-300 text-center"><input type="radio" name="check14" value="no"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: CONFIRMACIÓN METROLÓGICA -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-chart-line text-purple-600 mr-3"></i>
+            3. CONFIRMACIÓN METROLÓGICA
+        </h2>
+
+        <!-- Información del Certificado (sincronizada con Sección 1) -->
+        <div class="grid grid-cols-2 gap-4 mb-6 pb-6 border-b border-gray-200 bg-blue-50 p-4 rounded">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha del Certificado</label>
+                <p class="text-lg font-bold text-blue-900" id="display-fecha-certificado">-</p>
+                <p class="text-xs text-gray-600">Sincronizada con Sección 1</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">N° Certificado</label>
+                <p class="text-lg font-bold text-blue-900" id="display-numero-certificado">-</p>
+                <p class="text-xs text-gray-600">Sincronizado con Sección 1</p>
+            </div>
+        </div>
+
+        <!-- Selector de Regla de Decisión ILAC G8 -->
+        <div class="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+            <label class="block text-sm font-bold text-gray-800 mb-2">
+                <i class="fas fa-gavel mr-2"></i> Regla de Decisión (ILAC G8:09/2019)
+            </label>
+            <select id="regla-decision" onchange="recalcularTodasFilas()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 font-medium">
+                <option value="guard_band_U" selected>Banda de Guarda U Completa (Recomendado ISO/IEC 17025 - Riesgo ≤ 2.5%)</option>
+                <option value="simple_acceptance">Aceptación Simple - Riesgo Compartido (Sin banda de guarda - 50% riesgo)</option>
+                <option value="guard_band_half">Banda de Guarda U/2 (Balance comercial - Riesgo ≈ 16%)</option>
+                <option value="guard_band_sqrt">Banda de Guarda Óptima √(EMP² - U²) (Rigor matemático - Riesgo ≤ 2%)</option>
+                <option value="conditional">Aceptación Condicional (Identifica zona gris - Transparencia total)</option>
+            </select>
+            <p class="text-xs text-gray-600 mt-2" id="regla-descripcion">
+                Se acepta solo si el peor caso (Error + Incertidumbre) NO supera el EMP. Protege al cliente minimizando riesgo de falso aceptado (≤2.5%).
+            </p>
+        </div>
+
+        <!-- Tabla de Análisis de Mediciones -->
+        <div id="tabla-analisis" class="metodo-content">
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded">
+                <p class="text-sm"><strong>Análisis de Mediciones:</strong> Tabla con cálculo automático de errores, bandas de incertidumbre y conformidad según regla ILAC G8 seleccionada.</p>
+            </div>
+
+            <!-- Tabla de Mediciones -->
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse border border-gray-300 text-xs" id="tabla-mediciones">
+                    <thead>
+                        <tr class="bg-gray-800 text-white">
+                            <th class="border border-gray-300 px-2 py-2">#</th>
+                            <th class="border border-gray-300 px-2 py-2">Nominal<br><span id="th-nominal">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2">Lectura<br><span id="th-lectura">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2">Incert. (U)<br><span id="th-incert">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2 bg-yellow-800">EMP Valor</th>
+                            <th class="border border-gray-300 px-2 py-2 bg-yellow-800">EMP Tipo</th>
+                            <th class="border border-gray-300 px-2 py-2 bg-yellow-700">EMP Absoluto<br><span id="th-emp-abs">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2 bg-blue-900">Error<br><span id="th-error">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2 bg-indigo-900">Factor de Corrección<br>(adimensional)</th>
+                            <th class="border border-gray-300 px-2 py-2 bg-green-900">Error + U<br><span id="th-error-mas">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2 bg-green-900">Error - U<br><span id="th-error-menos">(lx)</span></th>
+                            <th class="border border-gray-300 px-2 py-2 bg-purple-900">Conformidad</th>
+                            <th class="border border-gray-300 px-2 py-2 no-print">
+                                <button onclick="agregarFila()" class="text-green-400 hover:text-green-200">
+                                    <i class="fas fa-plus-circle"></i>
+                                </button>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-mediciones">
+                        <!-- Filas se generarán dinámicamente desde puntos_medicion_json -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 no-print">
+                <button onclick="agregarFila()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                    <i class="fas fa-plus mr-2"></i> Agregar Punto de Medición
+                </button>
+            </div>
+        </div>
+
+        <!-- Gráfica de Comportamiento por Año -->
+        <div class="mt-6 bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+            <h3 class="font-bold text-lg mb-3">
+                <i class="fas fa-chart-area mr-2"></i> Gráfica de Comportamiento Histórico
+            </h3>
+            <p class="text-sm text-gray-700 mb-4">Visualización de errores con barras de incertidumbre a través de los años. Permite identificar deriva y tendencias.</p>
+
+            <div class="bg-white border-2 border-gray-300 rounded-lg p-4">
+                <canvas id="grafico-historico" width="800" height="400"></canvas>
+            </div>
+
+            <div class="mt-3 text-xs text-gray-600">
+                <p><strong>Leyenda:</strong></p>
+                <p>• <span class="font-semibold">Puntos:</span> Errores de medición | <span class="font-semibold">Barras:</span> ± Incertidumbre (U) | <span class="font-semibold text-red-600">Líneas rojas:</span> Límites EMP ±</p>
+                <p class="mt-1">Los errores deben mantenerse dentro de los límites EMP (líneas rojas discontinuas) para conformidad</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: CONCLUSIÓN Y DECISIÓN -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-check-circle text-green-600 mr-3"></i>
+            4. CONCLUSIÓN Y DECISIÓN
+        </h2>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Resultado del Análisis:</label>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="decision" value="apto" checked class="mr-2">
+                        <span class="text-green-700 font-semibold">✓ APTO - Equipo cumple con especificaciones</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="decision" value="ajuste" class="mr-2">
+                        <span class="text-yellow-700 font-semibold">⚠ REQUIERE AJUSTE - Dentro de límites pero cercano</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="decision" value="no-apto" class="mr-2">
+                        <span class="text-red-700 font-semibold">✗ NO APTO - Fuera de especificaciones</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones y Recomendaciones:</label>
+                <textarea id="observaciones" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500" placeholder="Ingrese observaciones, recomendaciones o acciones a tomar...">El equipo presenta un comportamiento estable y dentro de especificaciones. Se recomienda mantener el intervalo de calibración actual.</textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Responsable del Análisis:</label>
+                <input type="text" id="responsable" value="{{ user.get_full_name|default:user.username }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" readonly>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div class="flex gap-4 no-print mb-6">
+        <button onclick="guardarPDF()" class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg">
+            <i class="fas fa-save mr-2"></i> Guardar PDF
+        </button>
+        <button onclick="window.print()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition shadow-lg">
+            <i class="fas fa-print mr-2"></i> Imprimir
+        </button>
+    </div>
+
+</div>
+
+<script>
+    // ========== INTEGRACIÓN CON DJANGO: DATOS DEL EQUIPO ==========
+
+    // Variable global con puntos de medición desde Django
+    const puntosMedicionDjango = {{ puntos_medicion_json|safe|default:'[]' }};
+
+    // DATOS REALES DE EJEMPLO (en implementación final vendrán de la base de datos Django)
+    const datosIniciales = puntosMedicionDjango.length > 0 ? puntosMedicionDjango : [
+        {nominal: 0.5, lectura: 0.476, incertidumbre: 0.015},
+        {nominal: 1, lectura: 0.96, incertidumbre: 0.021},
+        {nominal: 2, lectura: 1.92, incertidumbre: 0.03},
+        {nominal: 5, lectura: 4.99, incertidumbre: 0.05},
+        {nominal: 10, lectura: 10.1, incertidumbre: 0.1}
+    ];
+
+    // Datos históricos para gráfica (en implementación final vendrán de la base de datos)
+    const datosPorAnio = {
+        '2024': datosIniciales.map(d => ({
+            nominal: d.nominal,
+            error: d.nominal - d.lectura,
+            incertidumbre: d.incertidumbre
+        }))
+    };
+
+    // ========== FUNCIONES PRINCIPALES ==========
+
+    // Inicializar tabla con datos de Django
+    function inicializarTabla() {
+        if (datosIniciales && datosIniciales.length > 0) {
+            datosIniciales.forEach(dato => {
+                agregarFila(dato);
+            });
+        } else {
+            // Agregar fila vacía si no hay datos
+            agregarFila();
+        }
+    }
+
+    // Agregar fila a la tabla
+    function agregarFila(datos = null) {
+        const tbody = document.getElementById('tbody-mediciones');
+        const numFilas = tbody.children.length + 1;
+        const fila = tbody.insertRow();
+
+        const nominal = datos ? datos.nominal : '';
+        const lectura = datos ? datos.lectura : '';
+        const incertidumbre = datos ? datos.incertidumbre : '';
+        const empValor = datos ? (datos.emp_valor || '') : '';
+        const empTipo = datos ? (datos.emp_tipo || '%') : '%';
+
+        fila.innerHTML = `
+            <td class="border border-gray-300 px-2 py-2 text-center font-semibold">${numFilas}</td>
+            <td class="border border-gray-300 px-1 py-1">
+                <input type="number" step="0.01" value="${nominal}"
+                       onchange="calcularFila(this)"
+                       class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+            </td>
+            <td class="border border-gray-300 px-1 py-1">
+                <input type="number" step="0.01" value="${lectura}"
+                       onchange="calcularFila(this)"
+                       class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+            </td>
+            <td class="border border-gray-300 px-1 py-1">
+                <input type="number" step="0.001" value="${incertidumbre}"
+                       onchange="calcularFila(this)"
+                       class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+            </td>
+            <td class="border border-gray-300 px-1 py-1">
+                <input type="number" step="0.01" value="${empValor}"
+                       onchange="calcularFila(this)"
+                       class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded"
+                       placeholder="EMP">
+            </td>
+            <td class="border border-gray-300 px-1 py-1">
+                <select onchange="calcularFila(this)" class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
+                    <option value="%" ${empTipo === '%' ? 'selected' : ''}>%</option>
+                    <option value="abs" ${empTipo === 'abs' ? 'selected' : ''}>Absoluto</option>
+                </select>
+            </td>
+            <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs bg-yellow-50" data-tipo="emp-absoluto">-</td>
+            <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs" data-tipo="error">-</td>
+            <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs bg-indigo-50" data-tipo="factor-correccion">-</td>
+            <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs" data-tipo="error-mas-u">-</td>
+            <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs" data-tipo="error-menos-u">-</td>
+            <td class="border border-gray-300 px-2 py-2 text-center font-semibold text-xs" data-tipo="conformidad">-</td>
+            <td class="border border-gray-300 px-2 py-2 text-center no-print">
+                <button onclick="eliminarFila(this)" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-trash text-xs"></i>
+                </button>
+            </td>
+        `;
+
+        if (datos) {
+            calcularFila(fila.cells[1].querySelector('input'));
+        }
+    }
+
+    // Calcular error y conformidad según regla ILAC G8
+    function calcularFila(input) {
+        const fila = input.closest('tr');
+        const cells = fila.cells;
+
+        // Actualizar gráfica después de calcular (con debounce)
+        const actualizarGraficaDespues = () => {
+            dibujarGraficoHistoricoDebounced();
+        };
+
+        const nominal = parseFloat(cells[1].querySelector('input').value) || 0;
+        const lectura = parseFloat(cells[2].querySelector('input').value) || 0;
+        const incertidumbre = parseFloat(cells[3].querySelector('input').value) || 0;
+
+        // NUEVO: Leer EMP por punto
+        let empValorPunto = parseFloat(cells[4].querySelector('input').value) || 0;
+        const empTipoPunto = cells[5].querySelector('select').value; // '%' o 'abs'
+
+        const regla = document.getElementById('regla-decision').value;
+
+        if (nominal === 0) {
+            cells[6].textContent = '-'; // EMP Absoluto
+            cells[7].textContent = '-'; // Error
+            cells[8].textContent = '-'; // Factor de Corrección
+            cells[9].textContent = '-'; // Error + U
+            cells[10].textContent = '-'; // Error - U
+            cells[11].textContent = '-'; // Conformidad
+            return;
+        }
+
+        // Si no hay EMP para este punto, mostrar advertencia
+        if (empValorPunto === 0) {
+            cells[6].textContent = '⚠ Sin EMP';
+            cells[7].textContent = '-';
+            cells[8].textContent = '-';
+            cells[9].textContent = '-';
+            cells[10].textContent = '-';
+            cells[11].textContent = '⚠ Sin EMP';
+            return;
+        }
+
+        const empEsPorcentaje = (empTipoPunto === '%');
+
+        // Calcular EMP absoluto en unidades del equipo
+        let empAbsoluto;
+        if (empEsPorcentaje) {
+            // EMP en porcentaje: EMP_abs = nominal * (EMP% / 100)
+            empAbsoluto = Math.abs(nominal) * (empValorPunto / 100);
+        } else {
+            // EMP ya está en unidades absolutas
+            empAbsoluto = empValorPunto;
+        }
+
+        // Mostrar EMP absoluto calculado
+        cells[6].textContent = empAbsoluto.toFixed(3);
+
+        // Calcular error ABSOLUTO (siempre en unidades del equipo)
+        const error = parseFloat((nominal - lectura).toFixed(3));
+        const errorMasU = parseFloat((error + incertidumbre).toFixed(3));
+        const errorMenosU = parseFloat((error - incertidumbre).toFixed(3));
+
+        // Calcular factor de corrección: FC = nominal / lectura (adimensional)
+        const factorCorreccion = lectura !== 0 ? nominal / lectura : 0;
+
+        // Mostrar en tabla (valores absolutos)
+        cells[7].textContent = error.toFixed(3);
+        cells[8].textContent = factorCorreccion.toFixed(6); // Factor de Corrección (6 decimales para precisión)
+        cells[9].textContent = errorMasU.toFixed(3);
+        cells[10].textContent = errorMenosU.toFixed(3);
+
+        let cumple, textoConformidad, claseConformidad;
+
+        if (empEsPorcentaje) {
+            // Convertir EMP de % a decimal (5% → 0.05)
+            const empDecimal = empValorPunto / 100;
+
+            // Calcular error normalizado (error/nominal)
+            const errorNorm = error / nominal;
+            const errorMasUNorm = errorMasU / nominal;
+            const errorMenosUNorm = errorMenosU / nominal;
+            const incertNorm = incertidumbre / nominal;
+
+            switch(regla) {
+                case 'simple_acceptance':
+                    cumple = (Math.abs(errorNorm) <= empDecimal);
+                    break;
+                case 'guard_band_U':
+                    cumple = (Math.abs(errorMasUNorm) <= empDecimal) && (Math.abs(errorMenosUNorm) <= empDecimal);
+                    break;
+                case 'guard_band_half':
+                    const errorMasUMedio = Math.abs(errorNorm) + (incertNorm / 2);
+                    cumple = (errorMasUMedio <= empDecimal);
+                    break;
+                case 'guard_band_sqrt':
+                    const toleranciaAjustada = Math.sqrt(Math.pow(empDecimal, 2) - Math.pow(incertNorm, 2));
+                    cumple = (Math.abs(errorNorm) <= toleranciaAjustada);
+                    break;
+                case 'conditional':
+                    if (Math.abs(errorNorm) <= empDecimal && Math.abs(errorMasUNorm) <= empDecimal) {
+                        textoConformidad = 'Cumple';
+                        claseConformidad = 'cumple';
+                        cumple = true;
+                    } else if (Math.abs(errorNorm) > empDecimal) {
+                        textoConformidad = 'No Cumple';
+                        claseConformidad = 'no-cumple';
+                        cumple = false;
+                    } else {
+                        textoConformidad = 'Condicionado';
+                        claseConformidad = 'condicional';
+                        cumple = false;
+                    }
+                    break;
+            }
+        } else {
+            // Modo unidades absolutas (usar empAbsoluto calculado)
+            switch(regla) {
+                case 'simple_acceptance':
+                    cumple = (Math.abs(error) <= empAbsoluto);
+                    break;
+                case 'guard_band_U':
+                    cumple = (Math.abs(errorMasU) <= empAbsoluto) && (Math.abs(errorMenosU) <= empAbsoluto);
+                    break;
+                case 'guard_band_half':
+                    const valorMedio = Math.abs(error) + (incertidumbre / 2);
+                    cumple = (valorMedio <= empAbsoluto);
+                    break;
+                case 'guard_band_sqrt':
+                    const toleranciaAjustada = Math.sqrt(Math.pow(empAbsoluto, 2) - Math.pow(incertidumbre, 2));
+                    cumple = (Math.abs(error) <= toleranciaAjustada);
+                    break;
+                case 'conditional':
+                    if (Math.abs(error) <= empAbsoluto && Math.abs(errorMasU) <= empAbsoluto) {
+                        textoConformidad = 'Cumple';
+                        claseConformidad = 'cumple';
+                        cumple = true;
+                    } else if (Math.abs(error) > empAbsoluto) {
+                        textoConformidad = 'No Cumple';
+                        claseConformidad = 'no-cumple';
+                        cumple = false;
+                    } else {
+                        textoConformidad = 'Condicionado';
+                        claseConformidad = 'condicional';
+                        cumple = false;
+                    }
+                    break;
+            }
+        }
+
+        // Asignar texto de conformidad si no se definió en 'conditional'
+        if (!textoConformidad) {
+            textoConformidad = cumple ? 'Cumple' : 'No Cumple';
+            claseConformidad = cumple ? 'cumple' : 'no-cumple';
+        }
+
+        cells[11].textContent = textoConformidad;
+        cells[11].className = `border border-gray-300 px-2 py-2 text-center font-semibold text-xs ${claseConformidad}`;
+
+        // Actualizar gráfica automáticamente cuando cambian los datos
+        actualizarGraficaDespues();
+    }
+
+    function recalcularTodasFilas() {
+        const tbody = document.getElementById('tbody-mediciones');
+        const filas = tbody.getElementsByTagName('tr');
+
+        for (let i = 0; i < filas.length; i++) {
+            const primerInput = filas[i].cells[1].querySelector('input');
+            if (primerInput) {
+                calcularFila(primerInput);
+            }
+        }
+
+        actualizarDescripcionRegla();
+
+        // Redibujar gráfica con los nuevos valores de EMP (optimizado)
+        dibujarGraficoHistoricoDebounced();
+    }
+
+    function actualizarDescripcionRegla() {
+        const regla = document.getElementById('regla-decision').value;
+        const descripcion = document.getElementById('regla-descripcion');
+
+        const descripciones = {
+            'simple_acceptance': 'Acepta si el error medido está dentro del EMP, ignorando la incertidumbre. Cliente y proveedor comparten el riesgo de falso aceptado (hasta 50% en el límite).',
+            'guard_band_U': 'Se acepta solo si el peor caso (Error + Incertidumbre) NO supera el EMP. Protege al cliente minimizando riesgo de falso aceptado (≤2.5%).',
+            'guard_band_half': 'Usa la mitad de la incertidumbre como banda de protección. Balance comercial razonable entre riesgo del productor y consumidor (≈16%).',
+            'guard_band_sqrt': 'Ajuste matemático riguroso del límite: √(EMP² - U²). Minimiza simultáneamente ambos riesgos (productor y consumidor ≤2%).',
+            'conditional': 'Identifica casos en zona de incertidumbre que requieren decisión del cliente o análisis adicional. Transparencia total sobre el riesgo.'
+        };
+
+        descripcion.textContent = descripciones[regla];
+    }
+
+    function eliminarFila(button) {
+        const fila = button.closest('tr');
+        fila.remove();
+        renumerarFilas();
+    }
+
+    function renumerarFilas() {
+        const tbody = document.getElementById('tbody-mediciones');
+        Array.from(tbody.children).forEach((fila, index) => {
+            fila.cells[0].textContent = index + 1;
+        });
+    }
+
+    // Métodos de intervalos de calibración
+    function calcularIC() {
+        const E = parseInt(document.querySelector('input[name="estabilidad"]:checked').value);
+        const F = parseInt(document.querySelector('input[name="frecuencia"]:checked').value);
+        const U = parseInt(document.querySelector('input[name="impacto"]:checked').value);
+
+        const IC = E + F + U;
+
+        const intervalos = {
+            3: 36,
+            4: 24,
+            5: 12,
+            6: 6
+        };
+
+        const intervalo = intervalos[IC] || 12;
+
+        document.getElementById('resultado-ic').textContent = IC;
+        document.getElementById('intervalo-recomendado').textContent = intervalo;
+    }
+
+    function calcularIntervaloManual() {
+        const intervalo = parseFloat(document.getElementById('intervalo-manual-input').value) || 12;
+        const hoy = new Date();
+        const proximaFecha = new Date(hoy);
+        proximaFecha.setMonth(proximaFecha.getMonth() + intervalo);
+
+        document.getElementById('display-intervalo-manual').textContent = intervalo;
+        document.getElementById('proxima-calibracion-manual').textContent = proximaFecha.toISOString().split('T')[0];
+    }
+
+    function mostrarMetodoIntervalo(metodo) {
+        const metodos = ['manual', 'metodo1', 'metodo2', 'metodo3'];
+
+        metodos.forEach(m => {
+            const div = document.getElementById(`intervalo-${m}`);
+            const btn = document.getElementById(`btn-${m}`);
+            if (div) div.classList.add('hidden');
+            if (btn) btn.classList.remove('active');
+        });
+
+        const divSeleccionado = document.getElementById(`intervalo-${metodo}`);
+        const btnSeleccionado = document.getElementById(`btn-${metodo}`);
+
+        if (divSeleccionado) divSeleccionado.classList.remove('hidden');
+        if (btnSeleccionado) btnSeleccionado.classList.add('active');
+
+        if (metodo === 'manual') {
+            calcularIntervaloManual();
+        }
+    }
+
+    // ==================== GRÁFICA HISTÓRICA COMPLETA ====================
+    let timeoutGrafica = null;
+    function dibujarGraficoHistoricoDebounced() {
+        // Debounce para evitar redibujos excesivos
+        if (timeoutGrafica) clearTimeout(timeoutGrafica);
+        timeoutGrafica = setTimeout(() => {
+            requestAnimationFrame(dibujarGraficoHistorico);
+        }, 150);
+    }
+
+    function dibujarGraficoHistorico() {
+        const canvas = document.getElementById('grafico-historico');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Obtener datos de la tabla actual
+        const datosActuales = obtenerDatosTabla();
+        if (datosActuales.length === 0) {
+            ctx.fillStyle = '#999';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Complete la tabla de mediciones para ver la gráfica', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        // NUEVO: Usar EMPs por punto de la tabla en lugar de EMP global
+        // Determinar si los EMPs son porcentaje o absolutos para normalización
+        const primerPunto = datosActuales[0];
+        const empEsPorcentaje = (primerPunto.emp_tipo === '%');
+
+        // Calcular EMP máximo para determinar el rango del gráfico
+        let empMaxNormalizado = 0;
+        datosActuales.forEach(d => {
+            let empNorm;
+            if (empEsPorcentaje && d.nominal !== 0) {
+                empNorm = d.emp_absoluto / d.nominal;
+            } else {
+                empNorm = d.emp_absoluto;
+            }
+            empMaxNormalizado = Math.max(empMaxNormalizado, empNorm);
+        });
+
+        // Datos históricos desde Django
+        const calibracionesHistoricas = {{ calibraciones_historicas_json|safe|default:'{}' }};
+
+        // Preparar datos por año
+        const anios = Object.keys(calibracionesHistoricas).sort();
+        const colores = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+        // Configuración del canvas
+        const margen = {top: 40, right: 120, bottom: 60, left: 80};
+        const ancho = canvas.width - margen.left - margen.right;
+        const alto = canvas.height - margen.top - margen.bottom;
+
+        // Calcular rango de datos (siempre normalizado para comparar con EMP)
+        let errores = [];
+        datosActuales.forEach(d => {
+            let empNorm;
+            if (empEsPorcentaje && d.nominal !== 0) {
+                const errorNorm = (d.nominal - d.lectura) / d.nominal;
+                const uNorm = d.incertidumbre / d.nominal;
+                empNorm = d.emp_absoluto / d.nominal;
+                errores.push(errorNorm + uNorm);
+                errores.push(errorNorm - uNorm);
+                errores.push(empNorm);
+                errores.push(-empNorm);
+            } else {
+                const error = d.nominal - d.lectura;
+                errores.push(error + d.incertidumbre);
+                errores.push(error - d.incertidumbre);
+                errores.push(d.emp_absoluto);
+                errores.push(-d.emp_absoluto);
+            }
+        });
+
+        const maxError = Math.max(...errores);
+        const minError = Math.min(...errores);
+        const rangoError = maxError - minError;
+        const padding = rangoError * 0.1;
+
+        const yMax = maxError + padding;
+        const yMin = minError - padding;
+
+        // Función para escalar Y
+        const escalaY = (valor) => {
+            return margen.top + alto - ((valor - yMin) / (yMax - yMin)) * alto;
+        };
+
+        // Función para escalar X
+        const escalaX = (index, total) => {
+            return margen.left + (index / (total - 1)) * ancho;
+        };
+
+        // Dibujar ejes
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(margen.left, margen.top);
+        ctx.lineTo(margen.left, margen.top + alto);
+        ctx.lineTo(margen.left + ancho, margen.top + alto);
+        ctx.stroke();
+
+        // NUEVO: Dibujar líneas de EMP escalonadas por punto
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+
+        // Calcular coordenadas de las líneas EMP escalonadas
+        if (datosActuales.length > 0) {
+            // EMP+ (línea superior)
+            ctx.beginPath();
+            for (let i = 0; i < datosActuales.length; i++) {
+                const d = datosActuales[i];
+                let empNorm;
+                if (empEsPorcentaje && d.nominal !== 0) {
+                    empNorm = d.emp_absoluto / d.nominal;
+                } else {
+                    empNorm = d.emp_absoluto;
+                }
+
+                const x = escalaX(i, datosActuales.length);
+                const y = escalaY(empNorm);
+
+                if (i === 0) {
+                    ctx.moveTo(margen.left, y);
+                    ctx.lineTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+
+                // Si no es el último punto, dibujar línea horizontal hasta el siguiente
+                if (i < datosActuales.length - 1) {
+                    const xNext = escalaX(i + 1, datosActuales.length);
+                    ctx.lineTo(xNext, y);
+                }
+            }
+            // Extender hasta el final
+            ctx.lineTo(margen.left + ancho, escalaY(empEsPorcentaje && datosActuales[datosActuales.length-1].nominal !== 0
+                ? datosActuales[datosActuales.length-1].emp_absoluto / datosActuales[datosActuales.length-1].nominal
+                : datosActuales[datosActuales.length-1].emp_absoluto));
+            ctx.stroke();
+
+            // EMP- (línea inferior)
+            ctx.beginPath();
+            for (let i = 0; i < datosActuales.length; i++) {
+                const d = datosActuales[i];
+                let empNorm;
+                if (empEsPorcentaje && d.nominal !== 0) {
+                    empNorm = d.emp_absoluto / d.nominal;
+                } else {
+                    empNorm = d.emp_absoluto;
+                }
+
+                const x = escalaX(i, datosActuales.length);
+                const y = escalaY(-empNorm);
+
+                if (i === 0) {
+                    ctx.moveTo(margen.left, y);
+                    ctx.lineTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+
+                if (i < datosActuales.length - 1) {
+                    const xNext = escalaX(i + 1, datosActuales.length);
+                    ctx.lineTo(xNext, y);
+                }
+            }
+            ctx.lineTo(margen.left + ancho, escalaY(-(empEsPorcentaje && datosActuales[datosActuales.length-1].nominal !== 0
+                ? datosActuales[datosActuales.length-1].emp_absoluto / datosActuales[datosActuales.length-1].nominal
+                : datosActuales[datosActuales.length-1].emp_absoluto)));
+            ctx.stroke();
+        }
+
+        ctx.setLineDash([]);
+
+        // Labels EMP (mostrar rango variable)
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(`EMP+`, margen.left + ancho + 5, margen.top + 15);
+        ctx.fillText(`(variable)`, margen.left + ancho + 5, margen.top + 28);
+        ctx.fillText(`EMP-`, margen.left + ancho + 5, margen.top + alto - 20);
+
+        // Dibujar línea de cero
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        const yCero = escalaY(0);
+        ctx.beginPath();
+        ctx.moveTo(margen.left, yCero);
+        ctx.lineTo(margen.left + ancho, yCero);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Preparar puntos para línea conectada
+        const puntos = [];
+        datosActuales.forEach((d, i) => {
+            const x = escalaX(i, datosActuales.length);
+            let error, uNorm;
+
+            if (empEsPorcentaje) {
+                error = (d.nominal - d.lectura) / d.nominal;
+                uNorm = d.incertidumbre / d.nominal;
+            } else {
+                error = d.nominal - d.lectura;
+                uNorm = d.incertidumbre;
+            }
+
+            puntos.push({ x, y: escalaY(error), yMasU: escalaY(error + uNorm), yMenosU: escalaY(error - uNorm) });
+        });
+
+        // Dibujar línea que conecta puntos
+        if (puntos.length > 1) {
+            ctx.strokeStyle = colores[0];
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(puntos[0].x, puntos[0].y);
+            for (let i = 1; i < puntos.length; i++) {
+                ctx.lineTo(puntos[i].x, puntos[i].y);
+            }
+            ctx.stroke();
+        }
+
+        // Dibujar puntos y barras de incertidumbre
+        puntos.forEach((punto, i) => {
+            // Barra de incertidumbre
+            ctx.strokeStyle = colores[0];
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(punto.x, punto.yMasU);
+            ctx.lineTo(punto.x, punto.yMenosU);
+            ctx.stroke();
+
+            // Caps de la barra
+            ctx.beginPath();
+            ctx.moveTo(punto.x - 3, punto.yMasU);
+            ctx.lineTo(punto.x + 3, punto.yMasU);
+            ctx.moveTo(punto.x - 3, punto.yMenosU);
+            ctx.lineTo(punto.x + 3, punto.yMenosU);
+            ctx.stroke();
+
+            // Punto del error
+            ctx.fillStyle = colores[0];
+            ctx.beginPath();
+            ctx.arc(punto.x, punto.y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Borde blanco del punto
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        });
+
+        // Etiquetas eje X (números de punto)
+        ctx.fillStyle = '#333';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        datosActuales.forEach((d, i) => {
+            const x = escalaX(i, datosActuales.length);
+            ctx.fillText((i + 1).toString(), x, margen.top + alto + 15);
+        });
+
+        // Etiquetas eje Y
+        ctx.textAlign = 'right';
+        const numTicks = 5;
+        for (let i = 0; i <= numTicks; i++) {
+            const valor = yMin + (yMax - yMin) * (i / numTicks);
+            const y = escalaY(valor);
+            const textoValor = empEsPorcentaje ? `${(valor * 100).toFixed(1)}%` : valor.toFixed(3);
+            ctx.fillText(textoValor, margen.left - 5, y + 4);
+
+            // Línea de grid
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(margen.left, y);
+            ctx.lineTo(margen.left + ancho, y);
+            ctx.stroke();
+        }
+
+        // Título del eje X
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Punto de Medición', margen.left + ancho / 2, canvas.height - 20);
+
+        // Título del eje Y
+        ctx.save();
+        ctx.translate(15, margen.top + alto / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText(empEsPorcentaje ? 'Error (%)' : `Error (${empUnidad})`, 0, 0);
+        ctx.restore();
+
+        // Leyenda (movida abajo para evitar solapamiento)
+        ctx.fillStyle = '#333';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'left';
+        const legendaX = margen.left;
+        const legendaY = canvas.height - 5;
+
+        ctx.fillStyle = colores[0];
+        ctx.beginPath();
+        ctx.arc(legendaX, legendaY, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#333';
+        ctx.fillText('Calibración Actual ({% now "Y" %})', legendaX + 10, legendaY + 4);
+
+        // TODO: Agregar leyendas para años anteriores cuando tengamos datos históricos
+    }
+
+    // Función para guardar PDF con Django
+    function guardarPDF() {
+        // Recopilar todos los datos del formulario
+        const datos = {
+            // Datos de codificación del formato
+            formato: {
+                codigo: document.getElementById('formato-codigo').value,
+                version: document.getElementById('formato-version').value,
+                fecha: document.getElementById('formato-fecha').value
+            },
+            // Datos del equipo (editables)
+            equipo: {
+                nombre: document.getElementById('nombre-equipo').value,
+                codigo_interno: document.getElementById('codigo-interno').value,
+                numero_serie: document.getElementById('numero-serie').value,
+                marca: document.getElementById('marca').value,
+                modelo: document.getElementById('modelo').value,
+                fecha_analisis: document.getElementById('fecha-analisis').value
+            },
+            // Datos de medición
+            puntos_medicion: obtenerDatosTabla(),
+            regla_decision: document.getElementById('regla-decision').value,
+            checklist: obtenerChecklist(),
+            conclusion: {
+                decision: document.querySelector('input[name="decision"]:checked')?.value || 'apto',
+                observaciones: document.getElementById('observaciones').value,
+                responsable: document.getElementById('responsable').value
+            },
+            unidad_equipo: document.getElementById('unidad-equipo').value,
+            emp: document.getElementById('emp').value,
+            emp_unidad: document.getElementById('emp-unidad').value,
+            laboratorio: document.getElementById('laboratorio').value,
+            fecha_certificado: document.getElementById('fecha-certificado').value,
+            numero_certificado: document.getElementById('numero-certificado').value
+        };
+
+        // Mostrar loading
+        if (typeof showLoading === 'function') {
+            showLoading('Generando PDF...');
+        }
+
+        // Construir URL con calibracion_id si existe
+        let url = "{% url 'core:generar_pdf_confirmacion' equipo.pk %}";
+        {% if calibracion_id %}
+        url += "?calibracion_id={{ calibracion_id }}";
+        {% endif %}
+
+        // Enviar POST con fetch a la vista Django
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(datos)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (typeof hideLoading === 'function') hideLoading();
+
+            if (data.success) {
+                // Mostrar mensaje de éxito
+                if (typeof showToast === 'function') {
+                    showToast(data.message, 'success');
+                } else {
+                    alert(data.message);
+                }
+
+                // Redirigir al detalle del equipo después de 1 segundo
+                setTimeout(() => {
+                    window.location.href = data.redirect_url || '{% url "core:detalle_equipo" equipo.pk %}';
+                }, 1000);
+            } else {
+                // Mostrar error
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Error al generar PDF', 'error');
+                } else {
+                    alert(data.message || 'Error al generar PDF');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error al generar PDF:', error);
+            if (typeof hideLoading === 'function') hideLoading();
+            if (typeof showToast === 'function') {
+                showToast('Error al generar PDF: ' + error.message, 'error');
+            } else {
+                alert('Error al generar PDF: ' + error.message);
+            }
+        });
+    }
+
+    function obtenerDatosTabla() {
+        const tbody = document.getElementById('tbody-mediciones');
+        const filas = tbody.getElementsByTagName('tr');
+        const datos = [];
+
+        for (let i = 0; i < filas.length; i++) {
+            const cells = filas[i].cells;
+            const nominal = parseFloat(cells[1].querySelector('input').value) || 0;
+            const lectura = parseFloat(cells[2].querySelector('input').value) || 0;
+            const incertidumbre = parseFloat(cells[3].querySelector('input').value) || 0;
+
+            // NUEVO: Leer EMP por punto
+            const empValor = parseFloat(cells[4].querySelector('input').value) || 0;
+            const empTipo = cells[5].querySelector('select').value; // '%' o 'abs'
+
+            // Leer los valores calculados de las celdas (que ya fueron calculados por calcularFila)
+            const empAbsolutoText = cells[6].textContent.trim();
+            const errorText = cells[7].textContent.trim();
+            const factorCorreccionText = cells[8].textContent.trim();
+            const errorMasUText = cells[9].textContent.trim();
+            const errorMenosUText = cells[10].textContent.trim();
+            const conformidadText = cells[11].textContent.trim();
+
+            if (nominal > 0) {
+                datos.push({
+                    nominal: nominal,
+                    lectura: lectura,
+                    incertidumbre: incertidumbre,
+                    emp_valor: empValor,
+                    emp_tipo: empTipo,
+                    emp_absoluto: empAbsolutoText !== '-' && !empAbsolutoText.includes('⚠') ? parseFloat(empAbsolutoText) : 0,
+                    error: errorText !== '-' ? parseFloat(errorText) : 0,
+                    factor_correccion: factorCorreccionText !== '-' ? parseFloat(factorCorreccionText) : 0,
+                    error_mas_u: errorMasUText !== '-' ? parseFloat(errorMasUText) : 0,
+                    error_menos_u: errorMenosUText !== '-' ? parseFloat(errorMenosUText) : 0,
+                    conformidad: conformidadText !== '-' && !conformidadText.includes('⚠') ? conformidadText : ''
+                });
+            }
+        }
+
+        return datos;
+    }
+
+    function obtenerChecklist() {
+        const checklist = {};
+        for (let i = 1; i <= 14; i++) {
+            const radioChecked = document.querySelector(`input[name="check${i}"]:checked`);
+            checklist[`check${i}`] = radioChecked ? radioChecked.value : 'no';
+        }
+        return checklist;
+    }
+
+    // ==================== SINCRONIZACIÓN DE DATOS ====================
+    function sincronizarDatosCertificado() {
+        const fecha = document.getElementById('fecha-certificado').value;
+        const numero = document.getElementById('numero-certificado').value;
+
+        document.getElementById('display-fecha-certificado').textContent = fecha || '-';
+        document.getElementById('display-numero-certificado').textContent = numero || '-';
+    }
+
+    function actualizarEncabezadosTabla() {
+        const unidad = document.getElementById('unidad-equipo').value || 'lx';
+        // Factor de corrección es adimensional, no lleva unidad
+        const encabezados = ['th-nominal', 'th-lectura', 'th-incert', 'th-emp-abs', 'th-error', 'th-error-mas', 'th-error-menos'];
+
+        encabezados.forEach(id => {
+            const elem = document.getElementById(id);
+            if (elem) elem.textContent = `(${unidad})`;
+        });
+    }
+
+    // Inicializar al cargar
+    // ==================== NAVEGACIÓN CON FLECHAS ====================
+    function setupKeyboardNavigation() {
+        const tbody = document.getElementById('tbody-mediciones');
+
+        tbody.addEventListener('keydown', function(e) {
+            const target = e.target;
+            if (target.tagName !== 'INPUT') return;
+
+            const cell = target.parentElement;
+            const row = cell.parentElement;
+            const cellIndex = Array.from(row.cells).indexOf(cell);
+            const rowIndex = Array.from(tbody.rows).indexOf(row);
+
+            let newRow, newCell;
+
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    newRow = tbody.rows[rowIndex - 1];
+                    if (newRow) {
+                        newCell = newRow.cells[cellIndex];
+                        const input = newCell.querySelector('input');
+                        if (input) input.focus();
+                    }
+                    break;
+
+                case 'ArrowDown':
+                    e.preventDefault();
+                    newRow = tbody.rows[rowIndex + 1];
+                    if (newRow) {
+                        newCell = newRow.cells[cellIndex];
+                        const input = newCell.querySelector('input');
+                        if (input) input.focus();
+                    }
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    // Moverse a la celda anterior (índice 1, 2 o 3)
+                    if (cellIndex > 1) {
+                        newCell = row.cells[cellIndex - 1];
+                        const input = newCell.querySelector('input');
+                        if (input) input.focus();
+                    }
+                    break;
+
+                case 'ArrowRight':
+                case 'Enter':
+                    e.preventDefault();
+                    // Moverse a la siguiente celda (hasta índice 3)
+                    if (cellIndex < 3) {
+                        newCell = row.cells[cellIndex + 1];
+                        const input = newCell.querySelector('input');
+                        if (input) input.focus();
+                    } else {
+                        // Si está en la última columna, ir a la siguiente fila
+                        newRow = tbody.rows[rowIndex + 1];
+                        if (newRow) {
+                            newCell = newRow.cells[1]; // Primera celda editable
+                            const input = newCell.querySelector('input');
+                            if (input) input.focus();
+                        } else {
+                            // Si no hay siguiente fila, agregar una nueva
+                            agregarFila();
+                            setTimeout(() => {
+                                const nuevaFila = tbody.rows[tbody.rows.length - 1];
+                                const primerInput = nuevaFila.cells[1].querySelector('input');
+                                if (primerInput) primerInput.focus();
+                            }, 100);
+                        }
+                    }
+                    break;
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        inicializarTabla();
+        setupKeyboardNavigation(); // Activar navegación con flechas
+        actualizarEncabezadosTabla(); // Actualizar unidades en tabla
+        sincronizarDatosCertificado(); // Sincronizar certificado
+
+        const fechaActual = document.getElementById('fecha-actual');
+        if (fechaActual) {
+            fechaActual.textContent = new Date().toISOString().split('T')[0];
+        }
+
+        dibujarGraficoHistorico();
+
+        // Event listeners para sincronización en tiempo real
+        const fechaCertificado = document.getElementById('fecha-certificado');
+        const numeroCertificado = document.getElementById('numero-certificado');
+
+        if (fechaCertificado) {
+            fechaCertificado.addEventListener('change', sincronizarDatosCertificado);
+        }
+        if (numeroCertificado) {
+            numeroCertificado.addEventListener('input', sincronizarDatosCertificado);
+        }
+    });
+</script>
+
+{% endblock %}

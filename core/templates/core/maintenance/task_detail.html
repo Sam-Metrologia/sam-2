@@ -88,7 +88,7 @@
                         </div>
                         <div class="col-md-3">
                             <strong>Fecha de Creación:</strong>
-                            <p>{{ task.created_at|date:"d/m/Y H:i:s" }}</p>
+                            <p>{{ task.created_at|date:"Y-m-d H:i:s" }}</p>
                         </div>
                         <div class="col-md-3">
                             <strong>Duración:</strong>
@@ -100,12 +100,12 @@
                     <div class="row mt-2">
                         <div class="col-md-3">
                             <strong>Iniciada:</strong>
-                            <p>{{ task.started_at|date:"d/m/Y H:i:s" }}</p>
+                            <p>{{ task.started_at|date:"Y-m-d H:i:s" }}</p>
                         </div>
                         {% if task.completed_at %}
                         <div class="col-md-3">
                             <strong>Completada:</strong>
-                            <p>{{ task.completed_at|date:"d/m/Y H:i:s" }}</p>
+                            <p>{{ task.completed_at|date:"Y-m-d H:i:s" }}</p>
                         </div>
                         {% endif %}
                     </div>

@@ -85,7 +85,7 @@
                         <td class="py-3 px-6 text-left">
                             <span class="{{ empresa.fecha_fin_plan_status }}">
                                 {% if empresa.fecha_fin_plan_display %}
-                                    {{ empresa.fecha_fin_plan_display|date:"d/m/Y" }}
+                                    {{ empresa.fecha_fin_plan_display|date:"Y-m-d" }}
                                 {% else %}
                                     N/A
                                 {% endif %}

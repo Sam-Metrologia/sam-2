@@ -78,23 +78,20 @@
             {% if zip_info %}
                 {% if zip_info.requiere_paginacion %}
                     <p class="text-gray-600 mb-2">La empresa tiene {{ zip_info.total_equipos }} equipos.</p>
-                    <p class="text-orange-600 mb-4 text-sm">Se generarán {{ zip_info.total_partes }} archivos ZIP de {{ zip_info.equipos_por_zip }} equipos cada uno (por orden de cola).</p>
+                    <p class="text-orange-600 mb-4 text-sm">Se dividirá en {{ zip_info.total_partes }} archivos ZIP de máximo 35 equipos cada uno (descarga automática).</p>
 
-                    <div class="space-y-2" id="zip-buttons-container">
-                        {% for parte_info in zip_info.partes_info %}
-                            <button class="solicitarZipBtn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out w-full"
-                                    data-parte="{{ parte_info.numero }}">
-                                <i class="fas fa-clock mr-2"></i> Solicitar Parte {{ parte_info.numero }} de {{ zip_info.total_partes }}
-                                <br><small class="text-xs">(Equipos {{ parte_info.inicio_equipo }}-{{ parte_info.fin_equipo }})</small>
-                            </button>
-                        {% endfor %}
+                    <div id="zip-buttons-container">
+                        <button class="solicitarZipBtn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out"
+                                data-parte="1">
+                            <i class="fas fa-file-archive mr-2"></i> Solicitar ZIP
+                        </button>
                     </div>
                 {% else %}
                     <p class="text-gray-600 mb-4">Descarga un archivo ZIP con hojas de vida, actividades y documentos de todos los equipos ({{ zip_info.total_equipos }} equipos).</p>
                     <div id="zip-buttons-container">
                         <button class="solicitarZipBtn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out"
                                 data-parte="1">
-                            <i class="fas fa-clock mr-2"></i> Solicitar ZIP Completo
+                            <i class="fas fa-file-archive mr-2"></i> Solicitar ZIP
                         </button>
                     </div>
                 {% endif %}
@@ -103,7 +100,7 @@
                 <div id="zip-buttons-container">
                     <button class="solicitarZipBtn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out"
                             data-parte="1">
-                        <i class="fas fa-clock mr-2"></i> Solicitar ZIP
+                        <i class="fas fa-file-archive mr-2"></i> Solicitar ZIP
                     </button>
                 </div>
             {% endif %}
@@ -143,7 +140,7 @@
                 {% if calibraciones_proximas_30 %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for cal in calibraciones_proximas_30 %}
-                        <li><strong>{{ cal.equipo.codigo_interno }}</strong> - {{ cal.equipo.nombre }} (Fecha: {{ cal.fecha_programada|date:"d/m/Y" }}, Faltan: {{ cal.dias_restantes }} días)</li>
+                        <li><strong>{{ cal.equipo.codigo_interno }}</strong> - {{ cal.equipo.nombre }} (Fecha: {{ cal.fecha_programada|date:"Y-m-d" }}, Faltan: {{ cal.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -156,7 +153,7 @@
                 {% if calibraciones_proximas_15 %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for cal in calibraciones_proximas_15 %}
-                        <li><strong>{{ cal.equipo.codigo_interno }}</strong> - {{ cal.equipo.nombre }} (Fecha: {{ cal.fecha_programada|date:"d/m/Y" }}, Faltan: {{ cal.dias_restantes }} días)</li>
+                        <li><strong>{{ cal.equipo.codigo_interno }}</strong> - {{ cal.equipo.nombre }} (Fecha: {{ cal.fecha_programada|date:"Y-m-d" }}, Faltan: {{ cal.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -169,7 +166,7 @@
                 {% if calibraciones_vencidas %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for cal in calibraciones_vencidas %}
-                        <li><strong>{{ cal.equipo.codigo_interno }}</strong> - {{ cal.equipo.nombre }} (Fecha: {{ cal.fecha_programada|date:"d/m/Y" }}, Vencida hace: {{ cal.dias_restantes|abs_value }} días)</li>
+                        <li><strong>{{ cal.equipo.codigo_interno }}</strong> - {{ cal.equipo.nombre }} (Fecha: {{ cal.fecha_programada|date:"Y-m-d" }}, Vencida hace: {{ cal.dias_restantes|abs_value }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -187,7 +184,7 @@
                 {% if mantenimientos_proximos_30 %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for mant in mantenimientos_proximos_30 %}
-                        <li><strong>{{ mant.equipo.codigo_interno }}</strong> - {{ mant.equipo.nombre }} (Fecha: {{ mant.fecha_programada|date:"d/m/Y" }}, Faltan: {{ mant.dias_restantes }} días)</li>
+                        <li><strong>{{ mant.equipo.codigo_interno }}</strong> - {{ mant.equipo.nombre }} (Fecha: {{ mant.fecha_programada|date:"Y-m-d" }}, Faltan: {{ mant.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -200,7 +197,7 @@
                 {% if mantenimientos_proximos_15 %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for mant in mantenimientos_proximos_15 %}
-                        <li><strong>{{ mant.equipo.codigo_interno }}</strong> - {{ mant.equipo.nombre }} (Fecha: {{ mant.fecha_programada|date:"d/m/Y" }}, Faltan: {{ mant.dias_restantes }} días)</li>
+                        <li><strong>{{ mant.equipo.codigo_interno }}</strong> - {{ mant.equipo.nombre }} (Fecha: {{ mant.fecha_programada|date:"Y-m-d" }}, Faltan: {{ mant.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -213,7 +210,7 @@
                 {% if mantenimientos_vencidos %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for mant in mantenimientos_vencidos %}
-                        <li><strong>{{ mant.equipo.codigo_interno }}</strong> - {{ mant.equipo.nombre }} (Fecha: {{ mant.fecha_programada|date:"d/m/Y" }}, Vencido hace: {{ mant.dias_restantes|abs_value }} días)</li>
+                        <li><strong>{{ mant.equipo.codigo_interno }}</strong> - {{ mant.equipo.nombre }} (Fecha: {{ mant.fecha_programada|date:"Y-m-d" }}, Vencido hace: {{ mant.dias_restantes|abs_value }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -231,7 +228,7 @@
                 {% if comprobaciones_proximas_30 %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for comp in comprobaciones_proximas_30 %}
-                        <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"d/m/Y" }}, Faltan: {{ comp.dias_restantes }} días)</li>
+                        <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"Y-m-d" }}, Faltan: {{ comp.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -244,7 +241,7 @@
                 {% if comprobaciones_proximas_15 %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for comp in comprobaciones_proximas_15 %}
-                        <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"d/m/Y" }}, Faltan: {{ comp.dias_restantes }} días)</li>
+                        <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"Y-m-d" }}, Faltan: {{ comp.dias_restantes }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -257,7 +254,7 @@
                 {% if comprobaciones_vencidas %}
                 <ul class="list-disc list-inside text-gray-700">
                     {% for comp in comprobaciones_vencidas %}
-                        <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"d/m/Y" }}, Vencida hace: {{ comp.dias_restantes|abs_value }} días)</li>
+                        <li><strong>{{ comp.equipo.codigo_interno }}</strong> - {{ comp.equipo.nombre }} (Fecha: {{ comp.fecha_programada|date:"Y-m-d" }}, Vencida hace: {{ comp.dias_restantes|abs_value }} días)</li>
                     {% endfor %}
                 </ul>
                 {% else %}

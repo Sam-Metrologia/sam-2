@@ -52,13 +52,13 @@
             {% if usuario_a_ver.last_login %}
             <div>
                 <p class="text-gray-600 font-semibold">Último Login:</p>
-                <p class="text-gray-800">{{ usuario_a_ver.last_login|date:"d M Y H:i" }}</p>
+                <p class="text-gray-800">{{ usuario_a_ver.last_login|date:"Y-m-d H:i" }}</p>
             </div>
             {% endif %}
             {% if usuario_a_ver.date_joined %}
             <div>
                 <p class="text-gray-600 font-semibold">Fecha de Registro:</p>
-                <p class="text-gray-800">{{ usuario_a_ver.date_joined|date:"d M Y H:i" }}</p>
+                <p class="text-gray-800">{{ usuario_a_ver.date_joined|date:"Y-m-d H:i" }}</p>
             </div>
             {% endif %}
         </div>

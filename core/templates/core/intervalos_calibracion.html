@@ -1,0 +1,1753 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load l10n %}
+
+{% block title %}Intervalos de Calibración - {{ equipo.nombre }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white; }
+        .sidebar { display: none !important; }
+        .navbar { display: none !important; }
+        .main-content { margin-left: 0 !important; width: 100% !important; }
+    }
+
+    .tab-button {
+        padding: 0.75rem 1.5rem;
+        background-color: #f3f4f6;
+        border: 2px solid #d1d5db;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .tab-button:hover {
+        background-color: #e5e7eb;
+        border-color: #9ca3af;
+    }
+
+    .tab-button.active {
+        background-color: #374151;
+        color: white;
+        border-color: #1f2937;
+    }
+
+    .metodo-content {
+        display: none;
+    }
+
+    .metodo-content.active {
+        display: block;
+    }
+
+    .resultado-box {
+        background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        text-align: center;
+    }
+
+    .tabla-ic {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .tabla-ic th,
+    .tabla-ic td {
+        border: 1px solid #d1d5db;
+        padding: 0.5rem;
+        text-align: center;
+    }
+
+    .tabla-ic th {
+        background-color: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Encabezado (EXACTO A CONFIRMACIÓN METROLÓGICA) -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex justify-between items-start gap-6">
+            <!-- Logo de la Empresa -->
+            <div class="flex-shrink-0">
+                <div class="w-32 h-32 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    {% if logo_empresa_url %}
+                    <img src="{{ logo_empresa_url }}" alt="Logo Empresa" class="max-w-full max-h-full object-contain">
+                    {% else %}
+                    <div class="text-center text-gray-400">
+                        <i class="fas fa-building text-4xl mb-2"></i>
+                        <p class="text-xs">Logo<br>Empresa</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Título -->
+            <div class="flex-grow">
+                <h1 class="text-3xl font-bold text-gray-800">INTERVALOS DE CALIBRACIÓN</h1>
+                <p class="text-gray-600 mt-2">Sistema de Aseguramiento Metrológico - SAM</p>
+                <p class="text-sm text-gray-500 mt-1">Empresa: {{ nombre_empresa }}</p>
+            </div>
+
+            <!-- Información del Documento EDITABLE -->
+            <div class="text-right border-2 border-gray-300 p-3 rounded flex-shrink-0 bg-gray-50">
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">CÓDIGO:</label>
+                    <input type="text" id="formato-codigo" value="{{ formato_codigo }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500">
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">VERSIÓN:</label>
+                    <input type="text" id="formato-version" value="{{ formato_version }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-700">FECHA:</label>
+                    <input type="date" id="formato-fecha" value="{{ formato_fecha|date:'Y-m-d' }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Objetivo -->
+    <div class="bg-gray-50 border-l-4 border-gray-600 p-4 mb-6 rounded">
+        <p class="text-sm text-gray-700">
+            <strong>Objetivo:</strong> Determinar el intervalo óptimo de calibración del equipo utilizando métodos
+            basados en ILAC-G24:2022 y OIML D10, considerando su estabilidad, frecuencia de uso, impacto metrológico
+            y comportamiento histórico para optimizar costos sin comprometer la confiabilidad de las mediciones.
+        </p>
+    </div>
+
+    <!-- Aviso si hay Confirmación Metrológica disponible -->
+    {% if tiene_confirmacion %}
+    <div class="bg-gray-50 border-l-4 border-gray-600 p-4 mb-6 rounded">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-sm text-gray-700 mb-2">
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <strong>Confirmación Metrológica disponible:</strong> Los métodos de Carta de Control y Tiempo en Uso
+                    utilizarán automáticamente los datos de deriva del análisis de confirmación existente.
+                </p>
+                {% if deriva_automatica %}
+                <div class="bg-white border-2 border-gray-300 rounded-lg p-4 mt-3">
+                    <h4 class="text-sm font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-table text-gray-600 mr-2"></i>
+                        📊 Análisis Detallado de Deriva ({{ deriva_automatica.puntos_coincidentes }} puntos coincidentes)
+                    </h4>
+
+                    <!-- Tabla de puntos coincidentes -->
+                    <div class="overflow-x-auto mb-3">
+                        <table class="w-full text-xs border-collapse border border-gray-300">
+                            <thead class="bg-gradient-to-r from-gray-600 to-gray-700 text-white">
+                                <tr>
+                                    <th class="border border-gray-300 px-2 py-2">Nominal</th>
+                                    <th class="border border-gray-300 px-2 py-2">Desv. Ant.<br><span class="text-xs opacity-75">({{ deriva_automatica.fecha_anterior }})</span></th>
+                                    <th class="border border-gray-300 px-2 py-2">Desv. Act.<br><span class="text-xs opacity-75">({{ deriva_automatica.fecha_actual }})</span></th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-yellow-600">Cambio</th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-blue-600">EMP punto</th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-orange-600">Deriva/mes</th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-red-600">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-deriva-puntos" class="bg-white">
+                                <!-- Se llenará con JavaScript desde datos del backend -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Resumen de cálculos -->
+                    <div class="grid grid-cols-4 gap-2 bg-gray-50 p-3 rounded border border-gray-200">
+                        <div class="text-center">
+                            <p class="text-xs text-gray-600">Periodo Transcurrido</p>
+                            <p class="text-lg font-bold text-green-700">{{ deriva_automatica.meses_transcurridos }}</p>
+                            <p class="text-xs text-gray-500">meses</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-600">Cambio Máximo Detectado</p>
+                            <p class="text-lg font-bold text-orange-600">{{ deriva_automatica.cambio_desviacion }}</p>
+                            <p class="text-xs text-gray-500">unidades</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-600">Deriva Calculada</p>
+                            <p class="text-lg font-bold text-red-600">{{ deriva_automatica.deriva_por_mes|floatformat:4 }}</p>
+                            <p class="text-xs text-gray-500">por mes</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-600">Punto de Referencia</p>
+                            <p class="text-lg font-bold text-blue-600">{{ deriva_automatica.nominal_referencia }}</p>
+                            <p class="text-xs text-gray-500">nominal</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-600 p-3 mt-3 rounded">
+                        <p class="text-xs font-semibold text-gray-900 mb-2">
+                            <i class="fas fa-edit mr-1"></i> Ajuste de EMP por punto:
+                        </p>
+                        <p class="text-xs text-gray-700 mb-2">
+                            Puedes editar el EMP de cualquier punto haciendo clic en la celda azul. El sistema recalculará automáticamente usando el punto más restrictivo.
+                        </p>
+                        <p class="text-xs text-gray-600 italic">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            El intervalo final se calcula como el MÍNIMO de (EMP/Deriva) de todos los puntos.
+                        </p>
+                    </div>
+
+                    <p class="text-xs text-gray-600 mt-2 italic">
+                        <i class="fas fa-lightbulb mr-1"></i>
+                        La deriva se calcula usando el punto con mayor cambio absoluto. Puntos comparados con tolerancia del 5%.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            <a href="{{ url_confirmacion_pdf }}" target="_blank" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm ml-4">
+                <i class="fas fa-file-pdf mr-2"></i> Ver Confirmación
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- SECCIÓN 1: DATOS DEL EQUIPO -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-tools text-blue-600 mr-3"></i>
+            1. DATOS DEL EQUIPO
+        </h2>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Equipo</label>
+                <input type="text" id="nombre-equipo" value="{{ equipo.nombre }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Código Interno</label>
+                <input type="text" id="codigo-interno" value="{{ equipo.codigo_interno }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Serie</label>
+                <input type="text" id="numero-serie" value="{{ equipo.numero_serie|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                <input type="text" id="marca" value="{{ equipo.marca|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                <input type="text" id="modelo" value="{{ equipo.modelo|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Análisis</label>
+                <input type="date" id="fecha-analisis" value="{% now 'Y-m-d' %}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Unidad del Equipo</label>
+                <input type="text" id="unidad-equipo" value="{{ equipo.unidad|default:'lx' }}" placeholder="mm, lx, psi, °C, etc." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">EMP (Error Máximo Permitido)</label>
+                <div class="flex gap-2">
+                    <input type="number" id="emp" value="{{ equipo.emp_valor|default:'8' }}" step="0.01" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="emp-unidad" value="{{ equipo.emp_unidad|default:'%' }}" placeholder="% o unidad" class="w-24 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Campo Global: Intervalo Máximo del Cliente -->
+        <div class="bg-gray-50 border-l-4 border-gray-600 p-4 rounded mt-4">
+            <div class="grid grid-cols-2 gap-4 items-center">
+                <div>
+                    <label class="block text-sm font-bold text-gray-800 mb-1">
+                        <i class="fas fa-calendar-alt mr-2"></i>Intervalo Máximo Permitido por el Cliente
+                    </label>
+                    <p class="text-xs text-gray-600">Este valor se usará como límite superior en Método 2 y 3 cuando la deriva sea muy baja o cero</p>
+                </div>
+                <div>
+                    <input type="number" id="intervalo-maximo-global" value="60" min="1" max="120"
+                           class="w-full px-4 py-3 border-2 border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 font-bold text-lg text-center"
+                           onchange="actualizarIntervalosMaximos()">
+                    <p class="text-xs text-gray-600 mt-1 text-center">meses (típico: 12, 24, 36, 60)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: MÉTODOS DE DETERMINACIÓN DE INTERVALOS -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-calculator text-gray-600 mr-3"></i>
+            2. MÉTODOS DE DETERMINACIÓN DE INTERVALOS
+        </h2>
+
+        <!-- Tabs para seleccionar método -->
+        <div class="flex gap-3 mb-6 flex-wrap">
+            <button class="tab-button active" id="btn-manual" onclick="mostrarMetodo('manual')">
+                <i class="fas fa-hand-paper mr-2"></i>Manual
+            </button>
+            <button class="tab-button" id="btn-predictivo" onclick="mostrarMetodo('predictivo')">
+                <i class="fas fa-brain mr-2"></i>Predictivo Multifactorial
+            </button>
+            <button class="tab-button" id="btn-metodo1" onclick="mostrarMetodo('metodo1')">
+                <i class="fas fa-stairs mr-2"></i>Método 1: Escalera
+            </button>
+            <button class="tab-button" id="btn-metodo2" onclick="mostrarMetodo('metodo2')">
+                <i class="fas fa-chart-line mr-2"></i>Método 2: Carta de Control
+            </button>
+            <button class="tab-button" id="btn-metodo3" onclick="mostrarMetodo('metodo3')">
+                <i class="fas fa-clock mr-2"></i>Método 3: Tiempo en Uso
+            </button>
+        </div>
+
+        <!-- MÉTODO MANUAL -->
+        <div id="metodo-manual" class="metodo-content active">
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4 rounded">
+                <p class="text-sm text-gray-700">
+                    <strong>Método Manual:</strong> Se utiliza cuando el intervalo de calibración está especificado por
+                    norma, regulación o requerimiento del cliente. Simplemente ingrese el intervalo establecido.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Intervalo Especificado (meses)</label>
+                    <input type="number" id="manual-intervalo" value="12" min="1" max="120"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                           onchange="calcularManual()">
+                    <p class="text-xs text-gray-500 mt-1">Especificado por norma/regulación/cliente</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Justificación</label>
+                    <textarea id="manual-justificacion" rows="2"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                              placeholder="Ej: Especificado por norma ISO 17025, requerimiento del cliente, etc."></textarea>
+                </div>
+            </div>
+
+            <div class="resultado-box mt-6">
+                <p class="text-sm opacity-90 mb-2">INTERVALO DE CALIBRACIÓN ESTABLECIDO</p>
+                <p class="text-5xl font-bold" id="resultado-manual">12</p>
+                <p class="text-xl mt-2">MESES</p>
+            </div>
+        </div>
+
+        <!-- MÉTODO PREDICTIVO MULTIFACTORIAL -->
+        <div id="metodo-predictivo" class="metodo-content">
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 mb-4 rounded">
+                <p class="text-sm text-gray-700 mb-3">
+                    <strong>Método Predictivo Multifactorial:</strong> Determina el intervalo inicial de calibración mediante análisis de factores de riesgo metrológico, evaluando simultáneamente la estabilidad histórica del instrumento, la frecuencia e intensidad de uso, y el impacto metrológico de posibles fallas en las mediciones críticas.
+                </p>
+                <div class="bg-white border-l-2 border-blue-400 p-3 rounded">
+                    <p class="text-xs text-gray-700 mb-2">
+                        <i class="fas fa-book text-blue-600 mr-1"></i><strong>Fundamento Normativo: ILAC G-24:2022</strong>
+                    </p>
+                    <ul class="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li><strong>Sección 4.3 "Factores que afectan intervalos de calibración":</strong> Establece que los intervalos deben considerar el tipo de equipo, estabilidad de calibraciones previas, alcance de uso, severidad de condiciones operativas y consecuencias de falla.</li>
+                        <li><strong>Sección 5 "Determinación de intervalo inicial":</strong> Recomienda análisis de riesgos basado en estabilidad metrológica, frecuencia de uso e impacto potencial de errores en procesos críticos para establecer intervalos iniciales antes de contar con historial suficiente.</li>
+                        <li><strong>Clasificación de riesgo metrológico:</strong> El método asigna valores numéricos (1-3) a cada factor y mediante suma ponderada genera un índice de criticidad que se mapea a intervalos estándar de 6 a 60 meses.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 border-2 border-gray-300 p-4 rounded mb-4">
+                <h4 class="font-bold text-gray-900 mb-2">Determinación de Intervalo Inicial</h4>
+                <p class="text-sm text-gray-700 mb-2"><strong>Fórmula:</strong> IC = E + F + U</p>
+                <p class="text-xs text-gray-600">Determina el intervalo inicial basado en análisis de 3 factores de riesgo metrológico. El resultado se mapea a una tabla estándar.</p>
+            </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <!-- Estabilidad (E) -->
+                    <div class="border border-gray-300 rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-3">Estabilidad del Equipo (E)</h4>
+                        <div class="space-y-2 text-sm">
+                            <label class="flex items-start">
+                                <input type="radio" name="estabilidad" value="1" class="mt-1 mr-2" onchange="calcularMetodo1A()">
+                                <span><strong>1:</strong> Muy estable<br><span class="text-xs text-gray-600">Deriva &lt;20% EMP en últimas calibraciones</span></span>
+                            </label>
+                            <label class="flex items-start">
+                                <input type="radio" name="estabilidad" value="2" class="mt-1 mr-2" checked onchange="calcularMetodo1A()">
+                                <span><strong>2:</strong> Estable<br><span class="text-xs text-gray-600">Deriva 20-50% EMP, predecible</span></span>
+                            </label>
+                            <label class="flex items-start">
+                                <input type="radio" name="estabilidad" value="3" class="mt-1 mr-2" onchange="calcularMetodo1A()">
+                                <span><strong>3:</strong> Inestable<br><span class="text-xs text-gray-600">Deriva &gt;50% EMP o impredecible</span></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Frecuencia de Uso (F) -->
+                    <div class="border border-gray-300 rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-3">Frecuencia de Uso (F)</h4>
+                        <div class="space-y-2 text-sm">
+                            <label class="flex items-start">
+                                <input type="radio" name="frecuencia" value="1" class="mt-1 mr-2" onchange="calcularMetodo1A()">
+                                <span><strong>1:</strong> Uso ocasional<br><span class="text-xs text-gray-600">1 vez a la semana o menos</span></span>
+                            </label>
+                            <label class="flex items-start">
+                                <input type="radio" name="frecuencia" value="2" class="mt-1 mr-2" checked onchange="calcularMetodo1A()">
+                                <span><strong>2:</strong> Uso regular<br><span class="text-xs text-gray-600">Varias veces por semana</span></span>
+                            </label>
+                            <label class="flex items-start">
+                                <input type="radio" name="frecuencia" value="3" class="mt-1 mr-2" onchange="calcularMetodo1A()">
+                                <span><strong>3:</strong> Uso intensivo<br><span class="text-xs text-gray-600">Diario o continuo</span></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Impacto (U) -->
+                    <div class="border border-gray-300 rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-3">Impacto Metrológico (U)</h4>
+                        <div class="space-y-2 text-sm">
+                            <label class="flex items-start">
+                                <input type="radio" name="impacto" value="1" class="mt-1 mr-2" onchange="calcularMetodo1A()">
+                                <span><strong>1:</strong> Bajo impacto<br><span class="text-xs text-gray-600">Mediciones de referencia o control interno</span></span>
+                            </label>
+                            <label class="flex items-start">
+                                <input type="radio" name="impacto" value="2" class="mt-1 mr-2" checked onchange="calcularMetodo1A()">
+                                <span><strong>2:</strong> Impacto moderado<br><span class="text-xs text-gray-600">Afecta calidad del producto</span></span>
+                            </label>
+                            <label class="flex items-start">
+                                <input type="radio" name="impacto" value="3" class="mt-1 mr-2" onchange="calcularMetodo1A()">
+                                <span><strong>3:</strong> Crítico<br><span class="text-xs text-gray-600">Seguridad, salud o requisito legal</span></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Mapeo -->
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-800 mb-2">Tabla de Intervalos según IC</h4>
+                    <table class="tabla-ic text-sm">
+                        <thead>
+                            <tr>
+                                <th>IC Total (E+F+U)</th>
+                                <th>3</th>
+                                <th>4</th>
+                                <th>5</th>
+                                <th>6</th>
+                                <th>7</th>
+                                <th>8</th>
+                                <th>9</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="font-semibold">Intervalo (meses)</td>
+                                <td class="bg-green-100">60</td>
+                                <td class="bg-green-200">36</td>
+                                <td class="bg-yellow-100">24</td>
+                                <td class="bg-yellow-200">12</td>
+                                <td class="bg-orange-100">9</td>
+                                <td class="bg-orange-200">6</td>
+                                <td class="bg-red-100">6</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="resultado-box">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm opacity-90 mb-1">IC TOTAL</p>
+                            <p class="text-4xl font-bold" id="resultado-ic-total">6</p>
+                            <p class="text-xs mt-1">(E + F + U)</p>
+                        </div>
+                        <div>
+                            <p class="text-sm opacity-90 mb-1">INTERVALO RECOMENDADO</p>
+                            <p class="text-4xl font-bold" id="resultado-ic-intervalo">12</p>
+                            <p class="text-xl mt-1">MESES</p>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+        <!-- MÉTODO 1: ESCALERA -->
+        <div id="metodo-metodo1" class="metodo-content">
+            <div class="bg-gray-50 border-l-4 border-gray-600 p-4 mb-4 rounded">
+                <p class="text-sm text-gray-700">
+                    <strong>Método 1: Escalera (Ladder Method):</strong> Ajusta el intervalo de calibración de forma reactiva según los resultados históricos de calibraciones previas.
+                    <br><span class="text-xs italic mt-1 block">
+                        <i class="fas fa-book mr-1"></i>Referencia: ILAC G-24:2022, Método tradicional de ajuste progresivo
+                    </span>
+                </p>
+            </div>
+
+            <div class="bg-gray-50 border-2 border-gray-300 p-4 rounded mb-4">
+                <h4 class="font-bold text-gray-900 mb-2">Ajuste por Conformidad (Ladder Method)</h4>
+                <p class="text-sm text-gray-700 mb-2">Ajusta el intervalo actual basándose en el resultado de la última calibración:</p>
+                    <ul class="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li><strong>Error &lt; 80% EMP:</strong> Aumentar intervalo en 25%</li>
+                        <li><strong>80% ≤ Error &lt; 100% EMP:</strong> Mantener intervalo actual</li>
+                        <li class="text-red-600 font-semibold"><strong>Error ≥ 100% EMP:</strong> ⚠️ Calibrar inmediatamente o enviar a ajustar (Equipo fuera de especificación)</li>
+                    </ul>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Intervalo Actual (meses)</label>
+                    <input type="number" id="metodo1b-intervalo-actual" value="{{ frecuencia_actual|default:12 }}" min="1"
+                           class="w-48 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                           onchange="calcularMetodo1B()">
+                </div>
+
+                {% if error_maximo_info %}
+                <div class="bg-green-50 border-2 border-green-400 rounded-lg p-3 mb-4">
+                    <p class="text-sm"><i class="fas fa-check-circle text-green-600 mr-2"></i>
+                        <strong>Punto crítico detectado:</strong> Nominal {{ error_maximo_info.punto_nominal }} con {{ error_maximo_info.porcentaje_emp|floatformat:1 }}% del EMP ({{ error_maximo_info.emp_punto|floatformat:3 }} unidades)
+                    </p>
+                </div>
+
+                <!-- Tabla editable de puntos -->
+                <div class="bg-white border-2 border-gray-300 rounded-lg p-4 mb-4">
+                    <h4 class="text-sm font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-table text-gray-600 mr-2"></i>
+                        📊 Análisis por Punto (edita EMP si necesitas)
+                    </h4>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs border-collapse border border-gray-300">
+                            <thead class="bg-gradient-to-r from-gray-600 to-gray-700 text-white">
+                                <tr>
+                                    <th class="border border-gray-300 px-2 py-2">Nominal</th>
+                                    <th class="border border-gray-300 px-2 py-2">Error Absoluto</th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-blue-600">EMP punto</th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-orange-600">% del EMP</th>
+                                    <th class="border border-gray-300 px-2 py-2 bg-red-600">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-metodo1b-puntos" class="bg-white">
+                                <!-- Se llenará con JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-3 mb-4">
+                    <p class="text-sm"><i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                        No hay datos de confirmación metrológica. Ingresa manualmente el porcentaje del EMP:
+                    </p>
+                    <div class="mt-2">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">% del EMP</label>
+                        <input type="number" id="metodo1b-error-manual" value="0" step="0.1"
+                               class="w-32 px-2 py-1 text-sm border border-gray-300 rounded"
+                               onchange="calcularMetodo1B()">
+                    </div>
+                </div>
+                {% endif %}
+
+                <div id="metodo1b-analisis" class="bg-gray-50 border border-gray-300 rounded-lg p-4 mb-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">Análisis</h4>
+                    <div class="space-y-2 text-sm">
+                        <p><strong>EMP de referencia:</strong> <span id="metodo1b-emp-ref">8%</span></p>
+                        <p><strong>Error detectado:</strong> <span id="metodo1b-error-display">0%</span></p>
+                        <p><strong>Porcentaje del EMP:</strong> <span id="metodo1b-porcentaje" class="font-bold">0%</span></p>
+                        <p><strong>Decisión:</strong> <span id="metodo1b-decision" class="font-bold text-green-600">-</span></p>
+                    </div>
+                </div>
+
+                <div class="resultado-box">
+                    <p class="text-sm opacity-90 mb-2">NUEVO INTERVALO RECOMENDADO</p>
+                    <p class="text-5xl font-bold" id="resultado-metodo1b">12</p>
+                    <p class="text-xl mt-2">MESES</p>
+                    <p class="text-sm mt-3 opacity-90" id="resultado-metodo1b-cambio">Sin cambios</p>
+                </div>
+
+                <!-- Campos ocultos para el PDF con valores reales del análisis -->
+                <input type="hidden" id="metodo1b-error" value="">
+                <input type="hidden" id="metodo1b-emp-usado" value="">
+                <input type="hidden" id="metodo1b-emp-unidad-usado" value="%">
+            </div>
+        </div>
+
+        <!-- MÉTODO 2 - CARTA DE CONTROL (TIEMPO CALENDARIO) -->
+        <div id="metodo-metodo2" class="metodo-content">
+            <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-4 rounded">
+                <p class="text-sm text-gray-700">
+                    <strong>Método 2 - Carta de Control (Tiempo Calendario):</strong> Calcula el intervalo basándose en la deriva
+                    observada entre calibraciones sucesivas. <strong>Fórmula: Intervalo = EMP / Deriva</strong>, donde
+                    <strong>Deriva = (Desviación_actual - Desviación_anterior) / Tiempo_transcurrido</strong>.
+                </p>
+            </div>
+
+            {% if tiene_confirmacion %}
+            <div class="bg-gray-100 border border-gray-400 rounded-lg p-3 mb-4 text-sm">
+                <i class="fas fa-info-circle text-gray-700 mr-2"></i>
+                Se utilizarán automáticamente los datos de la Confirmación Metrológica para calcular la deriva.
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="border border-gray-300 rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">Calibración Anterior</h4>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+                            <input type="date" id="metodo2-fecha-anterior" value="{% if deriva_automatica %}{{ deriva_automatica.fecha_anterior }}{% endif %}" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularMetodo2()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Desviación Máxima</label>
+                            <input type="number" id="metodo2-desv-anterior" step="0.001" value="{% if deriva_automatica %}{{ deriva_automatica.desviacion_anterior }}{% endif %}" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularMetodo2()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-gray-300 rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">Calibración Actual</h4>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+                            <input type="date" id="metodo2-fecha-actual" value="{% if deriva_automatica %}{{ deriva_automatica.fecha_actual }}{% else %}{% now 'Y-m-d' %}{% endif %}" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularMetodo2()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Desviación Máxima</label>
+                            <input type="number" id="metodo2-desv-actual" step="0.001" value="{% if deriva_automatica %}{{ deriva_automatica.desviacion_actual }}{% endif %}" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularMetodo2()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 border border-gray-300 rounded-lg p-4 mb-4">
+                <h4 class="font-semibold text-gray-800 mb-3">Cálculo de Deriva</h4>
+                <table class="tabla-ic text-sm w-full">
+                    <thead>
+                        <tr>
+                            <th>Tiempo Transcurrido</th>
+                            <th>Cambio en Desviación</th>
+                            <th>Deriva (por mes)</th>
+                            <th>Intervalo Calculado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="metodo2-tiempo">-</td>
+                            <td id="metodo2-cambio">-</td>
+                            <td id="metodo2-deriva">-</td>
+                            <td id="metodo2-intervalo-calc">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Nota:</strong> Si la deriva es 0 o muy pequeña (intervalo > máximo permitido), se usará el intervalo máximo establecido por el cliente.
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Intervalo Máximo Permitido (meses)</label>
+                <input type="number" id="metodo2-max-intervalo" value="60" min="1"
+                       class="w-48 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                       onchange="calcularMetodo2()">
+                <p class="text-xs text-gray-500 mt-1">Límite establecido por el cliente o política interna</p>
+            </div>
+
+            <div class="resultado-box mt-6">
+                <p class="text-sm opacity-90 mb-2">INTERVALO DE CALIBRACIÓN RECOMENDADO</p>
+                <p class="text-5xl font-bold" id="resultado-metodo2">12</p>
+                <p class="text-xl mt-2">MESES</p>
+                <p class="text-sm mt-3 opacity-90" id="resultado-metodo2-nota">Complete los datos para calcular</p>
+            </div>
+        </div>
+
+        <!-- MÉTODO 3 - TIEMPO EN USO -->
+        <div id="metodo-metodo3" class="metodo-content">
+            <div class="bg-teal-50 border-l-4 border-teal-500 p-4 mb-4 rounded">
+                <p class="text-sm text-gray-700">
+                    <strong>Método 3 - Tiempo en Uso:</strong> Calcula el intervalo basándose en las horas reales de operación del equipo.
+                    Ideal para equipos con uso irregular o intermitente donde el desgaste depende más de las horas de operación que del tiempo calendario.
+                </p>
+                <div class="mt-3 bg-white border border-teal-400 rounded p-3">
+                    <p class="text-xs font-semibold text-teal-900 mb-2">Fórmula:</p>
+                    <p class="text-sm font-mono text-center mb-2">
+                        <strong>Intervalo (horas) = EMP / Deriva (por hora)</strong>
+                    </p>
+                    <p class="text-xs text-gray-600 mb-1">Donde:</p>
+                    <ul class="text-xs text-gray-600 list-disc ml-4 space-y-1">
+                        <li><strong>Deriva (por hora)</strong> = Cambio en Desviación / Horas de Uso Acumuladas</li>
+                        <li><strong>EMP</strong> = Error Máximo Permisible del equipo</li>
+                        <li><strong>Intervalo (meses)</strong> = Intervalo (horas) / Horas Promedio por Mes</li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if tiene_confirmacion %}
+            <div class="bg-gray-100 border border-gray-400 rounded-lg p-3 mb-4 text-sm">
+                <i class="fas fa-info-circle text-gray-700 mr-2"></i>
+                Se utilizarán automáticamente los datos de la Confirmación Metrológica para calcular la deriva.
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="border border-gray-300 rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">Calibración Anterior</h4>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+                            <input type="date" id="metodo3-fecha-anterior" value="{% if deriva_automatica %}{{ deriva_automatica.fecha_anterior }}{% endif %}" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularHorasPromedioMes()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Horas de Uso Acumuladas</label>
+                            <input type="number" id="metodo3-horas-anterior" step="0.1" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" oninput="calcularHorasPromedioMes(); calcularMetodo3();">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Desviación Máxima</label>
+                            <input type="number" id="metodo3-desv-anterior" step="0.001" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularMetodo3()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-gray-300 rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">Calibración Actual</h4>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Fecha</label>
+                            <input type="date" id="metodo3-fecha-actual" value="{% if deriva_automatica %}{{ deriva_automatica.fecha_actual }}{% else %}{% now 'Y-m-d' %}{% endif %}" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularHorasPromedioMes()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Horas de Uso Acumuladas</label>
+                            <input type="number" id="metodo3-horas-actual" step="0.1" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" oninput="calcularHorasPromedioMes(); calcularMetodo3();">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Desviación Máxima</label>
+                            <input type="number" id="metodo3-desv-actual" step="0.001" class="w-full px-2 py-1 text-sm border border-gray-300 rounded" onchange="calcularMetodo3()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Horas de Uso Promedio por Mes</label>
+                    <input type="number" id="metodo3-horas-mes" value="160" step="0.1"
+                           class="w-full px-3 py-2 border-2 border-green-400 rounded-md bg-green-50 font-semibold text-green-900"
+                           readonly>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="fas fa-calculator text-green-600 mr-1"></i>
+                        Calculado automáticamente: (Horas Actual - Horas Anterior) / Meses Transcurridos
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Intervalo Máximo Permitido (horas)</label>
+                    <input type="number" id="metodo3-max-intervalo" value="9600" min="1"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                           onchange="calcularMetodo3()">
+                    <p class="text-xs text-gray-500 mt-1">Límite establecido por el cliente (ej: 9600 hrs = 60 meses × 160 hrs/mes)</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 border border-gray-300 rounded-lg p-4 mb-4">
+                <h4 class="font-semibold text-gray-800 mb-3">Cálculo de Deriva por Horas de Uso</h4>
+                <table class="tabla-ic text-sm w-full">
+                    <thead>
+                        <tr>
+                            <th>Horas de Uso</th>
+                            <th>Cambio en Desviación</th>
+                            <th>Deriva (por hora)</th>
+                            <th>Intervalo (horas)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="metodo3-horas-uso">-</td>
+                            <td id="metodo3-cambio">-</td>
+                            <td id="metodo3-deriva">-</td>
+                            <td id="metodo3-intervalo-horas">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="resultado-box">
+                <p class="text-sm opacity-90 mb-2">INTERVALO DE CALIBRACIÓN RECOMENDADO</p>
+                <p class="text-5xl font-bold" id="resultado-metodo3">0</p>
+                <p class="text-xl mt-2">HORAS DE USO</p>
+                <p class="text-sm mt-3 opacity-90" id="resultado-metodo3-nota">Complete los datos para calcular</p>
+
+                <!-- Fórmula con valores -->
+                <div id="metodo3-formula" class="mt-4 p-3 bg-gray-50 rounded border border-gray-200" style="display: none;">
+                    <p class="text-xs font-semibold text-gray-600 mb-1">FÓRMULA UTILIZADA:</p>
+                    <p class="text-sm font-mono text-gray-700" id="metodo3-formula-texto">-</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: DECISIÓN FINAL Y JUSTIFICACIÓN -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-check-circle text-green-600 mr-3"></i>
+            3. DECISIÓN FINAL Y JUSTIFICACIÓN
+        </h2>
+
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Método Utilizado</label>
+                    <select id="metodo-seleccionado" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <option value="manual">Manual - Especificado por norma/cliente</option>
+                        <option value="predictivo_multifactorial">Método Predictivo Multifactorial (ILAC G-24:2022)</option>
+                        <option value="metodo1">Método 1: Escalera (Ladder Method)</option>
+                        <option value="metodo2">Método 2: Carta de Control</option>
+                        <option value="metodo3">Método 3: Tiempo en Uso</option>
+                    </select>
+                </div>
+                <div>
+                    <label id="label-intervalo-definitivo" class="block text-sm font-medium text-gray-700 mb-2">Intervalo Definitivo (meses)</label>
+                    <input type="number" id="intervalo-definitivo" value="12" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 font-bold text-lg">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Justificación de la Decisión</label>
+                <textarea id="justificacion" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                          placeholder="Explique por qué se eligió este método y este intervalo. Incluya consideraciones técnicas, operativas o regulatorias."></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Responsable del Análisis</label>
+                <input type="text" id="responsable" value="{{ user.get_full_name|default:user.username }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div class="flex gap-4 no-print mb-6">
+        <button onclick="guardarPDF()" class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg">
+            <i class="fas fa-save mr-2"></i> Guardar PDF y Actualizar Equipo
+        </button>
+        <button onclick="window.print()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition shadow-lg">
+            <i class="fas fa-print mr-2"></i> Imprimir
+        </button>
+    </div>
+
+</div>
+
+<script>
+// ========== OBTENER TOKEN CSRF ==========
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// ========== FUNCIONES DE NAVEGACIÓN ==========
+
+function mostrarMetodo(metodo) {
+    // Ocultar todos los métodos
+    const metodos = ['manual', 'predictivo', 'metodo1', 'metodo2', 'metodo3'];
+    metodos.forEach(m => {
+        const div = document.getElementById(`metodo-${m}`);
+        const btn = document.getElementById(`btn-${m}`);
+        if (div) div.classList.remove('active');
+        if (btn) btn.classList.remove('active');
+    });
+
+    // Mostrar el seleccionado
+    const divSeleccionado = document.getElementById(`metodo-${metodo}`);
+    const btnSeleccionado = document.getElementById(`btn-${metodo}`);
+    if (divSeleccionado) divSeleccionado.classList.add('active');
+    if (btnSeleccionado) btnSeleccionado.classList.add('active');
+
+    // Recalcular si es necesario
+    if (metodo === 'manual') calcularManual();
+    else if (metodo === 'metodo1') calcularMetodo1A();
+}
+
+function mostrarVariante(variante) {
+    // Ocultar variantes
+    const varianteA = document.getElementById('variante-a');
+    const varianteB = document.getElementById('variante-b');
+    const btnA = document.getElementById('btn-variante-a');
+    const btnB = document.getElementById('btn-variante-b');
+
+    varianteA.classList.remove('active');
+    varianteB.classList.remove('active');
+    btnA.classList.remove('active');
+    btnB.classList.remove('active');
+
+    if (variante === 'a') {
+        varianteA.classList.add('active');
+        btnA.classList.add('active');
+        calcularMetodo1A();
+    } else {
+        varianteB.classList.add('active');
+        btnB.classList.add('active');
+        calcularMetodo1B();
+    }
+}
+
+// ========== MÉTODO MANUAL ==========
+
+function calcularManual() {
+    const intervalo = parseInt(document.getElementById('manual-intervalo').value) || 12;
+    document.getElementById('resultado-manual').textContent = intervalo;
+}
+
+// ========== MÉTODO 1A - ESCALERA IC REGULAR ==========
+
+function calcularMetodo1A() {
+    const E = parseInt(document.querySelector('input[name="estabilidad"]:checked')?.value) || 2;
+    const F = parseInt(document.querySelector('input[name="frecuencia"]:checked')?.value) || 2;
+    const U = parseInt(document.querySelector('input[name="impacto"]:checked')?.value) || 2;
+
+    const IC = E + F + U;
+
+    const intervalos = {
+        3: 60,
+        4: 36,
+        5: 24,
+        6: 12,
+        7: 9,
+        8: 6,
+        9: 6
+    };
+
+    const intervalo = intervalos[IC] || 12;
+
+    document.getElementById('resultado-ic-total').textContent = IC;
+    document.getElementById('resultado-ic-intervalo').textContent = intervalo;
+}
+
+// ========== MÉTODO 1B - AJUSTE POR CONFORMIDAD ==========
+
+// Variable global para los puntos del Método 1B
+let puntosMetodo1bDatos = [];
+
+// Llenar tabla de puntos Método 1B
+function llenarTablaMetodo1B() {
+    {% if puntos_metodo1b %}
+    const puntosJson = '{{ puntos_metodo1b|escapejs }}';
+    const puntos = JSON.parse(puntosJson);
+    puntosMetodo1bDatos = puntos; // Guardar globalmente
+    const tbody = document.getElementById('tabla-metodo1b-puntos');
+
+    if (!tbody || !puntos) return;
+
+    tbody.innerHTML = '';
+
+    puntos.forEach((punto, index) => {
+        const row = tbody.insertRow();
+
+        // Clase de fila según si es crítico
+        let rowClass = punto.es_critico ? 'bg-red-50' : 'bg-gray-50';
+        row.className = rowClass;
+
+        // Nominal
+        row.insertCell(0).innerHTML = `<span class="font-semibold">${punto.nominal}</span>`;
+        row.cells[0].className = 'border border-gray-300 px-2 py-2 text-center';
+
+        // Error Absoluto
+        row.insertCell(1).innerHTML = punto.error_absoluto.toFixed(3);
+        row.cells[1].className = 'border border-gray-300 px-2 py-2 text-center';
+
+        // EMP del punto (EDITABLE)
+        const empCell = row.insertCell(2);
+        empCell.innerHTML = `<input type="number"
+                                     value="${punto.emp_punto.toFixed(3)}"
+                                     step="0.001"
+                                     class="w-full px-1 py-1 text-center border-2 border-blue-400 rounded bg-blue-50 font-semibold text-blue-900 hover:bg-blue-100 focus:bg-white focus:border-blue-600"
+                                     oninput="recalcularMetodo1BConEMPEditado()"
+                                     id="emp-metodo1b-${index}">`;
+        empCell.className = 'border border-gray-300 px-1 py-1 text-center bg-blue-50';
+
+        // % del EMP
+        const porcentajeCell = row.insertCell(3);
+        porcentajeCell.innerHTML = `<span class="font-bold" id="porcentaje-metodo1b-${index}">${punto.porcentaje_emp.toFixed(1)}%</span>`;
+        porcentajeCell.className = 'border border-gray-300 px-2 py-2 text-center bg-orange-50';
+
+        // Estado
+        let estadoClass = '';
+        let estadoTexto = '';
+        if (punto.porcentaje_emp >= 100) {
+            estadoClass = 'bg-red-100 text-red-800 font-bold';
+            estadoTexto = '⚠️ FUERA';
+        } else if (punto.porcentaje_emp >= 80) {
+            estadoClass = 'bg-yellow-100 text-yellow-800 font-semibold';
+            estadoTexto = '⚠ LÍMITE';
+        } else {
+            estadoClass = 'bg-green-100 text-green-800';
+            estadoTexto = '✓ OK';
+        }
+
+        if (punto.es_critico) {
+            estadoTexto = '🔴 CRÍTICO - ' + estadoTexto;
+        }
+
+        row.insertCell(4).innerHTML = `<span class="${estadoClass} px-2 py-1 rounded text-xs" id="estado-metodo1b-${index}">${estadoTexto}</span>`;
+        row.cells[4].className = 'border border-gray-300 px-2 py-2 text-center';
+    });
+    {% endif %}
+}
+
+// Recalcular con EMP editado
+function recalcularMetodo1BConEMPEditado() {
+    if (!puntosMetodo1bDatos || puntosMetodo1bDatos.length === 0) return;
+
+    // Actualizar EMPs desde inputs
+    puntosMetodo1bDatos.forEach((punto, index) => {
+        const inputEmp = document.getElementById(`emp-metodo1b-${index}`);
+        if (inputEmp) {
+            punto.emp_punto = parseFloat(inputEmp.value) || punto.emp_punto;
+
+            // Recalcular porcentaje
+            if (punto.emp_punto > 0) {
+                punto.porcentaje_emp = (punto.error_absoluto / punto.emp_punto) * 100;
+            }
+
+            // Actualizar display de porcentaje
+            const porcentajeSpan = document.getElementById(`porcentaje-metodo1b-${index}`);
+            if (porcentajeSpan) {
+                porcentajeSpan.textContent = punto.porcentaje_emp.toFixed(1) + '%';
+            }
+
+            // Actualizar estado
+            const estadoSpan = document.getElementById(`estado-metodo1b-${index}`);
+            if (estadoSpan) {
+                let estadoClass = '';
+                let estadoTexto = '';
+                if (punto.porcentaje_emp >= 100) {
+                    estadoClass = 'bg-red-100 text-red-800 font-bold';
+                    estadoTexto = '⚠️ FUERA';
+                } else if (punto.porcentaje_emp >= 80) {
+                    estadoClass = 'bg-yellow-100 text-yellow-800 font-semibold';
+                    estadoTexto = '⚠ LÍMITE';
+                } else {
+                    estadoClass = 'bg-green-100 text-green-800';
+                    estadoTexto = '✓ OK';
+                }
+
+                if (punto.es_critico) {
+                    estadoTexto = '🔴 CRÍTICO - ' + estadoTexto;
+                }
+
+                estadoSpan.className = `${estadoClass} px-2 py-1 rounded text-xs`;
+                estadoSpan.textContent = estadoTexto;
+            }
+        }
+    });
+
+    // Encontrar punto crítico (mayor porcentaje)
+    const puntoCritico = puntosMetodo1bDatos.reduce((max, p) =>
+        p.porcentaje_emp > max.porcentaje_emp ? p : max
+    );
+
+    // Actualizar cálculo con nuevo punto crítico
+    calcularMetodo1B(puntoCritico.porcentaje_emp);
+}
+
+function calcularMetodo1B(porcentajeEmpOverride = null) {
+    // Verificar si los elementos existen antes de continuar
+    const intervaloActualEl = document.getElementById('metodo1b-intervalo-actual');
+    if (!intervaloActualEl) {
+        console.warn('⚠️ Elementos de Método 1B no encontrados en el DOM');
+        return;
+    }
+
+    const intervaloActual = parseInt(intervaloActualEl.value) || 12;
+
+    // Determinar porcentaje EMP a usar
+    let porcentajeEMP = 0;
+    if (porcentajeEmpOverride !== null) {
+        // Viene de recalcularMetodo1BConEMPEditado (tabla editable)
+        porcentajeEMP = porcentajeEmpOverride;
+    } else {
+        // Intentar leer del input manual (cuando no hay confirmación)
+        const inputManual = document.getElementById('metodo1b-error-manual');
+        if (inputManual) {
+            porcentajeEMP = parseFloat(inputManual.value) || 0;
+        } else if (puntosMetodo1bDatos && puntosMetodo1bDatos.length > 0) {
+            // Usar punto crítico de la tabla
+            const puntoCritico = puntosMetodo1bDatos.reduce((max, p) =>
+                p.porcentaje_emp > max.porcentaje_emp ? p : max
+            );
+            porcentajeEMP = puntoCritico.porcentaje_emp;
+        }
+    }
+
+    // Actualizar displays (con verificación de existencia)
+    const empRefEl = document.getElementById('metodo1b-emp-ref');
+    const errorDisplayEl = document.getElementById('metodo1b-error-display');
+    const unidadEl = document.getElementById('metodo1b-unidad');
+    const porcentajeEl = document.getElementById('metodo1b-porcentaje');
+
+    if (empRefEl) empRefEl.textContent = '100% (EMP del punto crítico)';
+    if (errorDisplayEl) errorDisplayEl.textContent = porcentajeEMP.toFixed(1) + '%';
+    if (unidadEl) unidadEl.textContent = '%';
+    if (porcentajeEl) porcentajeEl.textContent = porcentajeEMP.toFixed(1) + '%';
+
+    let nuevoIntervalo = intervaloActual;
+    let decision = '';
+    let cambio = '';
+
+    const decisionEl = document.getElementById('metodo1b-decision');
+    const resultadoEl = document.getElementById('resultado-metodo1b');
+    const cambioEl = document.getElementById('resultado-metodo1b-cambio');
+
+    if (porcentajeEMP < 80) {
+        // Aumentar 25%
+        nuevoIntervalo = Math.round(intervaloActual * 1.25);
+        decision = 'Aumentar intervalo (Error < 80% EMP)';
+        cambio = `+${nuevoIntervalo - intervaloActual} meses (+25%)`;
+        if (decisionEl) decisionEl.className = 'font-bold text-green-600';
+    } else if (porcentajeEMP >= 80 && porcentajeEMP < 100) {
+        // Mantener
+        nuevoIntervalo = intervaloActual;
+        decision = 'Mantener intervalo (80% ≤ Error < 100% EMP)';
+        cambio = 'Sin cambios';
+        if (decisionEl) decisionEl.className = 'font-bold text-yellow-600';
+    } else {
+        // Error >= 100% EMP
+        nuevoIntervalo = intervaloActual; // No cambiamos automáticamente
+        decision = '⚠️ CALIBRAR INMEDIATAMENTE - Equipo fuera de especificación';
+        cambio = 'Requiere calibración urgente o ajuste';
+        if (decisionEl) decisionEl.className = 'font-bold text-red-600';
+    }
+
+    if (decisionEl) decisionEl.textContent = decision;
+    if (resultadoEl) resultadoEl.textContent = nuevoIntervalo;
+    if (cambioEl) cambioEl.textContent = cambio;
+
+    // NUEVO: Actualizar campos ocultos para el PDF con valores del punto crítico
+    const errorHiddenEl = document.getElementById('metodo1b-error');
+    const empUsadoEl = document.getElementById('metodo1b-emp-usado');
+    const empUnidadUsadoEl = document.getElementById('metodo1b-emp-unidad-usado');
+
+    // Si tenemos puntos, usar el EMP del punto crítico y calcular error porcentual real
+    if (puntosMetodo1bDatos && puntosMetodo1bDatos.length > 0) {
+        const puntoCritico = puntosMetodo1bDatos.reduce((max, p) =>
+            p.porcentaje_emp > max.porcentaje_emp ? p : max
+        );
+
+        // Calcular error porcentual real: (error_absoluto / nominal) * 100
+        const errorPorcentualReal = (puntoCritico.error_absoluto / puntoCritico.nominal) * 100;
+        if (errorHiddenEl) errorHiddenEl.value = errorPorcentualReal.toFixed(1);
+
+        if (empUsadoEl) empUsadoEl.value = puntoCritico.emp_punto.toFixed(3);
+        if (empUnidadUsadoEl) {
+            // Determinar si el EMP es porcentaje basándose en el nominal
+            const empAbsoluto = puntoCritico.emp_punto;
+            const nominal = puntoCritico.nominal;
+            // Si emp_absoluto es muy pequeño relativo al nominal, probablemente es absoluto
+            if (nominal > 0 && (empAbsoluto / nominal) < 0.5) {
+                empUnidadUsadoEl.value = document.getElementById('unidad-equipo').value || 'lx';
+            } else {
+                empUnidadUsadoEl.value = '%';
+            }
+        }
+    } else {
+        // Usar porcentaje de EMP como fallback
+        if (errorHiddenEl) errorHiddenEl.value = porcentajeEMP.toFixed(1);
+
+        // Usar valores globales como fallback
+        if (empUsadoEl) empUsadoEl.value = document.getElementById('emp').value;
+        if (empUnidadUsadoEl) empUnidadUsadoEl.value = document.getElementById('emp-unidad').value;
+    }
+}
+
+// ========== MÉTODO 2 - CARTA DE CONTROL (TIEMPO CALENDARIO) ==========
+
+function calcularMetodo2() {
+    // Si hay deriva automática con puntos editables, usar ese cálculo
+    if (puntosDerivaDatos && puntosDerivaDatos.length > 0) {
+        recalcularIntervaloConEMPEditado();
+
+        // Actualizar tabla de deriva con datos del punto limitante
+        if (puntosDerivaDatos.length > 0) {
+            // Calcular el intervalo para cada punto y encontrar el mínimo
+            let intervaloMinimo = Infinity;
+            let puntoLimitante = null;
+
+            puntosDerivaDatos.forEach(punto => {
+                const deriva = punto.deriva_por_mes || punto.deriva_punto;
+                if (deriva > 0) {
+                    const intervalo = punto.emp_punto / deriva;
+                    if (intervalo < intervaloMinimo) {
+                        intervaloMinimo = intervalo;
+                        puntoLimitante = punto;
+                    }
+                }
+            });
+
+            if (puntoLimitante) {
+                const derivaUsada = puntoLimitante.deriva_por_mes || puntoLimitante.deriva_punto;
+                const maxIntervalo = parseInt(document.getElementById('metodo2-max-intervalo').value) || 60;
+                const intervaloFinal = Math.min(Math.round(intervaloMinimo), maxIntervalo);
+
+                // Actualizar tabla
+                document.getElementById('metodo2-tiempo').textContent = '{{ deriva_automatica.meses_transcurridos }} meses';
+                document.getElementById('metodo2-cambio').textContent = puntoLimitante.cambio_desviacion.toFixed(3);
+                document.getElementById('metodo2-deriva').textContent = derivaUsada.toFixed(4);
+                document.getElementById('metodo2-intervalo-calc').textContent = intervaloFinal + ' meses';
+            }
+        }
+        return;
+    }
+
+    // Cálculo manual (sin deriva automática)
+    const fechaAnterior = new Date(document.getElementById('metodo2-fecha-anterior').value);
+    const fechaActual = new Date(document.getElementById('metodo2-fecha-actual').value);
+    const desvAnterior = parseFloat(document.getElementById('metodo2-desv-anterior').value) || 0;
+    const desvActual = parseFloat(document.getElementById('metodo2-desv-actual').value) || 0;
+    const maxIntervalo = parseInt(document.getElementById('metodo2-max-intervalo').value) || 60;
+    const emp = parseFloat(document.getElementById('emp').value) || 8;
+
+    if (!document.getElementById('metodo2-fecha-anterior').value ||
+        !document.getElementById('metodo2-fecha-actual').value) {
+        document.getElementById('resultado-metodo2-nota').textContent = 'Complete las fechas para calcular';
+        return;
+    }
+
+    // Calcular tiempo en meses
+    const tiempoMs = fechaActual - fechaAnterior;
+    const tiempoMeses = tiempoMs / (1000 * 60 * 60 * 24 * 30.44);
+
+    // Calcular cambio en desviación
+    const cambioDesv = Math.abs(desvActual - desvAnterior);
+
+    // Calcular deriva (cambio por mes)
+    const deriva = tiempoMeses > 0 ? cambioDesv / tiempoMeses : 0;
+
+    // Calcular intervalo
+    let intervalo = deriva > 0 ? emp / deriva : maxIntervalo;
+
+    // Si deriva es 0 o intervalo calculado excede el máximo, usar máximo
+    if (intervalo > maxIntervalo || deriva === 0) {
+        intervalo = maxIntervalo;
+        document.getElementById('resultado-metodo2-nota').textContent =
+            deriva === 0 ? 'Deriva cero - usando intervalo máximo' : 'Intervalo calculado excede máximo permitido';
+    } else {
+        document.getElementById('resultado-metodo2-nota').textContent = 'Basado en deriva observada';
+    }
+
+    // Redondear a entero
+    intervalo = Math.round(intervalo);
+
+    // Actualizar tabla
+    document.getElementById('metodo2-tiempo').textContent = tiempoMeses.toFixed(1) + ' meses';
+    document.getElementById('metodo2-cambio').textContent = cambioDesv.toFixed(3);
+    document.getElementById('metodo2-deriva').textContent = deriva.toFixed(4);
+    document.getElementById('metodo2-intervalo-calc').textContent = intervalo + ' meses';
+
+    // Actualizar resultado
+    document.getElementById('resultado-metodo2').textContent = intervalo;
+}
+
+// ========== MÉTODO 3 - TIEMPO EN USO ==========
+
+function calcularHorasPromedioMes() {
+    const fechaAnterior = document.getElementById('metodo3-fecha-anterior').value;
+    const fechaActual = document.getElementById('metodo3-fecha-actual').value;
+    const horasAnteriorInput = document.getElementById('metodo3-horas-anterior').value;
+    const horasActualInput = document.getElementById('metodo3-horas-actual').value;
+
+    // Validar que tengamos todos los datos necesarios (solo verificamos que los campos no estén vacíos)
+    if (!fechaAnterior || !fechaActual || horasAnteriorInput === '' || horasActualInput === '') {
+        return; // No actualizar si faltan datos
+    }
+
+    const horasAnterior = parseFloat(horasAnteriorInput);
+    const horasActual = parseFloat(horasActualInput);
+
+    // Calcular meses transcurridos
+    const fecha1 = new Date(fechaAnterior);
+    const fecha2 = new Date(fechaActual);
+    const diffTime = Math.abs(fecha2 - fecha1);
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const mesesTranscurridos = diffDays / 30.44; // Promedio días por mes
+
+    // Calcular horas de uso
+    const horasUso = horasActual - horasAnterior;
+
+    // Calcular horas promedio por mes (permitir valores de 0 en horasAnterior)
+    if (mesesTranscurridos > 0 && horasUso > 0) {
+        const horasPromedioMes = horasUso / mesesTranscurridos;
+        document.getElementById('metodo3-horas-mes').value = horasPromedioMes.toFixed(1);
+
+        // Actualizar el cálculo del método 3
+        calcularMetodo3();
+    }
+}
+
+function calcularMetodo3() {
+    const horasAnterior = parseFloat(document.getElementById('metodo3-horas-anterior').value) || 0;
+    const horasActual = parseFloat(document.getElementById('metodo3-horas-actual').value) || 0;
+    const desvAnterior = parseFloat(document.getElementById('metodo3-desv-anterior').value) || 0;
+    const desvActual = parseFloat(document.getElementById('metodo3-desv-actual').value) || 0;
+    const horasPorMes = parseFloat(document.getElementById('metodo3-horas-mes').value) || 160;
+    const maxIntervalo = parseInt(document.getElementById('metodo3-max-intervalo').value) || 60;
+
+    // NUEVO: Usar EMP del punto crítico si está disponible (del error_maximo_info)
+    {% if error_maximo_info %}
+    const emp = {{ error_maximo_info.emp_punto|unlocalize|default:8 }};
+    {% else %}
+    const emp = parseFloat(document.getElementById('emp').value) || 8;
+    {% endif %}
+
+    // Calcular horas de uso
+    const horasUso = horasActual - horasAnterior;
+
+    // Calcular cambio en desviación
+    const cambioDesv = Math.abs(desvActual - desvAnterior);
+
+    // Calcular deriva (cambio por hora)
+    const deriva = horasUso > 0 ? cambioDesv / horasUso : 0;
+
+    // Calcular intervalo en horas
+    let intervaloHoras = deriva > 0 ? emp / deriva : (maxIntervalo * horasPorMes);
+
+    // Convertir a meses (solo para referencia en la tabla)
+    let intervaloMeses = intervaloHoras / horasPorMes;
+
+    // Calcular máximo en horas
+    const maxIntervaloHoras = maxIntervalo * horasPorMes;
+
+    // Si deriva es 0 o intervalo excede máximo, usar máximo
+    if (intervaloHoras > maxIntervaloHoras || deriva === 0) {
+        intervaloHoras = maxIntervaloHoras;
+        intervaloMeses = maxIntervalo;
+        document.getElementById('resultado-metodo3-nota').textContent =
+            deriva === 0 ? 'Deriva cero - usando intervalo máximo' : 'Intervalo calculado excede máximo permitido';
+    } else {
+        document.getElementById('resultado-metodo3-nota').textContent = 'Basado en horas de uso con EMP del punto crítico';
+    }
+
+    // Redondear
+    intervaloHoras = Math.round(intervaloHoras);
+    intervaloMeses = Math.round(intervaloMeses);
+
+    // Actualizar tabla
+    document.getElementById('metodo3-horas-uso').textContent = horasUso.toFixed(1) + ' hrs';
+    document.getElementById('metodo3-cambio').textContent = cambioDesv.toFixed(3);
+    document.getElementById('metodo3-deriva').textContent = deriva.toFixed(6);
+    document.getElementById('metodo3-intervalo-horas').textContent = intervaloHoras.toFixed(0) + ' hrs';
+
+    // Actualizar resultado - AHORA EN HORAS
+    document.getElementById('resultado-metodo3').textContent = intervaloHoras;
+
+    // Mostrar fórmula con valores
+    const formulaDiv = document.getElementById('metodo3-formula');
+    const formulaTexto = document.getElementById('metodo3-formula-texto');
+
+    if (deriva > 0 && intervaloHoras < maxIntervaloHoras) {
+        // Fórmula normal: IC = EMP / Deriva
+        formulaTexto.innerHTML = `
+            IC = EMP / Deriva<br>
+            IC = ${emp.toFixed(2)} / ${deriva.toFixed(6)}<br>
+            IC = ${intervaloHoras} horas
+        `;
+    } else if (deriva === 0) {
+        formulaTexto.innerHTML = `Deriva = 0 (sin cambio entre calibraciones)<br>IC = Intervalo máximo = ${maxIntervaloHoras} horas`;
+    } else {
+        formulaTexto.innerHTML = `
+            IC calculado = EMP / Deriva = ${emp.toFixed(2)} / ${deriva.toFixed(6)} = ${(emp/deriva).toFixed(0)} horas<br>
+            Como excede el máximo (${maxIntervaloHoras} hrs), se usa el intervalo máximo permitido
+        `;
+    }
+    formulaDiv.style.display = 'block';
+}
+
+// ========== ACTUALIZAR LABEL INTERVALO DEFINITIVO ==========
+
+function actualizarLabelIntervaloDefinitivo() {
+    const metodoSeleccionado = document.getElementById('metodo-seleccionado').value;
+    const label = document.getElementById('label-intervalo-definitivo');
+
+    if (metodoSeleccionado === 'metodo3') {
+        label.textContent = 'Intervalo Definitivo (horas)';
+    } else {
+        label.textContent = 'Intervalo Definitivo (meses)';
+    }
+}
+
+// ========== GUARDAR PDF ==========
+
+function guardarPDF() {
+    const datos = {
+        formato: {
+            codigo: document.getElementById('formato-codigo').value,
+            version: document.getElementById('formato-version').value,
+            fecha: document.getElementById('formato-fecha').value
+        },
+        equipo: {
+            nombre: document.getElementById('nombre-equipo').value,
+            codigo_interno: document.getElementById('codigo-interno').value,
+            numero_serie: document.getElementById('numero-serie').value,
+            marca: document.getElementById('marca').value,
+            modelo: document.getElementById('modelo').value,
+            fecha_analisis: document.getElementById('fecha-analisis').value,
+            unidad: document.getElementById('unidad-equipo').value
+        },
+        emp: document.getElementById('emp').value,
+        emp_unidad: document.getElementById('emp-unidad').value,
+        metodo_seleccionado: document.getElementById('metodo-seleccionado').value,
+        intervalo_definitivo: document.getElementById('intervalo-definitivo').value,
+        justificacion: document.getElementById('justificacion').value,
+        responsable: document.getElementById('responsable').value,
+
+        // Datos específicos de cada método
+        manual_intervalo: document.getElementById('manual-intervalo')?.value,
+        manual_justificacion: document.getElementById('manual-justificacion')?.value,
+
+        metodo1a_E: document.querySelector('input[name="estabilidad"]:checked')?.value,
+        metodo1a_F: document.querySelector('input[name="frecuencia"]:checked')?.value,
+        metodo1a_U: document.querySelector('input[name="impacto"]:checked')?.value,
+        metodo1a_ic_total: document.getElementById('resultado-ic-total')?.textContent,
+        metodo1a_intervalo: document.getElementById('resultado-ic-intervalo')?.textContent,
+
+        metodo1b_intervalo_actual: document.getElementById('metodo1b-intervalo-actual')?.value,
+        metodo1b_error: document.getElementById('metodo1b-error')?.value,
+        metodo1b_emp_usado: document.getElementById('metodo1b-emp-usado')?.value,
+        metodo1b_emp_unidad_usado: document.getElementById('metodo1b-emp-unidad-usado')?.value,
+        metodo1b_porcentaje_emp: document.getElementById('metodo1b-porcentaje')?.textContent,
+        metodo1b_decision: document.getElementById('metodo1b-decision')?.textContent,
+        metodo1b_nuevo_intervalo: document.getElementById('resultado-metodo1b')?.textContent,
+
+        metodo2_fecha_anterior: document.getElementById('metodo2-fecha-anterior')?.value,
+        metodo2_fecha_actual: document.getElementById('metodo2-fecha-actual')?.value,
+        metodo2_desv_anterior: document.getElementById('metodo2-desv-anterior')?.value,
+        metodo2_desv_actual: document.getElementById('metodo2-desv-actual')?.value,
+        metodo2_tiempo: document.getElementById('metodo2-tiempo')?.textContent,
+        metodo2_deriva: document.getElementById('metodo2-deriva')?.textContent,
+        metodo2_intervalo: document.getElementById('resultado-metodo2')?.textContent,
+
+        metodo3_horas_anterior: document.getElementById('metodo3-horas-anterior')?.value,
+        metodo3_horas_actual: document.getElementById('metodo3-horas-actual')?.value,
+        metodo3_desv_anterior: document.getElementById('metodo3-desv-anterior')?.value,
+        metodo3_desv_actual: document.getElementById('metodo3-desv-actual')?.value,
+        metodo3_horas_mes: document.getElementById('metodo3-horas-mes')?.value,
+        metodo3_deriva: document.getElementById('metodo3-deriva')?.textContent,
+        metodo3_intervalo: document.getElementById('resultado-metodo3')?.textContent
+    };
+
+    // Mostrar loading
+    if (typeof showLoading === 'function') {
+        showLoading('Generando PDF y actualizando equipo...');
+    }
+
+    // Enviar a Django
+    const csrftoken = getCookie('csrftoken');
+    fetch("{% url 'core:generar_pdf_intervalos' equipo.pk %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(datos)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (typeof hideLoading === 'function') hideLoading();
+
+        if (data.success) {
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'success');
+            } else {
+                alert(data.message);
+            }
+
+            setTimeout(() => {
+                window.location.href = data.redirect_url;
+            }, 1000);
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(data.message || 'Error al generar PDF', 'error');
+            } else {
+                alert(data.message || 'Error al generar PDF');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if (typeof hideLoading === 'function') hideLoading();
+        if (typeof showToast === 'function') {
+            showToast('Error al generar PDF: ' + error.message, 'error');
+        } else {
+            alert('Error al generar PDF: ' + error.message);
+        }
+    });
+}
+
+// ========== FUNCIONES AUXILIARES ==========
+
+function actualizarIntervalosMaximos() {
+    const maxGlobal = parseInt(document.getElementById('intervalo-maximo-global').value) || 60;
+
+    // Actualizar Método 2
+    const metodo2Max = document.getElementById('metodo2-max-intervalo');
+    if (metodo2Max) {
+        metodo2Max.value = maxGlobal;
+        calcularMetodo2();
+    }
+
+    // Actualizar Método 3
+    const metodo3Max = document.getElementById('metodo3-max-intervalo');
+    if (metodo3Max) {
+        metodo3Max.value = maxGlobal;
+        calcularMetodo3();
+    }
+}
+
+// ========== DATOS GLOBALES DE DERIVA ==========
+let puntosDerivaDatos = null;
+
+// ========== LLENAR TABLA DE DERIVA DETALLADA ==========
+
+function llenarTablaDerivaDetallada() {
+    {% if deriva_automatica.puntos_detalle %}
+    const puntosDetalleJson = '{{ deriva_automatica.puntos_detalle|escapejs }}';
+    console.log('📊 JSON de puntos deriva:', puntosDetalleJson);
+
+    try {
+        const puntosDetalle = JSON.parse(puntosDetalleJson);
+        console.log('📊 Puntos parseados:', puntosDetalle);
+        console.log('📊 Número de puntos:', puntosDetalle.length);
+
+        puntosDerivaDatos = puntosDetalle; // Guardar globalmente
+        const tbody = document.getElementById('tabla-deriva-puntos');
+
+        if (!tbody) {
+            console.error('❌ No se encontró el tbody con id "tabla-deriva-puntos"');
+            return;
+        }
+
+        if (!puntosDetalle || puntosDetalle.length === 0) {
+            console.warn('⚠️ No hay puntos detalle para mostrar');
+            return;
+        }
+
+        tbody.innerHTML = '';
+        console.log('✅ Llenando tabla con', puntosDetalle.length, 'puntos');
+
+    puntosDetalle.forEach(punto => {
+        const row = tbody.insertRow();
+
+        // Clases de color según estado
+        let rowClass = '';
+        let estadoClass = '';
+        if (punto.es_maximo) {
+            rowClass = 'bg-red-50';
+            estadoClass = 'bg-red-100 text-red-800 font-bold';
+        } else if (punto.estado === 'ALTO') {
+            rowClass = 'bg-orange-50';
+            estadoClass = 'bg-orange-100 text-orange-800 font-semibold';
+        } else if (punto.estado === 'MODERADO') {
+            rowClass = 'bg-yellow-50';
+            estadoClass = 'bg-yellow-100 text-yellow-800';
+        } else {
+            rowClass = 'bg-gray-50';
+            estadoClass = 'bg-gray-100 text-gray-800';
+        }
+
+        row.className = rowClass;
+
+        // Nominal
+        row.insertCell(0).innerHTML = `<span class="font-semibold">${punto.nominal}</span>`;
+        row.cells[0].className = 'border border-gray-300 px-2 py-2 text-center';
+
+        // Desviación Anterior
+        row.insertCell(1).innerHTML = punto.desviacion_anterior.toFixed(3);
+        row.cells[1].className = 'border border-gray-300 px-2 py-2 text-center';
+
+        // Desviación Actual
+        row.insertCell(2).innerHTML = punto.desviacion_actual.toFixed(3);
+        row.cells[2].className = 'border border-gray-300 px-2 py-2 text-center';
+
+        // Cambio Absoluto
+        row.insertCell(3).innerHTML = `<span class="font-bold text-orange-700">${punto.cambio_desviacion.toFixed(3)}</span>`;
+        row.cells[3].className = 'border border-gray-300 px-2 py-2 text-center bg-yellow-50';
+
+        // EMP del punto (EDITABLE)
+        const empCell = row.insertCell(4);
+        empCell.innerHTML = `<input type="number"
+                                     value="${punto.emp_punto.toFixed(3)}"
+                                     step="0.001"
+                                     class="w-full px-1 py-1 text-center border-2 border-blue-400 rounded bg-blue-50 font-semibold text-blue-900 hover:bg-blue-100 focus:bg-white focus:border-blue-600"
+                                     oninput="recalcularIntervaloConEMPEditado()"
+                                     data-punto-index="${puntosDetalle.indexOf(punto)}"
+                                     id="emp-punto-${puntosDetalle.indexOf(punto)}">`;
+        empCell.className = 'border border-gray-300 px-1 py-1 text-center bg-blue-50';
+
+        // Deriva individual
+        const derivaIcon = punto.es_maximo ? '⚠️' : punto.deriva_punto > 0.05 ? '🔴' : punto.deriva_punto > 0.02 ? '🟡' : '🟢';
+        row.insertCell(5).innerHTML = `${derivaIcon} <span class="font-bold">${punto.deriva_punto.toFixed(4)}</span>`;
+        row.cells[5].className = 'border border-gray-300 px-2 py-2 text-center bg-orange-50';
+
+        // Estado
+        const estadoIcon = punto.es_maximo ? '⚠️ ' : '';
+        row.insertCell(6).innerHTML = `<span class="${estadoClass} px-2 py-1 rounded text-xs">${estadoIcon}${punto.estado}</span>`;
+        row.cells[6].className = 'border border-gray-300 px-2 py-2 text-center';
+    });
+
+    console.log('✅ Tabla de deriva llenada correctamente con', puntosDetalle.length, 'puntos');
+
+    } catch (error) {
+        console.error('❌ Error al llenar tabla de deriva:', error);
+        console.error('JSON problemático:', puntosDetalleJson);
+    }
+    {% else %}
+    console.warn('⚠️ deriva_automatica.puntos_detalle no está disponible en el template');
+    {% endif %}
+}
+
+// ========== RECALCULAR CON EMP EDITADO ==========
+// Busca el punto con intervalo MÁS CORTO (más restrictivo)
+
+function recalcularIntervaloConEMPEditado() {
+    if (!puntosDerivaDatos) return;
+
+    // Actualizar los valores de EMP desde los inputs
+    puntosDerivaDatos.forEach((punto, index) => {
+        const inputEmp = document.getElementById(`emp-punto-${index}`);
+        if (inputEmp) {
+            punto.emp_punto = parseFloat(inputEmp.value) || punto.emp_punto;
+        }
+    });
+
+    // Calcular intervalo para cada punto (EMP/Deriva)
+    let intervaloMinimo = Infinity;
+    let puntoLimitante = null;
+
+    puntosDerivaDatos.forEach(punto => {
+        const deriva = punto.deriva_por_mes || punto.deriva_punto;
+        if (deriva > 0) {
+            const intervalo = punto.emp_punto / deriva;
+            if (intervalo < intervaloMinimo) {
+                intervaloMinimo = intervalo;
+                puntoLimitante = punto;
+            }
+        }
+    });
+
+    // Aplicar intervalo mínimo (el más restrictivo)
+    if (puntoLimitante && intervaloMinimo !== Infinity) {
+        const maxIntervalo = parseInt(document.getElementById('metodo2-max-intervalo').value) || 60;
+        const intervaloFinal = Math.min(Math.round(intervaloMinimo), maxIntervalo);
+
+        // Actualizar resultado en pantalla
+        document.getElementById('resultado-metodo2').textContent = intervaloFinal;
+
+        if (intervaloMinimo > maxIntervalo) {
+            document.getElementById('resultado-metodo2-nota').textContent =
+                `Intervalo calculado (${Math.round(intervaloMinimo)}) excede máximo permitido`;
+        } else {
+            const derivaUsada = puntoLimitante.deriva_por_mes || puntoLimitante.deriva_punto;
+            document.getElementById('resultado-metodo2-nota').textContent =
+                `Punto limitante: ${puntoLimitante.nominal} | EMP=${puntoLimitante.emp_punto.toFixed(3)} / Deriva=${derivaUsada.toFixed(4)} = ${intervaloFinal} meses`;
+        }
+    }
+}
+
+// ========== GUARDAR FORMATO EMPRESA ==========
+
+function guardarFormatoEmpresa() {
+    const codigo = document.getElementById('formato-codigo').value;
+    const version = document.getElementById('formato-version').value;
+    const fecha = document.getElementById('formato-fecha').value;
+
+    const csrftoken = getCookie('csrftoken');
+
+    fetch("{% url 'core:actualizar_formato_empresa' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({
+            codigo: codigo,
+            version: version,
+            fecha: fecha
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (typeof showToast === 'function') {
+                showToast('Formato actualizado para todos los equipos', 'success');
+            } else {
+                console.log('✓ Formato actualizado:', data.message);
+            }
+        } else {
+            if (typeof showToast === 'function') {
+                showToast('Error: ' + data.message, 'error');
+            } else {
+                console.error('Error:', data.message);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error al guardar formato:', error);
+        if (typeof showToast === 'function') {
+            showToast('Error al guardar formato', 'error');
+        }
+    });
+}
+
+// ========== INICIALIZACIÓN ==========
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular métodos iniciales
+    calcularManual();
+    calcularMetodo1A();
+
+    // Llenar tabla Método 1B si hay datos
+    {% if puntos_metodo1b %}
+    llenarTablaMetodo1B();
+    {% endif %}
+
+    calcularMetodo1B();
+
+    // Si hay datos automáticos, calcular Método 2 y 3
+    {% if deriva_automatica %}
+    calcularMetodo2();
+    llenarTablaDerivaDetallada();
+    // Nota: Método 3 requiere datos de horas que no están en deriva automática
+    {% endif %}
+
+    // Sincronizar intervalo máximo global con los campos individuales
+    actualizarIntervalosMaximos();
+
+    // Agregar listeners para guardar formato cuando cambian los campos
+    const formatoCodigo = document.getElementById('formato-codigo');
+    const formatoVersion = document.getElementById('formato-version');
+    const formatoFecha = document.getElementById('formato-fecha');
+
+    if (formatoCodigo) {
+        formatoCodigo.addEventListener('blur', guardarFormatoEmpresa);
+    }
+    if (formatoVersion) {
+        formatoVersion.addEventListener('blur', guardarFormatoEmpresa);
+    }
+    if (formatoFecha) {
+        formatoFecha.addEventListener('change', guardarFormatoEmpresa);
+    }
+
+    // Agregar listener para cambiar label de intervalo según método
+    const metodoSelect = document.getElementById('metodo-seleccionado');
+    if (metodoSelect) {
+        metodoSelect.addEventListener('change', actualizarLabelIntervaloDefinitivo);
+        // Llamar al cargar para establecer el estado inicial
+        actualizarLabelIntervaloDefinitivo();
+    }
+});
+</script>
+
+{% endblock %}

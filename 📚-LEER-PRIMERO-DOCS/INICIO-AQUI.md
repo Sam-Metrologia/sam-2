@@ -8,20 +8,21 @@
 
 ### Día 1: Setup
 - [ ] Leer este archivo completo (5 minutos)
-- [ ] Leer `documentacion/README.md` (proyecto)
+- [ ] Leer `README.md` (proyecto overview)
 - [ ] Setup de entorno local
 - [ ] Ejecutar tests: `pytest`
 
 ### Día 2: Entender el Sistema
 - [ ] **LECTURA OBLIGATORIA:** `DEVELOPER-GUIDE.md` (30-40 min)
-- [ ] Revisar `auditorias/AUDITORIA_COMPLETA_2025-11-13.md` (conocer estado del sistema)
+- [ ] Revisar `auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md` (estado actual 7.8/10)
+- [ ] Revisar `auditorias/AUDITORIA_COMPLETA_2025-12-05.md` (última auditoría)
 - [ ] Explorar código: `core/models.py`, `core/views/`
 
 ### Día 3-5: Práctica
 - [ ] Hacer cambio pequeño (agregar campo a modelo)
 - [ ] Ejecutar tests
 - [ ] Code review con equipo
-- [ ] Leer `documentacion/DESPLEGAR-EN-RENDER.md` (deployment)
+- [ ] Leer `DESPLEGAR-EN-RENDER.md` (deployment)
 
 ---
 
@@ -31,31 +32,35 @@
 sam-2/
 ├── 📁 auditorias/              ← AUDITORÍAS y REPORTES DE PROGRESO
 │   ├── README.md
-│   ├── AUDITORIA_COMPLETA_2025-11-13.md      ⭐ LEER PRIMERO
-│   ├── PLAN_IMPLEMENTACION_2025-11-13.md
-│   └── PROGRESO_FASEX_*.md
+│   ├── PROGRESO_Y_ROADMAP_8.5_2025-12-05.md  ⭐ LEER PRIMERO
+│   ├── AUDITORIA_COMPLETA_2025-12-05.md      ⭐ ESTADO ACTUAL
+│   ├── LIMPIEZA_COMPLETADA_2025-12-05.md
+│   └── ... (histórico de auditorías)
 │
-├── 📁 documentacion/           ← DOCUMENTACIÓN TÉCNICA
-│   ├── README.md
-│   ├── DEVELOPER-GUIDE.md      ⭐ LECTURA OBLIGATORIA
-│   ├── README.md (proyecto)
-│   ├── DESPLEGAR-EN-RENDER.md
-│   └── ...
+├── 📁 documentacion/           ← (Reorganizada - solo README)
+│   └── README.md               (Explica reorganización)
 │
 ├── 📁 core/                    ← CÓDIGO PRINCIPAL
-│   ├── models.py               (⚠️ 3,142 líneas - refactorización pendiente)
+│   ├── models.py               (✅ Organizado con TOC)
 │   ├── views/
+│   │   ├── dashboard.py        (✅ Dashboard modernizado)
+│   │   ├── calibracion.py
+│   │   ├── mantenimiento.py
+│   │   ├── comprobacion.py
+│   │   └── reports.py
 │   ├── services.py
 │   └── ...
 │
-├── 📁 tests/                   ← TESTS (94% cobertura)
+├── 📁 tests/                   ← TESTS (94.8% pasando)
 │   ├── test_models/
 │   ├── test_views/
 │   └── test_services/
 │
-├── DEVELOPER-GUIDE.md          ← Guía principal (también en documentacion/)
-├── README.md                   ← Overview del proyecto
-└── INICIO-AQUI.md              ← Este archivo
+├── DEVELOPER-GUIDE.md          ← Guía principal técnica
+├── README.md                   ← Overview del proyecto (✅ actualizado)
+├── INICIO-AQUI.md              ← Este archivo
+├── CLAUDE.md                   ← Instrucciones para Claude Code
+└── DESPLEGAR-EN-RENDER.md      ← Guía de deployment
 ```
 
 ---
@@ -67,12 +72,14 @@ sam-2/
 **Lee en este orden:**
 1. **Este archivo** (5 min)
 2. **`DEVELOPER-GUIDE.md`** (30-40 min) ⭐ **OBLIGATORIO**
-3. **`auditorias/AUDITORIA_COMPLETA_2025-11-13.md`** (20 min) - Para conocer estado actual
-4. **`documentacion/README.md`** (10 min) - Setup inicial
+3. **`auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md`** (15 min) - Estado actual 7.8/10
+4. **`auditorias/AUDITORIA_COMPLETA_2025-12-05.md`** (20 min) - Última auditoría
+5. **`README.md`** (10 min) - Setup inicial
 
 **Después:**
 - Explorar código en `core/`
 - Revisar tests en `tests/`
+- Generar datos de prueba: `python manage.py generar_datos_prueba`
 - Hacer primer cambio pequeño
 
 ---
@@ -95,22 +102,26 @@ Auto-deploy está activo. El código va directo a producción.
 ### 📊 Quiero Ver Estado del Sistema
 
 **Ir a:**
-- **`auditorias/AUDITORIA_COMPLETA_2025-11-13.md`**
-  - Resumen Ejecutivo (puntuación: 7.2/10)
+- **`auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md`** ⭐ **MÁS RECIENTE**
+  - Puntuación actual: **7.8/10** (+0.6 desde nov)
+  - Roadmap hacia 8.5/10
+  - Quick wins y mejoras planificadas
+
+- **`auditorias/AUDITORIA_COMPLETA_2025-12-05.md`**
+  - Auditoría completa actualizada
   - Fortalezas y Debilidades
   - Recomendaciones priorizadas
 
-- **`auditorias/PLAN_IMPLEMENTACION_2025-11-13.md`**
-  - Plan de mejoras de 8-10 semanas
-  - Fases y tareas detalladas
-  - Roadmap de implementación
+- **`auditorias/LIMPIEZA_COMPLETADA_2025-12-05.md`**
+  - 1,149 líneas eliminadas
+  - Optimizaciones realizadas
 
 ---
 
 ### 🚀 Voy a Hacer Deploy
 
 **Lee:**
-1. `documentacion/DESPLEGAR-EN-RENDER.md` (guía completa)
+1. `DESPLEGAR-EN-RENDER.md` (guía completa)
 2. `DEVELOPER-GUIDE.md` → Sección "Environment Variables"
 3. Verifica variables de entorno en Render Dashboard
 
@@ -156,12 +167,13 @@ Ver `auditorias/README.md` para más detalles.
 
 **Troubleshooting:**
 1. `DEVELOPER-GUIDE.md` → Sección "Errores Comunes"
-2. `documentacion/DESPLEGAR-EN-RENDER.md` → Troubleshooting
+2. `DESPLEGAR-EN-RENDER.md` → Troubleshooting
 3. Revisar `auditorias/` por problemas conocidos
 4. Preguntar al equipo
 
 **Documentación:**
-- Ver carpeta `documentacion/` completa
+- Documentación principal en raíz del proyecto
+- Auditorías en carpeta `auditorias/`
 - Cada carpeta tiene su `README.md` explicativo
 
 ---
@@ -193,7 +205,7 @@ python manage.py shell                   # Django shell
 git push origin main                     # ⚠️ Deploy automático a producción
 
 # Utilidades
-python manage.py backup_data             # Backup de DB
+python manage.py generar_datos_prueba    # Generar escenario completo de prueba
 python manage.py cleanup_zip_files       # Limpiar ZIPs antiguos
 ```
 
@@ -201,21 +213,24 @@ python manage.py cleanup_zip_files       # Limpiar ZIPs antiguos
 
 ## 📊 Estado Actual del Sistema
 
-**Puntuación:** 7.2/10
+**Puntuación:** **7.8/10** (+0.6 desde noviembre)
 
 ### ⭐ Fortalezas
 - Documentación excepcional (9/10)
-- Seguridad robusta (8/10)
-- Testing sólido (94% cobertura)
+- Seguridad robusta (8.5/10)
+- Testing sólido (94.8% pasando - 254/268 tests)
 - Multi-tenancy completo
+- **Código limpio** (1,149 líneas eliminadas)
+- **models.py organizado** con TOC
+- **Dashboard modernizado** con diseño elegante
 
-### 🔴 Áreas de Mejora
-- `models.py` de 3,142 líneas (refactorización pendiente)
-- `reports.py` de 137 KB (refactorización pendiente)
-- Queries N+1 en algunas vistas
-- Plan Free de Render (limitado)
+### 🟡 Áreas de Mejora (Próximo: 8.5/10)
+- `reports.py` de 3,154 líneas (refactorización pendiente)
+- Queries N+1 en dashboard
+- Migrar campo `es_periodo_prueba` (deprecado)
+- Optimizar generación de reportes
 
-**Ver plan completo:** `auditorias/PLAN_IMPLEMENTACION_2025-11-13.md`
+**Ver roadmap:** `auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md`
 
 ---
 
@@ -279,4 +294,4 @@ python manage.py cleanup_zip_files       # Limpiar ZIPs antiguos
 
 ---
 
-**Última Actualización:** 13 de Noviembre de 2025
+**Última Actualización:** 5 de Diciembre de 2025

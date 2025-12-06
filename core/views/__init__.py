@@ -49,5 +49,28 @@ from .scheduled_tasks_api import (
     trigger_cleanup_notifications
 )
 
+# Confirmación Metrológica e Intervalos de Calibración
+from .confirmacion import (
+    confirmacion_metrologica,
+    intervalos_calibracion,
+    generar_pdf_confirmacion,
+    generar_pdf_intervalos,
+    guardar_confirmacion
+)
+
+# Comprobación Metrológica
+from .comprobacion import (
+    comprobacion_metrologica_view,
+    guardar_comprobacion_json,
+    generar_pdf_comprobacion
+)
+
+# Mantenimientos con Actividades
+from .mantenimiento import (
+    mantenimiento_actividades_view,
+    guardar_mantenimiento_json,
+    generar_pdf_mantenimiento
+)
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

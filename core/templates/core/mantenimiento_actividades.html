@@ -1,0 +1,600 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Registro de Mantenimiento - {{ equipo.nombre }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white; }
+        .sidebar { display: none !important; }
+        .navbar { display: none !important; }
+        .main-content { margin-left: 0 !important; width: 100% !important; }
+    }
+
+    .btn-primary {
+        background-color: #4299e1;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .btn-primary:hover {
+        background-color: #3182ce;
+    }
+
+    .btn-success {
+        background-color: #48bb78;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .btn-success:hover {
+        background-color: #38a169;
+    }
+
+    .checklist-item {
+        position: relative;
+        padding-left: 40px;
+        transition: all 0.2s;
+    }
+
+    .checklist-item:hover {
+        background-color: #f7fafc;
+    }
+
+    .checklist-item input[type="checkbox"] {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .checklist-item input[type="checkbox"]:checked + label {
+        color: #22543d;
+        font-weight: 600;
+    }
+
+    .checklist-item input[type="checkbox"]:checked + label::before {
+        content: '✓ ';
+        color: #48bb78;
+        font-weight: bold;
+        margin-right: 5px;
+    }
+
+    .checklist-item label {
+        cursor: pointer;
+        display: block;
+        padding: 12px 0;
+        user-select: none;
+    }
+
+    .checklist-counter {
+        background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Encabezado -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex justify-between items-start gap-6">
+            <!-- Logo de la Empresa -->
+            <div class="flex-shrink-0">
+                <div class="w-32 h-32 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    {% if logo_empresa_url %}
+                    <img src="{{ logo_empresa_url }}" alt="Logo Empresa" class="max-w-full max-h-full object-contain">
+                    {% else %}
+                    <div class="text-center text-gray-400">
+                        <i class="fas fa-building text-4xl mb-2"></i>
+                        <p class="text-xs">Logo<br>Empresa</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Título -->
+            <div class="flex-grow">
+                <h1 class="text-3xl font-bold text-gray-800">REGISTRO DE MANTENIMIENTO</h1>
+                <p class="text-gray-600 mt-2">Sistema de Aseguramiento Metrológico - SAM</p>
+                <p class="text-sm text-gray-500 mt-1">Empresa: {{ nombre_empresa }}</p>
+            </div>
+
+            <!-- Información del Documento EDITABLE -->
+            <div class="text-right border-2 border-blue-300 p-3 rounded flex-shrink-0 bg-blue-50">
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">CÓDIGO:</label>
+                    <input type="text" id="formato-codigo" value="{{ formato_codigo }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                           onchange="guardarFormatoEmpresa()">
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">VERSIÓN:</label>
+                    <input type="text" id="formato-version" value="{{ formato_version }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                           onchange="guardarFormatoEmpresa()">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-700">FECHA:</label>
+                    <input type="date" id="formato-fecha" value="{{ formato_fecha|date:'Y-m-d' }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                           onchange="guardarFormatoEmpresa()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón Volver -->
+        <div class="mt-4 flex justify-end no-print">
+            <a href="{% url 'core:detalle_equipo' equipo.id %}" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md shadow transition">
+                <i class="fas fa-arrow-left mr-2"></i> Volver al Equipo
+            </a>
+        </div>
+    </div>
+
+    <!-- Objetivo -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+        <p class="text-sm text-gray-700">
+            <strong>Objetivo:</strong> Registrar las actividades de mantenimiento realizadas sobre el equipo,
+            incluyendo mantenimientos preventivos, correctivos, predictivos e inspecciones, con el fin de
+            mantener un historial completo y asegurar el correcto funcionamiento del equipo.
+        </p>
+    </div>
+
+    <form id="formMantenimiento">
+
+        <!-- SECCIÓN 1: DATOS DEL EQUIPO -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-tools text-blue-600 mr-3"></i>
+                1. DATOS DEL EQUIPO
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Código Interno</label>
+                    <input type="text" value="{{ equipo.codigo_interno }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Equipo</label>
+                    <input type="text" value="{{ equipo.nombre }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                    <input type="text" value="{{ equipo.marca|default:'N/A' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                    <input type="text" value="{{ equipo.modelo|default:'N/A' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Número de Serie</label>
+                    <input type="text" value="{{ equipo.numero_serie|default:'N/A' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                    <input type="text" value="{{ equipo.ubicacion|default:'N/A' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 2: DATOS DEL MANTENIMIENTO -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-clipboard-list text-blue-600 mr-3"></i>
+                2. DATOS DEL MANTENIMIENTO
+            </h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Mantenimiento <span class="text-red-500">*</span></label>
+                    <input type="date" id="fechaMantenimiento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Mantenimiento <span class="text-red-500">*</span></label>
+                    <select id="tipoMantenimiento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" required>
+                        <option value="">Seleccionar...</option>
+                        <option value="Preventivo">Preventivo</option>
+                        <option value="Correctivo">Correctivo</option>
+                        <option value="Predictivo">Predictivo</option>
+                        <option value="Inspección">Inspección</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Responsable <span class="text-red-500">*</span></label>
+                    <input type="text" id="responsable" placeholder="Nombre del técnico" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Documento / Orden de Trabajo</label>
+                    <input type="text" id="documento" placeholder="Número de orden, ticket, etc." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción General</label>
+                <textarea id="descripcion" rows="3" placeholder="Descripción breve del mantenimiento realizado..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: ACTIVIDADES REALIZADAS -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-tasks text-blue-600 mr-3"></i>
+                    3. ACTIVIDADES REALIZADAS
+                </h2>
+                <div id="actividadesCounter" class="checklist-counter" style="display: none;">
+                    <span id="completadas">0</span> / <span id="totales">0</span> completadas
+                </div>
+            </div>
+
+            <div id="actividadesContainer" class="mb-4">
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-info-circle text-4xl mb-3"></i>
+                    <p>Seleccione un tipo de mantenimiento para ver las actividades disponibles</p>
+                </div>
+            </div>
+
+            <!-- Actividades Personalizadas -->
+            <div id="actividadesPersonalizadas" style="display: none;">
+                <hr class="my-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-lg font-semibold text-gray-700">
+                        <i class="fas fa-plus-circle text-blue-600 mr-2"></i>
+                        Actividades Adicionales
+                    </h3>
+                    <button type="button" onclick="agregarActividadPersonalizada()" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-1 px-3 rounded shadow transition">
+                        <i class="fas fa-plus mr-1"></i> Agregar
+                    </button>
+                </div>
+                <div id="listaActividadesPersonalizadas" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: OBSERVACIONES -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-comment-alt text-blue-600 mr-3"></i>
+                4. OBSERVACIONES Y RECOMENDACIONES
+            </h2>
+            <textarea id="observaciones" rows="4" placeholder="Observaciones adicionales, recomendaciones, problemas encontrados..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+    </form>
+
+    <!-- Botones de Acción -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6 no-print">
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="limpiarFormulario()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-md shadow-md transition">
+                <i class="fas fa-eraser mr-2"></i> Limpiar
+            </button>
+            <button type="button" onclick="guardarYGenerarPDF()" id="btnGenerarPDF" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-md shadow-md transition">
+                <i class="fas fa-file-pdf mr-2"></i> Guardar y Generar PDF
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// Actividades predefinidas por tipo
+const ACTIVIDADES_POR_TIPO = {{ actividades_por_tipo|safe }};
+
+// Datos existentes (si es edición)
+const DATOS_EXISTENTES = {% if datos_existentes %}{{ datos_existentes|safe }}{% else %}null{% endif %};
+const MANTENIMIENTO_ID = {% if mantenimiento_id %}{{ mantenimiento_id }}{% else %}null{% endif %};
+
+// Estado actual
+let actividadesPersonalizadasContador = 0;
+
+// Inicializar
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar fecha actual
+    document.getElementById('fechaMantenimiento').valueAsDate = new Date();
+
+    // Debug: Verificar que las actividades se cargaron
+    console.log('ACTIVIDADES_POR_TIPO:', ACTIVIDADES_POR_TIPO);
+
+    // Listener para cambio de tipo
+    document.getElementById('tipoMantenimiento').addEventListener('change', function() {
+        console.log('Tipo seleccionado:', this.value);
+        cargarActividades(this.value);
+    });
+
+    // Cargar datos existentes si hay
+    if (DATOS_EXISTENTES) {
+        cargarDatosExistentes();
+    }
+});
+
+function cargarActividades(tipo) {
+    const container = document.getElementById('actividadesContainer');
+    console.log('cargarActividades llamada con tipo:', tipo);
+
+    if (!tipo) {
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-info-circle text-4xl mb-3"></i>
+                <p>Seleccione un tipo de mantenimiento para ver las actividades disponibles</p>
+            </div>
+        `;
+        document.getElementById('actividadesPersonalizadas').style.display = 'none';
+        document.getElementById('actividadesCounter').style.display = 'none';
+        return;
+    }
+
+    const actividades = ACTIVIDADES_POR_TIPO[tipo] || [];
+    console.log('Actividades encontradas para', tipo, ':', actividades.length);
+
+    if (actividades.length === 0) {
+        // Tipo "Otro" - solo actividades personalizadas
+        container.innerHTML = `
+            <div class="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
+                <i class="fas fa-info-circle text-3xl mb-2"></i>
+                <p>Agregue actividades personalizadas utilizando el botón de abajo</p>
+            </div>
+        `;
+        document.getElementById('actividadesPersonalizadas').style.display = 'block';
+        document.getElementById('actividadesCounter').style.display = 'none';
+        return;
+    }
+
+    // Generar lista de chequeo visual
+    let html = '<div class="border border-gray-300 rounded-lg overflow-hidden">';
+    actividades.forEach((actividad, index) => {
+        const isEven = index % 2 === 0;
+        html += `
+            <div class="checklist-item border-b border-gray-200 ${isEven ? 'bg-white' : 'bg-gray-50'}">
+                <input class="actividad-check" type="checkbox" id="act_${index}" value="${actividad}" onchange="actualizarContador()">
+                <label for="act_${index}">
+                    ${actividad}
+                </label>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+    document.getElementById('actividadesPersonalizadas').style.display = 'block';
+
+    // Mostrar contador y actualizar totales
+    document.getElementById('actividadesCounter').style.display = 'block';
+    document.getElementById('totales').textContent = actividades.length;
+    actualizarContador();
+}
+
+function actualizarContador() {
+    const total = document.querySelectorAll('.actividad-check').length;
+    const completadas = document.querySelectorAll('.actividad-check:checked').length;
+
+    document.getElementById('completadas').textContent = completadas;
+    document.getElementById('totales').textContent = total;
+}
+
+function agregarActividadPersonalizada() {
+    const container = document.getElementById('listaActividadesPersonalizadas');
+    const id = `personalizada_${actividadesPersonalizadasContador++}`;
+
+    const div = document.createElement('div');
+    div.className = 'flex gap-2';
+    div.innerHTML = `
+        <input type="text" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 actividad-personalizada"
+               placeholder="Descripción de la actividad..." id="${id}">
+        <button class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md transition" type="button" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    container.appendChild(div);
+    document.getElementById(id).focus();
+}
+
+function recolectarDatos() {
+    // Validar formulario básico
+    const form = document.getElementById('formMantenimiento');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return null;
+    }
+
+    const tipo = document.getElementById('tipoMantenimiento').value;
+
+    // Recolectar actividades marcadas
+    const actividadesMarcadas = [];
+    document.querySelectorAll('.actividad-check:checked').forEach(checkbox => {
+        actividadesMarcadas.push({
+            descripcion: checkbox.value,
+            realizada: true
+        });
+    });
+
+    // Recolectar actividades personalizadas
+    document.querySelectorAll('.actividad-personalizada').forEach(input => {
+        if (input.value.trim()) {
+            actividadesMarcadas.push({
+                descripcion: input.value.trim(),
+                realizada: true,
+                personalizada: true
+            });
+        }
+    });
+
+    if (actividadesMarcadas.length === 0) {
+        alert('⚠️ Debe marcar al menos una actividad realizada');
+        return null;
+    }
+
+    return {
+        mantenimiento_id: MANTENIMIENTO_ID,
+        fecha_mantenimiento: document.getElementById('fechaMantenimiento').value,
+        tipo_mantenimiento: tipo,
+        responsable: document.getElementById('responsable').value,
+        documento: document.getElementById('documento').value,
+        descripcion: document.getElementById('descripcion').value,
+        observaciones: document.getElementById('observaciones').value,
+        actividades: actividadesMarcadas
+    };
+}
+
+// Función guardarMantenimiento eliminada - ahora solo se usa guardarYGenerarPDF
+
+function guardarYGenerarPDF() {
+    const datos = recolectarDatos();
+    if (!datos) return;
+
+    const btn = event.target;
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Generando PDF...';
+
+    // Primero guardar
+    fetch("{% url 'core:guardar_mantenimiento_json' equipo.id %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(datos)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error);
+        }
+
+        // Luego generar PDF
+        const formData = new FormData();
+        formData.append('datos_mantenimiento', JSON.stringify(datos));
+
+        const mantenimientoId = data.mantenimiento_id || MANTENIMIENTO_ID;
+
+        return fetch(`{% url 'core:generar_pdf_mantenimiento' equipo.id %}?mantenimiento_id=${mantenimientoId}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Abrir PDF en nueva pestaña
+            window.open(data.pdf_url, '_blank');
+            // Esperar un momento y redirigir al equipo
+            setTimeout(() => {
+                window.location.href = "{% url 'core:detalle_equipo' equipo.id %}";
+            }, 500);
+        } else {
+            alert('❌ Error al generar PDF: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        alert('❌ Error: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+}
+
+function cargarDatosExistentes() {
+    document.getElementById('fechaMantenimiento').value = DATOS_EXISTENTES.fecha_mantenimiento || '';
+    document.getElementById('tipoMantenimiento').value = DATOS_EXISTENTES.tipo_mantenimiento || '';
+    document.getElementById('responsable').value = DATOS_EXISTENTES.responsable || '';
+    document.getElementById('documento').value = DATOS_EXISTENTES.documento || '';
+    document.getElementById('descripcion').value = DATOS_EXISTENTES.descripcion || '';
+    document.getElementById('observaciones').value = DATOS_EXISTENTES.observaciones || '';
+
+    if (DATOS_EXISTENTES.tipo_mantenimiento) {
+        cargarActividades(DATOS_EXISTENTES.tipo_mantenimiento);
+
+        setTimeout(() => {
+            const actividades = DATOS_EXISTENTES.actividades || [];
+            actividades.forEach(act => {
+                if (act.personalizada) {
+                    agregarActividadPersonalizada();
+                    const inputs = document.querySelectorAll('.actividad-personalizada');
+                    inputs[inputs.length - 1].value = act.descripcion;
+                } else {
+                    document.querySelectorAll('.actividad-check').forEach(checkbox => {
+                        if (checkbox.value === act.descripcion) {
+                            checkbox.checked = true;
+                        }
+                    });
+                }
+            });
+        }, 100);
+    }
+}
+
+function limpiarFormulario() {
+    if (!confirm('¿Está seguro de limpiar el formulario?')) return;
+
+    document.getElementById('formMantenimiento').reset();
+    document.getElementById('observaciones').value = '';
+    document.getElementById('actividadesContainer').innerHTML = `
+        <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-info-circle text-4xl mb-3"></i>
+            <p>Seleccione un tipo de mantenimiento para ver las actividades disponibles</p>
+        </div>
+    `;
+    document.getElementById('listaActividadesPersonalizadas').innerHTML = '';
+    document.getElementById('actividadesPersonalizadas').style.display = 'none';
+    document.getElementById('fechaMantenimiento').valueAsDate = new Date();
+}
+
+// ========== GUARDAR FORMATO DE EMPRESA ==========
+function guardarFormatoEmpresa() {
+    const codigo = document.getElementById('formato-codigo').value;
+    const version = document.getElementById('formato-version').value;
+    const fecha = document.getElementById('formato-fecha').value;
+
+    fetch('{% url "core:actualizar_formato_empresa" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            codigo: codigo,
+            version: version,
+            fecha: fecha
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Formato actualizado correctamente para toda la empresa');
+            // Mostrar mensaje sutil de confirmación
+            const mensaje = document.createElement('div');
+            mensaje.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
+            mensaje.innerHTML = '<i class="fas fa-check mr-2"></i>Formato guardado para todos los equipos';
+            document.body.appendChild(mensaje);
+            setTimeout(() => mensaje.remove(), 3000);
+        } else {
+            console.error('Error al actualizar formato:', data.message);
+            alert('Error al guardar formato: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al comunicarse con el servidor');
+    });
+}
+</script>
+{% endblock %}

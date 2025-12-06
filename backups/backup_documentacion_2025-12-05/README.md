@@ -2,8 +2,6 @@
 
 > **⚠️ SISTEMA EN PRODUCCIÓN** - Este sistema está activamente desplegado y en uso en producción en **Render**. Cualquier cambio debe ser probado exhaustivamente en desarrollo antes de hacer push a `main`. Ver [DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md) para guía detallada.
 
-> **✅ ACTUALIZACIÓN 19 NOV 2025** - Hotfix crítico aplicado: Panel de Decisiones - TypeError Decimal/Float corregido. Sistema estable y verificado. Ver `auditorias/HOTFIX_APLICADO_2025-11-16.md` para detalles.
-
 [![Python](https://img.shields.io/badge/python-3.11.11-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/django-5.2.4-green.svg)](https://www.djangoproject.com/)
 [![Production](https://img.shields.io/badge/status-PRODUCTION-success.svg)](https://app.sammetrologia.com)

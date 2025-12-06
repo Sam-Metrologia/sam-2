@@ -80,7 +80,7 @@
     <div class="terminos-header">
         <h1>Términos y Condiciones de Uso</h1>
         <p>Plataforma SAM Metrología <span class="version-badge">Versión {{ terminos.version }}</span></p>
-        <p style="font-size: 0.95rem; margin-top: 0.5rem;">Vigente desde: {{ terminos.fecha_vigencia|date:"d/m/Y" }}</p>
+        <p style="font-size: 0.95rem; margin-top: 0.5rem;">Vigente desde: {{ terminos.fecha_vigencia|date:"Y-m-d" }}</p>
     </div>
 
     <!-- Detalles de mi aceptación -->
@@ -90,7 +90,7 @@
         <div class="detalles-grid">
             <div class="detalle-item">
                 <div class="detalle-label">📅 Fecha de Vigencia</div>
-                <div class="detalle-value">{{ mi_aceptacion.terminos.fecha_vigencia|date:"d/m/Y" }}</div>
+                <div class="detalle-value">{{ mi_aceptacion.terminos.fecha_vigencia|date:"Y-m-d" }}</div>
             </div>
 
             <div class="detalle-item">

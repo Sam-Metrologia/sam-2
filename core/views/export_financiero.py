@@ -12,7 +12,8 @@ from io import BytesIO
 from ..utils.analisis_financiero import (
     calcular_analisis_financiero_empresa,
     calcular_proyeccion_costos_empresa,
-    calcular_metricas_financieras_sam
+    calcular_metricas_financieras_sam,
+    calcular_presupuesto_mensual_detallado
 )
 from ..models import Empresa
 
@@ -110,14 +111,17 @@ def exportar_analisis_financiero_excel(request):
         filename = f"analisis_financiero_sam_{current_year}_{today.strftime('%Y%m%d')}.xlsx"
 
     elif getattr(user, 'rol_usuario', None) == 'GERENCIA' and user.empresa:
-        # VISTA EMPRESA: Exportar análisis de costos
+        # VISTA EMPRESA: Exportar análisis de costos CON PRESUPUESTO CALENDARIO
         empresa = user.empresa
-        ws = wb.active
-        ws.title = f"Análisis {empresa.nombre}"
 
         # Calcular análisis financiero
         analisis_financiero = calcular_analisis_financiero_empresa(empresa, current_year, today)
         proyeccion_costos = calcular_proyeccion_costos_empresa(empresa, current_year + 1)
+        presupuesto_calendario = calcular_presupuesto_mensual_detallado(empresa, current_year + 1)
+
+        # HOJA 1: RESUMEN EJECUTIVO
+        ws = wb.active
+        ws.title = "Resumen Ejecutivo"
 
         # Header principal
         ws.merge_cells('A1:F1')
@@ -208,6 +212,222 @@ def exportar_analisis_financiero_excel(request):
         ws[f'A{row}'] = "⚠️ NOTA: Esta proyección no incluye costos por mantenimientos correctivos no programados"
         ws[f'A{row}'].font = Font(italic=True, color="D97706")
         ws[f'A{row}'].alignment = Alignment(horizontal='center')
+
+        # HOJA 2: PRESUPUESTO CALENDARIO DETALLADO
+        ws_calendario = wb.create_sheet(title=f"Presupuesto {current_year + 1}")
+
+        # Estilos específicos para calendario
+        calibracion_fill = PatternFill(start_color="DBEAFE", end_color="DBEAFE", fill_type="solid")  # Azul claro
+        mantenimiento_fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")  # Verde claro
+        comprobacion_fill = PatternFill(start_color="FED7AA", end_color="FED7AA", fill_type="solid")  # Naranja claro
+        mes_header_fill = PatternFill(start_color="6366F1", end_color="6366F1", fill_type="solid")  # Índigo
+        mes_header_font = Font(bold=True, size=12, color="FFFFFF")
+        subtotal_fill = PatternFill(start_color="F3F4F6", end_color="F3F4F6", fill_type="solid")  # Gris claro
+        subtotal_font = Font(bold=True, size=10)
+
+        # Header principal
+        ws_calendario.merge_cells('A1:E1')
+        ws_calendario['A1'] = f"📅 PRESUPUESTO CALENDARIO {current_year + 1} - {empresa.nombre}"
+        ws_calendario['A1'].font = Font(bold=True, size=14, color="1F2937")
+        ws_calendario['A1'].alignment = Alignment(horizontal='center')
+
+        # Resumen ejecutivo del presupuesto
+        resumen = presupuesto_calendario['resumen']
+        ws_calendario.merge_cells('A2:E2')
+        ws_calendario['A2'] = f"Total Anual: ${resumen['total_anual']:,.0f} COP | {resumen['count_total_actividades']} actividades programadas"
+        ws_calendario['A2'].font = Font(bold=True, size=10, color="059669")
+        ws_calendario['A2'].alignment = Alignment(horizontal='center')
+
+        ws_calendario.merge_cells('A3:E3')
+        ws_calendario['A3'] = f"Calibraciones: {resumen['count_calibraciones']} | Mantenimientos: {resumen['count_mantenimientos']} | Comprobaciones: {resumen['count_comprobaciones']}"
+        ws_calendario['A3'].font = Font(size=9, color="6B7280")
+        ws_calendario['A3'].alignment = Alignment(horizontal='center')
+
+        row_cal = 5
+
+        # Procesar cada mes
+        for mes_data in presupuesto_calendario['presupuesto_por_mes']:
+            # Si el mes no tiene actividades, saltar
+            if mes_data['total_mes'] == 0:
+                continue
+
+            # HEADER DEL MES
+            ws_calendario.merge_cells(f'A{row_cal}:E{row_cal}')
+            cell_mes = ws_calendario[f'A{row_cal}']
+            cell_mes.value = f"🗓️  {mes_data['nombre_mes'].upper()} {current_year + 1} - Total: ${mes_data['total_mes']:,.0f}"
+            cell_mes.font = mes_header_font
+            cell_mes.fill = mes_header_fill
+            cell_mes.alignment = Alignment(horizontal='center', vertical='center')
+            cell_mes.border = border
+            ws_calendario.row_dimensions[row_cal].height = 25
+            row_cal += 1
+
+            # CALIBRACIONES
+            if mes_data['calibraciones']:
+                # Subheader
+                ws_calendario.merge_cells(f'A{row_cal}:E{row_cal}')
+                cell_cal_header = ws_calendario[f'A{row_cal}']
+                cell_cal_header.value = f"🔵 CALIBRACIONES ({len(mes_data['calibraciones'])})"
+                cell_cal_header.font = Font(bold=True, size=10, color="1E40AF")
+                cell_cal_header.fill = calibracion_fill
+                cell_cal_header.border = border
+                row_cal += 1
+
+                # Headers de columnas
+                headers_cal = ['Código', 'Nombre Equipo', 'Marca', 'Modelo', 'Costo']
+                for col, header in enumerate(headers_cal, 1):
+                    cell = ws_calendario.cell(row=row_cal, column=col, value=header)
+                    cell.font = Font(bold=True, size=9)
+                    cell.fill = subheader_fill
+                    cell.border = border
+                    cell.alignment = Alignment(horizontal='center')
+                row_cal += 1
+
+                # Datos de calibraciones
+                for cal in mes_data['calibraciones']:
+                    ws_calendario.cell(row=row_cal, column=1, value=cal['codigo']).border = border
+                    ws_calendario.cell(row=row_cal, column=2, value=cal['nombre']).border = border
+                    ws_calendario.cell(row=row_cal, column=3, value=cal['marca']).border = border
+                    ws_calendario.cell(row=row_cal, column=4, value=cal['modelo']).border = border
+                    cost_cell = ws_calendario.cell(row=row_cal, column=5, value=cal['costo'])
+                    cost_cell.number_format = currency_format
+                    cost_cell.border = border
+                    row_cal += 1
+
+                # Subtotal calibraciones
+                ws_calendario.merge_cells(f'A{row_cal}:D{row_cal}')
+                subtotal_cell = ws_calendario[f'A{row_cal}']
+                subtotal_cell.value = "Subtotal Calibraciones"
+                subtotal_cell.font = subtotal_font
+                subtotal_cell.fill = subtotal_fill
+                subtotal_cell.border = border
+                subtotal_cell.alignment = Alignment(horizontal='right')
+
+                subtotal_valor = ws_calendario.cell(row=row_cal, column=5, value=mes_data['total_calibraciones'])
+                subtotal_valor.number_format = currency_format
+                subtotal_valor.font = subtotal_font
+                subtotal_valor.fill = subtotal_fill
+                subtotal_valor.border = border
+                row_cal += 2
+
+            # MANTENIMIENTOS
+            if mes_data['mantenimientos']:
+                # Subheader
+                ws_calendario.merge_cells(f'A{row_cal}:E{row_cal}')
+                cell_mant_header = ws_calendario[f'A{row_cal}']
+                cell_mant_header.value = f"🟢 MANTENIMIENTOS ({len(mes_data['mantenimientos'])})"
+                cell_mant_header.font = Font(bold=True, size=10, color="047857")
+                cell_mant_header.fill = mantenimiento_fill
+                cell_mant_header.border = border
+                row_cal += 1
+
+                # Headers de columnas
+                for col, header in enumerate(headers_cal, 1):
+                    cell = ws_calendario.cell(row=row_cal, column=col, value=header)
+                    cell.font = Font(bold=True, size=9)
+                    cell.fill = subheader_fill
+                    cell.border = border
+                    cell.alignment = Alignment(horizontal='center')
+                row_cal += 1
+
+                # Datos de mantenimientos
+                for mant in mes_data['mantenimientos']:
+                    ws_calendario.cell(row=row_cal, column=1, value=mant['codigo']).border = border
+                    ws_calendario.cell(row=row_cal, column=2, value=mant['nombre']).border = border
+                    ws_calendario.cell(row=row_cal, column=3, value=mant['marca']).border = border
+                    ws_calendario.cell(row=row_cal, column=4, value=mant['modelo']).border = border
+                    cost_cell = ws_calendario.cell(row=row_cal, column=5, value=mant['costo'])
+                    cost_cell.number_format = currency_format
+                    cost_cell.border = border
+                    row_cal += 1
+
+                # Subtotal mantenimientos
+                ws_calendario.merge_cells(f'A{row_cal}:D{row_cal}')
+                subtotal_cell = ws_calendario[f'A{row_cal}']
+                subtotal_cell.value = "Subtotal Mantenimientos"
+                subtotal_cell.font = subtotal_font
+                subtotal_cell.fill = subtotal_fill
+                subtotal_cell.border = border
+                subtotal_cell.alignment = Alignment(horizontal='right')
+
+                subtotal_valor = ws_calendario.cell(row=row_cal, column=5, value=mes_data['total_mantenimientos'])
+                subtotal_valor.number_format = currency_format
+                subtotal_valor.font = subtotal_font
+                subtotal_valor.fill = subtotal_fill
+                subtotal_valor.border = border
+                row_cal += 2
+
+            # COMPROBACIONES
+            if mes_data['comprobaciones']:
+                # Subheader
+                ws_calendario.merge_cells(f'A{row_cal}:E{row_cal}')
+                cell_comp_header = ws_calendario[f'A{row_cal}']
+                cell_comp_header.value = f"🟠 COMPROBACIONES ({len(mes_data['comprobaciones'])})"
+                cell_comp_header.font = Font(bold=True, size=10, color="C2410C")
+                cell_comp_header.fill = comprobacion_fill
+                cell_comp_header.border = border
+                row_cal += 1
+
+                # Headers de columnas
+                for col, header in enumerate(headers_cal, 1):
+                    cell = ws_calendario.cell(row=row_cal, column=col, value=header)
+                    cell.font = Font(bold=True, size=9)
+                    cell.fill = subheader_fill
+                    cell.border = border
+                    cell.alignment = Alignment(horizontal='center')
+                row_cal += 1
+
+                # Datos de comprobaciones
+                for comp in mes_data['comprobaciones']:
+                    ws_calendario.cell(row=row_cal, column=1, value=comp['codigo']).border = border
+                    ws_calendario.cell(row=row_cal, column=2, value=comp['nombre']).border = border
+                    ws_calendario.cell(row=row_cal, column=3, value=comp['marca']).border = border
+                    ws_calendario.cell(row=row_cal, column=4, value=comp['modelo']).border = border
+                    cost_cell = ws_calendario.cell(row=row_cal, column=5, value=comp['costo'])
+                    cost_cell.number_format = currency_format
+                    cost_cell.border = border
+                    row_cal += 1
+
+                # Subtotal comprobaciones
+                ws_calendario.merge_cells(f'A{row_cal}:D{row_cal}')
+                subtotal_cell = ws_calendario[f'A{row_cal}']
+                subtotal_cell.value = "Subtotal Comprobaciones"
+                subtotal_cell.font = subtotal_font
+                subtotal_cell.fill = subtotal_fill
+                subtotal_cell.border = border
+                subtotal_cell.alignment = Alignment(horizontal='right')
+
+                subtotal_valor = ws_calendario.cell(row=row_cal, column=5, value=mes_data['total_comprobaciones'])
+                subtotal_valor.number_format = currency_format
+                subtotal_valor.font = subtotal_font
+                subtotal_valor.fill = subtotal_fill
+                subtotal_valor.border = border
+                row_cal += 2
+
+            # TOTAL DEL MES
+            ws_calendario.merge_cells(f'A{row_cal}:D{row_cal}')
+            total_mes_cell = ws_calendario[f'A{row_cal}']
+            total_mes_cell.value = f"💰 TOTAL {mes_data['nombre_mes'].upper()}"
+            total_mes_cell.font = Font(bold=True, size=11, color="FFFFFF")
+            total_mes_cell.fill = PatternFill(start_color="059669", end_color="059669", fill_type="solid")
+            total_mes_cell.border = border
+            total_mes_cell.alignment = Alignment(horizontal='right')
+
+            total_mes_valor = ws_calendario.cell(row=row_cal, column=5, value=mes_data['total_mes'])
+            total_mes_valor.number_format = currency_format
+            total_mes_valor.font = Font(bold=True, size=11, color="FFFFFF")
+            total_mes_valor.fill = PatternFill(start_color="059669", end_color="059669", fill_type="solid")
+            total_mes_valor.border = border
+            ws_calendario.row_dimensions[row_cal].height = 20
+
+            row_cal += 3  # Espacio entre meses
+
+        # Ajustar anchos de columnas para la hoja de calendario
+        ws_calendario.column_dimensions['A'].width = 15
+        ws_calendario.column_dimensions['B'].width = 30
+        ws_calendario.column_dimensions['C'].width = 20
+        ws_calendario.column_dimensions['D'].width = 20
+        ws_calendario.column_dimensions['E'].width = 18
 
         filename = f"analisis_financiero_{empresa.nombre.replace(' ', '_')}_{current_year}_{today.strftime('%Y%m%d')}.xlsx"
     else:

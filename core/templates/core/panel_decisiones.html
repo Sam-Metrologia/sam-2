@@ -183,7 +183,7 @@
                 {{ empresa.nombre }} - Gestión Táctica de Cumplimiento
             {% endif %}
         </p>
-        <p style="margin: 5px 0 0 0; opacity: 0.7; font-size: 0.9rem;">{{ today|date:"d/m/Y" }}</p>
+        <p style="margin: 5px 0 0 0; opacity: 0.7; font-size: 0.9rem;">{{ today|date:"Y-m-d" }}</p>
 
         {% if perspectiva == 'sam' %}
         <!-- Selector de empresa para SAM -->
@@ -753,7 +753,7 @@
                     <li><strong>Calibraciones:</strong> Dinero pagado a laboratorios externos para certificar la precisión de sus equipos</li>
                     <li><strong>Mantenimientos:</strong> Dinero invertido en reparaciones y mantenimiento preventivo para mantener equipos funcionando</li>
                     <li><strong>Comprobaciones:</strong> Dinero gastado en comprobaciones internas para asegurar el buen funcionamiento</li>
-                    <li><strong>Cómo se calcula:</strong> Solo se cuenta el dinero efectivamente gastado desde enero hasta {{ today|date:"d/m/Y" }}</li>
+                    <li><strong>Cómo se calcula:</strong> Solo se cuenta el dinero efectivamente gastado desde enero hasta {{ today|date:"Y-m-d" }}</li>
                 </ul>
             </div>
 
@@ -1024,7 +1024,7 @@
                 {% for equipo in actividades_criticas.calibraciones_vencidas %}
                 <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
                     <strong>{{ equipo.codigo_interno }}</strong> - {{ equipo.nombre }}
-                    <small style="display: block; color: #991b1b;">Vencida: {{ equipo.proxima_calibracion|date:"d/m/Y" }}</small>
+                    <small style="display: block; color: #991b1b;">Vencida: {{ equipo.proxima_calibracion|date:"Y-m-d" }}</small>
                 </div>
                 {% endfor %}
             </div>
@@ -1037,7 +1037,7 @@
                 {% for equipo in actividades_criticas.mantenimientos_vencidos %}
                 <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
                     <strong>{{ equipo.codigo_interno }}</strong> - {{ equipo.nombre }}
-                    <small style="display: block; color: #991b1b;">Vencido: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</small>
+                    <small style="display: block; color: #991b1b;">Vencido: {{ equipo.proximo_mantenimiento|date:"Y-m-d" }}</small>
                 </div>
                 {% endfor %}
             </div>
@@ -1050,7 +1050,7 @@
                 {% for equipo in actividades_criticas.comprobaciones_vencidas %}
                 <div style="font-size: 0.9rem; margin-bottom: 5px; color: #7f1d1d;">
                     <strong>{{ equipo.codigo_interno }}</strong> - {{ equipo.nombre }}
-                    <small style="display: block; color: #991b1b;">Vencida: {{ equipo.proxima_comprobacion|date:"d/m/Y" }}</small>
+                    <small style="display: block; color: #991b1b;">Vencida: {{ equipo.proxima_comprobacion|date:"Y-m-d" }}</small>
                 </div>
                 {% endfor %}
             </div>
@@ -1173,7 +1173,7 @@
                             <strong>Actividad:</strong> {{ alerta.tipo }}
                         </div>
                         <div style="color: #991b1b; font-size: 0.9rem;">
-                            <strong>Fecha de vencimiento:</strong> {{ alerta.fecha_vencimiento|date:"d/m/Y" }}
+                            <strong>Fecha de vencimiento:</strong> {{ alerta.fecha_vencimiento|date:"Y-m-d" }}
                         </div>
                         <div style="color: #7f1d1d; font-size: 0.9rem;">
                             <strong>Días vencida:</strong> {{ alerta.dias_vencido }} días
@@ -1218,7 +1218,7 @@
                             <strong>Actividad:</strong> {{ alerta.tipo }}
                         </div>
                         <div style="color: #991b1b; font-size: 0.9rem;">
-                            <strong>Fecha límite:</strong> {{ alerta.fecha_vencimiento|date:"d/m/Y" }}
+                            <strong>Fecha límite:</strong> {{ alerta.fecha_vencimiento|date:"Y-m-d" }}
                         </div>
                         <div style="color: #7f1d1d; font-size: 0.9rem;">
                             <strong>Días restantes:</strong> {{ alerta.dias_restantes }} días ⏰
@@ -1263,7 +1263,7 @@
                             <strong>Actividad:</strong> {{ alerta.tipo }}
                         </div>
                         <div style="color: #92400e; font-size: 0.9rem;">
-                            <strong>Fecha límite:</strong> {{ alerta.fecha_vencimiento|date:"d/m/Y" }}
+                            <strong>Fecha límite:</strong> {{ alerta.fecha_vencimiento|date:"Y-m-d" }}
                         </div>
                         <div style="color: #a16207; font-size: 0.9rem;">
                             <strong>Días restantes:</strong> {{ alerta.dias_restantes }} días 📅
@@ -1743,7 +1743,7 @@
                         <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; margin-bottom: 6px;">
                             <div style="color: #2563eb; font-weight: bold; font-size: 0.75rem;">📍 {{ oportunidad.ubicacion }}</div>
                             <div style="color: #475569; font-size: 0.7rem;">{{ oportunidad.cantidad }} actividades → Ahorro: ${{ oportunidad.ahorro_estimado|floatformat:0 }} COP</div>
-                            <div style="color: #64748b; font-size: 0.65rem;">Fecha sugerida: {{ oportunidad.fecha_sugerida|date:"d/m/Y" }}</div>
+                            <div style="color: #64748b; font-size: 0.65rem;">Fecha sugerida: {{ oportunidad.fecha_sugerida|date:"Y-m-d" }}</div>
                         </div>
                         {% endfor %}
 
@@ -1772,7 +1772,7 @@
                         </span>
                     </div>
                     <div style="color: #6b7280; font-size: 0.9rem; margin-bottom: 8px;">
-                        {{ oportunidad.cantidad }} actividades programadas cerca de {{ oportunidad.fecha_sugerida|date:"d/m/Y" }}
+                        {{ oportunidad.cantidad }} actividades programadas cerca de {{ oportunidad.fecha_sugerida|date:"Y-m-d" }}
                     </div>
                     <div style="color: #374151; font-size: 0.8rem;">
                         {% for actividad in oportunidad.actividades|slice:":3" %}
@@ -1892,7 +1892,7 @@
         <p style="margin: 0; font-size: 0.875rem;">
             ✅ Panel de Decisiones
             {% if perspectiva == 'sam' %}SAM{% else %}{{ empresa.nombre }}{% endif %} |
-            Datos actualizados: {{ today|date:"d/m/Y" }}
+            Datos actualizados: {{ today|date:"Y-m-d" }}
         </p>
         <p style="margin: 5px 0 0 0; font-size: 0.75rem; opacity: 0.7;">
             Lógica coherente con Dashboard Técnico | Las 3 Métricas Pilares: Salud + Cumplimiento + Eficiencia

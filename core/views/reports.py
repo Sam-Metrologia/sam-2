@@ -1265,6 +1265,41 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         mantenimientos = equipo.mantenimientos.select_related('proveedor').order_by('-fecha_mantenimiento')
         comprobaciones = equipo.comprobaciones.select_related('proveedor').order_by('-fecha_comprobacion')
 
+        # ========== GRÁFICAS HISTÓRICAS PARA PDF ==========
+        # Importar funciones de equipment.py para generar gráficas
+        from core.views.equipment import _generar_grafica_hist_confirmaciones, _generar_grafica_hist_comprobaciones
+
+        # Obtener últimas 5 confirmaciones con datos JSON
+        calibraciones_con_datos = []
+        for cal in calibraciones[:5]:
+            if (hasattr(cal, 'confirmacion_metrologica_datos') and
+                cal.confirmacion_metrologica_datos and
+                cal.confirmacion_metrologica_datos.get('puntos_medicion')):
+                calibraciones_con_datos.append({
+                    'fecha': cal.fecha_calibracion,
+                    'puntos': cal.confirmacion_metrologica_datos['puntos_medicion']
+                })
+
+        # Obtener últimas 5 comprobaciones con datos JSON
+        comprobaciones_con_datos = []
+        for comp in comprobaciones[:5]:
+            if (hasattr(comp, 'datos_comprobacion') and
+                comp.datos_comprobacion and
+                comp.datos_comprobacion.get('puntos_medicion')):
+                comprobaciones_con_datos.append({
+                    'fecha': comp.fecha_comprobacion,
+                    'puntos': comp.datos_comprobacion['puntos_medicion']
+                })
+
+        # Generar gráficas SVG
+        grafica_hist_confirmaciones = None
+        if len(calibraciones_con_datos) > 0:
+            grafica_hist_confirmaciones = _generar_grafica_hist_confirmaciones(calibraciones_con_datos)
+
+        grafica_hist_comprobaciones = None
+        if len(comprobaciones_con_datos) > 0:
+            grafica_hist_comprobaciones = _generar_grafica_hist_comprobaciones(comprobaciones_con_datos)
+
         baja_registro = None
         try:
             baja_registro = equipo.baja_registro
@@ -1400,6 +1435,9 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
             'manual_pdf_url': manual_pdf_url,
             'otros_documentos_pdf_url': otros_documentos_pdf_url,
             'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
+            # Gráficas históricas (NUEVO 2025-12-04)
+            'grafica_hist_confirmaciones': grafica_hist_confirmaciones,
+            'grafica_hist_comprobaciones': grafica_hist_comprobaciones,
         }
 
         # Generar PDF
@@ -1896,12 +1934,23 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
     sheet['A3'].font = Font(bold=True, size=12, color="1f4e79")
     sheet['A3'].alignment = Alignment(horizontal="center")
 
+    # INFORMACIÓN DEL FORMATO (común para todos los equipos) - Fila 4
+    primer_equipo = equipos_queryset.first()
+    if primer_equipo:
+        sheet.merge_cells('A4:AB4')
+        formato_info = f'FORMATO: Código: {primer_equipo.codificacion_formato or "N/A"} | Versión: {primer_equipo.version_formato or "N/A"}'
+        if primer_equipo.fecha_version_formato:
+            formato_info += f' | Fecha Versión: {primer_equipo.fecha_version_formato.strftime("%Y-%m-%d")}'
+        sheet['A4'] = formato_info
+        sheet['A4'].font = Font(bold=True, size=10, color="FFFFFF")
+        sheet['A4'].fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+        sheet['A4'].alignment = Alignment(horizontal="center", vertical="center")
+
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
-        "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
-        "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración",
+        "Observaciones", "Último Certificado Calibración", "Fecha Última Calibración", "Próxima Calibración",
         "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
         "Próxima Comprobación", "Frecuencia Comprobación (meses)"
@@ -1927,6 +1976,10 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
     # Agregar datos de equipos empezando desde la fila 7
     current_row = 7
     for equipo in equipos_queryset:
+        # Obtener el último certificado de calibración
+        ultima_calibracion = equipo.calibraciones.order_by('-fecha_calibracion').first()
+        ultimo_certificado = ultima_calibracion.numero_certificado if ultima_calibracion else 'N/A'
+
         row_data = [
             equipo.codigo_interno,
             equipo.nombre,
@@ -1943,11 +1996,8 @@ def _generate_general_equipment_list_excel_content(equipos_queryset):
             equipo.resolucion,
             equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
             equipo.puntos_calibracion if equipo.puntos_calibracion is not None else '',
-            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
             equipo.observaciones,
-            equipo.version_formato,
-            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-            equipo.codificacion_formato,
+            ultimo_certificado,  # NUEVA COLUMNA
             equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
             equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
             float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
@@ -2336,13 +2386,25 @@ def _generate_general_equipment_list_excel_content_local(equipos_queryset):
     sheet['A3'] = f'LISTADO GENERAL DE EQUIPOS - Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
     sheet['A3'].font = Font(bold=True, size=12, color="1f4e79")
 
-    # Headers principales
+    # INFORMACIÓN DEL FORMATO (común para todos los equipos) - Fila 4 y 5
+    primer_equipo = equipos_queryset.first()
+    if primer_equipo:
+        sheet.merge_cells('A4:AB4')
+        formato_info = f'FORMATO: Código: {primer_equipo.codificacion_formato or "N/A"} | Versión: {primer_equipo.version_formato or "N/A"}'
+        if primer_equipo.fecha_version_formato:
+            formato_info += f' | Fecha Versión: {primer_equipo.fecha_version_formato.strftime("%Y-%m-%d")}'
+        sheet['A4'] = formato_info
+        sheet['A4'].font = Font(bold=True, size=10, color="FFFFFF")
+        sheet['A4'].fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+        from openpyxl.styles import Alignment
+        sheet['A4'].alignment = Alignment(horizontal="center", vertical="center")
+
+    # Headers principales (sin columnas de formato que ya están arriba)
     headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
-        "Observaciones", "Versión Formato Equipo", "Fecha Versión Formato Equipo",
-        "Codificación Formato Equipo", "Fecha Última Calibración", "Próxima Calibración",
+        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración",
+        "Observaciones", "Último Certificado Calibración", "Fecha Última Calibración", "Próxima Calibración",
         "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
         "Próxima Comprobación", "Frecuencia Comprobación (meses)"
@@ -2361,6 +2423,10 @@ def _generate_general_equipment_list_excel_content_local(equipos_queryset):
     # Datos de equipos
     current_row = 7
     for equipo in equipos_queryset:
+        # Obtener el último certificado de calibración
+        ultima_calibracion = equipo.calibraciones.order_by('-fecha_calibracion').first()
+        ultimo_certificado = ultima_calibracion.numero_certificado if ultima_calibracion else 'N/A'
+
         row_data = [
             equipo.codigo_interno,
             equipo.nombre,
@@ -2377,11 +2443,8 @@ def _generate_general_equipment_list_excel_content_local(equipos_queryset):
             equipo.resolucion,
             equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
             equipo.puntos_calibracion if equipo.puntos_calibracion is not None else '',
-            equipo.fecha_registro.strftime('%Y-%m-%d %H:%M:%S') if equipo.fecha_registro else '',
             equipo.observaciones,
-            equipo.version_formato,
-            equipo.fecha_version_formato.strftime('%Y-%m-%d') if equipo.fecha_version_formato else '',
-            equipo.codificacion_formato,
+            ultimo_certificado,  # NUEVA COLUMNA
             equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
             equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
             float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',

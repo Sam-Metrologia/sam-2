@@ -300,31 +300,69 @@ Total de Equipos: {self.empresa.equipos.filter(estado__in=['Activo', 'En Manteni
 
     def _add_mantenimientos(self, zip_file, equipo, equipo_folder):
         """
-        Agrega documentos de mantenimientos.
+        Agrega documentos de mantenimientos en subcarpetas organizadas.
         """
         try:
             mantenimientos = equipo.mantenimientos.all()
+            logger.info(f"[DEBUG] Equipo {equipo.codigo_interno}: {mantenimientos.count()} mantenimientos encontrados")
             if mantenimientos.exists():
                 mant_folder = f"{equipo_folder}Mantenimientos/"
                 for mantenimiento in mantenimientos:
+                    logger.info(f"[DEBUG] Procesando mantenimiento ID:{mantenimiento.pk}")
+                    # Documento Externo
+                    if mantenimiento.documento_externo:
+                        logger.info(f"[DEBUG] -> Agregando documento_externo: {mantenimiento.documento_externo.name}")
+                        subfolder = f"{mant_folder}Documentos_Externos/"
+                        self._add_file_to_zip(zip_file, mantenimiento.documento_externo, subfolder)
+
+                    # Análisis Interno
+                    if mantenimiento.analisis_interno:
+                        logger.info(f"[DEBUG] -> Agregando analisis_interno: {mantenimiento.analisis_interno.name}")
+                        subfolder = f"{mant_folder}Analisis_Internos/"
+                        self._add_file_to_zip(zip_file, mantenimiento.analisis_interno, subfolder)
+
+                    # Documento General
                     if mantenimiento.documento_mantenimiento:
-                        self._add_file_to_zip(zip_file, mantenimiento.documento_mantenimiento, mant_folder)
+                        logger.info(f"[DEBUG] -> Agregando documento_mantenimiento: {mantenimiento.documento_mantenimiento.name}")
+                        subfolder = f"{mant_folder}Documentos_Generales/"
+                        self._add_file_to_zip(zip_file, mantenimiento.documento_mantenimiento, subfolder)
+            else:
+                logger.info(f"[DEBUG] Equipo {equipo.codigo_interno}: Sin mantenimientos")
         except Exception as e:
-            logger.warning(f"Error adding mantenimientos for {equipo.codigo_interno}: {e}")
+            logger.error(f"Error adding mantenimientos for {equipo.codigo_interno}: {e}")
 
     def _add_comprobaciones(self, zip_file, equipo, equipo_folder):
         """
-        Agrega documentos de comprobaciones.
+        Agrega documentos de comprobaciones en subcarpetas organizadas.
         """
         try:
             comprobaciones = equipo.comprobaciones.all()
+            logger.info(f"[DEBUG] Equipo {equipo.codigo_interno}: {comprobaciones.count()} comprobaciones encontradas")
             if comprobaciones.exists():
                 comp_folder = f"{equipo_folder}Comprobaciones/"
                 for comprobacion in comprobaciones:
+                    logger.info(f"[DEBUG] Procesando comprobacion ID:{comprobacion.pk}")
+                    # Documento Externo
+                    if comprobacion.documento_externo:
+                        logger.info(f"[DEBUG] -> Agregando documento_externo: {comprobacion.documento_externo.name}")
+                        subfolder = f"{comp_folder}Documentos_Externos/"
+                        self._add_file_to_zip(zip_file, comprobacion.documento_externo, subfolder)
+
+                    # Análisis Interno
+                    if comprobacion.analisis_interno:
+                        logger.info(f"[DEBUG] -> Agregando analisis_interno: {comprobacion.analisis_interno.name}")
+                        subfolder = f"{comp_folder}Analisis_Internos/"
+                        self._add_file_to_zip(zip_file, comprobacion.analisis_interno, subfolder)
+
+                    # Documento General
                     if comprobacion.documento_comprobacion:
-                        self._add_file_to_zip(zip_file, comprobacion.documento_comprobacion, comp_folder)
+                        logger.info(f"[DEBUG] -> Agregando documento_comprobacion: {comprobacion.documento_comprobacion.name}")
+                        subfolder = f"{comp_folder}Documentos_Generales/"
+                        self._add_file_to_zip(zip_file, comprobacion.documento_comprobacion, subfolder)
+            else:
+                logger.info(f"[DEBUG] Equipo {equipo.codigo_interno}: Sin comprobaciones")
         except Exception as e:
-            logger.warning(f"Error adding comprobaciones for {equipo.codigo_interno}: {e}")
+            logger.error(f"Error adding comprobaciones for {equipo.codigo_interno}: {e}")
 
     def _add_procedimientos(self, zip_file):
         """

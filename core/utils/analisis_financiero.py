@@ -166,6 +166,315 @@ def calcular_proyeccion_costos_empresa(empresa, next_year):
     }
 
 
+def calcular_presupuesto_mensual_detallado(empresa, year):
+    """
+    4. PRESUPUESTO CALENDARIO MENSUAL DETALLADO
+    Genera un presupuesto mes por mes con desglose de equipos y costos
+
+    Returns:
+        {
+            'presupuesto_por_mes': [
+                {
+                    'mes': 1,
+                    'nombre_mes': 'Enero',
+                    'calibraciones': [{'equipo': obj, 'costo': 100000}, ...],
+                    'mantenimientos': [...],
+                    'comprobaciones': [...],
+                    'total_mes': 500000
+                },
+                ...
+            ],
+            'total_anual': 6000000,
+            'resumen': {...}
+        }
+    """
+    from datetime import date, timedelta
+    from dateutil.relativedelta import relativedelta
+    from decimal import Decimal
+
+    equipos_empresa = Equipo.objects.filter(empresa=empresa).exclude(estado__in=['De Baja', 'Inactivo'])
+
+    # Estructura para almacenar el presupuesto mensual
+    presupuesto_mensual = []
+    meses_nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+    # Inicializar estructura para cada mes
+    for mes in range(1, 13):
+        presupuesto_mensual.append({
+            'mes': mes,
+            'nombre_mes': meses_nombres[mes - 1],
+            'calibraciones': [],
+            'mantenimientos': [],
+            'comprobaciones': [],
+            'total_calibraciones': 0,
+            'total_mantenimientos': 0,
+            'total_comprobaciones': 0,
+            'total_mes': 0
+        })
+
+    # Procesar cada equipo
+    for equipo in equipos_empresa:
+        # CALIBRACIONES
+        if equipo.frecuencia_calibracion_meses and int(equipo.frecuencia_calibracion_meses) > 0:
+            frecuencia_meses = int(equipo.frecuencia_calibracion_meses)
+
+            # Obtener costo estimado
+            costo_calibracion = _obtener_costo_estimado_calibracion(equipo, empresa, year)
+
+            if costo_calibracion:
+                # Determinar mes de inicio basado en la última calibración o fecha de adquisición
+                mes_inicio = _calcular_mes_inicio_actividad(equipo, 'calibracion', year)
+
+                # Proyectar calibraciones a lo largo del año
+                mes_actual = mes_inicio
+                while mes_actual <= 12:
+                    presupuesto_mensual[mes_actual - 1]['calibraciones'].append({
+                        'equipo': equipo,
+                        'codigo': equipo.codigo_interno,
+                        'nombre': equipo.nombre,
+                        'marca': equipo.marca or 'N/A',
+                        'modelo': equipo.modelo or 'N/A',
+                        'costo': float(costo_calibracion)
+                    })
+                    presupuesto_mensual[mes_actual - 1]['total_calibraciones'] += float(costo_calibracion)
+                    mes_actual += frecuencia_meses
+
+        # MANTENIMIENTOS
+        if equipo.frecuencia_mantenimiento_meses and int(equipo.frecuencia_mantenimiento_meses) > 0:
+            frecuencia_meses = int(equipo.frecuencia_mantenimiento_meses)
+
+            # Obtener costo estimado
+            costo_mantenimiento = _obtener_costo_estimado_mantenimiento(equipo, empresa, year)
+
+            if costo_mantenimiento:
+                # Determinar mes de inicio
+                mes_inicio = _calcular_mes_inicio_actividad(equipo, 'mantenimiento', year)
+
+                # Proyectar mantenimientos a lo largo del año
+                mes_actual = mes_inicio
+                while mes_actual <= 12:
+                    presupuesto_mensual[mes_actual - 1]['mantenimientos'].append({
+                        'equipo': equipo,
+                        'codigo': equipo.codigo_interno,
+                        'nombre': equipo.nombre,
+                        'marca': equipo.marca or 'N/A',
+                        'modelo': equipo.modelo or 'N/A',
+                        'costo': float(costo_mantenimiento)
+                    })
+                    presupuesto_mensual[mes_actual - 1]['total_mantenimientos'] += float(costo_mantenimiento)
+                    mes_actual += frecuencia_meses
+
+        # COMPROBACIONES
+        if equipo.frecuencia_comprobacion_meses and int(equipo.frecuencia_comprobacion_meses) > 0:
+            frecuencia_meses = int(equipo.frecuencia_comprobacion_meses)
+
+            # Obtener costo estimado
+            costo_comprobacion = _obtener_costo_estimado_comprobacion(equipo, empresa, year)
+
+            if costo_comprobacion:
+                # Determinar mes de inicio
+                mes_inicio = _calcular_mes_inicio_actividad(equipo, 'comprobacion', year)
+
+                # Proyectar comprobaciones a lo largo del año
+                mes_actual = mes_inicio
+                while mes_actual <= 12:
+                    presupuesto_mensual[mes_actual - 1]['comprobaciones'].append({
+                        'equipo': equipo,
+                        'codigo': equipo.codigo_interno,
+                        'nombre': equipo.nombre,
+                        'marca': equipo.marca or 'N/A',
+                        'modelo': equipo.modelo or 'N/A',
+                        'costo': float(costo_comprobacion)
+                    })
+                    presupuesto_mensual[mes_actual - 1]['total_comprobaciones'] += float(costo_comprobacion)
+                    mes_actual += frecuencia_meses
+
+    # Calcular totales mensuales
+    total_anual = 0
+    for mes_data in presupuesto_mensual:
+        mes_data['total_mes'] = (
+            mes_data['total_calibraciones'] +
+            mes_data['total_mantenimientos'] +
+            mes_data['total_comprobaciones']
+        )
+        total_anual += mes_data['total_mes']
+
+    # Calcular resumen
+    total_calibraciones_año = sum(m['total_calibraciones'] for m in presupuesto_mensual)
+    total_mantenimientos_año = sum(m['total_mantenimientos'] for m in presupuesto_mensual)
+    total_comprobaciones_año = sum(m['total_comprobaciones'] for m in presupuesto_mensual)
+
+    count_calibraciones = sum(len(m['calibraciones']) for m in presupuesto_mensual)
+    count_mantenimientos = sum(len(m['mantenimientos']) for m in presupuesto_mensual)
+    count_comprobaciones = sum(len(m['comprobaciones']) for m in presupuesto_mensual)
+
+    resumen = {
+        'total_anual': total_anual,
+        'total_calibraciones': total_calibraciones_año,
+        'total_mantenimientos': total_mantenimientos_año,
+        'total_comprobaciones': total_comprobaciones_año,
+        'count_calibraciones': count_calibraciones,
+        'count_mantenimientos': count_mantenimientos,
+        'count_comprobaciones': count_comprobaciones,
+        'count_total_actividades': count_calibraciones + count_mantenimientos + count_comprobaciones,
+        'promedio_mensual': total_anual / 12 if total_anual > 0 else 0,
+        'mes_mas_caro': max(presupuesto_mensual, key=lambda x: x['total_mes']) if presupuesto_mensual else None,
+        'mes_mas_economico': min([m for m in presupuesto_mensual if m['total_mes'] > 0],
+                                  key=lambda x: x['total_mes']) if any(m['total_mes'] > 0 for m in presupuesto_mensual) else None
+    }
+
+    return {
+        'presupuesto_por_mes': presupuesto_mensual,
+        'total_anual': total_anual,
+        'resumen': resumen,
+        'año': year
+    }
+
+
+def _obtener_costo_estimado_calibracion(equipo, empresa, year):
+    """Obtiene el costo estimado de calibración con actualización dinámica"""
+    from decimal import Decimal
+
+    # 1. Buscar último costo del equipo específico (puede ser del año proyectado si ya hay datos)
+    ultimo_costo = Calibracion.objects.filter(
+        equipo=equipo,
+        costo_calibracion__isnull=False,
+        costo_calibracion__gt=0
+    ).order_by('-fecha_calibracion').first()
+
+    if ultimo_costo:
+        return ultimo_costo.costo_calibracion
+
+    # 2. Buscar costo promedio por Marca y Modelo (más recientes tienen prioridad)
+    costo_promedio = Calibracion.objects.filter(
+        equipo__empresa=empresa,
+        equipo__marca=equipo.marca,
+        equipo__modelo=equipo.modelo,
+        costo_calibracion__isnull=False,
+        costo_calibracion__gt=0
+    ).order_by('-fecha_calibracion').aggregate(promedio=Avg('costo_calibracion'))['promedio']
+
+    return costo_promedio if costo_promedio else None
+
+
+def _obtener_costo_estimado_mantenimiento(equipo, empresa, year):
+    """Obtiene el costo estimado de mantenimiento con actualización dinámica"""
+    from decimal import Decimal
+
+    # 1. Buscar último costo del equipo específico (solo preventivos)
+    ultimo_costo = Mantenimiento.objects.filter(
+        equipo=equipo,
+        tipo_mantenimiento='Preventivo',
+        costo_sam_interno__isnull=False,
+        costo_sam_interno__gt=0
+    ).order_by('-fecha_mantenimiento').first()
+
+    if ultimo_costo:
+        return ultimo_costo.costo_sam_interno
+
+    # 2. Buscar costo promedio por Marca y Modelo
+    costo_promedio = Mantenimiento.objects.filter(
+        equipo__empresa=empresa,
+        equipo__marca=equipo.marca,
+        equipo__modelo=equipo.modelo,
+        tipo_mantenimiento='Preventivo',
+        costo_sam_interno__isnull=False,
+        costo_sam_interno__gt=0
+    ).order_by('-fecha_mantenimiento').aggregate(promedio=Avg('costo_sam_interno'))['promedio']
+
+    return costo_promedio if costo_promedio else None
+
+
+def _obtener_costo_estimado_comprobacion(equipo, empresa, year):
+    """Obtiene el costo estimado de comprobación con actualización dinámica"""
+    from decimal import Decimal
+
+    # 1. Buscar último costo del equipo específico
+    ultimo_costo = Comprobacion.objects.filter(
+        equipo=equipo,
+        costo_comprobacion__isnull=False,
+        costo_comprobacion__gt=0
+    ).order_by('-fecha_comprobacion').first()
+
+    if ultimo_costo:
+        return ultimo_costo.costo_comprobacion
+
+    # 2. Buscar costo promedio por Marca y Modelo
+    costo_promedio = Comprobacion.objects.filter(
+        equipo__empresa=empresa,
+        equipo__marca=equipo.marca,
+        equipo__modelo=equipo.modelo,
+        costo_comprobacion__isnull=False,
+        costo_comprobacion__gt=0
+    ).order_by('-fecha_comprobacion').aggregate(promedio=Avg('costo_comprobacion'))['promedio']
+
+    return costo_promedio if costo_promedio else None
+
+
+def _calcular_mes_inicio_actividad(equipo, tipo_actividad, year):
+    """
+    Calcula el mes de inicio para una actividad en el año proyectado
+    Basado en la última actividad realizada o la fecha de adquisición
+    """
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+
+    # Obtener la última actividad del tipo correspondiente
+    if tipo_actividad == 'calibracion':
+        ultima_actividad = Calibracion.objects.filter(equipo=equipo).order_by('-fecha_calibracion').first()
+        fecha_proxima = equipo.proxima_calibracion
+        frecuencia = equipo.frecuencia_calibracion_meses
+    elif tipo_actividad == 'mantenimiento':
+        ultima_actividad = Mantenimiento.objects.filter(equipo=equipo).order_by('-fecha_mantenimiento').first()
+        fecha_proxima = equipo.proximo_mantenimiento
+        frecuencia = equipo.frecuencia_mantenimiento_meses
+    else:  # comprobacion
+        ultima_actividad = Comprobacion.objects.filter(equipo=equipo).order_by('-fecha_comprobacion').first()
+        fecha_proxima = equipo.proxima_comprobacion
+        frecuencia = equipo.frecuencia_comprobacion_meses
+
+    if not frecuencia or int(frecuencia) <= 0:
+        return 1  # Default: enero
+
+    frecuencia = int(frecuencia)
+
+    # Si hay una fecha próxima programada y es en el año proyectado
+    if fecha_proxima and fecha_proxima.year == year:
+        return fecha_proxima.month
+
+    # Si hay una última actividad, calcular la próxima basándose en ella
+    if ultima_actividad:
+        if tipo_actividad == 'calibracion':
+            fecha_ultima = ultima_actividad.fecha_calibracion
+        elif tipo_actividad == 'mantenimiento':
+            fecha_ultima = ultima_actividad.fecha_mantenimiento
+        else:
+            fecha_ultima = ultima_actividad.fecha_comprobacion
+
+        # Calcular cuándo sería la próxima actividad
+        fecha_siguiente = fecha_ultima
+        while fecha_siguiente.year < year:
+            fecha_siguiente = fecha_siguiente + relativedelta(months=frecuencia)
+
+        if fecha_siguiente.year == year:
+            return fecha_siguiente.month
+
+    # Si no hay datos, usar fecha de adquisición como referencia
+    if equipo.fecha_adquisicion:
+        fecha_ref = equipo.fecha_adquisicion
+        fecha_siguiente = fecha_ref
+        while fecha_siguiente.year < year:
+            fecha_siguiente = fecha_siguiente + relativedelta(months=frecuencia)
+
+        if fecha_siguiente.year == year:
+            return fecha_siguiente.month
+
+    # Default: distribuir uniformemente a lo largo del año
+    # Usar un offset basado en el ID del equipo para evitar que todo caiga en enero
+    return ((equipo.id - 1) % 12) + 1
+
+
 def calcular_metricas_financieras_sam(empresas_queryset, current_year, previous_year):
     """
     3. MÉTRICAS FINANCIERAS DEL NEGOCIO SAM (Para Superusuarios)

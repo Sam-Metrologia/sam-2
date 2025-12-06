@@ -4,6 +4,7 @@ from django.urls import path
 from . import views
 from . import admin_views
 from . import zip_functions  # Import for ZIP system
+from .views import confirmacion  # Import confirmacion module
 # Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
@@ -53,6 +54,24 @@ urlpatterns = [
     path('equipos/<int:equipo_pk>/calibraciones/añadir/', views.añadir_calibracion, name='añadir_calibracion'),
     path('equipos/<int:equipo_pk>/calibraciones/<int:pk>/editar/', views.editar_calibracion, name='editar_calibracion'),
     path('equipos/<int:equipo_pk>/calibraciones/<int:pk>/eliminar/', views.eliminar_calibracion, name='eliminar_calibracion'),
+
+    # Confirmación Metrológica e Intervalos de Calibración (NUEVO 2025-11-29)
+    path('equipos/<int:equipo_id>/confirmacion-metrologica/', views.confirmacion_metrologica, name='confirmacion_metrologica'),
+    path('equipos/<int:equipo_id>/intervalos-calibracion/', views.intervalos_calibracion, name='intervalos_calibracion'),
+    path('equipos/<int:equipo_id>/confirmacion-metrologica/pdf/', views.generar_pdf_confirmacion, name='generar_pdf_confirmacion'),
+    path('equipos/<int:equipo_id>/intervalos-calibracion/pdf/', views.generar_pdf_intervalos, name='generar_pdf_intervalos'),
+    path('equipos/<int:equipo_id>/confirmacion-metrologica/guardar/', views.guardar_confirmacion, name='guardar_confirmacion'),
+    path('empresas/actualizar-formato/', confirmacion.actualizar_formato_empresa, name='actualizar_formato_empresa'),
+
+    # Comprobación Metrológica
+    path('equipos/<int:equipo_id>/comprobacion-metrologica/', views.comprobacion_metrologica_view, name='comprobacion_metrologica'),
+    path('equipos/<int:equipo_id>/comprobacion-metrologica/guardar/', views.guardar_comprobacion_json, name='guardar_comprobacion_json'),
+    path('equipos/<int:equipo_id>/comprobacion-metrologica/pdf/', views.generar_pdf_comprobacion, name='generar_pdf_comprobacion'),
+
+    # Mantenimientos con Actividades (Nuevo Sistema)
+    path('equipos/<int:equipo_id>/mantenimiento-actividades/', views.mantenimiento_actividades_view, name='mantenimiento_actividades'),
+    path('equipos/<int:equipo_id>/mantenimiento-actividades/guardar/', views.guardar_mantenimiento_json, name='guardar_mantenimiento_json'),
+    path('equipos/<int:equipo_id>/mantenimiento-actividades/pdf/', views.generar_pdf_mantenimiento, name='generar_pdf_mantenimiento'),
 
     # Mantenimientos
     path('equipos/<int:equipo_pk>/mantenimientos/añadir/', views.añadir_mantenimiento, name='añadir_mantenimiento'),

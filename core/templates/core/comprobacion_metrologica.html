@@ -1,0 +1,956 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Comprobación Metrológica - {{ equipo.nombre }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white; }
+        .sidebar { display: none !important; }
+        .navbar { display: none !important; }
+        .main-content { margin-left: 0 !important; width: 100% !important; }
+    }
+
+    .tabla-comprobacion {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .tabla-comprobacion th,
+    .tabla-comprobacion td {
+        border: 1px solid #cbd5e0;
+        padding: 0.5rem;
+        text-align: center;
+    }
+
+    .tabla-comprobacion th {
+        background-color: #4a5568;
+        color: white;
+        font-weight: 600;
+    }
+
+    .tabla-comprobacion input[type="number"] {
+        width: 100%;
+        padding: 0.25rem;
+        border: 1px solid #cbd5e0;
+        border-radius: 0.25rem;
+        text-align: center;
+    }
+
+    .tabla-comprobacion input[type="number"]:focus {
+        outline: none;
+        border-color: #4299e1;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+
+    .conforme {
+        background-color: #c6f6d5;
+        color: #22543d;
+        font-weight: bold;
+    }
+
+    .no-conforme {
+        background-color: #fed7d7;
+        color: #742a2a;
+        font-weight: bold;
+    }
+
+    .btn-primary {
+        background-color: #4299e1;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .btn-primary:hover {
+        background-color: #3182ce;
+    }
+
+    .btn-success {
+        background-color: #48bb78;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .btn-success:hover {
+        background-color: #38a169;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Encabezado -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div class="flex justify-between items-start gap-6">
+            <!-- Logo de la Empresa -->
+            <div class="flex-shrink-0">
+                <div class="w-32 h-32 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    {% if logo_empresa_url %}
+                    <img src="{{ logo_empresa_url }}" alt="Logo Empresa" class="max-w-full max-h-full object-contain">
+                    {% else %}
+                    <div class="text-center text-gray-400">
+                        <i class="fas fa-building text-4xl mb-2"></i>
+                        <p class="text-xs">Logo<br>Empresa</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Título -->
+            <div class="flex-grow">
+                <h1 class="text-3xl font-bold text-gray-800">COMPROBACIÓN METROLÓGICA</h1>
+                <p class="text-gray-600 mt-2">Sistema de Aseguramiento Metrológico - SAM</p>
+                <p class="text-sm text-gray-500 mt-1">Empresa: {{ nombre_empresa }}</p>
+            </div>
+
+            <!-- Información del Documento EDITABLE -->
+            <div class="text-right border-2 border-blue-300 p-3 rounded flex-shrink-0 bg-blue-50">
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">CÓDIGO:</label>
+                    <input type="text" id="formato-codigo" value="{{ formato_codigo }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="mb-2">
+                    <label class="text-xs font-semibold text-gray-700">VERSIÓN:</label>
+                    <input type="text" id="formato-version" value="{{ formato_version }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-700">FECHA:</label>
+                    <input type="date" id="formato-fecha" value="{% now 'Y-m-d' %}"
+                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Objetivo -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+        <p class="text-sm text-gray-700">
+            <strong>Objetivo:</strong> Realizar verificaciones intermedias de los equipos de medición entre calibraciones,
+            para asegurar que se mantienen dentro de las tolerancias establecidas y detectar desviaciones tempranas
+            que requieran acciones correctivas o mantenimiento preventivo.
+        </p>
+    </div>
+
+    <!-- SECCIÓN 1: DATOS DEL EQUIPO -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-tools text-blue-600 mr-3"></i>
+            1. DATOS DEL EQUIPO
+        </h2>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Equipo</label>
+                <input type="text" id="nombre-equipo" value="{{ equipo.nombre }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Código Interno</label>
+                <input type="text" id="codigo-interno" value="{{ equipo.codigo_interno }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Serie</label>
+                <input type="text" id="numero-serie" value="{{ equipo.numero_serie|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                <input type="text" id="marca" value="{{ equipo.marca|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+                <input type="text" id="modelo" value="{{ equipo.modelo|default:'-' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Comprobación</label>
+                <input type="date" id="fecha-comprobacion" value="{% now 'Y-m-d' %}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Unidad del Equipo</label>
+                <input type="text" id="unidad-equipo" value="{{ unidad_equipo }}" placeholder="mm, µm, psi, °C, etc." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="actualizarEncabezadosTabla()">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
+                <input type="text" id="responsable" value="{{ user.get_full_name|default:user.username }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 2: PUNTOS DE MEDICIÓN -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-clipboard-check text-blue-600 mr-3"></i>
+            2. PUNTOS DE MEDICIÓN Y CONFORMIDAD
+        </h2>
+
+        <div class="overflow-x-auto">
+            <table class="tabla-comprobacion" id="tabla-medicion">
+                <thead>
+                    <tr>
+                        <th style="width: 4%;">#</th>
+                        <th style="width: 10%;">Valor Nominal<br><span id="th-nominal">({{ unidad_equipo }})</span></th>
+                        <th style="width: 10%;">Lectura<br><span id="th-lectura">({{ unidad_equipo }})</span></th>
+                        <th style="width: 9%;">EMP Valor</th>
+                        <th style="width: 9%;">EMP Tipo</th>
+                        <th style="width: 10%;">EMP Absoluto<br><span id="th-emp-abs">({{ unidad_equipo }})</span></th>
+                        <th style="width: 10%;">Error<br><span id="th-error">({{ unidad_equipo }})</span></th>
+                        <th style="width: 10%;">Límite Superior<br><span id="th-lim-sup">({{ unidad_equipo }})</span></th>
+                        <th style="width: 10%;">Límite Inferior<br><span id="th-lim-inf">({{ unidad_equipo }})</span></th>
+                        <th style="width: 12%;">Conformidad</th>
+                        <th style="width: 6%;" class="no-print">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-medicion">
+                    <!-- Filas se agregarán dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 flex gap-4 no-print">
+            <button onclick="agregarFila()" class="btn-primary">
+                <i class="fas fa-plus mr-2"></i>Agregar Punto
+            </button>
+            <button onclick="cargarDatosCalibracion()" class="btn-primary">
+                <i class="fas fa-file-import mr-2"></i>Importar de Última Calibración
+            </button>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: GRÁFICA DE TENDENCIAS -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-chart-line text-purple-600 mr-3"></i>
+            3. GRÁFICA DE TENDENCIAS
+        </h2>
+
+        <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+            <h3 class="font-bold text-lg mb-3">
+                <i class="fas fa-chart-area mr-2"></i> Comportamiento de Errores en Comprobaciones
+            </h3>
+            <p class="text-sm text-gray-700 mb-4">Visualización de errores y límites EMP por punto de medición.</p>
+
+            <div class="bg-white border-2 border-gray-300 rounded-lg p-4">
+                <canvas id="grafico-comprobacion" width="800" height="400"></canvas>
+            </div>
+
+            <div class="mt-3 text-xs text-gray-600">
+                <p><strong>Leyenda:</strong></p>
+                <p>• <span class="font-semibold">Puntos azules:</span> Errores de medición | <span class="font-semibold text-red-600">Líneas rojas discontinuas:</span> Límites EMP ±</p>
+                <p class="mt-1">Los errores deben mantenerse dentro de los límites EMP para conformidad</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: RESUMEN Y ACCIONES -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-chart-bar text-blue-600 mr-3"></i>
+            4. RESUMEN DE CONFORMIDAD
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-green-100 border-2 border-green-300 p-6 rounded-lg text-center">
+                <p class="text-sm font-semibold text-gray-700 mb-2">Puntos Conformes</p>
+                <p class="text-4xl font-bold text-green-700" id="puntos-conformes">0</p>
+                <p class="text-xs text-gray-600 mt-1">Dentro de tolerancia</p>
+            </div>
+            <div class="bg-red-100 border-2 border-red-300 p-6 rounded-lg text-center">
+                <p class="text-sm font-semibold text-gray-700 mb-2">Puntos No Conformes</p>
+                <p class="text-4xl font-bold text-red-700" id="puntos-no-conformes">0</p>
+                <p class="text-xs text-gray-600 mt-1">Fuera de tolerancia</p>
+            </div>
+            <div class="bg-blue-100 border-2 border-blue-300 p-6 rounded-lg text-center">
+                <p class="text-sm font-semibold text-gray-700 mb-2">Total de Puntos</p>
+                <p class="text-4xl font-bold text-blue-700" id="total-puntos">0</p>
+                <p class="text-xs text-gray-600 mt-1">Puntos verificados</p>
+            </div>
+        </div>
+
+        <div class="flex gap-4 no-print">
+            <button onclick="generarPDF()" class="btn-success inline-flex items-center" id="btn-pdf">
+                <i class="fas fa-file-pdf mr-2"></i>Generar y Guardar PDF
+            </button>
+            <a href="{% url 'core:detalle_equipo' equipo.id %}" class="inline-flex items-center px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold transition">
+                <i class="fas fa-arrow-left mr-2"></i>Volver al Equipo
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de carga -->
+<div id="loading-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-xl">
+        <div class="flex items-center gap-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="text-lg font-semibold">Procesando...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+let comprobacionId = {% if comprobacion_id %}{{ comprobacion_id }}{% else %}null{% endif %};
+let datosExistentes = {% if datos_existentes %}{{ datos_existentes|safe }}{% else %}null{% endif %};
+let datosCalibracion = {% if datos_calibracion %}{{ datos_calibracion|safe }}{% else %}null{% endif %};
+
+// ========== GESTIÓN DE FILAS ==========
+
+function agregarFila() {
+    const tbody = document.getElementById('tbody-medicion');
+    const numeroFila = tbody.children.length + 1;
+
+    const fila = document.createElement('tr');
+    fila.innerHTML = `
+        <td>${numeroFila}</td>
+        <td><input type="number" step="0.001" class="nominal" onchange="calcularFila(this)" /></td>
+        <td><input type="number" step="0.001" class="lectura" onchange="calcularFila(this)" /></td>
+        <td><input type="number" step="0.001" class="emp-valor" onchange="calcularFila(this)" /></td>
+        <td>
+            <select class="emp-tipo" onchange="calcularFila(this)">
+                <option value="%">%</option>
+                <option value="abs">Absoluto</option>
+            </select>
+        </td>
+        <td class="emp-absoluto">-</td>
+        <td class="error">-</td>
+        <td class="lim-sup">-</td>
+        <td class="lim-inf">-</td>
+        <td class="conformidad">-</td>
+        <td class="no-print">
+            <button onclick="eliminarFila(this)" class="text-red-600 hover:text-red-800">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(fila);
+    actualizarResumen();
+}
+
+function eliminarFila(btn) {
+    if (confirm('¿Eliminar este punto de medición?')) {
+        btn.closest('tr').remove();
+        renumerarFilas();
+        actualizarResumen();
+    }
+}
+
+function renumerarFilas() {
+    const tbody = document.getElementById('tbody-medicion');
+    Array.from(tbody.children).forEach((fila, index) => {
+        fila.children[0].textContent = index + 1;
+    });
+}
+
+function actualizarEncabezadosTabla() {
+    const unidad = document.getElementById('unidad-equipo').value || 'mm';
+    const encabezados = ['th-nominal', 'th-lectura', 'th-emp-abs', 'th-error', 'th-lim-sup', 'th-lim-inf'];
+    encabezados.forEach(id => {
+        const elem = document.getElementById(id);
+        if (elem) {
+            elem.textContent = `(${unidad})`;
+        }
+    });
+}
+
+// ========== CÁLCULOS ==========
+
+function calcularFila(input) {
+    const fila = input.closest('tr');
+    const cells = fila.children;
+
+    const nominal = parseFloat(fila.querySelector('.nominal').value) || 0;
+    const lectura = parseFloat(fila.querySelector('.lectura').value) || 0;
+    const empValor = parseFloat(fila.querySelector('.emp-valor').value) || 0;
+    const empTipo = fila.querySelector('.emp-tipo').value; // '%' o 'abs'
+
+    if (nominal === 0 && lectura === 0) return;
+
+    // Calcular EMP absoluto según el tipo
+    let empAbsoluto;
+    if (empTipo === '%') {
+        // Normalizar: convertir porcentaje a valor absoluto
+        empAbsoluto = (nominal * empValor) / 100;
+    } else {
+        // Ya es absoluto
+        empAbsoluto = empValor;
+    }
+
+    // Mostrar EMP absoluto
+    cells[5].textContent = empAbsoluto.toFixed(3);
+
+    // Calcular error
+    const error = lectura - nominal;
+    cells[6].textContent = error.toFixed(3);
+
+    // Calcular límites usando EMP absoluto
+    const limSup = nominal + empAbsoluto;
+    const limInf = nominal - empAbsoluto;
+    cells[7].textContent = limSup.toFixed(3);
+    cells[8].textContent = limInf.toFixed(3);
+
+    // Determinar conformidad
+    const conforme = (lectura >= limInf && lectura <= limSup);
+    const conformidadCell = cells[9];
+    conformidadCell.textContent = conforme ? 'CONFORME' : 'NO CONFORME';
+    conformidadCell.className = conforme ? 'conformidad conforme' : 'conformidad no-conforme';
+
+    actualizarResumen();
+}
+
+function actualizarResumen() {
+    const tbody = document.getElementById('tbody-medicion');
+    const filas = Array.from(tbody.children);
+
+    let conformes = 0;
+    let noConformes = 0;
+
+    filas.forEach(fila => {
+        const conformidadText = fila.querySelector('.conformidad').textContent;
+        if (conformidadText === 'CONFORME') conformes++;
+        else if (conformidadText === 'NO CONFORME') noConformes++;
+    });
+
+    document.getElementById('puntos-conformes').textContent = conformes;
+    document.getElementById('puntos-no-conformes').textContent = noConformes;
+    document.getElementById('total-puntos').textContent = filas.length;
+
+    // Actualizar gráfica
+    dibujarGrafico();
+}
+
+// ========== GRÁFICA ==========
+
+function dibujarGrafico() {
+    const canvas = document.getElementById('grafico-comprobacion');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Obtener datos de la tabla
+    const tbody = document.getElementById('tbody-medicion');
+    const filas = Array.from(tbody.children);
+
+    if (filas.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Complete la tabla de mediciones para ver la gráfica', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Extraer datos de las filas
+    const datos = filas.map((fila, index) => {
+        const nominal = parseFloat(fila.querySelector('.nominal').value) || 0;
+        const lectura = parseFloat(fila.querySelector('.lectura').value) || 0;
+        const empAbsoluto = parseFloat(fila.children[5].textContent) || 0;
+        const error = parseFloat(fila.children[6].textContent) || 0;
+        const conformidad = fila.querySelector('.conformidad').textContent;
+
+        return {
+            index: index + 1,
+            nominal,
+            lectura,
+            empAbsoluto,
+            error,
+            conforme: conformidad === 'CONFORME'
+        };
+    }).filter(d => d.nominal !== 0 || d.lectura !== 0);
+
+    if (datos.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Ingrese valores para ver la gráfica', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Configuración del canvas
+    const margen = {top: 40, right: 80, bottom: 60, left: 80};
+    const ancho = canvas.width - margen.left - margen.right;
+    const alto = canvas.height - margen.top - margen.bottom;
+
+    // Calcular rango de datos
+    const errores = datos.map(d => d.error);
+    const emps = datos.map(d => d.empAbsoluto);
+    const maxError = Math.max(...errores, ...emps);
+    const minError = Math.min(...errores, ...emps.map(e => -e));
+    const rangoError = maxError - minError;
+    const padding = rangoError * 0.15;
+
+    const yMax = maxError + padding;
+    const yMin = minError - padding;
+
+    // Funciones de escala
+    const escalaY = (valor) => {
+        return margen.top + alto - ((valor - yMin) / (yMax - yMin)) * alto;
+    };
+
+    const escalaX = (index, total) => {
+        return margen.left + ((index - 1) / (total - 1)) * ancho;
+    };
+
+    // Dibujar título
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Errores de Medición vs Límites EMP', canvas.width / 2, 20);
+
+    // Dibujar ejes
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(margen.left, margen.top);
+    ctx.lineTo(margen.left, margen.top + alto);
+    ctx.lineTo(margen.left + ancho, margen.top + alto);
+    ctx.stroke();
+
+    // Dibujar línea de cero
+    const y0 = escalaY(0);
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(margen.left, y0);
+    ctx.lineTo(margen.left + ancho, y0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dibujar límites EMP (líneas rojas discontinuas escalonadas)
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    // Límite superior (+EMP)
+    ctx.beginPath();
+    for (let i = 0; i < datos.length; i++) {
+        const x = escalaX(datos[i].index, datos.length);
+        const y = escalaY(datos[i].empAbsoluto);
+
+        if (i === 0) {
+            ctx.moveTo(margen.left, y);
+            ctx.lineTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+
+        if (i < datos.length - 1) {
+            const xNext = escalaX(datos[i + 1].index, datos.length);
+            ctx.lineTo(xNext, y);
+        }
+    }
+    ctx.lineTo(margen.left + ancho, escalaY(datos[datos.length - 1].empAbsoluto));
+    ctx.stroke();
+
+    // Límite inferior (-EMP)
+    ctx.beginPath();
+    for (let i = 0; i < datos.length; i++) {
+        const x = escalaX(datos[i].index, datos.length);
+        const y = escalaY(-datos[i].empAbsoluto);
+
+        if (i === 0) {
+            ctx.moveTo(margen.left, y);
+            ctx.lineTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+
+        if (i < datos.length - 1) {
+            const xNext = escalaX(datos[i + 1].index, datos.length);
+            ctx.lineTo(xNext, y);
+        }
+    }
+    ctx.lineTo(margen.left + ancho, escalaY(-datos[datos.length - 1].empAbsoluto));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dibujar puntos de error
+    datos.forEach((d, i) => {
+        const x = escalaX(d.index, datos.length);
+        const y = escalaY(d.error);
+
+        // Punto
+        ctx.fillStyle = d.conforme ? '#3b82f6' : '#ef4444';
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Borde blanco
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+
+    // Etiquetas eje X
+    ctx.fillStyle = '#666';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'center';
+    datos.forEach((d, i) => {
+        if (i % Math.ceil(datos.length / 10) === 0 || i === datos.length - 1) {
+            const x = escalaX(d.index, datos.length);
+            ctx.fillText(`P${d.index}`, x, margen.top + alto + 20);
+        }
+    });
+
+    // Etiqueta eje X
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText('Punto de Medición', canvas.width / 2, canvas.height - 15);
+
+    // Etiquetas eje Y
+    ctx.textAlign = 'right';
+    ctx.font = '10px Arial';
+    const numTicks = 6;
+    for (let i = 0; i <= numTicks; i++) {
+        const valor = yMin + (yMax - yMin) * (i / numTicks);
+        const y = escalaY(valor);
+        ctx.fillText(valor.toFixed(3), margen.left - 10, y + 3);
+
+        // Línea de cuadrícula
+        ctx.strokeStyle = '#e5e5e5';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(margen.left, y);
+        ctx.lineTo(margen.left + ancho, y);
+        ctx.stroke();
+    }
+
+    // Etiqueta eje Y
+    ctx.save();
+    ctx.translate(15, canvas.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#333';
+    const unidad = document.getElementById('unidad-equipo').value || 'mm';
+    ctx.fillText(`Error (${unidad})`, 0, 0);
+    ctx.restore();
+
+    // Leyenda
+    const leyendaX = margen.left + ancho + 10;
+    const leyendaY = margen.top + 20;
+
+    ctx.textAlign = 'left';
+    ctx.font = '11px Arial';
+
+    // Conforme
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(leyendaX, leyendaY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.fillText('Conforme', leyendaX + 10, leyendaY + 4);
+
+    // No conforme
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(leyendaX, leyendaY + 20, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.fillText('No Conforme', leyendaX + 10, leyendaY + 24);
+
+    // Límites EMP
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(leyendaX - 5, leyendaY + 40);
+    ctx.lineTo(leyendaX + 15, leyendaY + 40);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#333';
+    ctx.fillText('Límites EMP', leyendaX + 20, leyendaY + 44);
+}
+
+// ========== IMPORTAR DATOS ==========
+
+function cargarDatosCalibracion() {
+    console.log('Intentando cargar datos de calibración...');
+    console.log('datosCalibracion:', datosCalibracion);
+
+    if (!datosCalibracion) {
+        alert('No hay datos de calibración disponibles para importar.\n\nAsegúrese de que el equipo tiene una calibración con Confirmación Metrológica registrada.');
+        return;
+    }
+
+    if (!datosCalibracion.puntos_medicion || datosCalibracion.puntos_medicion.length === 0) {
+        alert('La última calibración no tiene puntos de medición registrados en la Confirmación Metrológica.');
+        return;
+    }
+
+    if (!confirm(`¿Importar ${datosCalibracion.puntos_medicion.length} puntos de la última calibración?\n\nEsto limpiará los datos actuales de la tabla.`)) {
+        return;
+    }
+
+    // Limpiar tabla
+    document.getElementById('tbody-medicion').innerHTML = '';
+
+    // Cargar puntos
+    let puntosImportados = 0;
+    datosCalibracion.puntos_medicion.forEach(punto => {
+        agregarFila();
+        const tbody = document.getElementById('tbody-medicion');
+        const ultimaFila = tbody.lastElementChild;
+
+        // Llenar campos
+        ultimaFila.querySelector('.nominal').value = punto.nominal || 0;
+
+        // EMP valor y tipo (buscar en diferentes campos por compatibilidad)
+        const empValor = punto.emp_valor || punto.emp_absoluto || 0;
+        ultimaFila.querySelector('.emp-valor').value = empValor;
+        ultimaFila.querySelector('.emp-tipo').value = punto.emp_tipo || 'abs';
+
+        // Recalcular la fila
+        calcularFila(ultimaFila.querySelector('.nominal'));
+        puntosImportados++;
+    });
+
+    console.log(`${puntosImportados} puntos importados exitosamente`);
+    alert(`${puntosImportados} puntos importados exitosamente.\n\nComplete las LECTURAS de cada punto para la comprobación.`);
+}
+
+// ========== GUARDAR Y PDF ==========
+
+async function generarPDF() {
+    const tbody = document.getElementById('tbody-medicion');
+    const filas = Array.from(tbody.children);
+
+    if (filas.length === 0) {
+        alert('Agregue al menos un punto de medición.');
+        return;
+    }
+
+    const puntos = filas.map(fila => {
+        return {
+            nominal: parseFloat(fila.querySelector('.nominal').value) || 0,
+            lectura: parseFloat(fila.querySelector('.lectura').value) || 0,
+            emp_valor: parseFloat(fila.querySelector('.emp-valor').value) || 0,
+            emp_tipo: fila.querySelector('.emp-tipo').value,
+            emp_absoluto: parseFloat(fila.children[5].textContent) || 0,
+            error: parseFloat(fila.children[6].textContent) || 0,
+            limite_superior: parseFloat(fila.children[7].textContent) || 0,
+            limite_inferior: parseFloat(fila.children[8].textContent) || 0,
+            conformidad: fila.children[9].textContent
+        };
+    });
+
+    const datos = {
+        comprobacion_id: comprobacionId,
+        unidad_equipo: document.getElementById('unidad-equipo').value,
+        puntos_medicion: puntos,
+        fecha: new Date().toISOString()
+    };
+
+    mostrarLoading(true);
+
+    try {
+        // Primero guardar los datos
+        const saveResponse = await fetch('{% url "core:guardar_comprobacion_json" equipo.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const saveResult = await saveResponse.json();
+
+        if (!saveResult.success) {
+            alert('Error al guardar: ' + saveResult.error);
+            mostrarLoading(false);
+            return;
+        }
+
+        comprobacionId = saveResult.comprobacion_id;
+
+        // Luego generar el PDF
+        const formData = new FormData();
+        formData.append('datos_comprobacion', JSON.stringify(datos));
+
+        const pdfResponse = await fetch(`{% url "core:generar_pdf_comprobacion" equipo.id %}?comprobacion_id=${comprobacionId}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        });
+
+        const pdfResult = await pdfResponse.json();
+
+        if (pdfResult.success) {
+            window.open(pdfResult.pdf_url, '_blank');
+            alert('PDF generado y guardado exitosamente');
+            // Redirigir al detalle del equipo después de 1 segundo
+            setTimeout(() => {
+                window.location.href = '{% url "core:detalle_equipo" equipo.id %}';
+            }, 1000);
+        } else {
+            alert('Error al generar PDF: ' + pdfResult.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al procesar la comprobación.');
+    } finally {
+        mostrarLoading(false);
+    }
+}
+
+function mostrarLoading(mostrar) {
+    const modal = document.getElementById('loading-modal');
+    if (mostrar) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    } else {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+// ========== NAVEGACIÓN CON FLECHAS (CONFIGURAR UNA SOLA VEZ) ==========
+document.addEventListener('keydown', function(e) {
+    // Solo aplicar navegación si el foco está en un input o select de la tabla
+    const activeElement = document.activeElement;
+    if (!activeElement) return;
+
+    const isTableInput = activeElement.matches('#tbody-medicion input, #tbody-medicion select');
+    if (!isTableInput) return;
+
+    const fila = activeElement.closest('tr');
+    if (!fila) return;
+
+    const tbody = document.getElementById('tbody-medicion');
+    const todasLasFilas = Array.from(tbody.children);
+    const indiceFila = todasLasFilas.indexOf(fila);
+
+    // Obtener todas las celdas navegables de la fila actual
+    const celdas = Array.from(fila.querySelectorAll('input, select'));
+    const indiceCelda = celdas.indexOf(activeElement);
+
+    let nuevoFoco = null;
+
+    switch(e.key) {
+        case 'ArrowRight':
+            // Mover a la derecha
+            if (indiceCelda < celdas.length - 1) {
+                nuevoFoco = celdas[indiceCelda + 1];
+                e.preventDefault();
+            }
+            break;
+
+        case 'ArrowLeft':
+            // Mover a la izquierda
+            if (indiceCelda > 0) {
+                nuevoFoco = celdas[indiceCelda - 1];
+                e.preventDefault();
+            }
+            break;
+
+        case 'ArrowDown':
+            // Mover abajo (misma columna, siguiente fila)
+            if (indiceFila < todasLasFilas.length - 1) {
+                const siguienteFila = todasLasFilas[indiceFila + 1];
+                const celdasSiguiente = Array.from(siguienteFila.querySelectorAll('input, select'));
+                // Intentar ir a la misma posición de columna
+                nuevoFoco = celdasSiguiente[indiceCelda] || celdasSiguiente[0];
+                e.preventDefault();
+            }
+            break;
+
+        case 'ArrowUp':
+            // Mover arriba (misma columna, fila anterior)
+            if (indiceFila > 0) {
+                const filaAnterior = todasLasFilas[indiceFila - 1];
+                const celdasAnterior = Array.from(filaAnterior.querySelectorAll('input, select'));
+                // Intentar ir a la misma posición de columna
+                nuevoFoco = celdasAnterior[indiceCelda] || celdasAnterior[0];
+                e.preventDefault();
+            }
+            break;
+
+        case 'Enter':
+            // Enter: mover a la siguiente celda o siguiente fila
+            if (indiceCelda < celdas.length - 1) {
+                nuevoFoco = celdas[indiceCelda + 1];
+            } else if (indiceFila < todasLasFilas.length - 1) {
+                // Si estamos en la última celda, ir a la primera celda de la siguiente fila
+                const siguienteFila = todasLasFilas[indiceFila + 1];
+                const celdasSiguiente = Array.from(siguienteFila.querySelectorAll('input, select'));
+                nuevoFoco = celdasSiguiente[0];
+            }
+            e.preventDefault();
+            break;
+
+        case 'Tab':
+            // Tab ya funciona nativamente, pero podemos mejorarlo
+            // Si estamos en la última celda de la última fila, agregar nueva fila
+            if (!e.shiftKey && indiceCelda === celdas.length - 1 && indiceFila === todasLasFilas.length - 1) {
+                agregarFila();
+                // El foco se moverá naturalmente al siguiente elemento tabulable
+                e.preventDefault();
+                setTimeout(() => {
+                    const nuevaFila = tbody.lastElementChild;
+                    const primeracelda = nuevaFila.querySelector('input, select');
+                    if (primeracelda) primeracelda.focus();
+                }, 50);
+            }
+            break;
+    }
+
+    if (nuevoFoco) {
+        nuevoFoco.focus();
+        // Si es input, seleccionar el contenido para facilitar el reemplazo
+        if (nuevoFoco.tagName === 'INPUT') {
+            nuevoFoco.select();
+        }
+    }
+});
+
+// ========== INICIALIZACIÓN ==========
+window.addEventListener('DOMContentLoaded', () => {
+    if (datosExistentes && datosExistentes.puntos_medicion && datosExistentes.puntos_medicion.length > 0) {
+        // Cargar datos existentes
+        const datos = datosExistentes;
+        datos.puntos_medicion.forEach(punto => {
+            agregarFila();
+            const tbody = document.getElementById('tbody-medicion');
+            const ultimaFila = tbody.lastElementChild;
+
+            ultimaFila.querySelector('.nominal').value = punto.nominal;
+            ultimaFila.querySelector('.lectura').value = punto.lectura;
+
+            // Compatibilidad con datos antiguos (emp/tolerancia) y nuevos (emp_valor/emp_tipo)
+            if (punto.emp_valor !== undefined) {
+                ultimaFila.querySelector('.emp-valor').value = punto.emp_valor;
+                ultimaFila.querySelector('.emp-tipo').value = punto.emp_tipo || 'abs';
+            } else {
+                // Datos antiguos: convertir emp/tolerancia a nuevo formato
+                ultimaFila.querySelector('.emp-valor').value = punto.emp || punto.tolerancia || 0;
+                ultimaFila.querySelector('.emp-tipo').value = 'abs';
+            }
+
+            calcularFila(ultimaFila.querySelector('.nominal'));
+        });
+    } else {
+        // Siempre agregar 5 filas vacías por defecto si no hay datos existentes
+        for (let i = 0; i < 5; i++) {
+            agregarFila();
+        }
+    }
+});
+</script>
+{% endblock %}

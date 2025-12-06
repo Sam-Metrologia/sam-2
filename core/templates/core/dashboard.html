@@ -6,20 +6,71 @@
     <style>
         .chart-container {
             position: relative;
-            height: 300px; /* Altura fija para las gráficas */
+            height: 320px; /* Altura aumentada para mejor visualización */
             width: 100%;
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0; /* border-gray-200 */
-            display: flex; /* Asegurar que el canvas dentro se ajuste */
+            max-width: 100%;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0;
+            display: flex;
             justify-content: center;
             align-items: center;
-            border-radius: 0.5rem; /* Rounded corners for chart containers */
-            overflow: hidden; /* Hide overflow for rounded corners */
+            border-radius: 1rem;
+            overflow: hidden;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
         canvas {
-            max-width: 100%;
-            height: 100%;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            height: auto !important;
+            width: auto !important;
             display: block; /* Asegurar que el canvas no tenga espacio extra */
+        }
+
+        /* Responsive para pantallas pequeñas */
+        @media (max-width: 1024px) {
+            .chart-container {
+                height: 280px;
+                padding: 15px;
+            }
+
+            .pie-chart-card {
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 260px;
+                padding: 15px;
+            }
+
+            .pie-chart-card-title {
+                font-size: 1.125rem;
+                margin-bottom: 1.25rem;
+            }
+
+            .summary-table th, .summary-table td {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .chart-container {
+                height: 240px;
+                padding: 10px;
+            }
+
+            .pie-chart-card {
+                padding: 1rem !important;
+            }
+
+            .detail-button {
+                padding: 0.625rem 1.25rem;
+                font-size: 0.8125rem;
+            }
         }
         .info-card {
             background-color: #ffffff;
@@ -310,25 +361,106 @@
         }
         .summary-table {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 0.5rem;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
         .summary-table th, .summary-table td {
-            padding: 0.75rem;
+            padding: 1rem 0.75rem;
             text-align: left;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e5e7eb;
         }
         .summary-table th {
-            background-color: #f8f8f8;
+            background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
             font-weight: 600;
-            color: #4a5568;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
         }
         .summary-table td {
-            color: #2d3748;
+            color: #1f2937;
+            font-weight: 500;
+            background-color: #ffffff;
+        }
+        .summary-table tbody tr:hover td {
+            background-color: #f9fafb;
+            transition: background-color 0.2s ease;
         }
         .summary-table tr:last-child td {
             border-bottom: none;
         }
+
+        /* Estilos mejorados para las tarjetas de gráficas de torta */
+        .pie-chart-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .pie-chart-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+            transform: translateY(-2px);
+        }
+
+        .pie-chart-card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .pie-chart-section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #475569;
+            text-align: center;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border-radius: 0.75rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-button:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .detail-button:active {
+            transform: translateY(0);
+        }
+
         /* Estilos para la lista de mantenimientos correctivos */
         .corrective-maintenance-list {
             list-style: none;
@@ -707,153 +839,156 @@
     </div>
     {% endif %}
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-10">
         {# Gráfica de Torta para Calibraciones #}
-        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
-            <div class="w-full lg:w-1/2 p-2">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Calibraciones (Año Actual)</h2>
-                <div class="chart-container">
-                    <canvas id="calibracionesPieChart"></canvas>
+        <div class="pie-chart-card p-6 lg:p-8">
+            <h2 class="pie-chart-card-title">Cumplimiento Calibraciones (Año Actual)</h2>
+            <div class="flex flex-col lg:flex-row gap-6 items-start">
+                <div class="w-full lg:w-1/2">
+                    <div class="chart-container">
+                        <canvas id="calibracionesPieChart"></canvas>
+                    </div>
                 </div>
-            </div>
-            <div class="w-full lg:w-1/2 p-2">
-                <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Resumen Calibraciones (Año Actual)</h3>
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>Estado</th>
-                            <th>Cantidad</th>
-                            <th>Porcentaje</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Total Programadas</td>
-                            <td>{{ cal_total_programmed_anual }}</td>
-                            <td>100%</td>
-                        </tr>
-                        <tr>
-                            <td>Realizadas</td>
-                            <td>{{ cal_realized_anual }}</td>
-                            <td>{{ cal_realized_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                        <tr>
-                            <td>No Cumplidas (Vencidas)</td>
-                            <td>{{ cal_no_cumplido_anual }}</td>
-                            <td>{{ cal_no_cumplido_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                        <tr>
-                            <td>Pendientes/Programadas (Futuro)</td>
-                            <td>{{ cal_pendiente_anual }}</td>
-                            <td>{{ cal_pendiente_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="mt-4 text-center">
-                    <button onclick="openAllActivitiesModal('calibracion')"
-                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
-                        📋 Ver Detalles Completos
-                    </button>
+                <div class="w-full lg:w-1/2">
+                    <h3 class="pie-chart-section-title">Resumen del Año</h3>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Estado</th>
+                                <th>Cantidad</th>
+                                <th>Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Total Programadas</td>
+                                <td><strong>{{ cal_total_programmed_anual }}</strong></td>
+                                <td>100%</td>
+                            </tr>
+                            <tr>
+                                <td>Realizadas</td>
+                                <td><strong>{{ cal_realized_anual }}</strong></td>
+                                <td><span class="text-green-600 font-semibold">{{ cal_realized_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                            <tr>
+                                <td>No Cumplidas</td>
+                                <td><strong>{{ cal_no_cumplido_anual }}</strong></td>
+                                <td><span class="text-red-600 font-semibold">{{ cal_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                            <tr>
+                                <td>Pendientes</td>
+                                <td><strong>{{ cal_pendiente_anual }}</strong></td>
+                                <td><span class="text-yellow-600 font-semibold">{{ cal_pendiente_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-6 text-center">
+                        <button onclick="openAllActivitiesModal('calibracion')" class="detail-button">
+                            📋 Ver Detalles Completos
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
         {# NUEVA Gráfica de Torta para Mantenimientos - Cumplimiento #}
-        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
-            <div class="w-full lg:w-1/2 p-2">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Mantenimientos (Año Actual)</h2>
-                <div class="chart-container">
-                    <canvas id="mantenimientosCumplimientoPieChart"></canvas>
+        <div class="pie-chart-card p-6 lg:p-8">
+            <h2 class="pie-chart-card-title">Cumplimiento Mantenimientos (Año Actual)</h2>
+            <div class="flex flex-col lg:flex-row gap-6 items-start">
+                <div class="w-full lg:w-1/2">
+                    <div class="chart-container">
+                        <canvas id="mantenimientosCumplimientoPieChart"></canvas>
+                    </div>
                 </div>
-            </div>
-            <div class="w-full lg:w-1/2 p-2">
-                <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Resumen Mantenimientos (Año Actual)</h3>
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>Estado</th>
-                            <th>Cantidad</th>
-                            <th>Porcentaje</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Total Programados</td>
-                            <td>{{ mant_total_programmed_anual }}</td>
-                            <td>100%</td>
-                        </tr>
-                        <tr>
-                            <td>Realizados</td>
-                            <td>{{ mant_realized_anual }}</td>
-                            <td>{{ mant_realized_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                        <tr>
-                            <td>No Cumplidos (Vencidos)</td>
-                            <td>{{ mant_no_cumplido_anual }}</td>
-                            <td>{{ mant_no_cumplido_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                        <tr>
-                            <td>Pendientes/Programados (Futuro)</td>
-                            <td>{{ mant_pendiente_anual }}</td>
-                            <td>{{ mant_pendiente_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="mt-4 text-center">
-                    <button onclick="openAllActivitiesModal('mantenimiento')"
-                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
-                        📋 Ver Detalles Completos
-                    </button>
+                <div class="w-full lg:w-1/2">
+                    <h3 class="pie-chart-section-title">Resumen del Año</h3>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Estado</th>
+                                <th>Cantidad</th>
+                                <th>Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Total Programados</td>
+                                <td><strong>{{ mant_total_programmed_anual }}</strong></td>
+                                <td>100%</td>
+                            </tr>
+                            <tr>
+                                <td>Realizados</td>
+                                <td><strong>{{ mant_realized_anual }}</strong></td>
+                                <td><span class="text-green-600 font-semibold">{{ mant_realized_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                            <tr>
+                                <td>No Cumplidos</td>
+                                <td><strong>{{ mant_no_cumplido_anual }}</strong></td>
+                                <td><span class="text-red-600 font-semibold">{{ mant_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                            <tr>
+                                <td>Pendientes</td>
+                                <td><strong>{{ mant_pendiente_anual }}</strong></td>
+                                <td><span class="text-yellow-600 font-semibold">{{ mant_pendiente_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-6 text-center">
+                        <button onclick="openAllActivitiesModal('mantenimiento')" class="detail-button">
+                            📋 Ver Detalles Completos
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
         {# Gráfica de Torta para Comprobaciones #}
-        <div class="bg-white p-6 rounded-lg shadow-md flex flex-col lg:flex-row items-center justify-center">
-            <div class="w-full lg:w-1/2 p-2">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Cumplimiento Comprobaciones (Año Actual)</h2>
-                <div class="chart-container">
-                    <canvas id="comprobacionesPieChart"></canvas>
+        <div class="pie-chart-card p-6 lg:p-8">
+            <h2 class="pie-chart-card-title">Cumplimiento Comprobaciones (Año Actual)</h2>
+            <div class="flex flex-col lg:flex-row gap-6 items-start">
+                <div class="w-full lg:w-1/2">
+                    <div class="chart-container">
+                        <canvas id="comprobacionesPieChart"></canvas>
+                    </div>
                 </div>
-            </div>
-            <div class="w-full lg:w-1/2 p-2">
-                <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Resumen Comprobaciones (Año Actual)</h3>
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>Estado</th>
-                            <th>Cantidad</th>
-                            <th>Porcentaje</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Total Programadas</td>
-                            <td>{{ comp_total_programmed_anual }}</td>
-                            <td>100%</td>
-                        </tr>
-                        <tr>
-                            <td>Realizadas</td>
-                            <td>{{ comp_realized_anual }}</td>
-                            <td>{{ comp_realized_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                        <tr>
-                            <td>No Cumplidas (Vencidas)</td>
-                            <td>{{ comp_no_cumplido_anual }}</td>
-                            <td>{{ comp_no_cumplido_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                        <tr>
-                            <td>Pendientes/Programadas (Futuro)</td>
-                            <td>{{ comp_pendiente_anual }}</td>
-                            <td>{{ comp_pendiente_anual_percent|floatformat:"0" }}%</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="mt-4 text-center">
-                    <button onclick="openAllActivitiesModal('comprobacion')"
-                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
-                        📋 Ver Detalles Completos
-                    </button>
+                <div class="w-full lg:w-1/2">
+                    <h3 class="pie-chart-section-title">Resumen del Año</h3>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Estado</th>
+                                <th>Cantidad</th>
+                                <th>Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Total Programadas</td>
+                                <td><strong>{{ comp_total_programmed_anual }}</strong></td>
+                                <td>100%</td>
+                            </tr>
+                            <tr>
+                                <td>Realizadas</td>
+                                <td><strong>{{ comp_realized_anual }}</strong></td>
+                                <td><span class="text-green-600 font-semibold">{{ comp_realized_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                            <tr>
+                                <td>No Cumplidas</td>
+                                <td><strong>{{ comp_no_cumplido_anual }}</strong></td>
+                                <td><span class="text-red-600 font-semibold">{{ comp_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                            <tr>
+                                <td>Pendientes</td>
+                                <td><strong>{{ comp_pendiente_anual }}</strong></td>
+                                <td><span class="text-yellow-600 font-semibold">{{ comp_pendiente_anual_percent|floatformat:"0" }}%</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-6 text-center">
+                        <button onclick="openAllActivitiesModal('comprobacion')" class="detail-button">
+                            📋 Ver Detalles Completos
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -895,7 +1030,7 @@
                         <li>
                             <a href="{% url 'core:detalle_mantenimiento' maintenance.equipo.pk maintenance.pk %}" class="text-blue-500 hover:underline">
                                 Equipo: {{ maintenance.equipo.nombre }} ({{ maintenance.equipo.codigo_interno }}) - 
-                                Fecha: {{ maintenance.fecha_mantenimiento|date:"d/m/Y" }} - 
+                                Fecha: {{ maintenance.fecha_mantenimiento|date:"Y-m-d" }} - 
                                 Proveedor: {{ maintenance.nombre_proveedor|default:"N/A" }}
                             </a>
                         </li>
@@ -1209,6 +1344,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Equipo</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Actividad</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Justificación</th>
                             </tr>
                         </thead>
                         <tbody id="modalTableBody" class="bg-white divide-y divide-gray-200">
@@ -2178,7 +2314,7 @@
             if (data.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                             No se encontraron equipos
                         </td>
                     </tr>
@@ -2214,6 +2350,12 @@
                     estadoEquipoColor = 'blue';
                 }
 
+                // Justificación (solo mostrar si existe y es 'No Cumplido')
+                const justificacion = item.justificacion || '';
+                const justificacionHTML = justificacion
+                    ? `<span class="text-xs text-gray-600 italic">${justificacion}</span>`
+                    : '<span class="text-xs text-gray-400">-</span>';
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.codigo}</td>
                     <td class="px-6 py-4 text-sm text-gray-700">${item.nombre}</td>
@@ -2227,6 +2369,9 @@
                         <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-${statusColor}-100 text-${statusColor}-800">
                             ${item.status}${item.tipo ? ' (' + item.tipo + ')' : ''}
                         </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700 max-w-xs">
+                        ${justificacionHTML}
                     </td>
                 `;
                 tbody.appendChild(row);

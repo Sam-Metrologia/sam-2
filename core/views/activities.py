@@ -29,23 +29,15 @@ def añadir_calibracion(request, equipo_pk):
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
-        # LOGGING CON PRINT PARA DEBUG INMEDIATO
-        print(f"DEBUG === POST CALIBRACIÓN - Datos recibidos ===")
-        print(f"DEBUG POST data: {dict(request.POST)}")
-        print(f"DEBUG FILES data: {list(request.FILES.keys())}")
-        print(f"DEBUG Empresa del equipo: {equipo.empresa.nombre}")
-
         logger.info(f"=== POST CALIBRACIÓN - Datos recibidos ===")
         logger.info(f"POST data: {dict(request.POST)}")
         logger.info(f"FILES data: {list(request.FILES.keys())}")
         logger.info(f"Empresa del equipo: {equipo.empresa.nombre}")
 
         form = CalibracionForm(request.POST, request.FILES, empresa=equipo.empresa)
-        print(f"DEBUG Formulario inicializado para empresa: {equipo.empresa.nombre}")
         logger.info(f"Formulario inicializado para empresa: {equipo.empresa.nombre}")
 
         if form.is_valid():
-            print("DEBUG Formulario es VÁLIDO - procesando...")
             logger.info("Formulario es VÁLIDO - procesando...")
             try:
                 # Validar límites de almacenamiento solo si hay archivos
@@ -67,43 +59,33 @@ def añadir_calibracion(request, equipo_pk):
                 calibracion = _create_calibracion_with_files(equipo, form, request.FILES)
 
                 messages.success(request, 'Calibración añadida exitosamente.')
-                print(f"DEBUG [SUCCESS] ÉXITO: Calibración creada ID: {calibracion.pk} para equipo {equipo.nombre}")
                 logger.info(f"[SUCCESS] ÉXITO: Calibración creada ID: {calibracion.pk} para equipo {equipo.nombre}")
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except ValidationError as e:
-                print(f"DEBUG [ERROR] ERROR DE VALIDACIÓN: {e}")
                 logger.error(f"[ERROR] ERROR DE VALIDACIÓN: {e}")
                 messages.error(request, str(e))
                 return _render_calibracion_form_with_error(request, equipo, CalibracionForm(empresa=equipo.empresa))
             except Exception as e:
-                print(f"DEBUG [ERROR] ERROR GENERAL al guardar calibración: {e}")
                 logger.error(f"[ERROR] ERROR GENERAL al guardar calibración: {e}")
                 logger.error(f"Tipo de error: {type(e).__name__}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 messages.error(request, f'Hubo un error al guardar la calibración: {e}')
         else:
-            print(f"DEBUG [ERROR] FORMULARIO INVÁLIDO")
-            print(f"DEBUG Errores del formulario: {form.errors}")
-            print(f"DEBUG Errores no de campo: {form.non_field_errors()}")
             logger.error("[ERROR] FORMULARIO INVÁLIDO")
             logger.error(f"Errores del formulario: {form.errors}")
             logger.error(f"Errores no de campo: {form.non_field_errors()}")
             # Revisar proveedores disponibles
             proveedores = form.fields['proveedor'].queryset
-            print(f"DEBUG Proveedores disponibles para {equipo.empresa.nombre}: {proveedores.count()}")
             logger.error(f"Proveedores disponibles para {equipo.empresa.nombre}: {proveedores.count()}")
             for p in proveedores:
-                print(f"DEBUG   - Proveedor: {p.nombre_empresa} ({p.tipo_servicio})")
                 logger.error(f"  - Proveedor: {p.nombre_empresa} ({p.tipo_servicio})")
 
     else:
-        print(f"DEBUG GET request - mostrando formulario vacío")
         logger.info("GET request - mostrando formulario vacío")
         form = CalibracionForm(empresa=equipo.empresa)
         proveedores = form.fields['proveedor'].queryset
-        print(f"DEBUG Proveedores disponibles para {equipo.empresa.nombre}: {proveedores.count()}")
         logger.info(f"Proveedores disponibles para {equipo.empresa.nombre}: {proveedores.count()}")
 
     return render(request, 'core/añadir_calibracion.html', {
@@ -229,12 +211,13 @@ def añadir_mantenimiento(request, equipo_pk):
         if form.is_valid():
             logger.info("Formulario es VÁLIDO - procesando...")
             try:
-                # Validar límite de almacenamiento para archivo
-                if 'documento_mantenimiento' in request.FILES:
-                    archivo = request.FILES['documento_mantenimiento']
-                    _validate_single_file_storage(equipo.empresa, archivo, form, equipo, 'mantenimiento')
+                # Validar límite de almacenamiento para TODOS los archivos
+                for campo in ['documento_externo', 'analisis_interno', 'documento_mantenimiento']:
+                    if campo in request.FILES:
+                        archivo = request.FILES[campo]
+                        _validate_single_file_storage(equipo.empresa, archivo, form, equipo, 'mantenimiento')
 
-                # Crear mantenimiento con archivo procesado
+                # Crear mantenimiento con archivos procesados
                 mantenimiento = _create_mantenimiento_with_files(equipo, form, request.FILES)
 
                 messages.success(request, 'Mantenimiento añadido exitosamente.')
@@ -292,7 +275,9 @@ def editar_mantenimiento(request, equipo_pk, pk):
             try:
                 mantenimiento = form.save(commit=False)
 
-                # Procesar archivo PDF si se subió uno nuevo
+                # Procesar TODOS los archivos si se subieron nuevos
+                _process_single_file(mantenimiento, request.FILES, 'documento_externo')
+                _process_single_file(mantenimiento, request.FILES, 'analisis_interno')
                 _process_single_file(mantenimiento, request.FILES, 'documento_mantenimiento')
                 mantenimiento.save()
 
@@ -414,12 +399,13 @@ def añadir_comprobacion(request, equipo_pk):
         if form.is_valid():
             logger.info("Formulario es VÁLIDO - procesando...")
             try:
-                # Validar límite de almacenamiento para archivo
-                if 'documento_comprobacion' in request.FILES:
-                    archivo = request.FILES['documento_comprobacion']
-                    _validate_single_file_storage(equipo.empresa, archivo, form, equipo, 'comprobación')
+                # Validar límite de almacenamiento para TODOS los archivos
+                for campo in ['documento_externo', 'analisis_interno', 'documento_comprobacion']:
+                    if campo in request.FILES:
+                        archivo = request.FILES[campo]
+                        _validate_single_file_storage(equipo.empresa, archivo, form, equipo, 'comprobación')
 
-                # Crear comprobación con archivo procesado
+                # Crear comprobación con archivos procesados
                 comprobacion = _create_comprobacion_with_files(equipo, form, request.FILES)
 
                 messages.success(request, 'Comprobación añadida exitosamente.')
@@ -477,7 +463,9 @@ def editar_comprobacion(request, equipo_pk, pk):
             try:
                 comprobacion = form.save(commit=False)
 
-                # Procesar archivo PDF si se subió uno nuevo
+                # Procesar TODOS los archivos si se subieron nuevos
+                _process_single_file(comprobacion, request.FILES, 'documento_externo')
+                _process_single_file(comprobacion, request.FILES, 'analisis_interno')
                 _process_single_file(comprobacion, request.FILES, 'documento_comprobacion')
                 comprobacion.save()
 
@@ -621,7 +609,7 @@ def _create_calibracion_with_files(equipo, form, files):
 
 
 def _create_mantenimiento_with_files(equipo, form, files):
-    """Crea un mantenimiento con su archivo procesado."""
+    """Crea un mantenimiento con sus archivos procesados."""
     mantenimiento = Mantenimiento(
         equipo=equipo,
         fecha_mantenimiento=form.cleaned_data['fecha_mantenimiento'],
@@ -637,7 +625,9 @@ def _create_mantenimiento_with_files(equipo, form, files):
     # Primero guardamos el objeto para obtener un ID
     mantenimiento.save()
 
-    # Luego procesamos los archivos
+    # Luego procesamos TODOS los archivos
+    _process_single_file(mantenimiento, files, 'documento_externo')
+    _process_single_file(mantenimiento, files, 'analisis_interno')
     _process_single_file(mantenimiento, files, 'documento_mantenimiento')
 
     # Guardamos nuevamente para actualizar los campos de archivo
@@ -646,7 +636,7 @@ def _create_mantenimiento_with_files(equipo, form, files):
 
 
 def _create_comprobacion_with_files(equipo, form, files):
-    """Crea una comprobación con su archivo procesado."""
+    """Crea una comprobación con sus archivos procesados."""
     comprobacion = Comprobacion(
         equipo=equipo,
         fecha_comprobacion=form.cleaned_data['fecha_comprobacion'],
@@ -660,7 +650,9 @@ def _create_comprobacion_with_files(equipo, form, files):
     # Primero guardamos el objeto para obtener un ID
     comprobacion.save()
 
-    # Luego procesamos los archivos
+    # Luego procesamos TODOS los archivos
+    _process_single_file(comprobacion, files, 'documento_externo')
+    _process_single_file(comprobacion, files, 'analisis_interno')
     _process_single_file(comprobacion, files, 'documento_comprobacion')
 
     # Guardamos nuevamente para actualizar los campos de archivo

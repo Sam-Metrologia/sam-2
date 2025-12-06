@@ -5,6 +5,46 @@ from .base import *
 import json
 
 
+def get_justificacion_incumplimiento(equipo, status):
+    """
+    Obtiene la justificación del incumplimiento según el estado del equipo y el status de la actividad.
+
+    Lógica:
+    - Si estado_equipo == 'Inactivo' → equipo.observaciones
+    - Si estado_equipo == 'De Baja' → baja_registro.razon_baja + observaciones
+    - Si estado_equipo == 'Activo' AND status == 'No Cumplido' → equipo.observaciones
+    """
+    justificacion = ""
+
+    # Solo agregar justificación si no se cumplió
+    if status != 'No Cumplido':
+        return justificacion
+
+    estado = equipo.estado
+
+    if estado == 'Inactivo':
+        justificacion = equipo.observaciones or "Equipo inactivo sin observaciones registradas"
+
+    elif estado == 'De Baja':
+        # Buscar registro de baja
+        if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
+            baja = equipo.baja_registro
+            justificacion = f"BAJA: {baja.razon_baja}"
+            if baja.observaciones:
+                justificacion += f" | {baja.observaciones}"
+        else:
+            justificacion = "Equipo dado de baja sin registro detallado"
+
+    elif estado == 'Activo':
+        justificacion = equipo.observaciones or "Equipo activo - no cumplió sin observaciones registradas"
+
+    else:
+        # Otros estados (En Calibración, En Mantenimiento, etc.)
+        justificacion = equipo.observaciones or f"Estado: {estado}"
+
+    return justificacion
+
+
 def get_projected_activities_for_year(equipos_queryset, activity_type, year, today):
     """
     Obtiene las actividades proyectadas para el año especificado
@@ -887,7 +927,8 @@ def get_chart_details(request):
     equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
 
     # Para proyecciones anuales (tortas): incluir TODOS los equipos
-    equipos_para_proyecciones = equipos_queryset
+    # Optimización: Prefetch del registro de baja para evitar N+1 queries
+    equipos_para_proyecciones = equipos_queryset.select_related('baja_registro')
 
     # Para actividades programadas en líneas: solo equipos activos
     equipos_activos = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
@@ -953,12 +994,14 @@ def get_chart_details(request):
 
         # Formatear para respuesta
         for act in filtered:
+            justificacion = get_justificacion_incumplimiento(act['equipo'], act['status'])
             result.append({
                 'codigo': act['equipo'].codigo_interno,
                 'nombre': act['equipo'].nombre,
                 'estado_equipo': act['equipo'].estado,
                 'fecha_programada': act['fecha_programada'].strftime('%d/%m/%Y'),
-                'status': act['status']
+                'status': act['status'],
+                'justificacion': justificacion
             })
 
     elif chart_type == 'line':

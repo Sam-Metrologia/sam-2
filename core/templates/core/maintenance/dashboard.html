@@ -115,7 +115,7 @@
                 </div>
             </div>
             <small class="text-muted d-block mt-2">
-                Última verificación: {{ last_health_check.checked_at|date:"d/m/Y H:i" }}
+                Última verificación: {{ last_health_check.checked_at|date:"Y-m-d H:i" }}
             </small>
         </div>
     </div>
@@ -170,7 +170,7 @@
                         {% endif %}
                     </td>
                     <td>{{ task.created_by.username|default:"Sistema" }}</td>
-                    <td>{{ task.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>{{ task.created_at|date:"Y-m-d H:i" }}</td>
                     <td>{{ task.get_duration_display }}</td>
                     <td>
                         <a href="{% url 'core:maintenance_task_detail' task.id %}" class="btn btn-sm btn-outline-primary">

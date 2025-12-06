@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Intervalos de Calibración - {{ datos_intervalos.equipo.nombre }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.2cm 1cm;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 8.5pt;
+            line-height: 1.3;
+            color: #2D3748;
+        }
+
+        /* ENCABEZADO CORPORATIVO - Estilo unificado con hoja de vida */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            border: 1px solid #000;
+        }
+
+        .header-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            vertical-align: middle;
+        }
+
+        .header-logo-cell {
+            width: 25%;
+            text-align: center;
+        }
+
+        .header-logo {
+            max-width: 70px;
+            max-height: 70px;
+        }
+
+        .header-title-cell {
+            width: 50%;
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2D3748;
+        }
+
+        .header-info-cell {
+            width: 25%;
+            font-size: 8pt;
+            color: #2D3748;
+        }
+
+        .header-info-cell p {
+            margin: 2px 0;
+        }
+
+        /* SECCIONES */
+        .section {
+            margin: 10px 0;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            font-size: 11pt;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #4A5568 0%, #5A6C7D 100%);
+            padding: 5px 10px;
+            margin: 0 0 8px 0;
+            border-radius: 3px;
+            box-shadow: 0 1px 3px rgba(26, 84, 144, 0.3);
+        }
+
+        /* INFORMACIÓN EN GRID */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .info-item {
+            background: #F7FAFC;
+            padding: 6px 10px;
+            border-left: 3px solid #4A5568;
+            font-size: 9pt;
+        }
+
+        .info-item strong {
+            color: #4A5568;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 2px;
+            font-size: 8pt;
+        }
+
+        .info-value {
+            color: #2D3748;
+            font-weight: 500;
+        }
+
+        /* HIGHLIGHT BOX */
+        .highlight-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #f39c12;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .highlight-box strong {
+            color: #875a0c;
+            font-weight: 700;
+        }
+
+        /* TABLAS */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        table th {
+            background: linear-gradient(135deg, #4A5568 0%, #5A6C7D 100%);
+            color: white;
+            font-weight: 700;
+            text-align: center;
+            padding: 8px 5px;
+            font-size: 8.5pt;
+            border: 1px solid #155080;
+        }
+
+        table td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            font-size: 8.5pt;
+        }
+
+        /* CAJA DE DECISIÓN */
+        .decision-box {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            border: 3px solid #1a5490;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(26, 84, 144, 0.2);
+        }
+
+        .decision-box .label {
+            font-size: 10pt;
+            color: #0c5460;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .decision-box .value {
+            font-size: 18pt;
+            color: #4A5568;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        /* RESULTADO DEL MÉTODO */
+        .metodo-resultado {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #28a745;
+            padding: 12px;
+            margin: 10px 0;
+            text-align: center;
+            border-radius: 4px;
+        }
+
+        .metodo-resultado .label {
+            font-size: 9pt;
+            color: #155724;
+            font-weight: 600;
+        }
+
+        .metodo-resultado .value {
+            font-size: 16pt;
+            color: #155724;
+            font-weight: 900;
+        }
+
+        /* CAJA DE OBSERVACIONES */
+        .observation-box {
+            background: #F7FAFC;
+            border: 2px solid #4A5568;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .observation-box p {
+            margin: 6px 0;
+            font-size: 9pt;
+            line-height: 1.6;
+        }
+
+        .observation-box strong {
+            color: #4A5568;
+            font-weight: 700;
+        }
+
+        /* PIE DE PÁGINA */
+        .footer {
+            margin-top: 25px;
+            padding-top: 12px;
+            border-top: 2px solid #1a5490;
+            text-align: center;
+            font-size: 7.5pt;
+            color: #6c757d;
+        }
+
+        .footer p {
+            margin: 3px 0;
+        }
+
+        /* ESTILOS DE CALIDAD */
+        .quality-badge {
+            display: inline-block;
+            background: #1a5490;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 8pt;
+            font-weight: 600;
+        }
+
+        /* BADGE DE ESTADO */
+        .badge-success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-weight: 700;
+            font-size: 8pt;
+        }
+
+        .badge-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            color: #856404;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-weight: 700;
+            font-size: 8pt;
+        }
+    </style>
+</head>
+<body>
+    <!-- ==================== ENCABEZADO ==================== -->
+    <table class="header-table">
+        <tr>
+            <td class="header-logo-cell">
+                {% if logo_empresa_url %}
+                <img src="{{ logo_empresa_url }}" alt="Logo Empresa" class="header-logo">
+                {% endif %}
+            </td>
+            <td class="header-title-cell">
+                <div>INTERVALOS DE CALIBRACIÓN</div>
+                <div style="font-size: 10pt; font-weight: normal; margin-top: 4px;">{{ nombre_empresa }}</div>
+            </td>
+            <td class="header-info-cell">
+                <p><strong>CÓDIGO:</strong> {{ datos_intervalos.formato.codigo }}</p>
+                <p><strong>VERSIÓN:</strong> {{ datos_intervalos.formato.version }}</p>
+                <p><strong>FECHA:</strong> {{ datos_intervalos.formato.fecha }}</p>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ==================== OBJETIVO ==================== -->
+    <div class="highlight-box">
+        <strong>🎯 OBJETIVO:</strong> Determinar el intervalo óptimo de calibración del equipo utilizando métodos
+        basados en ILAC-G24:2022 y OIML D10, considerando su estabilidad, frecuencia de uso, impacto metrológico
+        y comportamiento histórico para optimizar costos sin comprometer la confiabilidad de las mediciones.
+    </div>
+
+    <!-- ==================== SECCIÓN 1: INFORMACIÓN DEL EQUIPO ==================== -->
+    <div class="section">
+        <h2 class="section-title">1. INFORMACIÓN DEL EQUIPO</h2>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>NOMBRE DEL EQUIPO</strong>
+                <div class="info-value">{{ datos_intervalos.equipo.nombre }}</div>
+            </div>
+            <div class="info-item">
+                <strong>CÓDIGO INTERNO</strong>
+                <div class="info-value">{{ datos_intervalos.equipo.codigo_interno }}</div>
+            </div>
+            <div class="info-item">
+                <strong>MARCA / MODELO</strong>
+                <div class="info-value">{{ datos_intervalos.equipo.marca }} / {{ datos_intervalos.equipo.modelo }}</div>
+            </div>
+            <div class="info-item">
+                <strong>NÚMERO DE SERIE</strong>
+                <div class="info-value">{{ datos_intervalos.equipo.numero_serie|default:"N/A" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>UNIDAD DE MEDIDA</strong>
+                <div class="info-value">{{ datos_intervalos.equipo.unidad }}</div>
+            </div>
+            <div class="info-item">
+                <strong>ERROR MÁXIMO PERMISIBLE (EMP)</strong>
+                <div class="info-value"><strong>{{ datos_intervalos.emp }} {{ datos_intervalos.emp_unidad }}</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 2: MÉTODO APLICADO ==================== -->
+    <div class="section">
+        <h2 class="section-title">2. MÉTODO APLICADO ILAC-G24:2022</h2>
+
+        {% if datos_intervalos.metodo_seleccionado == 'manual' %}
+        <!-- ==================== MÉTODO MANUAL ==================== -->
+        <div class="highlight-box">
+            <strong>📊 MÉTODO MANUAL - Especificado por norma/regulación/cliente</strong>
+        </div>
+
+        <p style="font-size: 9pt; margin: 8px 0; line-height: 1.6;">
+            El intervalo de calibración ha sido establecido de acuerdo a especificaciones de norma, regulación
+            o requerimiento del cliente.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Parámetro</th>
+                    <th style="width: 60%;">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Intervalo Especificado</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.manual_intervalo }} meses</td>
+                </tr>
+                <tr>
+                    <td><strong>Justificación</strong></td>
+                    <td>{{ datos_intervalos.manual_justificacion|default:"Establecido por norma/cliente" }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% elif datos_intervalos.metodo_seleccionado == 'predictivo_multifactorial' or datos_intervalos.metodo_seleccionado == 'metodo1a' %}
+        <!-- ==================== MÉTODO PREDICTIVO MULTIFACTORIAL ==================== -->
+        <div class="highlight-box">
+            <strong>📊 MÉTODO PREDICTIVO MULTIFACTORIAL - ILAC G-24:2022</strong>
+        </div>
+
+        <p style="font-size: 9pt; margin: 8px 0; line-height: 1.6;">
+            <strong>Fundamento Normativo:</strong> ILAC G-24:2022, Secciones 4.3 "Factores que afectan intervalos de calibración" y 5 "Determinación de intervalo inicial".
+        </p>
+
+        <p style="font-size: 8.5pt; margin: 8px 0; line-height: 1.5; background: #F7FAFC; padding: 8px; border-left: 3px solid #4299e1;">
+            <strong>Principio:</strong> Determinación del intervalo de calibración inicial mediante análisis de factores de riesgo metrológico,
+            evaluando simultáneamente la estabilidad histórica del instrumento, la frecuencia e intensidad de uso, y el impacto metrológico
+            de posibles fallas en las mediciones críticas. <strong>Fórmula: IC = E + F + U</strong>
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Criterio</th>
+                    <th style="width: 20%;">Valor</th>
+                    <th style="width: 30%;">Descripción</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Estabilidad del Equipo (E)</strong></td>
+                    <td style="text-align: center; font-weight: 700; color: #1a5490;">{{ datos_intervalos.metodo1a_E }}</td>
+                    <td style="font-size: 8pt;">
+                        {% if datos_intervalos.metodo1a_E == '1' %}Muy estable
+                        {% elif datos_intervalos.metodo1a_E == '2' %}Estable normal
+                        {% else %}Deriva apreciable{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Frecuencia de Uso (F)</strong></td>
+                    <td style="text-align: center; font-weight: 700; color: #1a5490;">{{ datos_intervalos.metodo1a_F }}</td>
+                    <td style="font-size: 8pt;">
+                        {% if datos_intervalos.metodo1a_F == '1' %}Ocasional
+                        {% elif datos_intervalos.metodo1a_F == '2' %}Regular/moderado
+                        {% else %}Intensivo/continuo{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Impacto Metrológico (U)</strong></td>
+                    <td style="text-align: center; font-weight: 700; color: #1a5490;">{{ datos_intervalos.metodo1a_U }}</td>
+                    <td style="font-size: 8pt;">
+                        {% if datos_intervalos.metodo1a_U == '1' %}Bajo impacto
+                        {% elif datos_intervalos.metodo1a_U == '2' %}Impacto moderado
+                        {% else %}Crítico, alto impacto{% endif %}
+                    </td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td><strong>IC TOTAL (E + F + U)</strong></td>
+                    <td style="text-align: center; font-weight: 900; font-size: 11pt; color: #dc3545;">{{ datos_intervalos.metodo1a_ic_total }}</td>
+                    <td><strong>Suma de criterios</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p style="font-size: 9pt; font-weight: 600; color: #4A5568; margin: 10px 0;">
+            TABLA DE INTERVALOS SEGÚN IC TOTAL (E+F+U):
+        </p>
+        <table style="font-size: 8pt;">
+            <thead>
+                <tr>
+                    <th>IC Total</th>
+                    <th>3</th>
+                    <th>4</th>
+                    <th>5</th>
+                    <th>6</th>
+                    <th>7</th>
+                    <th>8</th>
+                    <th>9</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight: 700;">Intervalo (meses)</td>
+                    <td style="text-align: center; background: #D1FAE5;">60</td>
+                    <td style="text-align: center; background: #A7F3D0;">36</td>
+                    <td style="text-align: center; background: #FEF3C7;">24</td>
+                    <td style="text-align: center; background: #FED7AA;">12</td>
+                    <td style="text-align: center; background: #FED7AA;">9</td>
+                    <td style="text-align: center; background: #FEE2E2;">6</td>
+                    <td style="text-align: center; background: #FEE2E2;">6</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="metodo-resultado">
+            <div class="label">INTERVALO CALCULADO - MÉTODO PREDICTIVO MULTIFACTORIAL</div>
+            <div class="value">{{ datos_intervalos.metodo1a_intervalo }} MESES</div>
+        </div>
+
+        {% elif datos_intervalos.metodo_seleccionado == 'metodo1' or datos_intervalos.metodo_seleccionado == 'metodo1b' %}
+        <!-- ==================== MÉTODO 1: ESCALERA (LADDER METHOD) ==================== -->
+        <div class="highlight-box">
+            <strong>📊 MÉTODO 1: ESCALERA (LADDER METHOD) - ILAC G-24:2022</strong>
+        </div>
+
+        <p style="font-size: 9pt; margin: 8px 0; line-height: 1.6;">
+            <strong>Fundamento Normativo:</strong> ILAC G-24:2022, Método tradicional de ajuste progresivo de intervalos.
+        </p>
+
+        <p style="font-size: 8.5pt; margin: 8px 0; line-height: 1.5; background: #F7FAFC; padding: 8px; border-left: 3px solid #718096;">
+            <strong>Principio:</strong> Ajuste reactivo del intervalo de calibración basado en los resultados históricos de calibraciones previas.
+            Compara el error detectado con el EMP (Error Máximo Permitido) para determinar si se debe aumentar, mantener o reducir el intervalo.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Parámetro</th>
+                    <th style="width: 60%;">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Intervalo Actual</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo1b_intervalo_actual|default:"-" }} meses</td>
+                </tr>
+                <tr>
+                    <td><strong>EMP de Referencia</strong></td>
+                    <td style="text-align: center; font-weight: 700; color: #dc3545;">{{ datos_intervalos.metodo1b_emp_usado|default:datos_intervalos.emp }} {{ datos_intervalos.metodo1b_emp_unidad_usado|default:datos_intervalos.emp_unidad }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Error Detectado</strong></td>
+                    <td style="text-align: center; font-weight: 700; color: #0056b3;">{{ datos_intervalos.metodo1b_error|default:"-" }}%</td>
+                </tr>
+                <tr>
+                    <td><strong>Porcentaje del EMP</strong></td>
+                    <td style="text-align: center; font-weight: 900; font-size: 11pt;">{{ datos_intervalos.metodo1b_porcentaje_emp }}</td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td><strong>Decisión Aplicada</strong></td>
+                    <td style="font-weight: 700; color: #155724;">{{ datos_intervalos.metodo1b_decision }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p style="font-size: 8.5pt; margin: 10px 0; padding: 8px; background: #e7f3ff; border-left: 3px solid #0056b3;">
+            <strong>Criterio de Ajuste:</strong><br>
+            • Error &lt; 80% EMP → Aumentar intervalo en 25%<br>
+            • 80% ≤ Error &lt; 100% EMP → Mantener intervalo actual<br>
+            • Error ≥ 100% EMP → ⚠️ <strong style="color: #dc3545;">Calibrar inmediatamente o enviar a ajustar</strong> (Equipo fuera de especificación)
+        </p>
+
+        <div class="metodo-resultado">
+            <div class="label">NUEVO INTERVALO CALCULADO - MÉTODO 1B</div>
+            <div class="value">{{ datos_intervalos.metodo1b_nuevo_intervalo }} MESES</div>
+        </div>
+
+        {% elif datos_intervalos.metodo_seleccionado == 'metodo2' %}
+        <!-- ==================== MÉTODO 2: CARTA DE CONTROL ==================== -->
+        <div class="highlight-box">
+            <strong>📊 MÉTODO 2: CARTA DE CONTROL - ILAC G-24:2022</strong>
+        </div>
+
+        <p style="font-size: 9pt; margin: 8px 0; line-height: 1.6;">
+            <strong>Fundamento Normativo:</strong> ILAC G-24:2022, Método estadístico de análisis de deriva.
+        </p>
+
+        <p style="font-size: 8.5pt; margin: 8px 0; line-height: 1.5; background: #F7FAFC; padding: 8px; border-left: 3px solid #667eea;">
+            <strong>Principio:</strong> Calcula el intervalo basándose en la deriva observada entre calibraciones sucesivas
+            en función del tiempo calendario. <strong>Fórmula: Intervalo = EMP / Deriva</strong>
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Parámetro</th>
+                    <th style="width: 60%;">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Fecha Calibración Anterior</strong></td>
+                    <td style="text-align: center;">{{ datos_intervalos.metodo2_fecha_anterior }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Desviación Anterior</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo2_desv_anterior }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Fecha Calibración Actual</strong></td>
+                    <td style="text-align: center;">{{ datos_intervalos.metodo2_fecha_actual }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Desviación Actual</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo2_desv_actual }}</td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td><strong>Tiempo Transcurrido</strong></td>
+                    <td style="text-align: center; font-weight: 700; color: #0056b3;">{{ datos_intervalos.metodo2_tiempo }}</td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td><strong>Deriva (por mes)</strong></td>
+                    <td style="text-align: center; font-weight: 900; font-size: 11pt; color: #dc3545;">{{ datos_intervalos.metodo2_deriva }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Tabla detallada de deriva por punto (si existe deriva automática) -->
+        {% if deriva_automatica and deriva_automatica.puntos_detalle %}
+        <p style="font-size: 9pt; font-weight: 700; color: #4A5568; margin: 15px 0 8px 0;">
+            ANÁLISIS DETALLADO DE DERIVA POR PUNTO DE MEDICIÓN:
+        </p>
+        <table style="font-size: 8pt; margin-bottom: 10px;">
+            <thead>
+                <tr style="background: linear-gradient(135deg, #4A5568 0%, #5A6C7D 100%);">
+                    <th style="padding: 4px; color: white;">Nominal</th>
+                    <th style="padding: 4px; color: white;">Desv. Ant.</th>
+                    <th style="padding: 4px; color: white;">Desv. Act.</th>
+                    <th style="padding: 4px; color: white;">Cambio</th>
+                    <th style="padding: 4px; color: white;">EMP</th>
+                    <th style="padding: 4px; color: white;">Deriva/mes</th>
+                    <th style="padding: 4px; color: white;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for punto in deriva_automatica.puntos_detalle %}
+                <tr style="{% if punto.es_maximo %}background: #E2E8F0;{% elif punto.estado == 'ALTO' %}background: #EDF2F7;{% elif punto.estado == 'MODERADO' %}background: #F7FAFC;{% else %}background: #F7FAFC;{% endif %}">
+                    <td style="text-align: center; font-weight: 700; padding: 4px; color: #2D3748;">{{ punto.nominal }}</td>
+                    <td style="text-align: center; padding: 4px; color: #4A5568;">{{ punto.desviacion_anterior }}</td>
+                    <td style="text-align: center; padding: 4px; color: #4A5568;">{{ punto.desviacion_actual }}</td>
+                    <td style="text-align: center; font-weight: 700; color: #4A5568; padding: 4px;">{{ punto.cambio_desviacion }}</td>
+                    <td style="text-align: center; font-weight: 700; color: #2D3748; padding: 4px; background: #E2E8F0;">{{ punto.emp_punto }}</td>
+                    <td style="text-align: center; font-weight: 700; color: #2D3748; padding: 4px;">{{ punto.deriva_punto }}</td>
+                    <td style="text-align: center; padding: 4px;">
+                        <span style="{% if punto.es_maximo %}background: #718096; color: white; font-weight: 900;{% elif punto.estado == 'ALTO' %}background: #A0AEC0; color: white; font-weight: 700;{% elif punto.estado == 'MODERADO' %}background: #CBD5E0; color: #2D3748;{% else %}background: #E2E8F0; color: #4A5568;{% endif %} padding: 2px 6px; border-radius: 3px; font-size: 7pt;">
+                            {% if punto.es_maximo %}⚠️ {% endif %}{{ punto.estado }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p style="font-size: 7.5pt; color: #6c757d; font-style: italic; margin-bottom: 10px;">
+            ℹ️ <strong>Deriva:</strong> (Desv. Actual - Desv. Anterior) / Tiempo Transcurrido.
+            <strong>EMP específico por punto:</strong> {% if emp_info.unidad == '%' %}{{ emp_info.valor }}% del valor nominal de cada punto{% else %}{{ emp_info.valor }} {{ emp_info.unidad }} (constante){% endif %}.
+            Se identificaron <strong>{{ deriva_automatica.puntos_coincidentes }} puntos coincidentes</strong> con tolerancia del 5% en valor nominal.
+            El punto marcado como <strong>MÁXIMO</strong> (mayor deriva) define el intervalo de calibración calculado.
+        </p>
+        {% endif %}
+
+        <p style="font-size: 8.5pt; margin: 10px 0; padding: 8px; background: #fff3cd; border-left: 3px solid #f39c12;">
+            <strong>Nota:</strong> Si la deriva es cero o el intervalo calculado excede el máximo permitido,
+            se utiliza el intervalo máximo establecido por el cliente.
+        </p>
+
+        <div class="metodo-resultado">
+            <div class="label">INTERVALO CALCULADO - MÉTODO 2</div>
+            <div class="value">{{ datos_intervalos.metodo2_intervalo }} MESES</div>
+        </div>
+
+        {% elif datos_intervalos.metodo_seleccionado == 'metodo3' %}
+        <!-- ==================== MÉTODO 3: TIEMPO EN USO ==================== -->
+        <div class="highlight-box">
+            <strong>📊 MÉTODO 3: TIEMPO EN USO - ILAC G-24:2022</strong>
+        </div>
+
+        <p style="font-size: 9pt; margin: 8px 0; line-height: 1.6;">
+            <strong>Fundamento Normativo:</strong> ILAC G-24:2022, Método basado en tiempo real de operación.
+        </p>
+
+        <p style="font-size: 8.5pt; margin: 8px 0; line-height: 1.5; background: #F7FAFC; padding: 8px; border-left: 3px solid #48bb78;">
+            <strong>Principio:</strong> Calcula el intervalo basándose en las horas reales de operación del equipo.
+            Ideal para equipos con uso irregular o intermitente donde el desgaste depende más de las horas de operación que del tiempo calendario.
+            <strong>Fórmula: Intervalo (horas) = EMP / Deriva (por hora)</strong>
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Parámetro</th>
+                    <th style="width: 60%;">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Horas Acumuladas (Anterior)</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo3_horas_anterior }} hrs</td>
+                </tr>
+                <tr>
+                    <td><strong>Desviación Anterior</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo3_desv_anterior }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Horas Acumuladas (Actual)</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo3_horas_actual }} hrs</td>
+                </tr>
+                <tr>
+                    <td><strong>Desviación Actual</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo3_desv_actual }}</td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td><strong>Horas de Uso Promedio por Mes</strong></td>
+                    <td style="text-align: center; font-weight: 700;">{{ datos_intervalos.metodo3_horas_mes }} hrs/mes</td>
+                </tr>
+                <tr style="background: #f8f9fa;">
+                    <td><strong>Deriva (por hora)</strong></td>
+                    <td style="text-align: center; font-weight: 900; font-size: 11pt; color: #dc3545;">{{ datos_intervalos.metodo3_deriva }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="metodo-resultado">
+            <div class="label">INTERVALO CALCULADO - MÉTODO 3</div>
+            <div class="value">{{ datos_intervalos.metodo3_intervalo }} HORAS DE USO</div>
+        </div>
+
+        {% endif %}
+    </div>
+
+    <!-- ==================== SECCIÓN 3: DECISIÓN FINAL ==================== -->
+    <div class="section">
+        <h2 class="section-title">3. DECISIÓN FINAL Y PROGRAMACIÓN</h2>
+
+        <div class="decision-box">
+            <div class="label">INTERVALO DE CALIBRACIÓN ESTABLECIDO</div>
+            <div class="value">{{ datos_intervalos.intervalo_definitivo }} {% if datos_intervalos.metodo_seleccionado == 'metodo3' %}HORAS{% else %}MESES{% endif %}</div>
+        </div>
+
+        <div class="observation-box">
+            <p><strong>JUSTIFICACIÓN TÉCNICA:</strong></p>
+            <p>{{ datos_intervalos.justificacion|default:"Intervalo determinado según método ILAC-G24 aplicado." }}</p>
+        </div>
+
+        <div class="info-grid" style="margin-top: 15px;">
+            <div class="info-item">
+                <strong>RESPONSABLE DEL ANÁLISIS</strong>
+                <div class="info-value">{{ datos_intervalos.responsable }}</div>
+            </div>
+            <div class="info-item">
+                <strong>FECHA DE ANÁLISIS</strong>
+                <div class="info-value">{{ datos_intervalos.equipo.fecha_analisis }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PIE DE PÁGINA ==================== -->
+    <div class="footer">
+        <p><strong>SAM - Sistema de Aseguramiento Metrológico</strong></p>
+        <p>Documento generado de acuerdo con los lineamientos de ILAC-G24:2022 y OIML D10</p>
+    </div>
+</body>
+</html>

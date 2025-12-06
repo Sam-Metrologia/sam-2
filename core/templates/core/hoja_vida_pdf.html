@@ -187,7 +187,7 @@
             <td class="header-info-cell">
                 <strong>CÓDIGO:</strong> {{ equipo.codificacion_formato|default:"N/A" }}<br>
                 <strong>VERSIÓN:</strong> {{ equipo.version_formato|default:"N/A" }}<br>
-                <strong>FECHA:</strong> {{ equipo.fecha_version_formato|date:"d/m/Y"|default:"N/A" }}
+                <strong>FECHA:</strong> {{ equipo.fecha_version_formato|date:"Y-m-d"|default:"N/A" }}
             </td>
         </tr>
     </table>
@@ -201,7 +201,7 @@
         <tr><td><strong>Marca:</strong> {{ equipo.marca|default:"N/A" }}</td><td><strong>Modelo:</strong> {{ equipo.modelo|default:"N/A" }}</td></tr>
         <tr><td><strong>Número de Serie:</strong> {{ equipo.numero_serie|default:"N/A" }}</td><td><strong>Ubicación:</strong> {{ equipo.ubicacion|default:"N/A" }}</td></tr>
         <tr><td><strong>Responsable:</strong> {{ equipo.responsable|default:"N/A" }}</td><td><strong>Estado:</strong> {{ equipo.estado|default:"N/A" }}</td></tr>
-        <tr><td><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"d/m/Y"|default:"N/A" }}</td><td><strong>Fecha de Registro:</strong> {{ equipo.fecha_registro|date:"d/m/Y H:i"|default:"N/A" }}</td></tr>
+        <tr><td><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"Y-m-d"|default:"N/A" }}</td><td><strong>Fecha de Registro:</strong> {{ equipo.fecha_registro|date:"Y-m-d H:i"|default:"N/A" }}</td></tr>
         <tr><td><strong>Rango de Medida:</strong> {{ equipo.rango_medida|default:"N/A" }}</td><td><strong>Resolución:</strong> {{ equipo.resolucion|default:"N/A" }}</td></tr>
         <tr><td colspan="2"><strong>Error Máximo Permisible:</strong> {{ equipo.error_maximo_permisible|floatformat:"5"|default:"N/A" }}</td></tr>
         <tr><td colspan="2"><strong>Puntos de Calibración:</strong> {{ equipo.puntos_calibracion|linebreaksbr|default:"N/A" }}</td></tr>
@@ -213,7 +213,7 @@
     {% if baja_registro %}
     <h2 class="section-title">Información de Baja del Equipo</h2>
     <table>
-        <tr><td><strong>Razón de Baja:</strong> {{ baja_registro.razon_baja|default:"N/A" }}</td><td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"d/m/Y"|default:"N/A" }}</td></tr>
+        <tr><td><strong>Razón de Baja:</strong> {{ baja_registro.razon_baja|default:"N/A" }}</td><td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"Y-m-d"|default:"N/A" }}</td></tr>
         <tr><td><strong>Dado de Baja Por:</strong> {{ baja_registro.dado_de_baja_por.get_full_name|default:baja_registro.dado_de_baja_por.username|default:"N/A" }}</td><td><strong>Observaciones:</strong> {{ baja_registro.observaciones|default:"N/A" }}</td></tr>
     </table>
     {% else %}
@@ -234,18 +234,16 @@
     {% if calibraciones %}
     <table>
         <thead>
-            <tr><th>Fecha</th><th>Proveedor</th><th>Resultado</th><th>Certificado</th><th>Observaciones</th><th>Documento</th><th>Confirmación Metrológica</th></tr>
+            <tr><th>Fecha</th><th>Proveedor</th><th>Resultado</th><th>Certificado de Calibración</th><th>Observaciones</th></tr>
         </thead>
         <tbody>
             {% for cal in calibraciones %}
             <tr>
-                <td>{{ cal.fecha_calibracion|date:"d/m/Y"|default:"N/A" }}</td>
+                <td>{{ cal.fecha_calibracion|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{{ cal.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ cal.resultado|default:"N/A" }}</td>
                 <td>{{ cal.numero_certificado|default:"N/A" }}</td>
                 <td>{{ cal.observaciones|default:"N/A" }}</td>
-                <td>{% if cal.documento_calibracion_url %}<a href="{{ cal.documento_calibracion_url }}">Ver</a>{% else %}N/A{% endif %}</td>
-                <td>{% if cal.confirmacion_metrologica_pdf_url %}<a href="{{ cal.confirmacion_metrologica_pdf_url }}">Ver</a>{% else %}N/A{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -256,18 +254,21 @@
     {% if mantenimientos %}
     <table>
         <thead>
-            <tr><th>Fecha</th><th>Tipo</th><th>Proveedor</th><th>Responsable</th><th>Costo</th><th>Descripción</th><th>Documento</th></tr>
+            <tr><th>Fecha</th><th>Tipo</th><th>Proveedor</th><th>Responsable</th><th>Costo</th><th>Documentos/Actividades Realizadas</th></tr>
         </thead>
         <tbody>
             {% for m in mantenimientos %}
             <tr>
-                <td>{{ m.fecha_mantenimiento|date:"d/m/Y"|default:"N/A" }}</td>
+                <td>{{ m.fecha_mantenimiento|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{{ m.get_tipo_mantenimiento_display|default:"N/A" }}</td>
                 <td>{{ m.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ m.responsable|default:"N/A" }}</td>
                 <td>{{ m.costo|floatformat:"2"|default:"N/A" }}</td>
-                <td>{{ m.descripcion|default:"N/A" }}</td>
-                <td>{% if m.documento_mantenimiento_url %}<a href="{{ m.documento_mantenimiento_url }}">Ver</a>{% else %}N/A{% endif %}</td>
+                <td>
+                    {% if m.descripcion %}{{ m.descripcion }}{% endif %}
+                    {% if m.documento_mantenimiento_url %}{% if m.descripcion %}<br>{% endif %}Documento de Mantenimiento{% endif %}
+                    {% if not m.descripcion and not m.documento_mantenimiento_url %}N/A{% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -283,7 +284,7 @@
         <tbody>
             {% for comp in comprobaciones %}
             <tr>
-                <td>{{ comp.fecha_comprobacion|date:"d/m/Y"|default:"N/A" }}</td>
+                <td>{{ comp.fecha_comprobacion|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{{ comp.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ comp.responsable|default:"N/A" }}</td>
                 <td>{{ comp.resultado|default:"N/A" }}</td>
@@ -299,7 +300,7 @@
     {% if baja_registro %}
     <table>
         <tr>
-            <td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"d/m/Y"|default:"N/A" }}</td>
+            <td><strong>Fecha de Baja:</strong> {{ baja_registro.fecha_baja|date:"Y-m-d"|default:"N/A" }}</td>
             <td><strong>Dado de Baja por:</strong> {{ baja_registro.dado_de_baja_por.get_full_name|default:baja_registro.dado_de_baja_por.username|default:"N/A" }}</td>
         </tr>
         <tr>
@@ -322,6 +323,31 @@
             <p class="no-records">Sin imagen disponible.</p>
         {% endif %}
     </div>
+
+    <!-- Gráficas Históricas al Final -->
+    {% if grafica_hist_confirmaciones or grafica_hist_comprobaciones %}
+    <h2 class="section-title" style="margin-top: 20px;">Análisis Histórico</h2>
+
+    {% if grafica_hist_confirmaciones %}
+    <h3 style="font-size: 12px; margin: 10px 0 5px 0; color: #1f2937;">Confirmaciones Metrológicas</h3>
+    <div style="margin: 5px 0; padding: 8px; background-color: #f9fafb; border: 1px solid #e5e7eb;">
+        {{ grafica_hist_confirmaciones|safe }}
+    </div>
+    <p style="font-size: 8px; color: #4b5563; margin: 3px 0; padding: 5px; background-color: #eff6ff; border-left: 2px solid #3b82f6;">
+        <strong>Nota:</strong> Últimas 5 confirmaciones. Barras (±) = incertidumbre. Límites EMP del registro reciente.
+    </p>
+    {% endif %}
+
+    {% if grafica_hist_comprobaciones %}
+    <h3 style="font-size: 12px; margin: 10px 0 5px 0; color: #1f2937;">Comprobaciones Metrológicas</h3>
+    <div style="margin: 5px 0; padding: 8px; background-color: #f9fafb; border: 1px solid #e5e7eb;">
+        {{ grafica_hist_comprobaciones|safe }}
+    </div>
+    <p style="font-size: 8px; color: #4b5563; margin: 3px 0; padding: 5px; background-color: #f0fdf4; border-left: 2px solid #10b981;">
+        <strong>Nota:</strong> Últimas 5 comprobaciones. Límites EMP del registro reciente.
+    </p>
+    {% endif %}
+    {% endif %}
 </div>
 
 <div id="footer_content">
