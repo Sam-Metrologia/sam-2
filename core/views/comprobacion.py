@@ -22,6 +22,26 @@ from core.models import Comprobacion, Equipo
 logger = logging.getLogger(__name__)
 
 
+def safe_float(value, default=0.0):
+    """
+    Convierte un valor a float de forma segura.
+    Maneja cadenas vacías, None, y valores inválidos.
+
+    Args:
+        value: Valor a convertir
+        default: Valor por defecto si la conversión falla (default: 0.0)
+
+    Returns:
+        float: Valor convertido o default
+    """
+    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def comprobacion_metrologica_view(request, equipo_id):
@@ -178,8 +198,8 @@ def generar_grafica_svg_comprobacion(puntos, unidad='mm'):
     plot_height = height - margin['top'] - margin['bottom']
 
     # Extraer datos
-    errores = [p['error'] for p in puntos]
-    emps = [p['emp_absoluto'] for p in puntos]
+    errores = [safe_float(p.get('error', 0), 0) for p in puntos]
+    emps = [safe_float(p.get('emp_absoluto', 0), 0) for p in puntos]
 
     # Calcular escalas
     max_error = max(max(errores), max(emps))
@@ -222,34 +242,34 @@ def generar_grafica_svg_comprobacion(puntos, unidad='mm'):
 
     # Límites EMP (líneas rojas escalonadas)
     # Límite superior
-    path_sup = f'M {margin["left"]} {escala_y(puntos[0]["emp_absoluto"])}'
+    path_sup = f'M {margin["left"]} {escala_y(emps[0])}'
     for i in range(len(puntos)):
         x = escala_x(i)
-        y = escala_y(puntos[i]['emp_absoluto'])
+        y = escala_y(emps[i])
         path_sup += f' L {x} {y}'
         if i < len(puntos) - 1:
             x_next = escala_x(i + 1)
             path_sup += f' L {x_next} {y}'
-    path_sup += f' L {margin["left"] + plot_width} {escala_y(puntos[-1]["emp_absoluto"])}'
+    path_sup += f' L {margin["left"] + plot_width} {escala_y(emps[-1])}'
     svg_parts.append(f'<path d="{path_sup}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5" fill="none"/>')
 
     # Límite inferior
-    path_inf = f'M {margin["left"]} {escala_y(-puntos[0]["emp_absoluto"])}'
+    path_inf = f'M {margin["left"]} {escala_y(-emps[0])}'
     for i in range(len(puntos)):
         x = escala_x(i)
-        y = escala_y(-puntos[i]['emp_absoluto'])
+        y = escala_y(-emps[i])
         path_inf += f' L {x} {y}'
         if i < len(puntos) - 1:
             x_next = escala_x(i + 1)
             path_inf += f' L {x_next} {y}'
-    path_inf += f' L {margin["left"] + plot_width} {escala_y(-puntos[-1]["emp_absoluto"])}'
+    path_inf += f' L {margin["left"] + plot_width} {escala_y(-emps[-1])}'
     svg_parts.append(f'<path d="{path_inf}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5" fill="none"/>')
 
     # Puntos de error
     for i, punto in enumerate(puntos):
         x = escala_x(i)
-        y = escala_y(punto['error'])
-        color = '#3b82f6' if punto['conformidad'] == 'CONFORME' else '#ef4444'
+        y = escala_y(errores[i])
+        color = '#3b82f6' if punto.get('conformidad') == 'CONFORME' else '#ef4444'
         svg_parts.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="#fff" stroke-width="2"/>')
 
     # Etiquetas eje X

@@ -19,6 +19,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def safe_float(value, default=0.0):
+    """
+    Convierte un valor a float de forma segura.
+    Maneja cadenas vacías, None, y valores inválidos.
+
+    Args:
+        value: Valor a convertir
+        default: Valor por defecto si la conversión falla (default: 0.0)
+
+    Returns:
+        float: Valor convertido o default
+    """
+    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad_equipo):
     """
     Genera una gráfica de confirmación metrológica usando matplotlib
@@ -35,11 +55,11 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
             return None
 
         # Extraer datos
-        nominales = [float(p['nominal']) for p in puntos_validos]
-        errores = [float(p['error']) for p in puntos_validos]
+        nominales = [safe_float(p.get('nominal', 0), 0) for p in puntos_validos]
+        errores = [safe_float(p.get('error', 0), 0) for p in puntos_validos]
         # Calcular medidos: medido = nominal + error
         medidos = [n + e for n, e in zip(nominales, errores)]
-        incertidumbres = [float(p.get('incertidumbre', 0)) for p in puntos_validos]
+        incertidumbres = [safe_float(p.get('incertidumbre', 0), 0) for p in puntos_validos]
 
         # NUEVO: Verificar si hay EMPs por punto
         tiene_emp_por_punto = all(p.get('emp_absoluto') is not None for p in puntos_validos)
@@ -73,7 +93,7 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
                 emps_normalizados_inf = []
 
                 for i, p in enumerate(puntos_validos):
-                    emp_abs = float(p.get('emp_absoluto', 0))
+                    emp_abs = safe_float(p.get('emp_absoluto', 0), 0)
                     nominal = nominales[i]
                     if nominal != 0:
                         emp_norm = emp_abs / nominal
@@ -115,7 +135,7 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
             # NUEVO: Dibujar líneas EMP escalonadas o globales
             if tiene_emp_por_punto:
                 # EMPs por punto - líneas escalonadas
-                emps_absolutos = [float(p.get('emp_absoluto', 0)) for p in puntos_validos]
+                emps_absolutos = [safe_float(p.get('emp_absoluto', 0), 0) for p in puntos_validos]
 
                 # Dibujar líneas escalonadas
                 ax.step(nominales, emps_absolutos, where='mid', color='r',
@@ -749,7 +769,7 @@ def generar_pdf_confirmacion(request, equipo_id):
     # ============ GENERAR GRÁFICA CON MATPLOTLIB ============
     if datos_confirmacion and 'puntos_medicion' in datos_confirmacion:
         puntos = datos_confirmacion['puntos_medicion']
-        emp_valor = float(datos_confirmacion.get('emp', context['datos_confirmacion']['emp']))
+        emp_valor = safe_float(datos_confirmacion.get('emp') or context['datos_confirmacion']['emp'], 0)
         emp_unidad = datos_confirmacion.get('emp_unidad', context['datos_confirmacion']['emp_unidad'])
         unidad_equipo = datos_confirmacion.get('unidad_equipo', context['datos_confirmacion']['unidad_equipo'])
 
@@ -780,8 +800,8 @@ def generar_pdf_confirmacion(request, equipo_id):
 
             for punto in puntos:
                 # Calcular desviación absoluta del punto
-                nominal = float(punto.get('nominal', 0))
-                error = float(punto.get('error', 0))
+                nominal = safe_float(punto.get('nominal', 0), 0)
+                error = safe_float(punto.get('error', 0), 0)
                 desviacion_abs = abs(error)
 
                 if desviacion_abs > desviacion_maxima:
@@ -795,22 +815,22 @@ def generar_pdf_confirmacion(request, equipo_id):
                 # Guardar punto procesado con todos los datos
                 punto_procesado = {
                     'nominal': nominal,
-                    'lectura': float(punto.get('lectura', 0)),
-                    'incertidumbre': float(punto.get('incertidumbre', 0)),
+                    'lectura': safe_float(punto.get('lectura', 0), 0),
+                    'incertidumbre': safe_float(punto.get('incertidumbre', 0), 0),
                     'error': error,
-                    'error_mas_u': float(punto.get('error_mas_u', 0)),
-                    'error_menos_u': float(punto.get('error_menos_u', 0)),
+                    'error_mas_u': safe_float(punto.get('error_mas_u', 0), 0),
+                    'error_menos_u': safe_float(punto.get('error_menos_u', 0), 0),
                     'conformidad': punto.get('conformidad', 'Pendiente'),
                     'desviacion_abs': desviacion_abs
                 }
 
                 # Agregar EMPs solo si existen
                 if emp_valor_punto is not None:
-                    punto_procesado['emp_valor'] = float(emp_valor_punto)
+                    punto_procesado['emp_valor'] = safe_float(emp_valor_punto, 0)
                 if emp_tipo_punto is not None:
                     punto_procesado['emp_tipo'] = emp_tipo_punto
                 if emp_absoluto_punto is not None:
-                    punto_procesado['emp_absoluto'] = float(emp_absoluto_punto)
+                    punto_procesado['emp_absoluto'] = safe_float(emp_absoluto_punto, 0)
 
                 puntos_procesados.append(punto_procesado)
 
@@ -819,7 +839,7 @@ def generar_pdf_confirmacion(request, equipo_id):
                 'fecha_confirmacion': datetime.now().strftime('%Y-%m-%d'),
                 'puntos_medicion': puntos_procesados,
                 'desviacion_maxima': desviacion_maxima,
-                'emp_valor': float(datos_confirmacion.get('emp', 0)),
+                'emp_valor': safe_float(datos_confirmacion.get('emp', 0), 0),
                 'emp_unidad': datos_confirmacion.get('emp_unidad', '%'),
                 'unidad_equipo': datos_confirmacion.get('unidad_equipo', ''),
                 'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U'),
@@ -1056,7 +1076,7 @@ def generar_pdf_intervalos(request, equipo_id):
         pdf_file = html_pdf.write_pdf(font_config=font_config)
 
         # ============ ACTUALIZAR INTERVALO AUTOMÁTICAMENTE (ANTES DE GUARDAR PDF) ============
-        nuevo_intervalo = float(datos_intervalos.get('intervalo_definitivo', equipo.frecuencia_calibracion_meses or 12))
+        nuevo_intervalo = safe_float(datos_intervalos.get('intervalo_definitivo', equipo.frecuencia_calibracion_meses or 12), 12)
         fecha_base = calibracion_actual.fecha_calibracion
 
         equipo.frecuencia_calibracion_meses = nuevo_intervalo
