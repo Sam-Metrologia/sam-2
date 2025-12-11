@@ -1048,6 +1048,16 @@ def generar_pdf_intervalos(request, equipo_id):
                     'puntos_coincidentes': len(puntos_coincidentes_pdf)
                 }
 
+    # Obtener logo de empresa de forma segura
+    logo_empresa_url = None
+    try:
+        if equipo.empresa and equipo.empresa.logo_empresa:
+            logo_empresa_url = equipo.empresa.logo_empresa.url
+    except Exception as logo_error:
+        logger = logging.getLogger(__name__)
+        logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
+        logo_empresa_url = None
+
     # Preparar contexto para el PDF
     context = {
         'equipo': equipo,
@@ -1055,7 +1065,7 @@ def generar_pdf_intervalos(request, equipo_id):
         'cal_anterior': cal_anterior,
         'fecha_actual': datetime.now().date(),
         'nombre_empresa': equipo.empresa.nombre,
-        'logo_empresa_url': equipo.empresa.logo_empresa.url if equipo.empresa.logo_empresa else None,
+        'logo_empresa_url': logo_empresa_url,
         'emp_info': emp_info,
 
         # Pasar todos los datos_intervalos al template

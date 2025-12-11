@@ -295,10 +295,10 @@
     <table class="header-table">
         <tr>
             <td class="header-logo-cell">
-                {% if empresa.logo_empresa %}
-                <img src="{{ empresa.logo_empresa.path }}" alt="Logo" class="header-logo">
+                {% if logo_empresa_url %}
+                <img src="{{ logo_empresa_url }}" alt="Logo {{ empresa.nombre }}" class="header-logo">
                 {% else %}
-                <div style="font-size: 10pt; color: #999;">LOGO</div>
+                <div style="font-size: 10pt; color: #4A5568; font-weight: bold;">{{ empresa.nombre }}</div>
                 {% endif %}
             </td>
             <td class="header-title-cell">
