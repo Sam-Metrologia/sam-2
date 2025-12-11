@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía Rápida SAM Metrología</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            font-size: 8.5pt;
+            line-height: 1.35;
+            color: #1e293b;
+        }
+
+        @page {
+            size: A4;
+            margin: 1.2cm 0.8cm;
+        }
+
+        /* PORTADA */
+        .portada {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+            color: white;
+            text-align: center;
+            page-break-after: always;
+        }
+
+        .portada-logo {
+            width: 65px;
+            height: 65px;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: #3B82F6;
+            margin-bottom: 0.8rem;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .portada h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 0.4rem;
+        }
+
+        .portada-subtitulo {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            margin-bottom: 1.2rem;
+        }
+
+        .portada-badge {
+            background: #3B82F6;
+            padding: 0.4rem 1.2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* LAYOUT 2 COLUMNAS */
+        .pagina {
+            column-count: 2;
+            column-gap: 1.2cm;
+            padding: 0.3cm 0;
+        }
+
+        .seccion {
+            break-inside: avoid;
+            margin-bottom: 0.6cm;
+        }
+
+        .seccion-completa {
+            column-span: all;
+            break-inside: avoid;
+            margin-bottom: 0.6cm;
+        }
+
+        /* TÍTULOS */
+        .titulo-seccion {
+            background: linear-gradient(90deg, #3B82F6, #2563EB);
+            color: white;
+            padding: 0.35rem 0.5rem;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .titulo-seccion i { font-size: 0.8rem; }
+
+        /* PASOS */
+        .paso {
+            display: flex;
+            gap: 0.4rem;
+            margin-bottom: 0.4rem;
+            align-items: flex-start;
+        }
+
+        .paso-num {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            background: #3B82F6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.7rem;
+        }
+
+        .paso-texto {
+            flex-grow: 1;
+            font-size: 0.8rem;
+            line-height: 1.25;
+        }
+
+        .paso-texto strong {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        /* IMÁGENES - MÁS COMPACTAS */
+        .img-captura {
+            width: 100%;
+            height: auto;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            margin: 0.3rem 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        /* CAJAS */
+        .caja {
+            padding: 0.35rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            margin: 0.35rem 0;
+            break-inside: avoid;
+            line-height: 1.25;
+        }
+
+        .caja-tip {
+            background: #ecfdf5;
+            border-left: 2.5px solid #10b981;
+            color: #047857;
+        }
+
+        .caja-warning {
+            background: #fef3c7;
+            border-left: 2.5px solid #f59e0b;
+            color: #92400e;
+        }
+
+        .caja-info {
+            background: #eff6ff;
+            border-left: 2.5px solid #3b82f6;
+            color: #1e40af;
+        }
+
+        .caja strong {
+            display: inline;
+            margin-right: 0.2rem;
+        }
+
+        /* TABLAS */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.7rem;
+            margin: 0.35rem 0;
+            break-inside: avoid;
+        }
+
+        th {
+            background: #334155;
+            color: white;
+            padding: 0.25rem 0.35rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.65rem;
+        }
+
+        td {
+            padding: 0.2rem 0.35rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        td:first-child {
+            font-weight: 600;
+            color: #475569;
+        }
+
+        tr:nth-child(even) { background: #f8fafc; }
+
+        /* ICONOS */
+        .icono {
+            color: #3B82F6;
+            margin-right: 0.25rem;
+            font-size: 0.75rem;
+        }
+
+        /* GRIDS */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.35rem;
+            margin: 0.35rem 0;
+        }
+
+        .card-mini {
+            background: #f8fafc;
+            border-left: 2px solid #3B82F6;
+            padding: 0.35rem;
+            border-radius: 3px;
+        }
+
+        .card-mini-titulo {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: #334155;
+            margin-bottom: 0.15rem;
+        }
+
+        .card-mini-desc {
+            font-size: 0.65rem;
+            color: #64748b;
+            line-height: 1.15;
+        }
+
+        /* BADGE */
+        .badge {
+            display: inline-block;
+            background: #3B82F6;
+            color: white;
+            padding: 0.08rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+
+        /* BULLETS */
+        ul {
+            margin-left: 0.8rem;
+            font-size: 0.75rem;
+        }
+
+        li {
+            margin-bottom: 0.15rem;
+            line-height: 1.25;
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            font-size: 0.65rem;
+            color: #94a3b8;
+            padding: 0.4rem 0;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 0.4rem;
+        }
+
+        /* PÁRRAFOS */
+        p {
+            margin-bottom: 0.3rem;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PORTADA -->
+    <div class="portada">
+        <div class="portada-logo">
+            <i class="fas fa-ruler-combined"></i>
+        </div>
+        <h1>SAM METROLOGÍA</h1>
+        <p class="portada-subtitulo">Sistema de Aseguramiento Metrológico</p>
+        <div class="portada-badge">📋 GUÍA RÁPIDA</div>
+        <p style="margin-top: 1.5rem; font-size: 0.75rem; color: #cbd5e1;">
+            Versión 8.5 | Diciembre 2025<br>
+            <i class="fas fa-globe"></i> https://sammetrologia.com
+        </p>
+    </div>
+
+    <!-- PÁGINA 1 -->
+    <div class="pagina">
+
+        <!-- 1. ACCESO -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-sign-in-alt"></i> 1. ACCESO
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">1</div>
+                <div class="paso-texto">
+                    <strong>Ir a:</strong> https://sammetrologia.com
+                </div>
+            </div>
+
+            <img src="assets/images/01-login.png" class="img-captura" alt="Login">
+
+            <div class="paso">
+                <div class="paso-num">2</div>
+                <div class="paso-texto">
+                    Ingresar <strong>usuario</strong> y <strong>contraseña</strong>
+                </div>
+            </div>
+
+            <div class="caja caja-tip">
+                <strong>💡 Primer ingreso:</strong> Cambie contraseña en Mi Perfil
+            </div>
+        </div>
+
+        <!-- 2. DASHBOARD -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-home"></i> 2. DASHBOARD
+            </div>
+
+            <img src="assets/images/02-dashboard.png" class="img-captura" alt="Dashboard">
+
+            <p>Vista principal con alertas de vencimientos y próximas actividades.</p>
+
+            <!-- Estadísticas mostradas en dashboard principal -->
+        </div>
+
+        <!-- 3. NAVEGACIÓN -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-bars"></i> MENÚ
+            </div>
+
+            <table>
+                <tr>
+                    <th>Sección</th>
+                    <th>Uso</th>
+                </tr>
+                <tr>
+                    <td><i class="icono fas fa-home"></i>Dashboard</td>
+                    <td>Resumen</td>
+                </tr>
+                <tr>
+                    <td><i class="icono fas fa-boxes"></i>Equipos</td>
+                    <td>Inventario</td>
+                </tr>
+                <tr>
+                    <td><i class="icono fas fa-calendar"></i>Actividades</td>
+                    <td>Calendario</td>
+                </tr>
+                <tr>
+                    <td><i class="icono fas fa-file-pdf"></i>Reportes</td>
+                    <td>PDFs/Excel</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 4. CREAR EQUIPO -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-plus-circle"></i> 3. CREAR EQUIPO
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">1</div>
+                <div class="paso-texto">
+                    <strong>Equipos</strong> > <span class="badge">+ Añadir</span>
+                </div>
+            </div>
+
+            <img src="assets/images/03-lista-equipos.png" class="img-captura" alt="Lista">
+
+            <div class="paso">
+                <div class="paso-num">2</div>
+                <div class="paso-texto">
+                    <strong>Completar formulario</strong> con datos del equipo
+                </div>
+            </div>
+
+            <img src="assets/images/04-formulario-equipo.png" class="img-captura" alt="Formulario">
+
+            <div class="caja caja-tip">
+                <strong>💡 Códigos:</strong> BAL-001, TERM-001, MIC-001
+            </div>
+        </div>
+
+        <!-- 5. CONFIRMACIÓN -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-check-circle"></i> 4. CONFIRMACIÓN
+            </div>
+
+            <p>Análisis de aptitud metrológica (ISO 10012:2003)</p>
+
+            <img src="assets/images/05-confirmacion.png" class="img-captura" alt="Confirmación">
+
+            <div class="paso">
+                <div class="paso-num">1</div>
+                <div class="paso-texto">
+                    Compara <strong>Error vs EMP</strong>
+                </div>
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">2</div>
+                <div class="paso-texto">
+                    Resultado: <span class="badge" style="background: #10b981;">APTO</span> / <span class="badge" style="background: #ef4444;">NO APTO</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. COMPROBACIÓN -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-clipboard-check"></i> 5. COMPROBACIÓN
+            </div>
+
+            <p>Verificaciones intermedias (ISO 17020:2012)</p>
+
+            <img src="assets/images/06-comprobacion.png" class="img-captura" alt="Comprobación">
+
+            <div class="caja caja-info">
+                <strong>2 opciones:</strong> Subir PDF externo o crear informe interno
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PÁGINA 2 -->
+    <div class="pagina" style="page-break-before: always;">
+
+        <!-- 7. INTERVALOS ILAC -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-calendar-alt"></i> 6. INTERVALOS (ILAC)
+            </div>
+
+            <img src="assets/images/07-intervalos-ilac.png" class="img-captura" alt="ILAC">
+
+            <div class="grid-2">
+                <div class="card-mini">
+                    <div class="card-mini-titulo">Manual</div>
+                    <div class="card-mini-desc">Por norma/cliente</div>
+                </div>
+                <div class="card-mini">
+                    <div class="card-mini-titulo">Predictivo</div>
+                    <div class="card-mini-desc">Estabilidad+Uso</div>
+                </div>
+                <div class="card-mini">
+                    <div class="card-mini-titulo">Escalera</div>
+                    <div class="card-mini-desc">Ajuste reactivo</div>
+                </div>
+                <div class="card-mini">
+                    <div class="card-mini-titulo">Carta Control</div>
+                    <div class="card-mini-desc">Análisis deriva</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. CALIBRACIÓN -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-tools"></i> 7. CALIBRACIÓN
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">1</div>
+                <div class="paso-texto">
+                    Detalle equipo > <strong>"Calibraciones"</strong>
+                </div>
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">2</div>
+                <div class="paso-texto">
+                    <span class="badge">+ Añadir Calibración</span>
+                </div>
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">3</div>
+                <div class="paso-texto">
+                    Completar: Fecha, Entidad, N° Certificado
+                </div>
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">4</div>
+                <div class="paso-texto">
+                    <strong>Subir PDF</strong> del certificado
+                </div>
+            </div>
+
+            <div class="caja caja-warning">
+                <strong>⚠️ PDF obligatorio</strong> (ISO 17025:2017)
+            </div>
+        </div>
+
+        <!-- 9. MANTENIMIENTO -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-wrench"></i> 8. MANTENIMIENTO
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">1</div>
+                <div class="paso-texto">
+                    <span class="badge">+ Añadir Mantenimiento</span>
+                </div>
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">2</div>
+                <div class="paso-texto">
+                    <strong>Tipo:</strong> Preventivo / Correctivo
+                </div>
+            </div>
+
+            <div class="paso">
+                <div class="paso-num">3</div>
+                <div class="paso-texto">
+                    <strong>Actividades:</strong> Lista de tareas
+                </div>
+            </div>
+        </div>
+
+        <!-- 10. REPORTES -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-file-pdf"></i> 9. REPORTES
+            </div>
+
+            <table>
+                <tr>
+                    <th>Reporte</th>
+                    <th>Contenido</th>
+                </tr>
+                <tr>
+                    <td>Hoja Vida</td>
+                    <td>Historial completo</td>
+                </tr>
+                <tr>
+                    <td>Vencimientos</td>
+                    <td>Próximas fechas</td>
+                </tr>
+                <tr>
+                    <td>Excel</td>
+                    <td>Listado equipos</td>
+                </tr>
+                <tr>
+                    <td>ZIP Masivo</td>
+                    <td>Todos PDFs</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 11. ESTADOS -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-traffic-light"></i> ESTADOS
+            </div>
+
+            <table>
+                <tr>
+                    <th>Estado</th>
+                    <th>Significado</th>
+                </tr>
+                <tr>
+                    <td><span style="color: #10b981;">●</span> Operativo</td>
+                    <td>En uso normal</td>
+                </tr>
+                <tr>
+                    <td><span style="color: #f59e0b;">●</span> Próximo</td>
+                    <td>Vence en 30 días</td>
+                </tr>
+                <tr>
+                    <td><span style="color: #ef4444;">●</span> Vencido</td>
+                    <td>Requiere calibración</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 12. NORMAS -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-book"></i> NORMAS
+            </div>
+
+            <ul>
+                <li><strong>ISO 17020:2012</strong> - Inspección</li>
+                <li><strong>ISO 17025:2017</strong> - Calibración</li>
+                <li><strong>ISO 10012:2003</strong> - Confirmación</li>
+                <li><strong>ILAC G-24:2022</strong> - Intervalos</li>
+            </ul>
+        </div>
+
+        <!-- 13. FAQ -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-question-circle"></i> FAQ
+            </div>
+
+            <p><strong>¿Editar calibración?</strong><br>Sí, desde Calibraciones > Editar</p>
+
+            <p><strong>¿PDF muy grande?</strong><br>Comprimir antes (máx 10 MB)</p>
+
+            <p><strong>¿Agregar usuarios?</strong><br>Solo administradores</p>
+
+            <p><strong>¿Datos seguros?</strong><br>Sí, multiempresa aislado</p>
+        </div>
+
+        <!-- 14. CONSEJOS -->
+        <div class="seccion">
+            <div class="titulo-seccion">
+                <i class="fas fa-lightbulb"></i> CONSEJOS
+            </div>
+
+            <div class="grid-2">
+                <div class="card-mini">
+                    <div class="card-mini-titulo">🔍 Búsqueda</div>
+                    <div class="card-mini-desc">Use filtros</div>
+                </div>
+                <div class="card-mini">
+                    <div class="card-mini-titulo">🔔 Alertas</div>
+                    <div class="card-mini-desc">Revise Dashboard</div>
+                </div>
+                <div class="card-mini">
+                    <div class="card-mini-titulo">💾 Guardar</div>
+                    <div class="card-mini-desc">Sesión 30 min</div>
+                </div>
+                <div class="card-mini">
+                    <div class="card-mini-titulo">📱 Móvil</div>
+                    <div class="card-mini-desc">Responsive</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 15. CONTACTO -->
+        <div class="seccion-completa">
+            <div class="titulo-seccion">
+                <i class="fas fa-headset"></i> CONTACTO
+            </div>
+
+            <div style="text-align: center; background: #f8fafc; padding: 0.4rem; border-radius: 5px;">
+                <p style="margin-bottom: 0.25rem;">
+                    <i class="fas fa-globe" style="color: #3B82F6;"></i>
+                    <strong>https://sammetrologia.com</strong>
+                </p>
+                <p style="margin-bottom: 0;">
+                    <i class="fas fa-envelope" style="color: #3B82F6;"></i>
+                    metrologiasam@gmail.com
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        SAM Metrología v8.5 | Diciembre 2025 | ISO 17020, 17025, 10012, ILAC G-24:2022
+    </div>
+
+</body>
+</html>

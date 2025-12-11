@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - SAM Metrología</title>
+    <link rel="stylesheet" href="assets/css/manual-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- ==================== PORTADA ==================== -->
+    <div class="cover-page">
+        <div class="cover-logo">
+            <i class="fas fa-ruler-combined"></i>
+        </div>
+        <h1 class="cover-title">SAM METROLOGÍA</h1>
+        <p class="cover-subtitle">Sistema de Aseguramiento Metrológico</p>
+        <p class="cover-subtitle" style="font-size: 1.2rem; margin-top: 2rem;">
+            <i class="fas fa-book-open"></i> Manual de Usuario
+        </p>
+        <div class="cover-version">
+            Versión 8.5 | Diciembre 2025
+        </div>
+        <p style="margin-top: 3rem; font-size: 0.9rem; color: #94a3b8;">
+            Guía completa para la gestión de equipos metrológicos<br>
+            Conforme a ISO 17020:2012 e ISO 17025:2017
+        </p>
+    </div>
+
+    <!-- ==================== TABLA DE CONTENIDOS ==================== -->
+    <div class="toc-page">
+        <h2 class="toc-title">Tabla de Contenidos</h2>
+        <ul class="toc-list">
+            <li class="toc-item">
+                <a href="#seccion-1">
+                    <span><i class="fas fa-home"></i> 1. Introducción al Sistema</span>
+                    <span class="toc-page-number">3</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-2">
+                    <span><i class="fas fa-sign-in-alt"></i> 2. Acceso y Navegación</span>
+                    <span class="toc-page-number">5</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-3">
+                    <span><i class="fas fa-plus-circle"></i> 3. Creación de Equipos</span>
+                    <span class="toc-page-number">7</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-4">
+                    <span><i class="fas fa-tools"></i> 4. Gestión de Calibraciones</span>
+                    <span class="toc-page-number">11</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-5">
+                    <span><i class="fas fa-check-circle"></i> 5. Confirmación Metrológica</span>
+                    <span class="toc-page-number">15</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-6">
+                    <span><i class="fas fa-clipboard-check"></i> 6. Comprobación Intermedia</span>
+                    <span class="toc-page-number">18</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-7">
+                    <span><i class="fas fa-wrench"></i> 7. Mantenimiento de Equipos</span>
+                    <span class="toc-page-number">21</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-8">
+                    <span><i class="fas fa-calendar-alt"></i> 8. Intervalos de Calibración</span>
+                    <span class="toc-page-number">24</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-9">
+                    <span><i class="fas fa-file-pdf"></i> 9. Generación de Reportes</span>
+                    <span class="toc-page-number">28</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-10">
+                    <span><i class="fas fa-ban"></i> 10. Baja de Equipos</span>
+                    <span class="toc-page-number">31</span>
+                </a>
+            </li>
+            <li class="toc-item">
+                <a href="#seccion-11">
+                    <span><i class="fas fa-question-circle"></i> 11. Preguntas Frecuentes</span>
+                    <span class="toc-page-number">33</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- ==================== SECCIÓN 1: INTRODUCCIÓN ==================== -->
+    <div class="section" id="seccion-1">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">1</span>
+                <span class="section-title">Introducción al Sistema</span>
+            </h2>
+            <p class="section-subtitle">Conozca las capacidades y beneficios de SAM Metrología</p>
+        </div>
+
+        <h3>¿Qué es SAM Metrología?</h3>
+        <p>
+            SAM (Sistema de Aseguramiento Metrológico) es una plataforma web especializada en la gestión integral
+            de equipos de medición, diseñada para cumplir con los requisitos de las normas ISO 17020:2012
+            e ISO 17025:2017.
+        </p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h4 class="feature-title">Trazabilidad Completa</h4>
+                <p class="feature-description">
+                    Registre y consulte todo el historial de calibraciones, mantenimientos y comprobaciones
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <h4 class="feature-title">Alertas Automáticas</h4>
+                <p class="feature-description">
+                    Reciba notificaciones antes del vencimiento de calibraciones y mantenimientos
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h4 class="feature-title">Análisis de Tendencias</h4>
+                <p class="feature-description">
+                    Monitoree el desempeño de sus equipos con gráficas y estadísticas
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-file-contract"></i>
+                </div>
+                <h4 class="feature-title">Documentación ISO</h4>
+                <p class="feature-description">
+                    Genere reportes conforme a normas internacionales de metrología
+                </p>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <div class="box-title">
+                <i class="fas fa-info-circle"></i>
+                Beneficios Clave
+            </div>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>Ahorre tiempo con automatización de tareas metrológicas</li>
+                <li>Cumpla requisitos normativos ISO 17020 e ISO 17025</li>
+                <li>Acceda desde cualquier lugar con conexión a internet</li>
+                <li>Proteja sus datos con seguridad multiempresa</li>
+            </ul>
+        </div>
+
+        <h3>Módulos Principales</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Módulo</th>
+                    <th>Funcionalidad</th>
+                    <th>Norma</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><i class="fas fa-boxes" style="color: #3b82f6;"></i> Equipos</td>
+                    <td>Gestión completa del inventario de equipos de medición</td>
+                    <td>ISO 10012:2003</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-tools" style="color: #3b82f6;"></i> Calibraciones</td>
+                    <td>Registro y trazabilidad de calibraciones externas</td>
+                    <td>ISO 17025:2017</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-check-circle" style="color: #10b981;"></i> Confirmación</td>
+                    <td>Análisis de aptitud metrológica post-calibración</td>
+                    <td>ISO 10012:2003</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-clipboard-check" style="color: #f59e0b;"></i> Comprobación</td>
+                    <td>Verificaciones intermedias entre calibraciones</td>
+                    <td>ISO 17020:2012</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-wrench" style="color: #8b5cf6;"></i> Mantenimiento</td>
+                    <td>Programación y seguimiento de mantenimientos</td>
+                    <td>ISO 10012:2003</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Reportes</td>
+                    <td>Generación de PDFs, Excel y documentación oficial</td>
+                    <td>ISO 17020/17025</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ==================== SECCIÓN 2: ACCESO Y NAVEGACIÓN ==================== -->
+    <div class="section" id="seccion-2">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">2</span>
+                <span class="section-title">Acceso y Navegación</span>
+            </h2>
+            <p class="section-subtitle">Aprenda a ingresar y navegar por el sistema</p>
+        </div>
+
+        <h3>Inicio de Sesión</h3>
+
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Acceda a la plataforma</div>
+                    <div class="step-description">
+                        Abra su navegador web (Chrome, Firefox, Edge) e ingrese a:<br>
+                        <code style="background: #f1f5f9; padding: 0.3rem 0.6rem; border-radius: 4px; font-family: monospace;">
+                            https://sam-9o6o.onrender.com
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Ingrese sus credenciales</div>
+                    <div class="step-description">
+                        Escriba su nombre de usuario y contraseña proporcionados por su administrador
+                    </div>
+                    <div class="tip-box" style="margin-top: 1rem;">
+                        <div class="box-title">
+                            <i class="fas fa-lightbulb"></i>
+                            Consejo de Seguridad
+                        </div>
+                        <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                            Cambie su contraseña la primera vez que ingrese al sistema.
+                            Use combinaciones de letras, números y símbolos.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Explore el Dashboard</div>
+                    <div class="step-description">
+                        Al ingresar, verá el panel principal con estadísticas de sus equipos,
+                        próximos vencimientos y alertas importantes
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3>Navegación por el Menú</h3>
+        <p>
+            El sistema utiliza un menú lateral oscuro ubicado a la izquierda de la pantalla.
+            Las opciones principales son:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Icono</th>
+                    <th style="width: 30%;">Sección</th>
+                    <th>Descripción</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><i class="fas fa-home" style="color: #3b82f6; font-size: 1.2rem;"></i></td>
+                    <td><strong>Dashboard</strong></td>
+                    <td>Panel principal con resumen y estadísticas</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-boxes" style="color: #3b82f6; font-size: 1.2rem;"></i></td>
+                    <td><strong>Equipos</strong></td>
+                    <td>Listado completo de equipos de medición</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-calendar-alt" style="color: #10b981; font-size: 1.2rem;"></i></td>
+                    <td><strong>Actividades Programadas</strong></td>
+                    <td>Calendario de calibraciones y mantenimientos</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-file-pdf" style="color: #ef4444; font-size: 1.2rem;"></i></td>
+                    <td><strong>Reportes</strong></td>
+                    <td>Generación de documentos y exportaciones</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-user-circle" style="color: #8b5cf6; font-size: 1.2rem;"></i></td>
+                    <td><strong>Mi Perfil</strong></td>
+                    <td>Configuración personal y cambio de contraseña</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="warning-box">
+            <div class="box-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                Importante: Sesiones Activas
+            </div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Por seguridad, las sesiones inactivas se cierran automáticamente después de 30 minutos.
+                Guarde su trabajo frecuentemente para evitar pérdida de datos.
+            </p>
+        </div>
+    </div>
+
+    <!-- Placeholder para las siguientes secciones -->
+    <div class="section" id="seccion-3">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">3</span>
+                <span class="section-title">Creación de Equipos</span>
+            </h2>
+            <p class="section-subtitle">Registre nuevos equipos de medición en el sistema</p>
+        </div>
+        <p style="text-align: center; padding: 3rem; color: #94a3b8; font-style: italic;">
+            [Contenido en desarrollo - Sección 3 a 11]
+        </p>
+    </div>
+
+    <!-- ==================== FOOTER ==================== -->
+    <div class="page-footer no-print">
+        <p>
+            <strong>SAM Metrología</strong> - Sistema de Aseguramiento Metrológico<br>
+            <i class="fas fa-globe"></i> https://sam-9o6o.onrender.com<br>
+            <i class="fas fa-envelope"></i> metrologiasam@gmail.com
+        </p>
+        <p style="margin-top: 1rem; font-size: 0.8rem; color: #cbd5e1;">
+            Este manual es propiedad de SAM Metrología. Versión 8.5 | Diciembre 2025<br>
+            Conforme a ISO 17020:2012, ISO 17025:2017, ISO 10012:2003, ILAC G-24:2022
+        </p>
+    </div>
+
+</body>
+</html>

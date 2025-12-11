@@ -916,11 +916,27 @@ def generar_pdf_intervalos(request, equipo_id):
     from django.urls import reverse
     from dateutil.relativedelta import relativedelta
     import json
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # DEBUG: Log de inicio de función
+    logger.info(f"=== INICIO generar_pdf_intervalos ===")
+    logger.info(f"User: {request.user.username} (ID: {request.user.id})")
+    logger.info(f"Equipo ID: {equipo_id}")
+    logger.info(f"Method: {request.method}")
+    logger.info(f"Content-Type: {request.content_type}")
 
     equipo = get_object_or_404(Equipo, id=equipo_id)
 
+    # DEBUG: Log de permisos
+    logger.info(f"User.empresa: {request.user.empresa} (ID: {request.user.empresa.id if request.user.empresa else None})")
+    logger.info(f"Equipo.empresa: {equipo.empresa} (ID: {equipo.empresa.id if equipo.empresa else None})")
+    logger.info(f"User.is_superuser: {request.user.is_superuser}")
+
     # Verificar permisos
     if request.user.empresa != equipo.empresa and not request.user.is_superuser:
+        logger.error(f"PERMISO DENEGADO: User empresa {request.user.empresa} != Equipo empresa {equipo.empresa}")
         return JsonResponse({'success': False, 'message': 'No tiene permisos'}, status=403)
 
     # Obtener calibración específica si se pasa por GET, sino la última
@@ -942,10 +958,14 @@ def generar_pdf_intervalos(request, equipo_id):
             'message': 'No hay calibraciones registradas para generar intervalos de calibración'
         }, status=400)
 
-    # Si es POST, recibir datos del formulario
-    datos_intervalos = {}
-    if request.method == 'POST' and request.content_type == 'application/json':
-        datos_intervalos = json.loads(request.body)
+    # Si es POST, recibir datos del formulario (usando FormData)
+    datos_json = request.POST.get('datos_intervalos')
+    if datos_json:
+        datos_intervalos = json.loads(datos_json)
+        logger.info(f"Datos intervalos recibidos: {len(datos_intervalos)} campos")
+    else:
+        datos_intervalos = {}
+        logger.warning("No se recibieron datos de intervalos en el POST")
 
     # Obtener calibración anterior para el contexto
     cal_anterior = Calibracion.objects.filter(

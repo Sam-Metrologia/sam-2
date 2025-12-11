@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía Rápida - SAM Metrología</title>
+    <link rel="stylesheet" href="assets/css/manual-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos específicos para guía rápida compacta */
+        body {
+            font-size: 10pt;
+            line-height: 1.5;
+        }
+        .quick-section {
+            margin-bottom: 1.5rem;
+            page-break-inside: avoid;
+        }
+        .quick-title {
+            background: linear-gradient(135deg, #334155, #475569);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .quick-step {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            align-items: flex-start;
+        }
+        .quick-number {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            background: #3B82F6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .quick-content {
+            flex-grow: 1;
+            font-size: 0.9rem;
+        }
+        .quick-content strong {
+            color: #334155;
+        }
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .quick-card {
+            background: #f8fafc;
+            border-left: 3px solid #3B82F6;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+        }
+        .quick-card-title {
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+        .quick-card-desc {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        .compact-table {
+            font-size: 0.85rem;
+            margin: 0.75rem 0;
+        }
+        .compact-table th {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.8rem;
+        }
+        .compact-table td {
+            padding: 0.35rem 0.6rem;
+        }
+        .icon-badge {
+            display: inline-block;
+            background: #3B82F6;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 24px;
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+        .tip-compact {
+            background: #ecfdf5;
+            border-left: 3px solid #10b981;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            margin: 0.75rem 0;
+            border-radius: 0.25rem;
+        }
+        .warning-compact {
+            background: #fef3c7;
+            border-left: 3px solid #f59e0b;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            margin: 0.75rem 0;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ==================== PORTADA COMPACTA ==================== -->
+    <div class="cover-page" style="padding: 2rem;">
+        <div class="cover-logo" style="width: 80px; height: 80px; font-size: 2rem; margin-bottom: 1.5rem;">
+            <i class="fas fa-ruler-combined"></i>
+        </div>
+        <h1 class="cover-title" style="font-size: 2.5rem;">SAM METROLOGÍA</h1>
+        <p class="cover-subtitle" style="font-size: 1rem;">Sistema de Aseguramiento Metrológico</p>
+        <div style="font-size: 1.5rem; font-weight: 300; color: white; margin: 2rem 0;">
+            📋 GUÍA RÁPIDA
+        </div>
+        <div class="cover-version" style="font-size: 0.9rem; padding: 0.5rem 1rem;">
+            Versión 8.5 | Diciembre 2025
+        </div>
+        <p style="margin-top: 2rem; font-size: 0.85rem; color: #cbd5e1;">
+            Referencia rápida de procesos esenciales<br>
+            <i class="fas fa-globe"></i> https://sammetrologia.com
+        </p>
+    </div>
+
+    <!-- ==================== PÁGINA 1: INICIO RÁPIDO ==================== -->
+    <div style="padding: 1.5rem;">
+
+        <!-- ACCESO AL SISTEMA -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-sign-in-alt"></i> 1. ACCESO AL SISTEMA
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    <strong>Ingrese a:</strong> https://sammetrologia.com
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    <strong>Login:</strong> Usuario y contraseña (proporcionados por su administrador)
+                </div>
+            </div>
+
+            <div class="tip-compact">
+                💡 <strong>Primer ingreso:</strong> Cambie su contraseña en Mi Perfil > Cambiar Contraseña
+            </div>
+        </div>
+
+        <!-- NAVEGACIÓN PRINCIPAL -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-bars"></i> 2. MENÚ PRINCIPAL
+            </div>
+
+            <table class="compact-table" style="width: 100%;">
+                <thead>
+                    <tr style="background: #334155; color: white;">
+                        <th style="width: 25%;">Sección</th>
+                        <th>Para qué sirve</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><i class="fas fa-home" style="color: #3b82f6;"></i> <strong>Dashboard</strong></td>
+                        <td>Ver resumen general y estadísticas</td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-boxes" style="color: #3b82f6;"></i> <strong>Equipos</strong></td>
+                        <td>Listado completo de equipos</td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-calendar-alt" style="color: #10b981;"></i> <strong>Actividades</strong></td>
+                        <td>Calendario de vencimientos</td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-file-pdf" style="color: #ef4444;"></i> <strong>Reportes</strong></td>
+                        <td>Generar PDFs y exportar datos</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- CREAR EQUIPO -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-plus-circle"></i> 3. CREAR EQUIPO NUEVO
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    Menú <strong>Equipos</strong> > Botón <strong>"Añadir Equipo"</strong> (azul, arriba derecha)
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    <strong>Campos obligatorios:</strong> Código interno, Nombre, Tipo, Ubicación, Responsable
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">3</div>
+                <div class="quick-content">
+                    <strong>Datos técnicos:</strong> Marca, Modelo, Serie, Rango, Resolución, EMP
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">4</div>
+                <div class="quick-content">
+                    Click <strong>"Guardar"</strong>
+                </div>
+            </div>
+
+            <div class="tip-compact">
+                💡 <strong>Código interno:</strong> Use prefijos cortos (BAL-001, TERM-001, MIC-001)
+            </div>
+        </div>
+
+        <!-- REGISTRAR CALIBRACIÓN -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-tools"></i> 4. REGISTRAR CALIBRACIÓN
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    Click en el <strong>equipo</strong> > Pestaña <strong>"Calibraciones"</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    Click <strong>"Añadir Calibración"</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">3</div>
+                <div class="quick-content">
+                    <strong>Completar:</strong> Fecha, Próxima calibración, Entidad, N° Certificado
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">4</div>
+                <div class="quick-content">
+                    <strong>Subir PDF</strong> del certificado de calibración
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">5</div>
+                <div class="quick-content">
+                    Seleccionar <strong>Resultado:</strong> Conforme / No Conforme
+                </div>
+            </div>
+
+            <div class="warning-compact">
+                ⚠️ <strong>PDF obligatorio:</strong> El certificado de calibración es requerido por la norma ISO 17025
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==================== PÁGINA 2: PROCESOS AVANZADOS ==================== -->
+    <div style="padding: 1.5rem; page-break-before: always;">
+
+        <!-- CONFIRMACIÓN METROLÓGICA -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-check-circle"></i> 5. CONFIRMACIÓN METROLÓGICA
+            </div>
+
+            <p style="font-size: 0.85rem; margin-bottom: 0.75rem;">
+                Análisis de aptitud después de calibración (ISO 10012:2003)
+            </p>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    Detalle equipo > <strong>"Análisis de Confirmación"</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    Sistema compara <strong>Error detectado vs EMP</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">3</div>
+                <div class="quick-content">
+                    Decisión automática: <strong>APTO / NO APTO</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">4</div>
+                <div class="quick-content">
+                    Generar <strong>PDF de confirmación</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMPROBACIÓN INTERMEDIA -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-clipboard-check"></i> 6. COMPROBACIÓN INTERMEDIA
+            </div>
+
+            <p style="font-size: 0.85rem; margin-bottom: 0.75rem;">
+                Verificación entre calibraciones (ISO 17020:2012)
+            </p>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    Detalle equipo > Pestaña <strong>"Comprobaciones"</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    <strong>Opción A:</strong> Subir documento externo (PDF laboratorio)
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">3</div>
+                <div class="quick-content">
+                    <strong>Opción B:</strong> Crear informe interno con resultados de verificación
+                </div>
+            </div>
+        </div>
+
+        <!-- MANTENIMIENTO -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-wrench"></i> 7. REGISTRAR MANTENIMIENTO
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    Detalle equipo > <strong>"Añadir Mantenimiento"</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    <strong>Tipo:</strong> Preventivo / Correctivo
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">3</div>
+                <div class="quick-content">
+                    <strong>Actividades realizadas:</strong> Lista de tareas ejecutadas
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">4</div>
+                <div class="quick-content">
+                    <strong>Próximo mantenimiento:</strong> Programar fecha
+                </div>
+            </div>
+        </div>
+
+        <!-- INTERVALOS DE CALIBRACIÓN -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-calendar-alt"></i> 8. INTERVALOS DE CALIBRACIÓN (ILAC G-24:2022)
+            </div>
+
+            <div class="quick-grid">
+                <div class="quick-card">
+                    <div class="quick-card-title">Manual</div>
+                    <div class="quick-card-desc">Especificado por norma o cliente</div>
+                </div>
+                <div class="quick-card">
+                    <div class="quick-card-title">Predictivo Multifactorial</div>
+                    <div class="quick-card-desc">Basado en estabilidad, uso e impacto</div>
+                </div>
+                <div class="quick-card">
+                    <div class="quick-card-title">Escalera (Método 1)</div>
+                    <div class="quick-card-desc">Ajuste reactivo según resultados</div>
+                </div>
+                <div class="quick-card">
+                    <div class="quick-card-title">Carta Control (Método 2)</div>
+                    <div class="quick-card-desc">Análisis de deriva temporal</div>
+                </div>
+            </div>
+
+            <p style="font-size: 0.85rem; margin-top: 0.5rem;">
+                <strong>Acceso:</strong> Detalle equipo > "Análisis de Intervalos"
+            </p>
+        </div>
+
+        <!-- REPORTES -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-file-pdf"></i> 9. GENERAR REPORTES
+            </div>
+
+            <table class="compact-table" style="width: 100%;">
+                <thead>
+                    <tr style="background: #334155; color: white;">
+                        <th style="width: 40%;">Reporte</th>
+                        <th>Contenido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Hoja de Vida PDF</strong></td>
+                        <td>Historial completo del equipo</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vencimientos</strong></td>
+                        <td>Próximas calibraciones y mantenimientos</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Export Excel</strong></td>
+                        <td>Listado de equipos en hoja de cálculo</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Dashboard PDF</strong></td>
+                        <td>Estadísticas y gráficas generales</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ZIP Masivo</strong></td>
+                        <td>Todos los certificados de calibración</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- BAJA DE EQUIPO -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-ban"></i> 10. DAR DE BAJA UN EQUIPO
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">1</div>
+                <div class="quick-content">
+                    Detalle equipo > Botón <strong>"Dar de Baja"</strong>
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">2</div>
+                <div class="quick-content">
+                    Especificar <strong>motivo:</strong> Obsoleto, Dañado, Vendido, etc.
+                </div>
+            </div>
+
+            <div class="quick-step">
+                <div class="quick-number">3</div>
+                <div class="quick-content">
+                    Confirmar acción (el equipo se oculta pero <strong>mantiene historial</strong>)
+                </div>
+            </div>
+
+            <div class="warning-compact">
+                ⚠️ <strong>No se elimina:</strong> Los datos se conservan para auditorías (soft delete)
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==================== PÁGINA 3: REFERENCIA RÁPIDA ==================== -->
+    <div style="padding: 1.5rem; page-break-before: always;">
+
+        <!-- ATAJOS Y CONSEJOS -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-keyboard"></i> ATAJOS Y CONSEJOS
+            </div>
+
+            <div class="quick-grid">
+                <div class="quick-card">
+                    <div class="quick-card-title">🔍 Búsqueda Rápida</div>
+                    <div class="quick-card-desc">Use el buscador en "Equipos" para filtrar por código, nombre o tipo</div>
+                </div>
+                <div class="quick-card">
+                    <div class="quick-card-title">🔔 Notificaciones</div>
+                    <div class="quick-card-desc">Revise alertas en el dashboard (próximos vencimientos)</div>
+                </div>
+                <div class="quick-card">
+                    <div class="quick-card-title">💾 Guardar Frecuente</div>
+                    <div class="quick-card-desc">Sesiones expiran a los 30 min de inactividad</div>
+                </div>
+                <div class="quick-card">
+                    <div class="quick-card-title">📱 Acceso Móvil</div>
+                    <div class="quick-card-desc">La plataforma es responsive, funciona en tablets y móviles</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESTADOS DE EQUIPOS -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-info-circle"></i> ESTADOS DE EQUIPOS
+            </div>
+
+            <table class="compact-table" style="width: 100%;">
+                <thead>
+                    <tr style="background: #334155; color: white;">
+                        <th style="width: 30%;">Estado</th>
+                        <th>Significado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span style="color: #10b981;">●</span> <strong>Operativo</strong></td>
+                        <td>En uso normal, calibrado y vigente</td>
+                    </tr>
+                    <tr>
+                        <td><span style="color: #f59e0b;">●</span> <strong>Próximo a Vencer</strong></td>
+                        <td>Calibración vence en menos de 30 días</td>
+                    </tr>
+                    <tr>
+                        <td><span style="color: #ef4444;">●</span> <strong>Vencido</strong></td>
+                        <td>Calibración expiró, requiere recalibración</td>
+                    </tr>
+                    <tr>
+                        <td><span style="color: #64748b;">●</span> <strong>En Mantenimiento</strong></td>
+                        <td>Fuera de servicio temporalmente</td>
+                    </tr>
+                    <tr>
+                        <td><span style="color: #1e293b;">●</span> <strong>De Baja</strong></td>
+                        <td>Retirado del inventario activo</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- NORMAS APLICABLES -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-book"></i> NORMAS APLICABLES
+            </div>
+
+            <table class="compact-table" style="width: 100%;">
+                <thead>
+                    <tr style="background: #334155; color: white;">
+                        <th style="width: 35%;">Norma</th>
+                        <th>Aplica en</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>ISO 17020:2012</strong></td>
+                        <td>Organismos de inspección, comprobaciones</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ISO 17025:2017</strong></td>
+                        <td>Laboratorios de calibración, trazabilidad</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ISO 10012:2003</strong></td>
+                        <td>Confirmación metrológica, gestión de equipos</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ILAC G-24:2022</strong></td>
+                        <td>Determinación de intervalos de calibración</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OIML D10</strong></td>
+                        <td>Intervalos de calibración para instrumentos</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PREGUNTAS FRECUENTES -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-question-circle"></i> PREGUNTAS FRECUENTES
+            </div>
+
+            <div style="font-size: 0.85rem;">
+                <p style="margin-bottom: 0.5rem;">
+                    <strong>P: ¿Puedo editar una calibración ya registrada?</strong><br>
+                    R: Sí, desde detalle del equipo > pestaña Calibraciones > botón Editar
+                </p>
+
+                <p style="margin-bottom: 0.5rem;">
+                    <strong>P: ¿Qué hago si el certificado PDF es muy grande?</strong><br>
+                    R: Comprima el PDF antes de subirlo (máximo 10 MB)
+                </p>
+
+                <p style="margin-bottom: 0.5rem;">
+                    <strong>P: ¿Cómo agrego usuarios a mi empresa?</strong><br>
+                    R: Solo administradores pueden agregar usuarios (requiere permisos especiales)
+                </p>
+
+                <p style="margin-bottom: 0.5rem;">
+                    <strong>P: ¿Los datos están seguros?</strong><br>
+                    R: Sí, sistema multiempresa con aislamiento total de datos por empresa
+                </p>
+
+                <p style="margin-bottom: 0;">
+                    <strong>P: ¿Hay límite de equipos?</strong><br>
+                    R: Depende del plan contratado (consulte con su administrador)
+                </p>
+            </div>
+        </div>
+
+        <!-- CONTACTO Y SOPORTE -->
+        <div class="quick-section">
+            <div class="quick-title">
+                <i class="fas fa-headset"></i> SOPORTE Y CONTACTO
+            </div>
+
+            <div style="font-size: 0.9rem; text-align: center; padding: 1rem; background: #f8fafc; border-radius: 0.5rem;">
+                <p style="margin-bottom: 0.5rem;">
+                    <i class="fas fa-globe" style="color: #3B82F6;"></i>
+                    <strong>Web:</strong> https://sammetrologia.com
+                </p>
+                <p style="margin-bottom: 0.5rem;">
+                    <i class="fas fa-envelope" style="color: #3B82F6;"></i>
+                    <strong>Email:</strong> metrologiasam@gmail.com
+                </p>
+                <p style="margin-bottom: 0;">
+                    <i class="fas fa-question-circle" style="color: #3B82F6;"></i>
+                    <strong>Dudas:</strong> Contacte a su administrador del sistema
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==================== FOOTER ==================== -->
+    <div class="page-footer" style="margin-top: 2rem;">
+        <p style="font-size: 0.85rem;">
+            <strong>SAM Metrología</strong> - Sistema de Aseguramiento Metrológico<br>
+            Versión 8.5 | Diciembre 2025
+        </p>
+        <p style="font-size: 0.75rem; color: #cbd5e1; margin-top: 0.5rem;">
+            Conforme a ISO 17020:2012, ISO 17025:2017, ISO 10012:2003, ILAC G-24:2022
+        </p>
+    </div>
+
+</body>
+</html>

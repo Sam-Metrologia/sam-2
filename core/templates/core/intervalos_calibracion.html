@@ -1443,15 +1443,16 @@ function guardarPDF() {
         showLoading('Generando PDF y actualizando equipo...');
     }
 
-    // Enviar a Django
-    const csrftoken = getCookie('csrftoken');
+    // Enviar a Django usando FormData (igual que comprobacion y mantenimiento)
+    const formData = new FormData();
+    formData.append('datos_intervalos', JSON.stringify(datos));
+
     fetch("{% url 'core:generar_pdf_intervalos' equipo.pk %}", {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
+            'X-CSRFToken': '{{ csrf_token }}'
         },
-        body: JSON.stringify(datos)
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
