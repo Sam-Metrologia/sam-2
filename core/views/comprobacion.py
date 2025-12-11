@@ -18,6 +18,7 @@ from django.views.decorators.http import require_http_methods
 from weasyprint import HTML
 
 from core.models import Comprobacion, Equipo
+from core.decorators_pdf import safe_pdf_response
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +292,7 @@ def generar_grafica_svg_comprobacion(puntos, unidad='mm'):
 
 @login_required
 @require_http_methods(["POST"])
+@safe_pdf_response
 def generar_pdf_comprobacion(request, equipo_id):
     """
     Genera el PDF de la comprobación metrológica.

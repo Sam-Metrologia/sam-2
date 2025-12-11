@@ -17,6 +17,7 @@ from django.views.decorators.http import require_http_methods
 from weasyprint import HTML
 
 from core.models import Mantenimiento, Equipo
+from core.decorators_pdf import safe_pdf_response
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,7 @@ def guardar_mantenimiento_json(request, equipo_id):
 
 @login_required
 @require_http_methods(["POST"])
+@safe_pdf_response
 def generar_pdf_mantenimiento(request, equipo_id):
     """
     Genera el PDF del mantenimiento con actividades.
