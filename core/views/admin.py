@@ -609,9 +609,10 @@ def listar_proveedores(request):
     if query:
         proveedores = proveedores.filter(
             Q(nombre_empresa__icontains=query) |
-            Q(nit__icontains=query) |
-            Q(contacto__icontains=query) |
-            Q(email__icontains=query)
+            Q(nombre_contacto__icontains=query) |
+            Q(correo_electronico__icontains=query) |
+            Q(servicio_prestado__icontains=query) |
+            Q(alcance__icontains=query)
         )
 
     proveedores = proveedores.order_by('nombre_empresa')

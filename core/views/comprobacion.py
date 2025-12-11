@@ -365,8 +365,11 @@ def generar_pdf_comprobacion(request, equipo_id):
         })
 
     except Exception as e:
-        logger.error(f"Error al generar PDF de comprobación: {str(e)}")
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error al generar PDF de comprobación: {str(e)}\n{error_traceback}")
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': error_traceback if request.user.is_superuser else None
         }, status=500)
