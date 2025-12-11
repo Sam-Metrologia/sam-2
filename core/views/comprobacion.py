@@ -336,12 +336,22 @@ def generar_pdf_comprobacion(request, equipo_id):
         unidad = datos_comprobacion.get('unidad_equipo', 'mm')
         grafica_svg = generar_grafica_svg_comprobacion(puntos, unidad)
 
+        # Obtener logo de empresa de forma segura
+        logo_empresa_url = None
+        try:
+            if equipo.empresa and equipo.empresa.logo_empresa:
+                logo_empresa_url = equipo.empresa.logo_empresa.url
+        except Exception as logo_error:
+            logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
+            logo_empresa_url = None
+
         # Preparar datos para el template
         context = {
             'equipo': equipo,
             'comprobacion': comprobacion,
             'datos_comprobacion': datos_comprobacion,
             'empresa': equipo.empresa,
+            'logo_empresa_url': logo_empresa_url,
             'fecha_generacion': datetime.now(),
             'puntos_conformes': puntos_conformes,
             'puntos_no_conformes': puntos_no_conformes,

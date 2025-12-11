@@ -219,12 +219,22 @@ def generar_pdf_mantenimiento(request, equipo_id):
         else:
             datos_mantenimiento = mantenimiento.actividades_realizadas or {}
 
+        # Obtener logo de empresa de forma segura
+        logo_empresa_url = None
+        try:
+            if equipo.empresa and equipo.empresa.logo_empresa:
+                logo_empresa_url = equipo.empresa.logo_empresa.url
+        except Exception as logo_error:
+            logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
+            logo_empresa_url = None
+
         # Preparar datos para el template (solo checklist, sin gráficas)
         context = {
             'equipo': equipo,
             'mantenimiento': mantenimiento,
             'datos_mantenimiento': datos_mantenimiento,
             'empresa': equipo.empresa,
+            'logo_empresa_url': logo_empresa_url,
             'fecha_generacion': datetime.now(),
         }
 
