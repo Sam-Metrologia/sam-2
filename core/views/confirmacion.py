@@ -7,6 +7,7 @@ Integrado con datos reales de la base de datos
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.views.decorators.http import require_http_methods
 from core.models import Equipo, Calibracion, meses_decimales_a_relativedelta
 from core.decorators_pdf import safe_pdf_response
 from datetime import datetime
@@ -891,6 +892,7 @@ def generar_pdf_confirmacion(request, equipo_id):
 
 
 @login_required
+@require_http_methods(["POST"])
 @safe_pdf_response
 def generar_pdf_intervalos(request, equipo_id):
     """
