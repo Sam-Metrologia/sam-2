@@ -1,0 +1,75 @@
+name: Backup Diario Automático de Base de Datos
+
+# Ejecuta backup automático diario a las 3:00 AM (hora Colombia)
+# Cumple con Cláusula 5.2 del contrato: "Copias de seguridad automáticas diarias"
+
+on:
+  schedule:
+    # Cron: 3:00 AM hora Colombia = 8:00 AM UTC
+    - cron: '0 8 * * *'
+
+  # Permitir ejecución manual desde GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  backup-database:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias de backup
+        run: |
+          pip install boto3 python-dotenv
+
+      - name: Instalar PostgreSQL client (pg_dump)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Ejecutar backup automático
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_BACKUP_BUCKET: ${{ secrets.AWS_BACKUP_BUCKET }}
+          AWS_S3_REGION_NAME: ${{ secrets.AWS_S3_REGION_NAME }}
+        run: |
+          python backup_to_s3.py
+
+      - name: Notificar resultado
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Backup completado exitosamente"
+          else
+            echo "❌ Error en backup - revisar logs"
+            exit 1
+          fi
+
+      # Opcional: Enviar notificación por email en caso de fallo
+      - name: Notificar fallo por email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: '⚠️ Fallo en Backup Automático SAM Metrología'
+          body: |
+            El backup automático programado falló.
+
+            Fecha: ${{ github.event.repository.updated_at }}
+            Workflow: ${{ github.workflow }}
+
+            Por favor revisar los logs en:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: ${{ secrets.ADMIN_EMAIL }}
+          from: SAM Metrología Backups
