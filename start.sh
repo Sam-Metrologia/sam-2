@@ -13,7 +13,11 @@ python manage.py migrate --noinput
 echo "📁 Recolectando archivos estáticos..."
 python manage.py collectstatic --noinput
 
-# PASO 3: Iniciar servidor Gunicorn
+# PASO 3: Actualizar términos y condiciones (contrato v1.0)
+echo "📄 Actualizando contrato a 180 días..."
+python actualizar_contrato_180_dias.py || echo "⚠️  Advertencia: No se pudo actualizar el contrato (continuando...)"
+
+# PASO 4: Iniciar servidor Gunicorn
 echo "🌐 Iniciando servidor Gunicorn..."
 # --workers: Numero de workers (recomendado 2-4 para Render free tier)
 # --bind: Render usa la variable PORT automaticamente
