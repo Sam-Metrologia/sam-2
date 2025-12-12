@@ -13,9 +13,9 @@ python manage.py migrate --noinput
 echo "📁 Recolectando archivos estáticos..."
 python manage.py collectstatic --noinput
 
-# PASO 3: Actualizar términos y condiciones (contrato v1.0)
-echo "📄 Actualizando contrato a 180 días..."
-python manage.py actualizar_contrato_180 || echo "⚠️  Advertencia: No se pudo actualizar el contrato (continuando...)"
+# PASO 3: Cargar contrato completo v1.0 (180 días)
+echo "📄 Cargando contrato completo v1.0..."
+python manage.py cargar_contrato_completo || echo "⚠️  Advertencia: No se pudo cargar el contrato (continuando...)"
 
 # PASO 4: Iniciar servidor Gunicorn
 echo "🌐 Iniciando servidor Gunicorn..."
