@@ -497,9 +497,9 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 # Configuración de sesiones
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db' if not DEBUG else 'django.contrib.sessions.backends.db'
 SESSION_CACHE_ALIAS = 'default'
-SESSION_COOKIE_AGE = 3600  # 1 hora
+SESSION_COOKIE_AGE = 28800  # 8 horas (extendido para evitar expiración frecuente)
 SESSION_SAVE_EVERY_REQUEST = False
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Mantener sesión aunque cierre el navegador
 
 # Configuración de cookies de seguridad
 if not DEBUG:
@@ -507,8 +507,9 @@ if not DEBUG:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     CSRF_COOKIE_SECURE = True
-    CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = False  # Permitir acceso JS si es necesario (evita errores CSRF)
     CSRF_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_AGE = 28800  # 8 horas, igual que la sesión
 
 # ==============================================================================
 # CONFIGURACIÓN DE EMAIL (OPCIONAL)
