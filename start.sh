@@ -15,7 +15,7 @@ python manage.py collectstatic --noinput
 
 # PASO 3: Actualizar términos y condiciones (contrato v1.0)
 echo "📄 Actualizando contrato a 180 días..."
-python actualizar_contrato_180_dias.py || echo "⚠️  Advertencia: No se pudo actualizar el contrato (continuando...)"
+python manage.py actualizar_contrato_180 || echo "⚠️  Advertencia: No se pudo actualizar el contrato (continuando...)"
 
 # PASO 4: Iniciar servidor Gunicorn
 echo "🌐 Iniciando servidor Gunicorn..."
