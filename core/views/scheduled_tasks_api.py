@@ -222,7 +222,7 @@ def trigger_cleanup_notifications(request):
         from io import StringIO
 
         output = StringIO()
-        call_command('cleanup_notifications', '--days', '30', stdout=output)
+        call_command('cleanup_notifications', '--days-read', '30', '--days-dismissed', '7', stdout=output)
 
         result = output.getvalue()
         logger.info(f'✅ Limpieza notificaciones completada: {result}')
