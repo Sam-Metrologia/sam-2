@@ -57,8 +57,16 @@ class DatabaseBackupManager:
         try:
             logger.info(f"Iniciando backup: {backup_filename}")
 
-            # Ejecutar pg_dump
-            dump_command = f'pg_dump {self.database_url} > {backup_filename}'
+            # Ejecutar pg_dump con path explícito (usar versión 17 si está disponible)
+            # Primero intentar con pg_dump 17, si no existe usar el default
+            pg_dump_cmd = 'pg_dump'
+            if subprocess.run(['which', 'pg_dump-17'], capture_output=True).returncode == 0:
+                pg_dump_cmd = 'pg_dump-17'
+            elif subprocess.run(['test', '-f', '/usr/lib/postgresql/17/bin/pg_dump'], shell=True, capture_output=True).returncode == 0:
+                pg_dump_cmd = '/usr/lib/postgresql/17/bin/pg_dump'
+
+            dump_command = f'{pg_dump_cmd} {self.database_url} > {backup_filename}'
+            logger.info(f"Usando: {pg_dump_cmd}")
             subprocess.run(dump_command, shell=True, check=True)
 
             # Comprimir

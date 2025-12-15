@@ -36,8 +36,11 @@ jobs:
           sudo apt-get update
           # Instalar PostgreSQL 17 client específicamente
           sudo apt-get install -y postgresql-client-17
+          # Agregar al PATH para que use versión 17 por defecto
+          echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
           # Verificar versión instalada
-          pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          ls -la /usr/lib/postgresql/17/bin/pg_dump
 
       - name: Ejecutar backup automático
         env:
