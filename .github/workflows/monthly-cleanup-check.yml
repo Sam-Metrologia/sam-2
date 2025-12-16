@@ -25,7 +25,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install django python-dotenv
+          pip install django python-dotenv psycopg2-binary
 
       - name: Verificar empresas elegibles para eliminación (DRY-RUN)
         env:
@@ -39,10 +39,21 @@ jobs:
           echo ""
 
           # Ejecutar comando en modo dry-run (sin --execute)
-          python manage.py cleanup_deleted_companies --days=180 > cleanup_report.txt 2>&1 || true
+          if python manage.py cleanup_deleted_companies --days=180 > cleanup_report.txt 2>&1; then
+            echo "✅ Verificación completada exitosamente"
+          else
+            echo "⚠️ Advertencia: Hubo un problema al ejecutar la verificación"
+            echo "Revisa los logs arriba para más detalles"
+          fi
 
-          # Mostrar reporte
-          cat cleanup_report.txt
+          # Mostrar reporte (incluso si hubo error)
+          if [ -f cleanup_report.txt ]; then
+            echo ""
+            echo "=== CONTENIDO DEL REPORTE ==="
+            cat cleanup_report.txt
+          else
+            echo "❌ No se pudo generar el reporte"
+          fi
 
       - name: Guardar reporte como artefacto
         uses: actions/upload-artifact@v3
