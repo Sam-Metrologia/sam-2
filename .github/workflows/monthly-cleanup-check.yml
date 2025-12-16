@@ -51,60 +51,26 @@ jobs:
           path: cleanup_report.txt
           retention-days: 90
 
-      - name: Crear Issue de Revisión
-        if: success()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('cleanup_report.txt', 'utf8');
-            const today = new Date().toISOString().split('T')[0];
-            const nextMonth = new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0];
-
-            const issueBody = `## 🔍 Reporte de Empresas Eliminadas
-
-**Fecha:** ${today}
-
-### 📊 Resumen:
-
-\`\`\`
-${report}
-\`\`\`
-
----
-
-### ✅ Acciones Requeridas:
-
-1. **Revisa el reporte arriba** para ver qué empresas serían eliminadas permanentemente
-2. **Si estás de acuerdo con eliminarlas:**
-   - Ve a: [Actions → Eliminar Empresas Confirmadas](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/cleanup-execute.yml)
-   - Haz clic en "Run workflow"
-   - Escribe "CONFIRMO" para autorizar
-
-3. **Si NO quieres eliminar alguna empresa:**
-   - Restaura la empresa desde el panel de administración Django
-   - O espera al siguiente mes
-
----
-
-### ⚠️ Importante:
-
-- Este reporte es **solo informativo**
-- **NO se ha eliminado nada** automáticamente
-- Tienes **control total** sobre qué se elimina
-- Las empresas listadas tienen más de **180 días (6 meses)** desde su eliminación
-
----
-
-**Próxima verificación:** ${nextMonth}`;
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `📋 Revisión Mensual: Empresas Eliminadas (${today})`,
-              body: issueBody,
-              labels: ['automatico', 'limpieza-empresas', 'requiere-revision']
-            });
+      - name: Mostrar resumen del reporte
+        run: |
+          echo ""
+          echo "=== RESUMEN DEL REPORTE ==="
+          echo ""
+          cat cleanup_report.txt
+          echo ""
+          echo "=== INSTRUCCIONES ==="
+          echo ""
+          echo "📄 El reporte completo está guardado como artefacto en esta ejecución"
+          echo "📋 Para revisar el reporte:"
+          echo "   1. Ve a la pestaña 'Summary' de esta ejecución"
+          echo "   2. Descarga el artefacto 'cleanup-report-${{ github.run_number }}'"
+          echo ""
+          echo "✅ Si hay empresas para eliminar y estás de acuerdo:"
+          echo "   1. Ve a: https://github.com/${{ github.repository }}/actions/workflows/cleanup-execute.yml"
+          echo "   2. Click en 'Run workflow'"
+          echo "   3. Escribe 'CONFIRMO' para autorizar"
+          echo ""
+          echo "⚠️ IMPORTANTE: Esta verificación NO eliminó nada"
 
       - name: Resumen
         if: always()
