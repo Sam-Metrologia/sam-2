@@ -236,3 +236,68 @@ ADMIN_EMAIL=admin@yourcompany.com
 - Verify AWS credentials have S3 permissions
 - Monitor logs for S3-related errors in `logs/sam_errors.log`
 - Test with local storage first by clearing AWS environment variables
+
+## Backups Automáticos y Retención de Datos
+
+### Sistema de Backups (PostgreSQL → AWS S3)
+- **Frecuencia:** Diario a las 3:00 AM (hora Colombia)
+- **Ubicación:** Bucket S3 `sam-metrologia-backups1`
+- **Retención:** 180 días (6 meses) con transición automática a Glacier después de 30 días
+- **Workflow:** `.github/workflows/daily-backup.yml`
+- **Script:** `backup_to_s3.py`
+- **Costo:** ~$0.15 USD/mes
+
+**Restaurar backup manualmente:**
+```bash
+aws s3 cp s3://sam-metrologia-backups1/backups/database/YYYY/MM/backup.sql.gz ./
+```
+
+### Sistema de Soft Delete de Empresas
+- **Retención:** 180 días (6 meses) antes de eliminación permanente
+- **Campos:** `is_deleted`, `deleted_at`, `deleted_by`, `delete_reason`
+- **Restauración:** `empresa.restore(user)` o desde Django Admin
+- **Verificación mensual:** Primer día del mes a las 2:00 AM
+- **Comando:** `python manage.py cleanup_deleted_companies --days=180`
+
+**Eliminar permanentemente (requiere confirmación manual):**
+```bash
+# Verificar qué se eliminaría (dry-run)
+python manage.py cleanup_deleted_companies
+
+# Ejecutar eliminación real
+python manage.py cleanup_deleted_companies --execute
+```
+
+### Tareas Programadas (GitHub Actions)
+
+| Tarea | Workflow | Frecuencia | Descripción |
+|-------|----------|------------|-------------|
+| Backup BD | `daily-backup.yml` | Diario 3:00 AM | Backup PostgreSQL a S3 |
+| Limpieza Notificaciones | `cleanup-notifications.yml` | Domingos 4:00 AM | Elimina notificaciones antiguas |
+| Verificación Empresas | `monthly-cleanup-check.yml` | Mensual (día 1, 2:00 AM) | Reporte de empresas para eliminar |
+| Eliminación Empresas | `cleanup-execute.yml` | Manual con confirmación | Elimina empresas confirmadas |
+
+**Secrets requeridos en GitHub Actions:**
+- `DATABASE_URL` (External PostgreSQL URL)
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_BACKUP_BUCKET` (sam-metrologia-backups1)
+- `AWS_S3_REGION_NAME` (us-east-2)
+- `SECRET_KEY`
+- `SCHEDULED_TASKS_TOKEN` (para endpoints API)
+- `APP_URL` (https://sam-9o6o.onrender.com)
+
+### Contrato de Términos y Condiciones
+- **Versión actual:** 1.0 (180 días de período de gracia)
+- **Ubicación:** `terminos_condiciones_v1.0.html`
+- **Comando de carga:** `python manage.py cargar_contrato_completo`
+- **Auto-carga:** En `start.sh` durante cada deploy
+- **Vista:** `/core/mi-aceptacion-terminos/`
+
+## Seguridad y Sesiones
+
+### CSRF y Sesiones
+- **Duración de sesión:** 8 horas (configurado para reducir errores 403)
+- **Cookie persistente:** No expira al cerrar navegador
+- **CSRF cookie:** 8 horas, HttpOnly=False para compatibilidad
+- **Rate limiting:** Configurado en `RATE_LIMIT_CONFIG`
