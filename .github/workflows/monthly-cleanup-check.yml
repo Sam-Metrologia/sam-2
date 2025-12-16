@@ -58,15 +58,12 @@ jobs:
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('cleanup_report.txt', 'utf8');
+            const today = new Date().toISOString().split('T')[0];
+            const nextMonth = new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0];
 
-            // Crear issue para que el usuario revise
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `📋 Revisión Mensual: Empresas Eliminadas (${new Date().toISOString().split('T')[0]})`,
-              body: `## 🔍 Reporte de Empresas Eliminadas
+            const issueBody = `## 🔍 Reporte de Empresas Eliminadas
 
-**Fecha:** ${new Date().toLocaleDateString('es-CO')}
+**Fecha:** ${today}
 
 ### 📊 Resumen:
 
@@ -82,7 +79,7 @@ ${report}
 2. **Si estás de acuerdo con eliminarlas:**
    - Ve a: [Actions → Eliminar Empresas Confirmadas](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/cleanup-execute.yml)
    - Haz clic en "Run workflow"
-   - Confirma la ejecución
+   - Escribe "CONFIRMO" para autorizar
 
 3. **Si NO quieres eliminar alguna empresa:**
    - Restaura la empresa desde el panel de administración Django
@@ -99,8 +96,14 @@ ${report}
 
 ---
 
-**Próxima verificación:** ${new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString('es-CO')}`,
-              labels: ['automático', 'limpieza-empresas', 'requiere-revisión']
+**Próxima verificación:** ${nextMonth}`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📋 Revisión Mensual: Empresas Eliminadas (${today})`,
+              body: issueBody,
+              labels: ['automatico', 'limpieza-empresas', 'requiere-revision']
             });
 
       - name: Resumen
