@@ -1,0 +1,114 @@
+# GitHub Action: Verificación Mensual de Empresas Eliminadas
+# Se ejecuta automáticamente el primer día de cada mes
+# NO ELIMINA NADA - Solo genera un reporte para revisión
+
+name: Verificación Mensual de Empresas Eliminadas
+
+on:
+  schedule:
+    # Primer día de cada mes a las 2:00 AM Colombia (7:00 UTC)
+    - cron: '0 7 1 * *'
+  workflow_dispatch:  # Permite ejecución manual
+
+jobs:
+  check-deleted-companies:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          pip install django python-dotenv
+
+      - name: Verificar empresas elegibles para eliminación (DRY-RUN)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          echo "=== VERIFICACIÓN DE EMPRESAS ELIMINADAS ==="
+          echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          echo "NOTA: Esta es solo una verificación. NO se eliminará nada."
+          echo ""
+
+          # Ejecutar comando en modo dry-run (sin --execute)
+          python manage.py cleanup_deleted_companies --days=180 > cleanup_report.txt 2>&1 || true
+
+          # Mostrar reporte
+          cat cleanup_report.txt
+
+      - name: Guardar reporte como artefacto
+        uses: actions/upload-artifact@v3
+        with:
+          name: cleanup-report-${{ github.run_number }}
+          path: cleanup_report.txt
+          retention-days: 90
+
+      - name: Crear Issue de Revisión
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('cleanup_report.txt', 'utf8');
+
+            // Crear issue para que el usuario revise
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📋 Revisión Mensual: Empresas Eliminadas (${new Date().toISOString().split('T')[0]})`,
+              body: `## 🔍 Reporte de Empresas Eliminadas
+
+**Fecha:** ${new Date().toLocaleDateString('es-CO')}
+
+### 📊 Resumen:
+
+\`\`\`
+${report}
+\`\`\`
+
+---
+
+### ✅ Acciones Requeridas:
+
+1. **Revisa el reporte arriba** para ver qué empresas serían eliminadas permanentemente
+2. **Si estás de acuerdo con eliminarlas:**
+   - Ve a: [Actions → Eliminar Empresas Confirmadas](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/cleanup-execute.yml)
+   - Haz clic en "Run workflow"
+   - Confirma la ejecución
+
+3. **Si NO quieres eliminar alguna empresa:**
+   - Restaura la empresa desde el panel de administración Django
+   - O espera al siguiente mes
+
+---
+
+### ⚠️ Importante:
+
+- Este reporte es **solo informativo**
+- **NO se ha eliminado nada** automáticamente
+- Tienes **control total** sobre qué se elimina
+- Las empresas listadas tienen más de **180 días (6 meses)** desde su eliminación
+
+---
+
+**Próxima verificación:** ${new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString('es-CO')}`,
+              labels: ['automático', 'limpieza-empresas', 'requiere-revisión']
+            });
+
+      - name: Resumen
+        if: always()
+        run: |
+          echo ""
+          echo "✅ Verificación completada"
+          echo "📄 Reporte guardado como artefacto"
+          echo "📋 Issue creado para revisión"
+          echo ""
+          echo "👉 Revisa el issue creado en GitHub para ver el reporte completo"

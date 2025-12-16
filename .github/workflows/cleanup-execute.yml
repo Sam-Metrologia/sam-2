@@ -1,0 +1,87 @@
+# GitHub Action: Eliminar Empresas Confirmadas (MANUAL)
+# Este workflow SOLO se ejecuta manualmente después de revisar el reporte mensual
+# REQUIERE CONFIRMACIÓN EXPLÍCITA del usuario
+
+name: Eliminar Empresas Confirmadas (MANUAL)
+
+on:
+  workflow_dispatch:  # Solo ejecución manual
+    inputs:
+      confirm:
+        description: 'Escribe "CONFIRMO" para eliminar permanentemente las empresas'
+        required: true
+        type: string
+      days:
+        description: 'Días de retención (por defecto: 180)'
+        required: false
+        default: '180'
+        type: string
+
+jobs:
+  cleanup-companies:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar confirmación
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "CONFIRMO" ]; then
+            echo "❌ ERROR: Debes escribir exactamente 'CONFIRMO' para continuar"
+            echo "Valor recibido: '${{ github.event.inputs.confirm }}'"
+            exit 1
+          fi
+          echo "✅ Confirmación recibida. Procediendo con la limpieza..."
+
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          pip install django python-dotenv psycopg2-binary
+
+      - name: Ejecutar limpieza REAL de empresas eliminadas
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          echo "=== ELIMINACIÓN PERMANENTE DE EMPRESAS ==="
+          echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "Días de retención: ${{ github.event.inputs.days }}"
+          echo "Ejecutado por: ${{ github.actor }}"
+          echo ""
+          echo "⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE"
+          echo ""
+
+          # Ejecutar comando con --execute para eliminar realmente
+          python manage.py cleanup_deleted_companies --days=${{ github.event.inputs.days }} --execute
+
+      - name: Registrar ejecución
+        if: always()
+        run: |
+          echo ""
+          echo "=== REGISTRO DE EJECUCIÓN ==="
+          echo "Usuario: ${{ github.actor }}"
+          echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "Workflow Run: ${{ github.run_number }}"
+          echo "Run ID: ${{ github.run_id }}"
+
+      - name: Notificar resultado
+        if: success()
+        run: |
+          echo ""
+          echo "✅ Limpieza completada exitosamente"
+          echo ""
+          echo "📊 Revisa los logs arriba para ver las empresas eliminadas"
+
+      - name: Notificar error
+        if: failure()
+        run: |
+          echo ""
+          echo "❌ Error durante la limpieza"
+          echo ""
+          echo "Por favor revisa los logs y contacta al administrador"
+          exit 1
