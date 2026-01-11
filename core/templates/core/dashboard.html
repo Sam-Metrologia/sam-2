@@ -799,6 +799,15 @@
             <h3>Comprobaciones Próximas (30 días)</h3>
             <p class="{% if comprobaciones_proximas > 0 %}text-yellow-700{% else %}text-gray-800{% endif %}">{{ comprobaciones_proximas }}</p>
         </div>
+
+        {# Préstamos Activos - CLICKEABLE #}
+        {% if perms.core.can_view_prestamo %}
+        <a href="{% url 'core:dashboard_prestamos' %}" class="info-card prestamos-activos {% if total_prestamos_activos > 0 %}bg-teal-100 hover:bg-teal-200{% else %}hover:bg-gray-100{% endif %} transition-colors cursor-pointer block no-underline">
+            <h3>🤝 Préstamos Activos</h3>
+            <p class="{% if total_prestamos_activos > 0 %}text-teal-700{% else %}text-gray-800{% endif %}">{{ total_prestamos_activos }}</p>
+            <small class="text-gray-600 text-xs">Click para ver dashboard →</small>
+        </a>
+        {% endif %}
     </div>
 
     {# Sección de Accesos Rápidos #}
