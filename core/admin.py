@@ -380,3 +380,73 @@ class AceptacionTerminosAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """No permitir eliminar aceptaciones (registro legal)."""
         return False
+
+
+# ============================================================================
+# ADMIN DE PRÉSTAMOS
+# ============================================================================
+
+@admin.register(PrestamoEquipo)
+class PrestamoEquipoAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'equipo', 'nombre_prestatario', 'estado_prestamo',
+        'fecha_prestamo', 'fecha_devolucion_programada', 'esta_vencido_display'
+    )
+    list_filter = ('estado_prestamo', 'fecha_prestamo', 'empresa')
+    search_fields = (
+        'nombre_prestatario', 'cedula_prestatario',
+        'equipo__codigo_interno', 'equipo__nombre'
+    )
+    readonly_fields = ('fecha_registro',)
+    date_hierarchy = 'fecha_prestamo'
+
+    fieldsets = (
+        ('Equipo', {
+            'fields': ('equipo', 'empresa')
+        }),
+        ('Prestatario', {
+            'fields': (
+                'nombre_prestatario', 'cedula_prestatario',
+                'cargo_prestatario', 'email_prestatario', 'telefono_prestatario'
+            )
+        }),
+        ('Fechas', {
+            'fields': (
+                'fecha_prestamo', 'fecha_devolucion_programada',
+                'fecha_devolucion_real', 'fecha_registro'
+            )
+        }),
+        ('Estado', {
+            'fields': ('estado_prestamo', 'observaciones_prestamo', 'observaciones_devolucion')
+        }),
+        ('Verificación', {
+            'fields': ('verificacion_salida', 'verificacion_entrada', 'actividades_realizadas'),
+            'classes': ('collapse',)
+        }),
+        ('Documentos', {
+            'fields': ('documento_prestamo', 'documento_devolucion'),
+            'classes': ('collapse',)
+        }),
+        ('Control', {
+            'fields': ('prestado_por', 'recibido_por', 'agrupacion'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def esta_vencido_display(self, obj):
+        return "Sí" if obj.esta_vencido() else "No"
+    esta_vencido_display.short_description = 'Vencido'
+    esta_vencido_display.boolean = True
+
+
+@admin.register(AgrupacionPrestamo)
+class AgrupacionPrestamoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'prestatario_nombre', 'empresa', 'fecha_creacion', 'total_prestamos')
+    list_filter = ('fecha_creacion', 'empresa')
+    search_fields = ('nombre', 'prestatario_nombre')
+    readonly_fields = ('fecha_creacion',)
+    date_hierarchy = 'fecha_creacion'
+
+    def total_prestamos(self, obj):
+        return obj.prestamos.count()
+    total_prestamos.short_description = 'Total Préstamos'

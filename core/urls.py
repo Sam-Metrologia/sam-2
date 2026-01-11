@@ -5,6 +5,7 @@ from . import views
 from . import admin_views
 from . import zip_functions  # Import for ZIP system
 from .views import confirmacion  # Import confirmacion module
+from .views import prestamos  # Import prestamos module
 # Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
@@ -84,6 +85,16 @@ urlpatterns = [
     path('equipos/<int:equipo_pk>/comprobaciones/añadir/', views.añadir_comprobacion, name='añadir_comprobacion'),
     path('equipos/<int:equipo_pk>/comprobaciones/<int:pk>/editar/', views.editar_comprobacion, name='editar_comprobacion'),
     path('equipos/<int:equipo_pk>/comprobaciones/<int:pk>/eliminar/', views.eliminar_comprobacion, name='eliminar_comprobacion'),
+
+    # Préstamos de Equipos
+    path('prestamos/', prestamos.listar_prestamos, name='prestamos_listar'),
+    path('prestamos/dashboard/', prestamos.prestamos_dashboard, name='prestamos_dashboard'),
+    path('prestamos/crear/', prestamos.crear_prestamo, name='prestamos_crear'),
+    path('prestamos/<int:prestamo_id>/', prestamos.detalle_prestamo, name='prestamos_detalle'),
+    path('prestamos/<int:prestamo_id>/devolver/', prestamos.devolver_equipo, name='prestamos_devolver'),
+    path('prestamos/<int:prestamo_id>/cancelar/', prestamos.cancelar_prestamo, name='prestamos_cancelar'),
+    path('prestamos/historial/<int:equipo_id>/', prestamos.historial_prestamos_equipo, name='prestamos_historial'),
+    path('prestamos/equipos-estado/', prestamos.equipos_en_prestamo, name='prestamos_equipos_estado'),
 
     # Ubicaciones
     path('ubicaciones/', views.listar_ubicaciones, name='listar_ubicaciones'),
