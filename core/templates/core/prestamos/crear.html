@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block extra_head %}
+<!-- Select2 para búsqueda mejorada de equipos -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .select2-container--default .select2-selection--multiple {
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        min-height: 42px;
+        padding: 4px;
+    }
+    .select2-container--default.select2-container--focus .select2-selection--multiple {
+        border-color: #3b82f6;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-4xl">
+    <div class="mb-6">
+        <a href="{% url 'core:listar_prestamos' %}" class="text-blue-600 hover:text-blue-800">
+            ← Volver a la lista
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ titulo_pagina }}</h1>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <p class="text-red-700">{{ form.non_field_errors }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Información del Equipo -->
+            <div class="border-b pb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Información del Equipo</h2>
+
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                    <p class="text-blue-800 text-sm">
+                        <strong>Opciones:</strong> Puedes prestar un equipo individual O múltiples equipos a la vez.
+                    </p>
+                </div>
+
+                <!-- Opción 1: Equipo Individual -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-gray-700 mb-3">Opción 1: Préstamo de Un Solo Equipo</h3>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.equipo.label }}</label>
+                        {{ form.equipo }}
+                        {% if form.equipo.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.equipo.errors.0 }}</p>
+                        {% endif %}
+                        <p class="text-gray-500 text-xs mt-1">Usa el buscador para encontrar el equipo rápidamente</p>
+                    </div>
+                </div>
+
+                <!-- Opción 2: Múltiples Equipos -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium text-gray-700 mb-3">Opción 2: Préstamo de Múltiples Equipos</h3>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.equipos.label }}</label>
+                        {{ form.equipos }}
+                        {% if form.equipos.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.equipos.errors.0 }}</p>
+                        {% endif %}
+                        {% if form.equipos.help_text %}
+                        <p class="text-gray-500 text-xs mt-1">{{ form.equipos.help_text }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información del Prestatario -->
+            <div class="border-b pb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Información del Prestatario</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.nombre_prestatario.label }} *</label>
+                        {{ form.nombre_prestatario }}
+                        {% if form.nombre_prestatario.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.nombre_prestatario.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.cedula_prestatario.label }}</label>
+                        {{ form.cedula_prestatario }}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.cargo_prestatario.label }}</label>
+                        {{ form.cargo_prestatario }}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.email_prestatario.label }}</label>
+                        {{ form.email_prestatario }}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.telefono_prestatario.label }}</label>
+                        {{ form.telefono_prestatario }}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.fecha_devolucion_programada.label }}</label>
+                        {{ form.fecha_devolucion_programada }}
+                        {% if form.fecha_devolucion_programada.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.fecha_devolucion_programada.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verificación de Salida del Equipo -->
+            <div class="border-b pb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Verificación del Equipo al Salir</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.estado_fisico_salida.label }} *</label>
+                        {{ form.estado_fisico_salida }}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.funcionalidad_salida.label }} *</label>
+                        {{ form.funcionalidad_salida }}
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded">
+                    <h3 class="font-medium text-gray-700 mb-3">Medición (Opcional)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.punto_medicion_salida.label }}</label>
+                            {{ form.punto_medicion_salida }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.valor_referencia_salida.label }}</label>
+                            {{ form.valor_referencia_salida }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.valor_medido_salida.label }}</label>
+                            {{ form.valor_medido_salida }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Observaciones -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.observaciones_prestamo.label }}</label>
+                {{ form.observaciones_prestamo }}
+            </div>
+
+            <!-- Botones -->
+            <div class="flex justify-end gap-4 pt-6">
+                <a href="{% url 'core:listar_prestamos' %}"
+                   class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400 transition">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+                    Crear Préstamo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% block extra_js %}
+<!-- Select2 JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Inicializar Select2 en el campo de equipo individual con búsqueda mejorada
+    $('#id_equipo').select2({
+        placeholder: 'Buscar equipo por código o nombre...',
+        allowClear: true,
+        width: '100%',
+        language: {
+            noResults: function() {
+                return "No se encontraron equipos disponibles";
+            },
+            searching: function() {
+                return "Buscando...";
+            }
+        }
+    });
+
+    // Inicializar Select2 en el campo de múltiples equipos
+    $('#id_equipos').select2({
+        placeholder: 'Buscar y seleccionar múltiples equipos...',
+        allowClear: true,
+        width: '100%',
+        language: {
+            noResults: function() {
+                return "No se encontraron equipos disponibles";
+            },
+            searching: function() {
+                return "Buscando...";
+            }
+        }
+    });
+
+    // Lógica para asegurar que solo se use una opción a la vez
+    $('#id_equipo').on('change', function() {
+        if ($(this).val()) {
+            // Si se selecciona un equipo individual, limpiar múltiples
+            $('#id_equipos').val(null).trigger('change');
+        }
+    });
+
+    $('#id_equipos').on('change', function() {
+        if ($(this).val() && $(this).val().length > 0) {
+            // Si se seleccionan múltiples, limpiar individual
+            $('#id_equipo').val(null).trigger('change');
+        }
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

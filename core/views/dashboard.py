@@ -253,6 +253,9 @@ def dashboard(request):
     # Mantenimientos correctivos recientes
     latest_corrective_maintenances = _get_latest_corrective_maintenances(user, selected_company_id)
 
+    # Datos de préstamos de equipos (NUEVO)
+    prestamos_data = _get_prestamos_data(user, selected_company_id)
+
     # Construir contexto
     context = {
         'titulo_pagina': 'Panel de Control de Metrología',
@@ -269,7 +272,8 @@ def dashboard(request):
         **plan_info_data,
         **actividades_data,
         **graficos_data,
-        **chart_json_data
+        **chart_json_data,
+        **prestamos_data  # AGREGAR ESTA LÍNEA
     }
 
     # CACHE DESHABILITADO TEMPORALMENTE (issue con serialización de QuerySets)

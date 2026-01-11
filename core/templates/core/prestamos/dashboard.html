@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="mb-6 flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-900">{{ titulo_pagina }}</h1>
+        <div class="flex gap-3">
+            <a href="{% url 'core:listar_prestamos' %}"
+               class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                Ver Lista Completa
+            </a>
+            {% if perms.core.can_add_prestamo %}
+            <a href="{% url 'core:crear_prestamo' %}"
+               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+                + Nuevo Préstamo
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Estadísticas generales -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-3xl font-bold text-blue-600">{{ total_prestamos_activos }}</div>
+            <div class="text-gray-600 text-sm">Préstamos Activos</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-3xl font-bold text-green-600">{{ total_prestatarios }}</div>
+            <div class="text-gray-600 text-sm">Personas con Equipos</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-3xl font-bold {% if prestamos_vencidos > 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+                {{ prestamos_vencidos }}
+            </div>
+            <div class="text-gray-600 text-sm">Préstamos Vencidos</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-3xl font-bold text-orange-600">{{ devoluciones_proximas }}</div>
+            <div class="text-gray-600 text-sm">Devoluciones Próximas (7 días)</div>
+        </div>
+        <a href="{% url 'core:equipos_disponibles' %}" class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500 hover:shadow-lg transition block">
+            <div class="text-3xl font-bold text-green-600">{{ equipos_disponibles }}</div>
+            <div class="text-gray-600 text-sm">✓ Equipos Disponibles</div>
+            <div class="text-xs text-gray-400 mt-2">Click para ver lista →</div>
+        </a>
+        <a href="{% url 'core:equipos_prestados' %}" class="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500 hover:shadow-lg transition block">
+            <div class="text-3xl font-bold text-orange-600">{{ equipos_prestados }}</div>
+            <div class="text-gray-600 text-sm">🔒 Equipos Prestados</div>
+            <div class="text-xs text-gray-400 mt-2">Click para ver lista →</div>
+        </a>
+    </div>
+
+    <!-- Acordeón por responsable -->
+    {% if prestatarios %}
+    <div class="space-y-4">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Préstamos Activos por Prestatario</h2>
+
+        {% for prestatario in prestatarios %}
+        <div class="bg-white rounded-lg shadow">
+            <!-- Header del acordeón (siempre visible) -->
+            <button class="w-full px-6 py-4 flex justify-between items-center text-left hover:bg-gray-50 transition acordeon-btn"
+                    type="button"
+                    onclick="toggleAcordeon(this)"
+                    data-target="prestatario-{{ forloop.counter }}">
+                <div class="flex-1">
+                    <div class="font-semibold text-gray-900 text-lg">{{ prestatario.nombre }}</div>
+                    <div class="text-sm text-gray-600 mt-1">
+                        {% if prestatario.cargo %}{{ prestatario.cargo }}{% endif %}
+                        {% if prestatario.cedula %}- CC: {{ prestatario.cedula }}{% endif %}
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                        {{ prestatario.cantidad_equipos }} equipo{{ prestatario.cantidad_equipos|pluralize }}
+                    </span>
+                    {% if prestatario.equipos_vencidos > 0 %}
+                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                        {{ prestatario.equipos_vencidos }} vencido{{ prestatario.equipos_vencidos|pluralize }}
+                    </span>
+                    <button onclick="enviarAlerta('{{ prestatario.nombre }}', '{{ prestatario.email }}', {{ prestatario.equipos_vencidos }}); event.stopPropagation();"
+                            class="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium transition"
+                            title="Enviar recordatorio de devolución">
+                        <i class="fas fa-bell"></i> Alertar
+                    </button>
+                    {% endif %}
+                    <svg class="w-5 h-5 text-gray-400 transform transition-transform acordeon-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </button>
+
+            <!-- Contenido colapsable -->
+            <div id="prestatario-{{ forloop.counter }}" class="acordeon-content" style="display: none;">
+                <div class="px-6 py-4 border-t border-gray-200">
+                    <!-- Información de contacto -->
+                    {% if prestatario.email or prestatario.telefono %}
+                    <div class="bg-gray-50 p-3 rounded mb-4 text-sm">
+                        {% if prestatario.email %}
+                        <span class="text-gray-700">📧 {{ prestatario.email }}</span>
+                        {% endif %}
+                        {% if prestatario.telefono %}
+                        <span class="text-gray-700 ml-4">📱 {{ prestatario.telefono }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Tabla de equipos prestados -->
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Equipo</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha Préstamo</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Devolución</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Días</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prestamo in prestatario.prestamos %}
+                            <tr class="border-t border-gray-100 hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm font-medium">
+                                    {{ prestamo.equipo.codigo_interno }}
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    {{ prestamo.equipo.nombre }}
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    {{ prestamo.fecha_prestamo|date:"d/m/Y" }}
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    {{ prestamo.fecha_devolucion_programada|date:"d/m/Y"|default:"No definida" }}
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    <span class="{% if prestamo.esta_vencido %}text-red-600 font-semibold{% endif %}">
+                                        {{ prestamo.dias_en_prestamo }} días
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
+                                       class="text-blue-600 hover:text-blue-900 mr-2">
+                                        Ver
+                                    </a>
+                                    {% if perms.core.can_change_prestamo %}
+                                    <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
+                                       class="text-green-600 hover:text-green-900">
+                                        Devolver
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <div class="text-gray-400 text-5xl mb-4">📦</div>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">No hay préstamos activos</h3>
+        <p class="text-gray-500 mb-6">Actualmente no hay equipos prestados.</p>
+        {% if perms.core.can_add_prestamo %}
+        <a href="{% url 'core:crear_prestamo' %}"
+           class="inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+            Crear Primer Préstamo
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+// Función para abrir/cerrar acordeón
+function toggleAcordeon(button) {
+    const targetId = button.getAttribute('data-target');
+    const content = document.getElementById(targetId);
+    const arrow = button.querySelector('.acordeon-arrow');
+
+    // Toggle display
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        arrow.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        arrow.style.transform = 'rotate(0deg)';
+    }
+}
+
+// Función para enviar alerta de devolución
+function enviarAlerta(nombre, email, cantidadVencidos) {
+    const mensaje = `Recordatorio de devolución para ${nombre}.\n\n` +
+                   `Tiene ${cantidadVencidos} equipo(s) con devolución vencida.\n` +
+                   (email ? `Se enviará notificación a: ${email}` : 'No hay email registrado para enviar notificación.');
+
+    if (confirm(mensaje + '\n\n¿Desea enviar el recordatorio?')) {
+        // Aquí se puede implementar el envío real de correo mediante AJAX
+        // Por ahora, mostrar mensaje de confirmación
+        alert('Recordatorio enviado exitosamente a ' + nombre);
+
+        // TODO: Implementar envío real de email mediante endpoint
+        // fetch('/core/prestamos/enviar-alerta/', {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //         'X-CSRFToken': getCookie('csrftoken')
+        //     },
+        //     body: JSON.stringify({
+        //         nombre: nombre,
+        //         email: email,
+        //         cantidad_vencidos: cantidadVencidos
+        //     })
+        // });
+    }
+}
+
+// Función helper para obtener CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
+{% endblock %}

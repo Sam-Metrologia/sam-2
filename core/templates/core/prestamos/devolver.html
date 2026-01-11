@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-4xl">
+    <div class="mb-6">
+        <a href="{% url 'core:detalle_prestamo' prestamo.pk %}" class="text-blue-600 hover:text-blue-800">
+            ← Volver al detalle del préstamo
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ titulo_pagina }}</h1>
+        <p class="text-gray-600 mb-6">Prestatario: {{ prestamo.nombre_prestatario }}</p>
+
+        <!-- Info del préstamo -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+            <h3 class="font-semibold text-blue-900">Información del Préstamo</h3>
+            <p class="text-blue-800 text-sm mt-1">
+                Días en préstamo: <strong>{{ prestamo.dias_en_prestamo }}</strong> días
+                {% if prestamo.esta_vencido %}
+                <span class="text-red-600 font-bold">¡VENCIDO!</span>
+                {% endif %}
+            </p>
+            <p class="text-blue-800 text-sm">
+                Fecha préstamo: {{ prestamo.fecha_prestamo|date:"d/m/Y H:i" }}
+            </p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <p class="text-red-700">{{ form.non_field_errors }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Verificación Funcional -->
+            <div class="border-b pb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Verificación Funcional del Equipo</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.verificado_por.label }} *</label>
+                        {{ form.verificado_por }}
+                        {% if form.verificado_por.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.verificado_por.errors.0 }}</p>
+                        {% endif %}
+                        <p class="text-gray-500 text-xs mt-1">Nombre del técnico que recibe el equipo</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.condicion_equipo.label }} *</label>
+                        {{ form.condicion_equipo }}
+                        {% if form.condicion_equipo.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.condicion_equipo.errors.0 }}</p>
+                        {% endif %}
+                        <p class="text-gray-500 text-xs mt-1">Evalúa el estado físico del equipo</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.verificacion_funcional_ok.label }} *</label>
+                        {{ form.verificacion_funcional_ok }}
+                        {% if form.verificacion_funcional_ok.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.verificacion_funcional_ok.errors.0 }}</p>
+                        {% endif %}
+                        <p class="text-gray-500 text-xs mt-1">¿El equipo funciona correctamente?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Datos de Medición (Opcional) -->
+            <div class="border-b pb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Datos de Medición (Opcional)</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.punto_medicion.label }}</label>
+                        {{ form.punto_medicion }}
+                        {% if form.punto_medicion.help_text %}
+                        <p class="text-gray-500 text-xs mt-1">{{ form.punto_medicion.help_text }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.valor_referencia.label }}</label>
+                        {{ form.valor_referencia }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.valor_medido.label }}</label>
+                        {{ form.valor_medido }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.conformidad.label }}</label>
+                        {{ form.conformidad }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Observaciones y Documento -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.observaciones_devolucion.label }}</label>
+                    {{ form.observaciones_devolucion }}
+                    <p class="text-gray-500 text-xs mt-1">Describe cualquier detalle relevante sobre la devolución</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.documento_devolucion.label }}</label>
+                    {{ form.documento_devolucion }}
+                    {% if form.documento_devolucion.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.documento_devolucion.errors.0 }}</p>
+                    {% endif %}
+                    {% if form.documento_devolucion.help_text %}
+                    <p class="text-gray-500 text-xs mt-1">{{ form.documento_devolucion.help_text }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Advertencia -->
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                <p class="text-yellow-800 text-sm">
+                    <strong>⚠️ Importante:</strong> Al confirmar la devolución, el préstamo se marcará como "Devuelto"
+                    y no se podrá modificar. Asegúrate de que toda la información sea correcta.
+                </p>
+            </div>
+
+            <!-- Botones -->
+            <div class="flex justify-end gap-4 pt-6">
+                <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
+                   class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400 transition">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition font-semibold">
+                    Confirmar Devolución
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

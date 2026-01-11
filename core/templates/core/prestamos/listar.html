@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">{{ titulo_pagina }}</h1>
+
+        {% if perms.core.can_add_prestamo %}
+        <div class="flex gap-3">
+            <a href="{% url 'core:dashboard_prestamos' %}"
+               class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                📊 Dashboard
+            </a>
+            <a href="{% url 'core:crear_prestamo' %}"
+               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+                + Nuevo Préstamo
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-2xl font-bold text-blue-600">{{ total_prestamos }}</div>
+            <div class="text-gray-600">Total Préstamos</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-2xl font-bold text-green-600">{{ prestamos_activos }}</div>
+            <div class="text-gray-600">Préstamos Activos</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="text-2xl font-bold {% if prestamos_vencidos > 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+                {{ prestamos_vencidos }}
+            </div>
+            <div class="text-gray-600">Préstamos Vencidos</div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <form method="get" class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <input type="text" name="search" value="{{ search_query|default:'' }}"
+                       placeholder="Buscar por equipo, prestatario o cédula..."
+                       class="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="min-w-[150px]">
+                <select name="estado" class="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos los estados</option>
+                    <option value="ACTIVO" {% if estado_filter == 'ACTIVO' %}selected{% endif %}>En Préstamo</option>
+                    <option value="DEVUELTO" {% if estado_filter == 'DEVUELTO' %}selected{% endif %}>Devueltos</option>
+                    <option value="VENCIDO" {% if estado_filter == 'VENCIDO' %}selected{% endif %}>Vencidos</option>
+                    <option value="CANCELADO" {% if estado_filter == 'CANCELADO' %}selected{% endif %}>Cancelados</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition">
+                Filtrar
+            </button>
+            {% if estado_filter or search_query %}
+            <a href="{% url 'core:listar_prestamos' %}" class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400 transition">
+                Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Tabla de préstamos -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Equipo
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Prestatario
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Fecha Préstamo
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Devolución Programada
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estado
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acciones
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for prestamo in prestamos %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-900">
+                            {{ prestamo.equipo.codigo_interno }}
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            {{ prestamo.equipo.nombre }}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        <div class="font-medium">{{ prestamo.nombre_prestatario }}</div>
+                        {% if prestamo.cargo_prestatario %}
+                        <div class="text-xs text-gray-500">{{ prestamo.cargo_prestatario }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        {{ prestamo.fecha_prestamo|date:"d/m/Y H:i" }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        {{ prestamo.fecha_devolucion_programada|date:"d/m/Y"|default:"No definida" }}
+                        {% if prestamo.esta_vencido %}
+                        <span class="text-xs text-red-600 font-semibold">¡VENCIDO!</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-semibold rounded
+                            {% if prestamo.estado_prestamo == 'ACTIVO' %}bg-green-100 text-green-800
+                            {% elif prestamo.estado_prestamo == 'DEVUELTO' %}bg-gray-100 text-gray-800
+                            {% elif prestamo.estado_prestamo == 'VENCIDO' %}bg-red-100 text-red-800
+                            {% elif prestamo.estado_prestamo == 'CANCELADO' %}bg-yellow-100 text-yellow-800
+                            {% endif %}">
+                            {{ prestamo.get_estado_prestamo_display }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
+                           class="text-blue-600 hover:text-blue-900 mr-3">
+                            Ver
+                        </a>
+                        {% if prestamo.estado_prestamo == 'ACTIVO' and perms.core.can_change_prestamo %}
+                        <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
+                           class="text-green-600 hover:text-green-900">
+                            Devolver
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                        No hay préstamos registrados.
+                        {% if perms.core.can_add_prestamo %}
+                        <a href="{% url 'core:crear_prestamo' %}" class="text-blue-600 hover:underline">
+                            Crear el primer préstamo
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if prestamos.has_other_pages %}
+    <div class="mt-4 flex justify-center">
+        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+            {% if prestamos.has_previous %}
+            <a href="?page={{ prestamos.previous_page_number }}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
+               class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                Anterior
+            </a>
+            {% endif %}
+
+            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                Página {{ prestamos.number }} de {{ prestamos.paginator.num_pages }}
+            </span>
+
+            {% if prestamos.has_next %}
+            <a href="?page={{ prestamos.next_page_number }}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
+               class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                Siguiente
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
