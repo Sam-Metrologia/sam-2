@@ -211,16 +211,13 @@ def dashboard(request):
     # Filtrado por empresa para superusuarios (solo empresas activas)
     selected_company_id = request.GET.get('empresa_id')
 
-    # CACHE: Generar cache key único por usuario y empresa
-    cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}"
+    # CACHE DESHABILITADO TEMPORALMENTE (issue con serialización de QuerySets)
+    # TODO: Implementar cache con serialización correcta de QuerySets
+    # cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}"
+    # cached_context = cache.get(cache_key)
+    # if cached_context:
+    #     return render(request, 'core/dashboard.html', cached_context)
 
-    # CACHE: Intentar obtener datos del cache
-    cached_context = cache.get(cache_key)
-    if cached_context:
-        # Cache hit: retornar datos cacheados inmediatamente
-        return render(request, 'core/dashboard.html', cached_context)
-
-    # Cache miss: ejecutar lógica normal
     empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
 
     # Obtener queryset de equipos según permisos
@@ -280,8 +277,9 @@ def dashboard(request):
         **prestamos_data  # AGREGAR ESTA LÍNEA
     }
 
-    # CACHE: Guardar contexto en cache con TTL de 5 minutos (300 segundos)
-    cache.set(cache_key, context, 300)
+    # CACHE DESHABILITADO TEMPORALMENTE (issue con serialización de QuerySets)
+    # TODO: Implementar cache con serialización correcta
+    # cache.set(cache_key, context, 300)
 
     return render(request, 'core/dashboard.html', context)
 

@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="mb-6 flex justify-between items-center">
+        <a href="{% url 'core:listar_prestamos' %}" class="text-blue-600 hover:text-blue-800">
+            ← Volver a la lista
+        </a>
+
+        {% if prestamo.estado_prestamo == 'ACTIVO' and perms.core.can_change_prestamo %}
+        <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
+           class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition">
+            Devolver Equipo
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <!-- Header -->
+        <div class="border-b pb-6 mb-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Préstamo de Equipo</h1>
+                    <p class="text-gray-600 mt-2">{{ prestamo.equipo.codigo_interno }} - {{ prestamo.equipo.nombre }}</p>
+                </div>
+                <span class="px-4 py-2 text-sm font-semibold rounded
+                    {% if prestamo.estado_prestamo == 'ACTIVO' %}bg-green-100 text-green-800
+                    {% elif prestamo.estado_prestamo == 'DEVUELTO' %}bg-gray-100 text-gray-800
+                    {% elif prestamo.estado_prestamo == 'VENCIDO' %}bg-red-100 text-red-800
+                    {% endif %}">
+                    {{ prestamo.get_estado_prestamo_display }}
+                </span>
+            </div>
+
+            {% if esta_vencido %}
+            <div class="mt-4 bg-red-50 border-l-4 border-red-500 p-4">
+                <p class="text-red-700 font-semibold">⚠️ Este préstamo está vencido ({{ dias_prestado }} días en préstamo)</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Información del Equipo -->
+            <div class="bg-gray-50 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Información del Equipo</h2>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Código Interno</dt>
+                        <dd class="text-gray-900 font-semibold">{{ prestamo.equipo.codigo_interno }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Nombre</dt>
+                        <dd class="text-gray-900">{{ prestamo.equipo.nombre }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Estado del Equipo</dt>
+                        <dd class="text-gray-900">{{ prestamo.equipo.get_estado_display }}</dd>
+                    </div>
+                    {% if prestamo.agrupacion %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Agrupación</dt>
+                        <dd class="text-gray-900">{{ prestamo.agrupacion.nombre }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Información del Prestatario -->
+            <div class="bg-gray-50 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Información del Prestatario</h2>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Nombre</dt>
+                        <dd class="text-gray-900 font-semibold">{{ prestamo.nombre_prestatario }}</dd>
+                    </div>
+                    {% if prestamo.cedula_prestatario %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Cédula</dt>
+                        <dd class="text-gray-900">{{ prestamo.cedula_prestatario }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if prestamo.cargo_prestatario %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Cargo</dt>
+                        <dd class="text-gray-900">{{ prestamo.cargo_prestatario }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if prestamo.email_prestatario %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        <dd class="text-gray-900">{{ prestamo.email_prestatario }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if prestamo.telefono_prestatario %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Teléfono</dt>
+                        <dd class="text-gray-900">{{ prestamo.telefono_prestatario }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Fechas -->
+            <div class="bg-gray-50 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Fechas</h2>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Fecha de Préstamo</dt>
+                        <dd class="text-gray-900">{{ prestamo.fecha_prestamo|date:"d/m/Y H:i" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Devolución Programada</dt>
+                        <dd class="text-gray-900">{{ prestamo.fecha_devolucion_programada|date:"d/m/Y"|default:"No definida" }}</dd>
+                    </div>
+                    {% if prestamo.fecha_devolucion_real %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Devolución Real</dt>
+                        <dd class="text-gray-900">{{ prestamo.fecha_devolucion_real|date:"d/m/Y H:i" }}</dd>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Días en Préstamo</dt>
+                        <dd class="text-gray-900 font-semibold {% if esta_vencido %}text-red-600{% endif %}">
+                            {{ dias_prestado }} días
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Responsables -->
+            <div class="bg-gray-50 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Responsables</h2>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Prestado por</dt>
+                        <dd class="text-gray-900">{{ prestamo.prestado_por.get_full_name|default:prestamo.prestado_por.username }}</dd>
+                    </div>
+                    {% if prestamo.recibido_por %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Recibido por</dt>
+                        <dd class="text-gray-900">{{ prestamo.recibido_por.get_full_name|default:prestamo.recibido_por.username }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Verificación de Salida (al prestar) -->
+        {% if prestamo.verificacion_salida %}
+        <div class="mt-8 border-t pt-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Verificación del Equipo al Salir</h2>
+            <div class="bg-green-50 p-6 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Verificado por</dt>
+                        <dd class="text-gray-900 font-semibold">{{ prestamo.verificacion_salida.verificado_por }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Fecha de Verificación</dt>
+                        <dd class="text-gray-900">{{ prestamo.verificacion_salida.fecha_verificacion|date:"d/m/Y H:i" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Estado Físico</dt>
+                        <dd class="text-gray-900">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium
+                                {% if prestamo.verificacion_salida.estado_fisico == 'Bueno' %}bg-green-100 text-green-800
+                                {% elif prestamo.verificacion_salida.estado_fisico == 'Regular' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ prestamo.verificacion_salida.estado_fisico }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Funcionalidad</dt>
+                        <dd class="text-gray-900">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium
+                                {% if prestamo.verificacion_salida.funcionalidad == 'Conforme' %}bg-green-100 text-green-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ prestamo.verificacion_salida.funcionalidad }}
+                            </span>
+                        </dd>
+                    </div>
+                </div>
+
+                <!-- Punto de medición si existe -->
+                {% if prestamo.verificacion_salida.punto_medicion %}
+                <div class="mt-4 pt-4 border-t border-green-200">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos de Medición</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Parámetro</dt>
+                            <dd class="text-gray-900">{{ prestamo.verificacion_salida.punto_medicion.punto }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Valor Referencia</dt>
+                            <dd class="text-gray-900">{{ prestamo.verificacion_salida.punto_medicion.valor_referencia }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Valor Medido</dt>
+                            <dd class="text-gray-900 font-semibold">{{ prestamo.verificacion_salida.punto_medicion.valor_medido }}</dd>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Verificación de Entrada (al devolver) -->
+        {% if prestamo.verificacion_entrada %}
+        <div class="mt-8 border-t pt-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Verificación del Equipo al Regresar</h2>
+            <div class="bg-blue-50 p-6 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Verificado por</dt>
+                        <dd class="text-gray-900 font-semibold">{{ prestamo.verificacion_entrada.verificado_por }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Fecha de Verificación</dt>
+                        <dd class="text-gray-900">{{ prestamo.verificacion_entrada.fecha_verificacion|date:"d/m/Y H:i" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Condición del Equipo</dt>
+                        <dd class="text-gray-900">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium
+                                {% if prestamo.verificacion_entrada.condicion_equipo == 'Bueno' %}bg-green-100 text-green-800
+                                {% elif prestamo.verificacion_entrada.condicion_equipo == 'Regular' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ prestamo.verificacion_entrada.condicion_equipo }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Verificación Funcional</dt>
+                        <dd class="text-gray-900">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium
+                                {% if prestamo.verificacion_entrada.verificacion_funcional == 'Conforme' %}bg-green-100 text-green-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ prestamo.verificacion_entrada.verificacion_funcional }}
+                            </span>
+                        </dd>
+                    </div>
+                </div>
+
+                <!-- Punto de medición de entrada si existe -->
+                {% if prestamo.verificacion_entrada.punto_medicion %}
+                <div class="mt-4 pt-4 border-t border-blue-200">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">Datos de Medición al Regresar</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Parámetro</dt>
+                            <dd class="text-gray-900">{{ prestamo.verificacion_entrada.punto_medicion.punto }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Valor Referencia</dt>
+                            <dd class="text-gray-900">{{ prestamo.verificacion_entrada.punto_medicion.valor_referencia }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Valor Medido</dt>
+                            <dd class="text-gray-900 font-semibold">{{ prestamo.verificacion_entrada.punto_medicion.valor_medido }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Conformidad</dt>
+                            <dd class="text-gray-900">
+                                <span class="px-2 py-1 rounded text-xs font-medium
+                                    {% if prestamo.verificacion_entrada.punto_medicion.conformidad == 'Conforme' %}bg-green-100 text-green-800
+                                    {% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ prestamo.verificacion_entrada.punto_medicion.conformidad }}
+                                </span>
+                            </dd>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Observaciones -->
+        {% if prestamo.observaciones_prestamo %}
+        <div class="mt-8 bg-blue-50 p-6 rounded-lg">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Observaciones del Préstamo</h3>
+            <p class="text-gray-700">{{ prestamo.observaciones_prestamo }}</p>
+        </div>
+        {% endif %}
+
+        {% if prestamo.observaciones_devolucion %}
+        <div class="mt-4 bg-green-50 p-6 rounded-lg">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Observaciones de la Devolución</h3>
+            <p class="text-gray-700">{{ prestamo.observaciones_devolucion }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Otros préstamos del mismo prestatario -->
+        {% if otros_prestamos %}
+        <div class="mt-8">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Otros Préstamos Activos del Mismo Prestatario</h3>
+            <ul class="space-y-2">
+                {% for otro in otros_prestamos %}
+                <li class="bg-gray-50 p-3 rounded">
+                    <a href="{% url 'core:detalle_prestamo' otro.pk %}" class="text-blue-600 hover:text-blue-800">
+                        {{ otro.equipo.codigo_interno }} - {{ otro.equipo.nombre }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
