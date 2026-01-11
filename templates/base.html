@@ -336,6 +336,12 @@
                 <li><a href="{% url 'core:listar_procedimientos' %}" class="{% if request.resolver_match and 'procedimiento' in request.resolver_match.url_name %}active{% endif %}">
                     <i class="fas fa-file-alt"></i> Procedimientos
                 </a></li>
+                {# SISTEMA DE PRÉSTAMOS DE EQUIPOS #}
+                {% if perms.core.can_view_prestamo %}
+                <li><a href="{% url 'core:dashboard_prestamos' %}" class="{% if request.resolver_match and 'prestamo' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-hand-holding"></i> Préstamos
+                </a></li>
+                {% endif %}
                 {% if user.is_superuser %}
                 <li><a href="{% url 'core:listar_empresas' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'listar_empresas' %}active{% endif %}">
                     <i class="fas fa-building"></i> Empresas

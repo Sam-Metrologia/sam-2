@@ -86,16 +86,6 @@ urlpatterns = [
     path('equipos/<int:equipo_pk>/comprobaciones/<int:pk>/editar/', views.editar_comprobacion, name='editar_comprobacion'),
     path('equipos/<int:equipo_pk>/comprobaciones/<int:pk>/eliminar/', views.eliminar_comprobacion, name='eliminar_comprobacion'),
 
-    # Préstamos de Equipos
-    path('prestamos/', prestamos.listar_prestamos, name='prestamos_listar'),
-    path('prestamos/dashboard/', prestamos.prestamos_dashboard, name='prestamos_dashboard'),
-    path('prestamos/crear/', prestamos.crear_prestamo, name='prestamos_crear'),
-    path('prestamos/<int:prestamo_id>/', prestamos.detalle_prestamo, name='prestamos_detalle'),
-    path('prestamos/<int:prestamo_id>/devolver/', prestamos.devolver_equipo, name='prestamos_devolver'),
-    path('prestamos/<int:prestamo_id>/cancelar/', prestamos.cancelar_prestamo, name='prestamos_cancelar'),
-    path('prestamos/historial/<int:equipo_id>/', prestamos.historial_prestamos_equipo, name='prestamos_historial'),
-    path('prestamos/equipos-estado/', prestamos.equipos_en_prestamo, name='prestamos_equipos_estado'),
-
     # Ubicaciones
     path('ubicaciones/', views.listar_ubicaciones, name='listar_ubicaciones'),
     path('ubicaciones/añadir/', views.añadir_ubicacion, name='añadir_ubicacion'),
@@ -226,4 +216,16 @@ urlpatterns = [
     path('api/scheduled/notifications/weekly-overdue/', views.trigger_weekly_overdue, name='trigger_weekly_overdue'),
     path('api/scheduled/check-trials/', views.trigger_check_trials, name='trigger_check_trials'),
     path('api/scheduled/cleanup/notifications/', views.trigger_cleanup_notifications, name='trigger_cleanup_notifications'),
+
+    # ==============================================================================
+    # SISTEMA DE PRÉSTAMOS DE EQUIPOS
+    # ==============================================================================
+    path('prestamos/', prestamos.listar_prestamos, name='listar_prestamos'),
+    path('prestamos/nuevo/', prestamos.crear_prestamo, name='crear_prestamo'),
+    path('prestamos/<int:pk>/', prestamos.detalle_prestamo, name='detalle_prestamo'),
+    path('prestamos/<int:pk>/devolver/', prestamos.devolver_equipo, name='devolver_equipo'),
+    path('prestamos/dashboard/', prestamos.dashboard_prestamos, name='dashboard_prestamos'),
+    path('prestamos/historial/<int:equipo_id>/', prestamos.historial_equipo, name='historial_equipo'),
+    path('prestamos/equipos-disponibles/', prestamos.equipos_disponibles, name='equipos_disponibles'),
+    path('prestamos/equipos-prestados/', prestamos.equipos_prestados, name='equipos_prestados'),
 ]

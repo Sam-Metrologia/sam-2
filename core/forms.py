@@ -4,7 +4,8 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AuthenticationForm as DjangoAuthenticationForm, PasswordChangeForm
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
-    BajaEquipo, Ubicacion, Procedimiento, Proveedor, Documento
+    BajaEquipo, Ubicacion, Procedimiento, Proveedor, Documento,
+    PrestamoEquipo, AgrupacionPrestamo
 )
 from .services import ValidationService
 
@@ -968,3 +969,498 @@ class EmpresaFormatoForm(forms.ModelForm):
         if fecha and fecha > timezone.localdate():
             raise ValidationError("La fecha de versión no puede ser en el futuro.")
         return fecha
+
+
+# ==============================================================================
+# FORMS PARA SISTEMA DE PRÉSTAMOS DE EQUIPOS
+# ==============================================================================
+
+class PrestamoEquipoForm(forms.ModelForm):
+    """
+    Formulario para crear y editar préstamos de equipos.
+    Incluye validación para evitar prestar equipos que ya están en préstamo activo.
+    Incluye verificación de salida del equipo.
+    """
+    # Campo personalizado para múltiples equipos
+    equipos = forms.ModelMultipleChoiceField(
+        queryset=Equipo.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-select',
+            'size': '10',
+            'style': 'height: auto; min-height: 200px;'
+        }),
+        label='Equipos a Prestar (puede seleccionar varios con Ctrl+Click)',
+        help_text='Mantenga presionado Ctrl (Windows) o Cmd (Mac) para seleccionar múltiples equipos'
+    )
+
+    # Verificación de salida
+    estado_fisico_salida = forms.ChoiceField(
+        choices=[
+            ('Bueno', 'Bueno'),
+            ('Regular', 'Regular'),
+            ('Malo', 'Malo'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Estado Físico al Salir',
+        initial='Bueno'
+    )
+
+    funcionalidad_salida = forms.ChoiceField(
+        choices=[
+            ('Conforme', 'Conforme - Funciona correctamente'),
+            ('No Conforme', 'No Conforme - Requiere atención'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Funcionalidad al Salir',
+        initial='Conforme'
+    )
+
+    # Punto de medición de salida
+    punto_medicion_salida = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Temperatura'}),
+        label='Parámetro Medido'
+    )
+
+    valor_referencia_salida = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 25.0°C'}),
+        label='Valor Referencia'
+    )
+
+    valor_medido_salida = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 25.1°C'}),
+        label='Valor Medido'
+    )
+
+    class Meta:
+        model = PrestamoEquipo
+        fields = [
+            'equipo', 'agrupacion', 'nombre_prestatario', 'cedula_prestatario',
+            'cargo_prestatario', 'email_prestatario', 'telefono_prestatario',
+            'fecha_devolucion_programada', 'observaciones_prestamo'
+        ]
+        # Excluir explícitamente campos que se asignan automáticamente en la vista
+        exclude = ['empresa', 'prestado_por', 'recibido_por', 'verificacion_salida',
+                   'verificacion_entrada', 'fecha_devolucion_real', 'estado_prestamo']
+        widgets = {
+            'equipo': forms.Select(attrs={'class': 'form-select'}),
+            'agrupacion': forms.Select(attrs={'class': 'form-select'}),
+            'nombre_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Nombre completo'}),
+            'cedula_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Cédula (opcional)'}),
+            'cargo_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Cargo (opcional)'}),
+            'email_prestatario': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'email@ejemplo.com'}),
+            'telefono_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '+57 300 123 4567'}),
+            'fecha_devolucion_programada': forms.DateInput(attrs={'type': 'date', 'class': 'form-input'}),
+            'observaciones_prestamo': forms.Textarea(attrs={'rows': 2, 'class': 'form-textarea', 'placeholder': 'Observaciones del préstamo...'}),
+        }
+        labels = {
+            'equipo': 'Equipo a Prestar (uno solo)',
+            'agrupacion': 'Agrupación (opcional)',
+            'nombre_prestatario': 'Nombre del Inspector/Prestatario',
+            'cedula_prestatario': 'Cédula',
+            'cargo_prestatario': 'Cargo',
+            'email_prestatario': 'Email',
+            'telefono_prestatario': 'Teléfono',
+            'fecha_devolucion_programada': 'Fecha de Devolución Programada',
+            'observaciones_prestamo': 'Observaciones',
+        }
+
+    def __init__(self, *args, **kwargs):
+        empresa = kwargs.pop('empresa', None)
+        super().__init__(*args, **kwargs)
+
+        # Hacer equipo opcional para permitir selección múltiple
+        self.fields['equipo'].required = False
+
+        if empresa:
+            # Solo equipos disponibles de la empresa (no en préstamo activo ni dados de baja)
+            equipos_disponibles = Equipo.objects.filter(
+                empresa=empresa,
+                estado__in=['Activo', 'En Mantenimiento', 'En Calibración', 'En Comprobación']
+            ).exclude(
+                prestamos__estado_prestamo='ACTIVO',
+                prestamos__fecha_devolucion_real__isnull=True
+            ).order_by('codigo_interno')
+
+            self.fields['equipo'].queryset = equipos_disponibles
+            self.fields['equipos'].queryset = equipos_disponibles  # Para selección múltiple
+
+            # Solo agrupaciones de la empresa
+            self.fields['agrupacion'].queryset = AgrupacionPrestamo.objects.filter(
+                empresa=empresa
+            ).order_by('-fecha_creacion')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        equipo_individual = cleaned_data.get('equipo')
+        equipos_multiples = cleaned_data.get('equipos')
+
+        # Debe seleccionar al menos uno (individual O múltiples)
+        if not equipo_individual and not equipos_multiples:
+            raise ValidationError(
+                'Debes seleccionar al menos un equipo (individual o múltiples).'
+            )
+
+        return cleaned_data
+
+    def clean_equipo(self):
+        equipo = self.cleaned_data.get('equipo')
+
+        if not equipo:
+            return equipo
+
+        # Validar que equipo no esté ya prestado
+        prestamo_activo = PrestamoEquipo.objects.filter(
+            equipo=equipo,
+            estado_prestamo='ACTIVO',
+            fecha_devolucion_real__isnull=True
+        ).exists()
+
+        if prestamo_activo:
+            raise ValidationError(
+                f'El equipo {equipo.codigo_interno} ya está en préstamo activo. '
+                'No se puede prestar un equipo que ya está prestado.'
+            )
+
+        # Validar que equipo no esté de baja
+        if equipo.estado == 'De Baja':
+            raise ValidationError(
+                f'El equipo {equipo.codigo_interno} está dado de baja. '
+                'No se puede prestar un equipo dado de baja.'
+            )
+
+        return equipo
+
+    def clean_fecha_devolucion_programada(self):
+        fecha = self.cleaned_data.get('fecha_devolucion_programada')
+
+        if fecha and fecha < timezone.now().date():
+            raise ValidationError(
+                'La fecha de devolución programada no puede ser en el pasado.'
+            )
+
+        return fecha
+
+    def get_verificacion_salida_data(self, user):
+        """
+        Construye el JSON de verificación de salida del equipo.
+        """
+        data = self.cleaned_data
+
+        # Construir punto de medición si se proporcionó
+        punto_medicion_data = None
+        if data.get('punto_medicion_salida'):
+            punto_medicion_data = {
+                'punto': data.get('punto_medicion_salida'),
+                'valor_referencia': data.get('valor_referencia_salida', ''),
+                'valor_medido': data.get('valor_medido_salida', '')
+            }
+
+        return {
+            'fecha_verificacion': timezone.now().isoformat(),
+            'verificado_por': user.get_full_name() or user.username,
+            'estado_fisico': data.get('estado_fisico_salida'),
+            'funcionalidad': data.get('funcionalidad_salida'),
+            'resultado_general': data.get('funcionalidad_salida'),
+            'punto_medicion': punto_medicion_data
+        }
+
+
+class VerificacionFuncionalForm(forms.Form):
+    """
+    Formulario para registrar verificación funcional de un equipo
+    al momento del préstamo (salida) o devolución (entrada).
+    Incluye campos para mediciones (valor medido vs valor referencia).
+    """
+
+    verificado_por = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Nombre del técnico verificador'}),
+        label='Verificado por'
+    )
+
+    estado_fisico = forms.ChoiceField(
+        choices=[
+            ('Bueno', 'Bueno - Sin daños ni desgaste anormal'),
+            ('Regular', 'Regular - Desgaste normal de uso'),
+            ('Malo', 'Malo - Daños o desgaste excesivo'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Estado Físico del Equipo'
+    )
+
+    observaciones = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-textarea', 'placeholder': 'Observaciones de la verificación...'}),
+        label='Observaciones Generales'
+    )
+
+    resultado_general = forms.ChoiceField(
+        choices=[
+            ('Aprobado', 'Aprobado'),
+            ('No Aprobado', 'No Aprobado'),
+            ('Aprobado con Observaciones', 'Aprobado con Observaciones'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Resultado General'
+    )
+
+    # Campos para puntos de medición (3 puntos)
+    # Punto 1
+    punto_medicion_1 = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Temperatura'}),
+        label='Punto de Medición 1'
+    )
+    valor_referencia_1 = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 25.0°C'}),
+        label='Valor de Referencia 1'
+    )
+    valor_medido_1 = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 25.1°C'}),
+        label='Valor Medido 1'
+    )
+    conformidad_1 = forms.ChoiceField(
+        choices=[
+            ('', '-- Seleccionar --'),
+            ('Conforme', 'Conforme'),
+            ('No Conforme', 'No Conforme'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Conformidad 1'
+    )
+
+    # Punto 2
+    punto_medicion_2 = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Humedad'}),
+        label='Punto de Medición 2'
+    )
+    valor_referencia_2 = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 50%'}),
+        label='Valor de Referencia 2'
+    )
+    valor_medido_2 = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 48%'}),
+        label='Valor Medido 2'
+    )
+    conformidad_2 = forms.ChoiceField(
+        choices=[
+            ('', '-- Seleccionar --'),
+            ('Conforme', 'Conforme'),
+            ('No Conforme', 'No Conforme'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Conformidad 2'
+    )
+
+    # Punto 3
+    punto_medicion_3 = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Presión'}),
+        label='Punto de Medición 3'
+    )
+    valor_referencia_3 = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 101.3 kPa'}),
+        label='Valor de Referencia 3'
+    )
+    valor_medido_3 = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 101.2 kPa'}),
+        label='Valor Medido 3'
+    )
+    conformidad_3 = forms.ChoiceField(
+        choices=[
+            ('', '-- Seleccionar --'),
+            ('Conforme', 'Conforme'),
+            ('No Conforme', 'No Conforme'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Conformidad 3'
+    )
+
+    def get_puntos_medicion(self):
+        """
+        Extrae los puntos de medición del formulario limpio.
+        Retorna una lista de diccionarios con los datos de cada punto.
+        """
+        puntos = []
+        data = self.cleaned_data
+
+        for i in range(1, 4):  # 3 puntos de medición
+            punto = data.get(f'punto_medicion_{i}')
+            if punto:  # Solo agregar si se completó el punto
+                puntos.append({
+                    'punto': punto,
+                    'valor_referencia': data.get(f'valor_referencia_{i}', ''),
+                    'valor_medido': data.get(f'valor_medido_{i}', ''),
+                    'conformidad': data.get(f'conformidad_{i}', '')
+                })
+
+        return puntos
+
+    def to_json(self):
+        """
+        Convierte los datos del formulario a la estructura JSON esperada
+        para almacenar en verificacion_salida o verificacion_entrada.
+        """
+        data = self.cleaned_data
+        return {
+            'fecha_verificacion': timezone.now().isoformat(),
+            'verificado_por': data.get('verificado_por'),
+            'estado_fisico': data.get('estado_fisico'),
+            'observaciones': data.get('observaciones', ''),
+            'resultado_general': data.get('resultado_general'),
+            'puntos_verificacion': self.get_puntos_medicion()
+        }
+
+
+class DevolucionEquipoForm(forms.Form):
+    """
+    Formulario para registrar la devolución de un equipo prestado.
+    Incluye verificación funcional con mediciones de entrada.
+    """
+
+    observaciones_devolucion = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': 'form-textarea',
+            'placeholder': 'Observaciones sobre la devolución del equipo...'
+        }),
+        label='Observaciones de Devolución'
+    )
+
+    documento_devolucion = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-input-file',
+            'accept': '.pdf'
+        }),
+        label='Acta de Devolución (PDF)',
+        help_text='Opcional: Documento firmado de devolución'
+    )
+
+    # Campos de verificación funcional de entrada
+    verificado_por = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Nombre del técnico que recibe'
+        }),
+        label='Recibido por'
+    )
+
+    condicion_equipo = forms.ChoiceField(
+        choices=[
+            ('Bueno', 'Bueno - Sin daños ni desgaste anormal'),
+            ('Regular', 'Regular - Desgaste normal de uso'),
+            ('Malo', 'Malo - Daños o desgaste excesivo'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Condición del Equipo al Devolverlo'
+    )
+
+    verificacion_funcional_ok = forms.ChoiceField(
+        choices=[
+            ('Conforme', 'Conforme - Funciona correctamente'),
+            ('No Conforme', 'No Conforme - Requiere revisión o mantenimiento'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Verificación Funcional'
+    )
+
+    # Campo para punto de medición (solo 1 para rapidez)
+    punto_medicion = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: Temperatura'}),
+        label='Parámetro Medido',
+        help_text='Parámetro principal que se verificó'
+    )
+    valor_referencia = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 25.0°C'}),
+        label='Valor de Referencia'
+    )
+    valor_medido = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Ej: 25.1°C'}),
+        label='Valor Medido'
+    )
+    conformidad = forms.ChoiceField(
+        choices=[
+            ('', '-- Seleccionar --'),
+            ('Conforme', 'Conforme'),
+            ('No Conforme', 'No Conforme'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Conformidad'
+    )
+
+    def clean_documento_devolucion(self):
+        archivo = self.cleaned_data.get('documento_devolucion')
+
+        if archivo:
+            # Validar que sea PDF
+            if not archivo.name.endswith('.pdf'):
+                raise ValidationError('El documento debe ser un archivo PDF')
+
+            # Validar tamaño máximo (10MB)
+            if archivo.size > 10 * 1024 * 1024:
+                raise ValidationError('El archivo no puede ser mayor a 10MB')
+
+        return archivo
+
+    def to_verificacion_json(self):
+        """
+        Convierte los datos del formulario a la estructura JSON
+        para almacenar en verificacion_entrada.
+        """
+        data = self.cleaned_data
+
+        # Construir punto de medición si se proporcionó
+        punto_medicion_data = None
+        if data.get('punto_medicion'):
+            punto_medicion_data = {
+                'punto': data.get('punto_medicion'),
+                'valor_referencia': data.get('valor_referencia', ''),
+                'valor_medido': data.get('valor_medido', ''),
+                'conformidad': data.get('conformidad', '')
+            }
+
+        return {
+            'fecha_verificacion': timezone.now().isoformat(),
+            'verificado_por': data.get('verificado_por'),
+            'condicion_equipo': data.get('condicion_equipo'),
+            'verificacion_funcional': data.get('verificacion_funcional_ok'),
+            'observaciones': data.get('observaciones_devolucion', ''),
+            'resultado_general': 'Aprobado' if data.get('verificacion_funcional_ok') == 'Conforme' else 'No Aprobado',
+            'punto_medicion': punto_medicion_data
+        }

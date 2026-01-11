@@ -6,7 +6,8 @@ from django.utils.translation import gettext_lazy as _ # Importar para las tradu
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
     BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest, MetricasEficienciaMetrologica,
-    TerminosYCondiciones, AceptacionTerminos # Nuevos modelos para términos y condiciones
+    TerminosYCondiciones, AceptacionTerminos, # Nuevos modelos para términos y condiciones
+    PrestamoEquipo, AgrupacionPrestamo # Sistema de préstamos de equipos
 )
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
@@ -382,32 +383,76 @@ class AceptacionTerminosAdmin(admin.ModelAdmin):
         return False
 
 
-# ============================================================================
-# ADMIN DE PRÉSTAMOS
-# ============================================================================
+# ================================
+# ADMIN PARA SISTEMA DE PRÉSTAMOS
+# ================================
+
+@admin.register(AgrupacionPrestamo)
+class AgrupacionPrestamoAdmin(admin.ModelAdmin):
+    """Admin para agrupaciones de préstamos de equipos."""
+    list_display = ('nombre', 'prestatario_nombre', 'empresa', 'fecha_creacion', 'cantidad_prestamos')
+    list_filter = ('empresa', 'fecha_creacion')
+    search_fields = ('nombre', 'prestatario_nombre', 'empresa__nombre')
+    readonly_fields = ('fecha_creacion',)
+    ordering = ('-fecha_creacion',)
+
+    fieldsets = (
+        ('Información de la Agrupación', {
+            'fields': ('nombre', 'prestatario_nombre', 'empresa')
+        }),
+        ('Metadata', {
+            'fields': ('fecha_creacion',)
+        }),
+    )
+
+    def cantidad_prestamos(self, obj):
+        """Muestra la cantidad de préstamos en esta agrupación."""
+        return obj.prestamos.count()
+    cantidad_prestamos.short_description = 'Cantidad de Equipos'
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        # Filtrar por la empresa del usuario actual
+        return qs.filter(empresa=request.user.empresa)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "empresa" and not request.user.is_superuser:
+            kwargs["queryset"] = Empresa.objects.filter(pk=request.user.empresa.pk)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if not request.user.is_superuser:
+            obj.empresa = request.user.empresa
+        super().save_model(request, obj, form, change)
+
 
 @admin.register(PrestamoEquipo)
 class PrestamoEquipoAdmin(admin.ModelAdmin):
+    """Admin para préstamos de equipos."""
     list_display = (
-        'id', 'equipo', 'nombre_prestatario', 'estado_prestamo',
-        'fecha_prestamo', 'fecha_devolucion_programada', 'esta_vencido_display'
+        'get_codigo_equipo', 'nombre_prestatario', 'fecha_prestamo',
+        'fecha_devolucion_programada', 'estado_prestamo', 'dias_transcurridos',
+        'prestado_por', 'empresa'
     )
-    list_filter = ('estado_prestamo', 'fecha_prestamo', 'empresa')
+    list_filter = ('estado_prestamo', 'empresa', 'fecha_prestamo', 'fecha_devolucion_programada')
     search_fields = (
-        'nombre_prestatario', 'cedula_prestatario',
-        'equipo__codigo_interno', 'equipo__nombre'
+        'equipo__codigo_interno', 'equipo__nombre', 'nombre_prestatario',
+        'cedula_prestatario', 'empresa__nombre'
     )
-    readonly_fields = ('fecha_registro',)
-    date_hierarchy = 'fecha_prestamo'
+    readonly_fields = ('fecha_registro', 'fecha_devolucion_real', 'dias_transcurridos')
+    ordering = ('-fecha_prestamo',)
+    raw_id_fields = ['equipo']
 
     fieldsets = (
-        ('Equipo', {
-            'fields': ('equipo', 'empresa')
+        ('Información del Préstamo', {
+            'fields': ('equipo', 'empresa', 'agrupacion', 'estado_prestamo')
         }),
-        ('Prestatario', {
+        ('Datos del Prestatario', {
             'fields': (
-                'nombre_prestatario', 'cedula_prestatario',
-                'cargo_prestatario', 'email_prestatario', 'telefono_prestatario'
+                'nombre_prestatario', 'cedula_prestatario', 'cargo_prestatario',
+                'email_prestatario', 'telefono_prestatario'
             )
         }),
         ('Fechas', {
@@ -416,37 +461,62 @@ class PrestamoEquipoAdmin(admin.ModelAdmin):
                 'fecha_devolucion_real', 'fecha_registro'
             )
         }),
-        ('Estado', {
-            'fields': ('estado_prestamo', 'observaciones_prestamo', 'observaciones_devolucion')
-        }),
-        ('Verificación', {
-            'fields': ('verificacion_salida', 'verificacion_entrada', 'actividades_realizadas'),
+        ('Verificaciones Funcionales', {
+            'fields': ('verificacion_salida', 'verificacion_entrada'),
             'classes': ('collapse',)
         }),
-        ('Documentos', {
+        ('Actividades y Observaciones', {
+            'fields': (
+                'actividades_realizadas', 'observaciones_prestamo',
+                'observaciones_devolucion'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Responsables', {
+            'fields': ('prestado_por', 'recibido_por')
+        }),
+        ('Documentación', {
             'fields': ('documento_prestamo', 'documento_devolucion'),
-            'classes': ('collapse',)
-        }),
-        ('Control', {
-            'fields': ('prestado_por', 'recibido_por', 'agrupacion'),
             'classes': ('collapse',)
         }),
     )
 
-    def esta_vencido_display(self, obj):
-        return "Sí" if obj.esta_vencido() else "No"
-    esta_vencido_display.short_description = 'Vencido'
-    esta_vencido_display.boolean = True
+    def get_codigo_equipo(self, obj):
+        """Muestra el código del equipo prestado."""
+        return obj.equipo.codigo_interno
+    get_codigo_equipo.short_description = 'Código Equipo'
+    get_codigo_equipo.admin_order_field = 'equipo__codigo_interno'
 
+    def dias_transcurridos(self, obj):
+        """Muestra los días que lleva el préstamo."""
+        dias = obj.dias_en_prestamo
+        if obj.esta_vencido:
+            return f"{dias} días (VENCIDO)"
+        return f"{dias} días"
+    dias_transcurridos.short_description = 'Días en Préstamo'
 
-@admin.register(AgrupacionPrestamo)
-class AgrupacionPrestamoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nombre', 'prestatario_nombre', 'empresa', 'fecha_creacion', 'total_prestamos')
-    list_filter = ('fecha_creacion', 'empresa')
-    search_fields = ('nombre', 'prestatario_nombre')
-    readonly_fields = ('fecha_creacion',)
-    date_hierarchy = 'fecha_creacion'
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        # Filtrar por la empresa del usuario actual
+        return qs.filter(empresa=request.user.empresa)
 
-    def total_prestamos(self, obj):
-        return obj.prestamos.count()
-    total_prestamos.short_description = 'Total Préstamos'
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "empresa" and not request.user.is_superuser:
+            kwargs["queryset"] = Empresa.objects.filter(pk=request.user.empresa.pk)
+        if db_field.name == "equipo" and not request.user.is_superuser:
+            # Solo equipos de la empresa del usuario
+            kwargs["queryset"] = Equipo.objects.filter(empresa=request.user.empresa)
+        if db_field.name == "agrupacion" and not request.user.is_superuser:
+            # Solo agrupaciones de la empresa del usuario
+            from .models import AgrupacionPrestamo
+            kwargs["queryset"] = AgrupacionPrestamo.objects.filter(empresa=request.user.empresa)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if not request.user.is_superuser:
+            obj.empresa = request.user.empresa
+        if not change:  # Solo en creación
+            obj.prestado_por = request.user
+        super().save_model(request, obj, form, change)
