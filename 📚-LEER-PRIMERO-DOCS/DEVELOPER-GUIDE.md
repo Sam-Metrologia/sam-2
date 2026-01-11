@@ -12,11 +12,12 @@
 
 ```
 auditorias/
-├── README.md                              # Guía de la carpeta
-├── AUDITORIA_COMPLETA_2025-11-13.md      # Auditoría completa del sistema
-├── PLAN_IMPLEMENTACION_2025-11-13.md      # Plan de mejoras detallado
-├── CAMBIOS_CRITICOS_2025-10-24.md         # Correcciones de seguridad
-├── PROGRESO_FASE1_YYYYMMDD.md             # Reportes de progreso semanales
+├── README.md                                              # Guía de la carpeta
+├── AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md            # Auditoría exhaustiva nivel 9
+├── AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md       # Auditoría cero confianza
+├── LIMPIEZA_COMPLETADA_2025-12-05.md                      # Limpieza de código fase 1
+├── CAMBIOS_CRITICOS_2025-10-24.md                         # Correcciones de seguridad
+├── PROGRESO_FASE1_YYYYMMDD.md                             # Reportes de progreso semanales
 ├── PROGRESO_FASE2_YYYYMMDD.md
 └── ... (análisis técnicos, métricas, etc.)
 ```
@@ -30,7 +31,7 @@ auditorias/
 - ✅ Métricas de performance
 - ✅ Listas de TODOs, bugs encontrados
 
-**Antes de iniciar cualquier mejora grande:** Leer `auditorias/AUDITORIA_COMPLETA_2025-11-13.md`
+**Antes de iniciar cualquier mejora grande:** Leer `auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md`
 
 ---
 

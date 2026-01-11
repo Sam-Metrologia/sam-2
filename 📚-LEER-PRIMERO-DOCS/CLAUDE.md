@@ -50,7 +50,16 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 ### Testing and Quality
 ```bash
-# Run tests
+# Run all tests with pytest (RECOMMENDED - 738 tests)
+pytest
+
+# Run tests with coverage report
+pytest --cov=core --cov-report=html --cov-report=term-missing
+
+# Run specific test file
+pytest tests/test_monitoring/test_monitoring_core.py -v
+
+# Run Django tests (legacy - use pytest instead)
 python manage.py test
 
 # Check for issues

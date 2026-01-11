@@ -50,15 +50,65 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 ### Testing and Quality
 ```bash
-# Run tests
+# Run all tests with pytest (RECOMMENDED - 738 tests)
+pytest
+
+# Run tests with coverage report
+pytest --cov=core --cov-report=html --cov-report=term-missing
+
+# Run specific test file
+pytest tests/test_monitoring/test_monitoring_core.py -v
+
+# Run tests by marker
+pytest -m integration
+
+# Run Django tests (legacy - use pytest instead)
 python manage.py test
 
-# Check for issues
+# Check for code issues
 python manage.py check
 
 # Create cache table (if using database cache)
 python manage.py createcachetable sam_cache_table
 ```
+
+### Test Organization
+
+**Current Status (Jan 10, 2026):**
+- **Total Tests:** 738 tests passing, 0 failing
+- **Coverage:** 54.66% (Goal: 80%)
+- **Organization:** Tests organized by functionality in 9 directories
+
+**Test Structure:**
+```
+tests/
+├── test_critical/      # Critical flow tests
+├── test_integration/   # Integration tests
+├── test_models/        # Model tests (Empresa, Equipo, Usuario)
+├── test_monitoring/    # System monitoring tests (30 tests, 81.50% coverage)
+├── test_notifications/ # Notification system tests (18 tests, 43.07% coverage)
+├── test_security/      # Security and file validation tests
+├── test_services/      # Service layer tests (25 tests for services_new.py)
+├── test_views/         # View and endpoint tests
+└── test_zip/           # ZIP generation tests (39 tests, 50% coverage)
+```
+
+**Recent Improvements (Jan 2026):**
+- ✅ Added 112 new critical tests
+- ✅ Increased coverage from 35.84% to 54.66% (+18.82%)
+- ✅ All tests passing (0 failures)
+- ✅ Tests organized by functionality
+- ✅ monitoring.py: 81.50% coverage (EXCEEDED 70% goal)
+- ✅ services_new.py: 59.24% coverage
+- ✅ zip_functions.py: 50% coverage
+
+**Testing Best Practices:**
+1. Write REAL tests without evasion
+2. Use mocks only for external I/O (storage, email, cache)
+3. Test error handling and edge cases
+4. Organize tests by functionality
+5. Run full test suite before commits
+6. Maintain coverage above 50%
 
 ### Deployment Commands
 ```bash

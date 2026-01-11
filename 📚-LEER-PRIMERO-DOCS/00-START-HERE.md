@@ -119,7 +119,7 @@ sam-2/
    ```bash
    pytest
    ```
-   - 254/268 tests deben pasar (94.8%)
+   - 738/738 tests deben pasar (100%)
    - Si rompes tests existentes, arréglalo ANTES de commit
 
 3. **ACTUALIZA EL CHANGELOG en CADA cambio**
@@ -144,22 +144,23 @@ sam-2/
 
 ## 📊 Estado Actual del Proyecto
 
-**Puntuación Global:** 7.8/10 (+0.6 desde noviembre 2025)
+**Puntuación Global:** 7.5/10 (Auditoría exhaustiva enero 2026)
 
 ### ✅ Fortalezas
-- 94.8% de tests pasando (254/268)
-- Documentación excepcional (9/10)
-- Seguridad robusta (8.5/10) - 0 vulnerabilidades críticas
+- 100% de tests pasando (738/738) - Coverage: 54.66%
+- Documentación robusta (8/10)
+- Seguridad robusta (8/10) - 0 vulnerabilidades críticas
 - Multi-tenancy completo y funcional
 - Sistema de comprobaciones metrológicas operativo
+- Sistema de cola ZIP para optimización de memoria
 
-### 🟡 Áreas de Mejora (Roadmap 8.5/10)
-- Refactorización de `reports.py` (3,154 líneas)
+### 🟡 Áreas de Mejora (Roadmap 8.0/10)
+- Refactorización de `reports.py` (3,268 líneas, 23.51% coverage)
+- Incrementar coverage general de 54.66% a 80%
 - Optimización de queries N+1 en dashboard
-- Migración de campo deprecado `es_periodo_prueba`
-- Optimización de generación de reportes
+- Centralización de constantes dispersas
 
-**Ver detalles completos en:** `auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md`
+**Ver detalles completos en:** `auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md`
 
 ---
 
@@ -181,8 +182,8 @@ sam-2/
 | Historial de cambios | [CHANGELOG.md](./CHANGELOG.md) |
 | Cómo hacer deploy | [DESPLEGAR-EN-RENDER.md](./DESPLEGAR-EN-RENDER.md) |
 | Instrucciones para Claude Code | [CLAUDE.md](./CLAUDE.md) |
-| Estado actual del sistema | `../auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md` |
-| Última auditoría | `../auditorias/AUDITORIA_COMPLETA_2025-12-05.md` |
+| Auditoría exhaustiva nivel 9 | `../auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md` |
+| Auditoría cero confianza | `../auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md` |
 
 ---
 
@@ -201,8 +202,8 @@ Marca cada item cuando lo completes:
 ### Día 2: Exploración
 - [ ] Leer [CONSOLIDATION.md](./CONSOLIDATION.md)
 - [ ] Leer [CHANGELOG.md](./CHANGELOG.md)
-- [ ] Revisar `../auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md`
-- [ ] Revisar `../auditorias/AUDITORIA_COMPLETA_2025-12-05.md`
+- [ ] Revisar `../auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md`
+- [ ] Revisar `../auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md`
 - [ ] Explorar código: `core/models.py`, `core/views/`
 - [ ] Generar datos de prueba: `python manage.py generar_datos_prueba`
 
@@ -276,6 +277,6 @@ git push origin feature/nombre-descriptivo   # Push a rama feature
 
 ---
 
-**Última Actualización:** 5 de Diciembre de 2025
+**Última Actualización:** 10 de Enero de 2026
 
 **¡Bienvenido a SAM Metrología!** 🔬📊
