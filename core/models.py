@@ -1521,6 +1521,27 @@ class Equipo(models.Model):
         else:
             self.proxima_comprobacion = None
 
+    @property
+    def esta_prestado(self):
+        """Verifica si el equipo está actualmente prestado."""
+        return self.prestamos.filter(estado_prestamo='ACTIVO').exists()
+
+    def get_prestamo_activo(self):
+        """Obtiene el préstamo activo del equipo, si existe."""
+        return self.prestamos.filter(estado_prestamo='ACTIVO').first()
+
+    @property
+    def responsable_actual(self):
+        """
+        Retorna el responsable actual del equipo:
+        - Si está prestado: nombre del prestatario
+        - Si está disponible: nombre de la empresa
+        """
+        prestamo_activo = self.get_prestamo_activo()
+        if prestamo_activo:
+            return prestamo_activo.nombre_prestatario
+        return self.empresa.nombre if self.empresa else "Sin asignar"
+
 
 class Calibracion(models.Model):
     """Modelo para registrar las calibraciones de un equipo."""
@@ -3482,15 +3503,50 @@ class PrestamoEquipo(models.Model):
     def __str__(self):
         return f"Préstamo {self.equipo.codigo_interno} - {self.nombre_prestatario} ({self.get_estado_prestamo_display()})"
 
+    @property
     def esta_vencido(self):
         """Verifica si el préstamo está vencido"""
         if self.estado_prestamo == 'ACTIVO' and self.fecha_devolucion_programada:
             return timezone.now().date() > self.fecha_devolucion_programada
         return False
 
-    def dias_prestamo(self):
-        """Calcula la duración del préstamo"""
+    @property
+    def dias_en_prestamo(self):
+        """Calcula la duración del préstamo en días"""
         if self.fecha_devolucion_real:
             return (self.fecha_devolucion_real - self.fecha_prestamo).days
         else:
             return (timezone.now() - self.fecha_prestamo).days
+
+    def devolver(self, user, verificacion_entrada_datos, observaciones=''):
+        """
+        Registra la devolución del equipo.
+
+        Args:
+            user: Usuario que recibe la devolución
+            verificacion_entrada_datos: Dict con datos de verificación de entrada
+            observaciones: Observaciones adicionales de la devolución
+        """
+        self.fecha_devolucion_real = timezone.now()
+        self.estado_prestamo = 'DEVUELTO'
+        self.recibido_por = user
+        self.verificacion_entrada = verificacion_entrada_datos
+        if observaciones:
+            self.observaciones_devolucion = observaciones
+        self.save()
+
+    def cancelar(self, user, motivo=''):
+        """
+        Cancela el préstamo (solo si está activo).
+
+        Args:
+            user: Usuario que cancela
+            motivo: Motivo de la cancelación
+        """
+        if self.estado_prestamo == 'ACTIVO':
+            self.estado_prestamo = 'CANCELADO'
+            self.recibido_por = user
+            self.fecha_devolucion_real = timezone.now()
+            if motivo:
+                self.observaciones_devolucion = f"CANCELADO: {motivo}"
+            self.save()

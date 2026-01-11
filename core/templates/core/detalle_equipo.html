@@ -73,7 +73,14 @@
                 <a href="{% url 'core:generar_hoja_vida_pdf' equipo.pk %}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
                     <i class="fas fa-file-pdf mr-2"></i> Descargar Hoja de Vida PDF
                 </a>
-                
+
+                {# Botón para ver historial de préstamos del equipo #}
+                {% if perms.core.can_view_prestamo %}
+                <a href="{% url 'core:historial_equipo' equipo.pk %}" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-history mr-2"></i> Historial de Préstamos
+                </a>
+                {% endif %}
+
                 {# === Lógica para botones de Estado: Dar de Baja, Inactivar, Activar === #}
                 {% if equipo.estado == 'Activo' %} {# Cualquier usuario autenticado puede inactivar/dar de baja si el equipo está activo #}
                     <a href="{% url 'core:inactivar_equipo' equipo.pk %}" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
