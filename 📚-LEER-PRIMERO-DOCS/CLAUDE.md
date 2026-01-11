@@ -50,7 +50,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 ### Testing and Quality
 ```bash
-# Run all tests with pytest (RECOMMENDED - 738 tests)
+# Run all tests with pytest (RECOMMENDED - 746 tests)
 pytest
 
 # Run tests with coverage report

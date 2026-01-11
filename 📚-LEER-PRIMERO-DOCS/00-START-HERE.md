@@ -119,7 +119,7 @@ sam-2/
    ```bash
    pytest
    ```
-   - 738/738 tests deben pasar (100%)
+   - 736/746 tests deben pasar (100%)
    - Si rompes tests existentes, arréglalo ANTES de commit
 
 3. **ACTUALIZA EL CHANGELOG en CADA cambio**
@@ -144,7 +144,7 @@ sam-2/
 
 ## 📊 Estado Actual del Proyecto
 
-**Puntuación Global:** 7.5/10 (Auditoría exhaustiva enero 2026)
+**Puntuación Global:** 7.8/10 (Auditoría 11 de January de 2026)
 
 ### ✅ Fortalezas
 - 100% de tests pasando (738/738) - Coverage: 54.66%
@@ -182,7 +182,7 @@ sam-2/
 | Historial de cambios | [CHANGELOG.md](./CHANGELOG.md) |
 | Cómo hacer deploy | [DESPLEGAR-EN-RENDER.md](./DESPLEGAR-EN-RENDER.md) |
 | Instrucciones para Claude Code | [CLAUDE.md](./CLAUDE.md) |
-| Auditoría exhaustiva nivel 9 | `../auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md` |
+| Auditoría exhaustiva nivel 9 | `../auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md` |
 | Auditoría cero confianza | `../auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md` |
 
 ---
@@ -202,7 +202,7 @@ Marca cada item cuando lo completes:
 ### Día 2: Exploración
 - [ ] Leer [CONSOLIDATION.md](./CONSOLIDATION.md)
 - [ ] Leer [CHANGELOG.md](./CHANGELOG.md)
-- [ ] Revisar `../auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md`
+- [ ] Revisar `../auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md`
 - [ ] Revisar `../auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-01-10.md`
 - [ ] Explorar código: `core/models.py`, `core/views/`
 - [ ] Generar datos de prueba: `python manage.py generar_datos_prueba`
@@ -277,6 +277,6 @@ git push origin feature/nombre-descriptivo   # Push a rama feature
 
 ---
 
-**Última Actualización:** 10 de Enero de 2026
+**Última Actualización:** 11 de January de 2026
 
 **¡Bienvenido a SAM Metrología!** 🔬📊
