@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import Count, Prefetch, Q
 from datetime import date, timedelta
 from .models import Equipo, Calibracion, Mantenimiento, Comprobacion, Empresa
+from .constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
 
 
 class OptimizedQueries:
@@ -58,9 +59,9 @@ class OptimizedQueries:
         """
         return Empresa.objects.filter(is_deleted=False).annotate(
             total_equipos=Count('equipos'),
-            equipos_activos=Count('equipos', filter=Q(equipos__estado='Activo')),
+            equipos_activos=Count('equipos', filter=Q(equipos__estado=ESTADO_ACTIVO)),
             equipos_mantenimiento=Count('equipos', filter=Q(equipos__estado='En Mantenimiento')),
-            equipos_baja=Count('equipos', filter=Q(equipos__estado='De Baja'))
+            equipos_baja=Count('equipos', filter=Q(equipos__estado=ESTADO_DE_BAJA))
         ).order_by('nombre')
 
     @staticmethod
@@ -134,7 +135,7 @@ class OptimizedQueries:
         base_query = Equipo.objects.select_related('empresa').filter(
             empresa__is_deleted=False  # Solo equipos de empresas activas
         ).exclude(
-            estado__in=['De Baja', 'Inactivo']
+            estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO]
         )
 
         if not user.is_superuser and user.empresa:
@@ -256,7 +257,7 @@ class CacheHelpers:
                 empresa = Empresa.objects.get(id=empresa_id)
                 stats = {
                     'total_equipos': Equipo.objects.filter(empresa=empresa, empresa__is_deleted=False).count(),
-                    'equipos_activos': Equipo.objects.filter(empresa=empresa, estado='Activo', empresa__is_deleted=False).count(),
+                    'equipos_activos': Equipo.objects.filter(empresa=empresa, estado=ESTADO_ACTIVO, empresa__is_deleted=False).count(),
                     'storage_used': empresa.get_total_storage_used_mb(),
                     'storage_limit': empresa.limite_almacenamiento_mb,
                     'equipment_limit': empresa.get_limite_equipos()

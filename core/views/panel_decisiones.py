@@ -3,6 +3,7 @@
 # Basado en la lógica sólida del dashboard técnico
 
 from .base import *
+from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
 from datetime import date, timedelta
 from django.db.models import Sum, Avg, Count, Q
 from decimal import Decimal
@@ -129,7 +130,7 @@ def _calcular_salud_equipo(equipos_para_dashboard, today):
 
     for equipo in equipos_para_dashboard:
         # 1. ESTADO DEL EQUIPO (30%): Activo/Operativo = 100%, otros estados = 0%
-        if equipo.estado in ['Activo', 'Operativo']:
+        if equipo.estado in [ESTADO_ACTIVO, 'Operativo']:
             puntuacion_estado = 100
         else:
             puntuacion_estado = 0
@@ -479,7 +480,7 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
 
     # Usar la misma lógica del dashboard técnico
     equipos_queryset = Equipo.objects.filter(empresa=empresa)
-    equipos_para_dashboard = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+    equipos_para_dashboard = equipos_queryset.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
 
     # 1. SALUD DEL EQUIPO (Pilar 1)
     salud_equipo_data = _calcular_salud_equipo(equipos_para_dashboard, today)
@@ -624,7 +625,7 @@ def _panel_decisiones_sam(request, today, current_year):
 
     for empresa in empresas_queryset:
         equipos_queryset = Equipo.objects.filter(empresa=empresa)
-        equipos_para_dashboard = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+        equipos_para_dashboard = equipos_queryset.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
 
         # Calcular métricas por empresa usando las mismas funciones
         salud_empresa = _calcular_salud_equipo(equipos_para_dashboard, today)
@@ -1099,14 +1100,14 @@ def get_equipos_salud_detalles(request):
 
     # Obtener equipos
     equipos_queryset = Equipo.objects.filter(empresa=empresa)
-    equipos_para_dashboard = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+    equipos_para_dashboard = equipos_queryset.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
 
     # Calcular puntuación de cada equipo
     equipos_detalles = []
 
     for equipo in equipos_para_dashboard:
         # 1. ESTADO DEL EQUIPO (30%)
-        if equipo.estado in ['Activo', 'Operativo']:
+        if equipo.estado in [ESTADO_ACTIVO, 'Operativo']:
             puntuacion_estado = 100
         else:
             puntuacion_estado = 0

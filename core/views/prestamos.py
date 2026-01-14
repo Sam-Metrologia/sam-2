@@ -14,6 +14,10 @@ from django.http import HttpResponseForbidden
 
 from ..models import PrestamoEquipo, AgrupacionPrestamo, Equipo
 from ..forms import PrestamoEquipoForm, DevolucionEquipoForm
+from ..constants import (
+    ESTADO_ACTIVO, ESTADO_DE_BAJA,
+    PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO, PRESTAMO_VENCIDO, PRESTAMO_CANCELADO,
+)
 
 
 @login_required
@@ -27,7 +31,7 @@ def listar_prestamos(request):
     # Los devueltos ya están en el historial del equipo
     prestamos = PrestamoEquipo.objects.select_related(
         'equipo', 'empresa', 'prestado_por', 'recibido_por'
-    ).filter(empresa=request.user.empresa).exclude(estado_prestamo='DEVUELTO')
+    ).filter(empresa=request.user.empresa).exclude(estado_prestamo=PRESTAMO_DEVUELTO)
 
     # Filtro por estado
     estado_filter = request.GET.get('estado')
@@ -54,9 +58,9 @@ def listar_prestamos(request):
 
     # Estadísticas
     total_prestamos = prestamos.count()
-    prestamos_activos = prestamos.filter(estado_prestamo='ACTIVO').count()
+    prestamos_activos = prestamos.filter(estado_prestamo=PRESTAMO_ACTIVO).count()
     prestamos_vencidos = prestamos.filter(
-        estado_prestamo='ACTIVO',
+        estado_prestamo=PRESTAMO_ACTIVO,
         fecha_devolucion_programada__lt=timezone.now().date()
     ).count()
 
@@ -118,7 +122,7 @@ def crear_prestamo(request):
                         fecha_devolucion_programada=form.cleaned_data.get('fecha_devolucion_programada'),
                         observaciones_prestamo=form.cleaned_data.get('observaciones_prestamo', ''),
                         prestado_por=request.user,
-                        estado_prestamo='ACTIVO',
+                        estado_prestamo=PRESTAMO_ACTIVO,
                         verificacion_salida=verificacion_salida_data
                     )
                     prestamo.save()
@@ -187,7 +191,7 @@ def detalle_prestamo(request, pk):
     otros_prestamos = PrestamoEquipo.objects.filter(
         empresa=request.user.empresa,
         nombre_prestatario=prestamo.nombre_prestatario,
-        estado_prestamo='ACTIVO'
+        estado_prestamo=PRESTAMO_ACTIVO
     ).exclude(pk=prestamo.pk).select_related('equipo')[:5]
 
     context = {
@@ -270,7 +274,7 @@ def dashboard_prestamos(request):
     # Préstamos activos de la empresa
     prestamos_activos = PrestamoEquipo.objects.filter(
         empresa=request.user.empresa,
-        estado_prestamo='ACTIVO'
+        estado_prestamo=PRESTAMO_ACTIVO
     ).select_related('equipo').order_by('nombre_prestatario', '-fecha_prestamo')
 
     # Agrupar por prestatario
@@ -308,7 +312,7 @@ def dashboard_prestamos(request):
     # Estadísticas de equipos disponibles/prestados
     total_equipos = Equipo.objects.filter(
         empresa=request.user.empresa,
-        estado='Activo'  # Solo contar equipos activos
+        estado=ESTADO_ACTIVO  # Solo contar equipos activos
     ).count()
     equipos_prestados = prestamos_activos.values('equipo').distinct().count()
     equipos_disponibles = total_equipos - equipos_prestados
@@ -346,8 +350,8 @@ def historial_equipo(request, equipo_id):
 
     # Estadísticas del equipo
     total_prestamos = prestamos.count()
-    prestamos_activos = prestamos.filter(estado_prestamo='ACTIVO').count()
-    prestamos_devueltos = prestamos.filter(estado_prestamo='DEVUELTO').count()
+    prestamos_activos = prestamos.filter(estado_prestamo=PRESTAMO_ACTIVO).count()
+    prestamos_devueltos = prestamos.filter(estado_prestamo=PRESTAMO_DEVUELTO).count()
 
     # Agrupar por año
     from datetime import datetime
@@ -383,7 +387,7 @@ def equipos_disponibles(request):
     # Obtener todos los equipos activos de la empresa
     equipos_activos = Equipo.objects.filter(
         empresa=request.user.empresa,
-        estado='Activo'
+        estado=ESTADO_ACTIVO
     ).select_related('empresa').prefetch_related(
         'prestamos'
     ).order_by('codigo_interno')
@@ -409,7 +413,7 @@ def equipos_prestados(request):
     # Obtener préstamos activos de la empresa
     prestamos_activos = PrestamoEquipo.objects.filter(
         empresa=request.user.empresa,
-        estado_prestamo='ACTIVO'
+        estado_prestamo=PRESTAMO_ACTIVO
     ).select_related('equipo', 'equipo__empresa').order_by('equipo__codigo_interno')
 
     # Crear lista de equipos con información del préstamo

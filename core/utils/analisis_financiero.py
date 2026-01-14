@@ -4,6 +4,9 @@
 from django.db.models import Sum, Avg, Count, Q
 from datetime import date
 from ..models import Calibracion, Mantenimiento, Comprobacion, Equipo
+import logging
+
+logger = logging.getLogger('core')
 
 
 def calcular_analisis_financiero_empresa(empresa, current_year, today):

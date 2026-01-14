@@ -4,6 +4,10 @@
 from .base import *
 import json
 from django.core.cache import cache
+from ..constants import (
+    ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA,
+    PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO,
+)
 
 
 def get_justificacion_incumplimiento(equipo, status):
@@ -23,10 +27,10 @@ def get_justificacion_incumplimiento(equipo, status):
 
     estado = equipo.estado
 
-    if estado == 'Inactivo':
+    if estado == ESTADO_INACTIVO:
         justificacion = equipo.observaciones or "Equipo inactivo sin observaciones registradas"
 
-    elif estado == 'De Baja':
+    elif estado == ESTADO_DE_BAJA:
         # Buscar registro de baja
         if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
             baja = equipo.baja_registro
@@ -36,7 +40,7 @@ def get_justificacion_incumplimiento(equipo, status):
         else:
             justificacion = "Equipo dado de baja sin registro detallado"
 
-    elif estado == 'Activo':
+    elif estado == ESTADO_ACTIVO:
         justificacion = equipo.observaciones or "Equipo activo - no cumplió sin observaciones registradas"
 
     else:
@@ -341,7 +345,7 @@ def _get_estadisticas_equipos(equipos_queryset):
 
     estadisticas = equipos_queryset.aggregate(
         total_equipos=Count('id'),
-        equipos_activos=Count(Case(When(estado='Activo', then=1), output_field=IntegerField())),
+        equipos_activos=Count(Case(When(estado=ESTADO_ACTIVO, then=1), output_field=IntegerField())),
         equipos_inactivos=Count(Case(When(estado='Inactivo', then=1), output_field=IntegerField())),
         equipos_de_baja=Count(Case(When(estado='De Baja', then=1), output_field=IntegerField()))
     )
@@ -996,7 +1000,7 @@ def _get_prestamos_data(user, selected_company_id):
 
     # Estadísticas de préstamos
     prestamos_activos = prestamos_queryset.filter(
-        estado_prestamo='ACTIVO',
+        estado_prestamo=PRESTAMO_ACTIVO,
         fecha_devolucion_real__isnull=True
     )
 

@@ -10,6 +10,10 @@ from django.utils import timezone
 import json
 
 from ..models import Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion, MetricasEficienciaMetrologica
+from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
+import logging
+
+logger = logging.getLogger('core')
 
 
 def calcular_metricas_eficiencia(empresa):
@@ -78,7 +82,7 @@ def calcular_metricas_eficiencia(empresa):
 
         # 5. Disponibilidad operativa (equipos que NO están fuera de servicio)
         # Un equipo está disponible si no está en estado "Fuera de Servicio" o "De Baja"
-        equipos_disponibles = equipos_empresa.exclude(estado__in=['Fuera de Servicio', 'De Baja']).count()
+        equipos_disponibles = equipos_empresa.exclude(estado__in=['Fuera de Servicio', ESTADO_DE_BAJA]).count()
         disponibilidad = (equipos_disponibles / total_equipos) * 100
 
         # 6. Tiempo promedio gestión (realista para calibraciones externas)

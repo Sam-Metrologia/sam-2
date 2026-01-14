@@ -5,6 +5,7 @@ from .base import *
 import zipfile
 import threading
 import time
+from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
 
 # =============================================================================
 # API ENDPOINTS FOR PROGRESS TRACKING (Fase 3)
@@ -472,7 +473,7 @@ def informe_vencimientos_pdf(request):
             equipos_base_query = Equipo.objects.none()
 
         # Excluir equipos inactivos
-        equipos_base_query = equipos_base_query.exclude(estado__in=['De Baja', 'Inactivo'])
+        equipos_base_query = equipos_base_query.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
 
         # Generar actividades programadas
         scheduled_activities = _get_scheduled_activities(equipos_base_query, today)
@@ -836,7 +837,7 @@ def _get_scheduled_activities(equipos_queryset, today):
     scheduled_activities = []
 
     # Filtrar solo equipos activos
-    equipos_activos = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+    equipos_activos = equipos_queryset.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
 
     # Calibraciones
     for equipo in equipos_activos.filter(proxima_calibracion__isnull=False):
@@ -1403,7 +1404,7 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         imagen_equipo_url = get_pdf_image_data(equipo.imagen_equipo) if equipo.imagen_equipo else None
         # SOLO mostrar documento de baja si el equipo realmente está dado de baja
         documento_baja_url = (get_pdf_file_url(baja_registro.documento_baja)
-                             if baja_registro and baja_registro.documento_baja and equipo.estado == 'De Baja'
+                             if baja_registro and baja_registro.documento_baja and equipo.estado == ESTADO_DE_BAJA
                              else None)
 
         for cal in calibraciones:
@@ -1426,7 +1427,7 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
             'calibraciones': calibraciones,
             'mantenimientos': mantenimientos,
             'comprobaciones': comprobaciones,
-            'baja_registro': baja_registro if equipo.estado == 'De Baja' else None,
+            'baja_registro': baja_registro if equipo.estado == ESTADO_DE_BAJA else None,
             'logo_empresa_url': logo_empresa_url,
             'imagen_equipo_url': imagen_equipo_url,
             'documento_baja_url': documento_baja_url,
@@ -1508,8 +1509,8 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
 
     equipos_list = list(equipos_queryset)
     total_equipos = len(equipos_list)
-    equipos_activos = sum(1 for eq in equipos_list if eq.estado == 'Activo')
-    equipos_inactivos = sum(1 for eq in equipos_list if eq.estado == 'Inactivo')
+    equipos_activos = sum(1 for eq in equipos_list if eq.estado == ESTADO_ACTIVO)
+    equipos_inactivos = sum(1 for eq in equipos_list if eq.estado == ESTADO_INACTIVO)
     equipos_baja = sum(1 for eq in equipos_list if eq.estado == 'De Baja')
 
     # Estadísticas por tipo

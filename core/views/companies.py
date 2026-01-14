@@ -2,6 +2,7 @@
 # Views para gestión de empresas, ubicaciones y planes
 
 from .base import *
+from ..constants import ESTADO_ACTIVO
 
 # =============================================================================
 # MAIN COMPANY VIEWS

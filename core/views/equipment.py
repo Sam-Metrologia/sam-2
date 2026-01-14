@@ -2,6 +2,10 @@
 # Views relacionadas con la gestión de equipos
 
 from .base import *
+from ..constants import (
+    ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_EN_CALIBRACION,
+    ESTADO_EN_COMPROBACION, ESTADO_EN_MANTENIMIENTO, ESTADO_DE_BAJA,
+)
 
 
 def sanitize_filename(filename):
@@ -111,12 +115,12 @@ def home(request):
     else:
         # Por defecto, no mostrar "De Baja" a menos que se filtre explícitamente por él
         if not user.is_superuser or (user.is_superuser and not selected_company_id):
-            equipos_list = equipos_list.exclude(estado='De Baja').exclude(estado='Inactivo')
+            equipos_list = equipos_list.exclude(estado=ESTADO_DE_BAJA).exclude(estado=ESTADO_INACTIVO)
 
     # Añadir lógica para el estado de las fechas de próxima actividad
     for equipo in equipos_list:
         # Calibración
-        if equipo.proxima_calibracion and equipo.estado not in ['De Baja', 'Inactivo']:
+        if equipo.proxima_calibracion and equipo.estado not in [ESTADO_DE_BAJA, ESTADO_INACTIVO]:
             days_remaining = (equipo.proxima_calibracion - today).days
             if days_remaining < 0:
                 equipo.proxima_calibracion_status = 'text-red-600 font-bold'
@@ -130,7 +134,7 @@ def home(request):
             equipo.proxima_calibracion_status = 'text-gray-500'
 
         # Mantenimiento
-        if equipo.proximo_mantenimiento and equipo.estado not in ['De Baja', 'Inactivo']:
+        if equipo.proximo_mantenimiento and equipo.estado not in [ESTADO_DE_BAJA, ESTADO_INACTIVO]:
             days_remaining = (equipo.proximo_mantenimiento - today).days
             if days_remaining < 0:
                 equipo.proximo_mantenimiento_status = 'text-red-600 font-bold'
@@ -144,7 +148,7 @@ def home(request):
             equipo.proximo_mantenimiento_status = 'text-gray-500'
 
         # Comprobación
-        if equipo.proxima_comprobacion and equipo.estado not in ['De Baja', 'Inactivo']:
+        if equipo.proxima_comprobacion and equipo.estado not in [ESTADO_DE_BAJA, ESTADO_INACTIVO]:
             days_remaining = (equipo.proxima_comprobacion - today).days
             if days_remaining < 0:
                 equipo.proxima_comprobacion_status = 'text-red-600 font-bold'
@@ -1018,12 +1022,12 @@ def activar_equipo(request, equipo_pk):
                 logger.info(f"Equipo reactivado desde baja ID: {equipo.pk} por usuario {request.user.username}")
             except BajaEquipo.DoesNotExist:
                 # No había registro de baja, solo cambiar estado
-                equipo.estado = 'Activo'
+                equipo.estado = ESTADO_ACTIVO
                 equipo.save()
                 messages.warning(request, f'Equipo {equipo.codigo_interno} activado. No se encontró registro de baja asociado.')
         else:
             # Equipo inactivo o en otro estado, solo cambiar estado
-            equipo.estado = 'Activo'
+            equipo.estado = ESTADO_ACTIVO
             equipo.save()
             messages.success(request, f'Equipo {equipo.codigo_interno} activado exitosamente.')
     except Exception as e:

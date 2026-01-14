@@ -3,6 +3,7 @@
 
 from .base import *
 import logging
+from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
 
 # Logger específico para activities
 logger = logging.getLogger('activities')
@@ -714,7 +715,7 @@ def dar_baja_equipo(request, equipo_pk):
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
     # Verificar si ya está dado de baja o ya tiene un registro de baja
-    if equipo.estado == 'De Baja':
+    if equipo.estado == ESTADO_DE_BAJA:
         messages.warning(request, f'El equipo "{equipo.nombre}" ya está dado de baja.')
         return redirect('core:detalle_equipo', pk=equipo.pk)
 
@@ -799,16 +800,16 @@ def inactivar_equipo(request, equipo_pk):
         return redirect('core:detalle_equipo', pk=equipo_pk)
 
     # Verificar estado actual
-    if equipo.estado == 'Inactivo':
+    if equipo.estado == ESTADO_INACTIVO:
         messages.info(request, f'El equipo "{equipo.nombre}" ya está inactivo.')
         return redirect('core:detalle_equipo', pk=equipo_pk)
-    elif equipo.estado == 'De Baja':
+    elif equipo.estado == ESTADO_DE_BAJA:
         messages.error(request, f'El equipo "{equipo.nombre}" ha sido dado de baja de forma permanente y no puede ser inactivado.')
         return redirect('core:detalle_equipo', pk=equipo_pk)
 
     if request.method == 'POST':
         # Cambiar estado a inactivo y limpiar próximas fechas
-        equipo.estado = 'Inactivo'
+        equipo.estado = ESTADO_INACTIVO
         equipo.proxima_calibracion = None
         equipo.proximo_mantenimiento = None
         equipo.proxima_comprobacion = None
@@ -843,13 +844,13 @@ def activar_equipo(request, equipo_pk):
         return redirect('core:detalle_equipo', pk=equipo_pk)
 
     # Verificar estado actual
-    if equipo.estado == 'Activo':
+    if equipo.estado == ESTADO_ACTIVO:
         messages.info(request, f'El equipo "{equipo.nombre}" ya está activo.')
         return redirect('core:detalle_equipo', pk=equipo_pk)
 
     if request.method == 'POST':
         try:
-            if equipo.estado == 'De Baja':
+            if equipo.estado == ESTADO_DE_BAJA:
                 # Eliminar registro de baja y activar
                 try:
                     baja_registro = BajaEquipo.objects.get(equipo=equipo)
@@ -857,13 +858,13 @@ def activar_equipo(request, equipo_pk):
                     messages.success(request, f'Equipo "{equipo.nombre}" activado exitosamente y registro de baja eliminado.')
                     logger.info(f"Equipo reactivado desde baja ID: {equipo.pk} por usuario {request.user.username}")
                 except BajaEquipo.DoesNotExist:
-                    equipo.estado = 'Activo'
+                    equipo.estado = ESTADO_ACTIVO
                     equipo.save(update_fields=['estado'])
                     messages.warning(request, f'Equipo "{equipo.nombre}" activado. No se encontró registro de baja asociado.')
 
-            elif equipo.estado == 'Inactivo':
+            elif equipo.estado == ESTADO_INACTIVO:
                 # Activar y recalcular próximas fechas
-                equipo.estado = 'Activo'
+                equipo.estado = ESTADO_ACTIVO
                 equipo.calcular_proxima_calibracion()
                 equipo.calcular_proximo_mantenimiento()
                 equipo.calcular_proxima_comprobacion()
@@ -909,7 +910,7 @@ def programmed_activities_list(request):
         equipos_base_query = Equipo.objects.none()
 
     # Excluir equipos "De Baja" y "Inactivo" para esta lista
-    equipos_base_query = equipos_base_query.exclude(estado__in=['De Baja', 'Inactivo'])
+    equipos_base_query = equipos_base_query.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
 
     calibraciones_query = equipos_base_query.filter(
         proxima_calibracion__isnull=False

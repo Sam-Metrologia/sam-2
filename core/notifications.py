@@ -9,6 +9,10 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from .models import Equipo, Empresa, CustomUser
 import logging
+from .constants import (
+    ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA,
+    ESTADO_EN_CALIBRACION, ESTADO_EN_MANTENIMIENTO
+)
 
 logger = logging.getLogger('core')
 
@@ -298,7 +302,7 @@ class NotificationScheduler:
         equipos_comprobacion_proximas = empresa.equipos.filter(
             proxima_comprobacion__gte=today,  # Solo futuras
             proxima_comprobacion__lte=target_date,
-            estado__in=['Activo', 'En Calibración', 'En Mantenimiento']
+            estado__in=[ESTADO_ACTIVO, ESTADO_EN_CALIBRACION, 'En Mantenimiento']
         ).select_related('empresa').order_by('proxima_comprobacion')
 
         # ACTIVIDADES VENCIDAS (hasta 30 días atrás)
@@ -317,7 +321,7 @@ class NotificationScheduler:
         equipos_comprobacion_vencidas = empresa.equipos.filter(
             proxima_comprobacion__lt=today,  # Vencidas
             proxima_comprobacion__gte=today - timedelta(days=30),  # Máximo 30 días atrás
-            estado__in=['Activo', 'En Calibración', 'En Mantenimiento']
+            estado__in=[ESTADO_ACTIVO, ESTADO_EN_CALIBRACION, 'En Mantenimiento']
         ).select_related('empresa').order_by('proxima_comprobacion')
 
         # Contar totales
@@ -427,7 +431,7 @@ class NotificationScheduler:
                 has_activities = (
                     empresa.equipos.filter(proxima_calibracion=target_date, estado__in=['Activo', 'En Mantenimiento', 'En Comprobación']).exists() or
                     empresa.equipos.filter(proximo_mantenimiento=target_date, estado__in=['Activo', 'En Calibración', 'En Comprobación']).exists() or
-                    empresa.equipos.filter(proxima_comprobacion=target_date, estado__in=['Activo', 'En Calibración', 'En Mantenimiento']).exists()
+                    empresa.equipos.filter(proxima_comprobacion=target_date, estado__in=[ESTADO_ACTIVO, ESTADO_EN_CALIBRACION, 'En Mantenimiento']).exists()
                 )
 
                 if has_activities:
@@ -565,7 +569,7 @@ class NotificationScheduler:
             # COMPROBACIONES VENCIDAS
             for equipo in empresa.equipos.filter(
                 proxima_comprobacion__lt=today,
-                estado__in=['Activo', 'En Calibración', 'En Mantenimiento']
+                estado__in=[ESTADO_ACTIVO, ESTADO_EN_CALIBRACION, 'En Mantenimiento']
             ).select_related('empresa'):
                 puede_enviar, numero_recordatorio = NotificacionVencimiento.puede_enviar_recordatorio(
                     equipo, 'comprobacion', equipo.proxima_comprobacion

@@ -11,6 +11,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 import threading
+from .constants import ESTADO_ACTIVO, ESTADO_EN_MANTENIMIENTO, ESTADO_EN_COMPROBACION
 
 logger = logging.getLogger('core')
 
@@ -130,7 +131,7 @@ class AdminService:
                         for empresa in empresas:
                             overdue_count += empresa.equipos.filter(
                                 proxima_calibracion__lt=today,
-                                estado__in=['Activo', 'En Mantenimiento', 'En Comprobación']
+                                estado__in=[ESTADO_ACTIVO, ESTADO_EN_MANTENIMIENTO, ESTADO_EN_COMPROBACION]
                             ).count()
                             overdue_count += empresa.equipos.filter(
                                 proximo_mantenimiento__lt=today,

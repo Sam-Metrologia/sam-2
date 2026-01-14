@@ -15,6 +15,7 @@ from django.core.files.storage import default_storage
 from django.db.models import Max
 from .models import ZipRequest, Empresa, Equipo, Proveedor, Procedimiento
 from .zip_functions import stream_file_to_zip_local
+from .constants import ESTADO_DE_BAJA
 
 logger = logging.getLogger('core')
 
@@ -418,7 +419,7 @@ class AsyncZipProcessor:
                                     logger.error(f"Error añadiendo documento del equipo: {e}")
 
                         # f) Carpeta de Baja SOLO si estado = 'De Baja' (IGUAL que original)
-                        if equipo.estado == 'De Baja':
+                        if equipo.estado == ESTADO_DE_BAJA:
                             try:
                                 baja_registro = equipo.baja_registro
                                 if baja_registro and baja_registro.documento_baja:

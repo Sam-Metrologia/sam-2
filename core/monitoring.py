@@ -9,6 +9,7 @@ from core.models import Empresa, Equipo, Calibracion, Mantenimiento, Comprobacio
 from datetime import datetime, timedelta
 import logging
 import json
+from .constants import ESTADO_ACTIVO, ESTADO_EN_CALIBRACION
 
 logger = logging.getLogger('core')
 
@@ -292,13 +293,13 @@ class SystemMonitor:
             # Métricas de equipos (solo de empresas activas)
             equipos_activos = Equipo.objects.filter(
                 empresa__is_deleted=False,
-                estado='Activo'
+                estado=ESTADO_ACTIVO
             ).count()
             equipos_mantenimiento = Equipo.objects.filter(
                 empresa__is_deleted=False,
                 estado='En Mantenimiento'
             ).count()
-            equipos_calibracion = Equipo.objects.filter(estado='En Calibración').count()
+            equipos_calibracion = Equipo.objects.filter(estado=ESTADO_EN_CALIBRACION).count()
 
             # Métricas de actividades recientes
             calibraciones_semana = Calibracion.objects.filter(fecha_calibracion__gte=last_week).count()

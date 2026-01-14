@@ -18,6 +18,58 @@ import uuid # Importar uuid para generar nombres únicos temporales
 import json # Para almacenar configuraciones JSON
 import logging # Para logging en métodos de eliminación/restauración
 
+# Importar constantes centralizadas
+from .constants import (
+    # Estados de equipos
+    ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_EN_CALIBRACION,
+    ESTADO_EN_COMPROBACION, ESTADO_EN_MANTENIMIENTO, ESTADO_DE_BAJA,
+    ESTADO_EN_PRESTAMO, EQUIPO_ESTADO_CHOICES,
+    # Tipos de equipos
+    TIPO_EQUIPO_MEDICION, TIPO_EQUIPO_ENSAYO, TIPO_EQUIPO_PATRON,
+    TIPO_EQUIPO_AUXILIAR, TIPO_EQUIPO_CHOICES,
+    # Tipos de servicios
+    SERVICIO_CALIBRACION, SERVICIO_VERIFICACION, SERVICIO_ENSAYO,
+    SERVICIO_OTRO, TIPO_SERVICIO_CHOICES,
+    # Tipos de mantenimiento
+    MANTENIMIENTO_PREVENTIVO, MANTENIMIENTO_CORRECTIVO,
+    MANTENIMIENTO_PREDICTIVO, TIPO_MANTENIMIENTO_CHOICES,
+    # Estados de préstamos
+    PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO, PRESTAMO_VENCIDO,
+    PRESTAMO_CANCELADO, PRESTAMO_ESTADO_CHOICES,
+    # Roles
+    ROLE_ADMIN, ROLE_USER, ROLE_VIEWER, ROLE_CHOICES,
+    # Modalidades de pago
+    MODALIDAD_GRATIS, MODALIDAD_PRUEBA, MODALIDAD_PAGO,
+    MODALIDAD_PAGO_CHOICES,
+    # Estados de tareas
+    TASK_STATUS_PENDING, TASK_STATUS_RUNNING, TASK_STATUS_COMPLETED,
+    TASK_STATUS_FAILED, TASK_STATUS_CANCELLED, TASK_STATUS_CHOICES,
+    # Estados de notificaciones
+    NOTIFICATION_STATUS_UNREAD, NOTIFICATION_STATUS_READ,
+    NOTIFICATION_STATUS_ARCHIVED, NOTIFICATION_STATUS_CHOICES,
+    NOTIFICATION_TYPE_INFO, NOTIFICATION_TYPE_SUCCESS,
+    NOTIFICATION_TYPE_WARNING, NOTIFICATION_TYPE_ERROR,
+    NOTIFICATION_TIPO_CHOICES,
+    # Estados de salud
+    HEALTH_STATUS_HEALTHY, HEALTH_STATUS_WARNING,
+    HEALTH_STATUS_CRITICAL, HEALTH_STATUS_UNKNOWN,
+    HEALTH_STATUS_CHOICES,
+    # Límites
+    DEFAULT_EQUIPMENT_LIMIT, MAX_EQUIPMENT_LIMIT,
+    FREE_PLAN_EQUIPMENT_LIMIT, TRIAL_PLAN_EQUIPMENT_LIMIT,
+    DEFAULT_STORAGE_LIMIT_MB, MAX_STORAGE_LIMIT_MB,
+    FREE_PLAN_STORAGE_MB, TRIAL_PLAN_STORAGE_MB,
+    MAX_FILE_SIZE_MB, MAX_LOGO_SIZE_MB,
+    TRIAL_DURATION_DAYS, TRIAL_WARNING_DAYS,
+    # Formatos permitidos
+    ALLOWED_IMAGE_FORMATS, ALLOWED_DOCUMENT_FORMATS,
+    ALLOWED_CERTIFICATE_FORMATS,
+    # Paginación
+    PAGINATION_SIZE,
+    # Notificaciones
+    NOTIFICATION_DAYS_BEFORE, PROXIMAS_DIAS,
+)
+
 # Configurar logger para este módulo
 logger = logging.getLogger('core')
 
@@ -1263,14 +1315,9 @@ class Equipo(models.Model):
         ('Otro', 'Otro'),
     ]
 
-    ESTADO_CHOICES = [
-        ('Activo', 'Activo'),
-        ('En Mantenimiento', 'En Mantenimiento'),
-        ('En Calibración', 'En Calibración'),
-        ('En Comprobación', 'En Comprobación'),
-        ('Inactivo', 'Inactivo'), # NUEVO ESTADO: Equipo que no se usa temporalmente
-        ('De Baja', 'De Baja'), # Equipo dado de baja, no vuelve a operar
-    ]
+    # Usar constantes centralizadas (importadas desde constants.py)
+    # Referencia a constante para compatibilidad con tests
+    ESTADO_CHOICES = EQUIPO_ESTADO_CHOICES
 
     codigo_interno = models.CharField(max_length=100, unique=False, help_text="Código interno único por empresa.") # Se valida la unicidad a nivel de formulario/vista
     nombre = models.CharField(max_length=200, verbose_name="Nombre del Equipo")
@@ -1279,12 +1326,12 @@ class Equipo(models.Model):
     marca = models.CharField(max_length=100, blank=True, null=True, verbose_name="Marca")
     modelo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
     numero_serie = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número de Serie")
-    
+
     # Campo para la ubicación - ahora como TextField
     ubicacion = models.CharField(max_length=255, blank=True, null=True, verbose_name="Ubicación") # Ahora CharField
 
     responsable = models.CharField(max_length=100, blank=True, null=True, verbose_name="Responsable")
-    estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='Activo', verbose_name="Estado")
+    estado = models.CharField(max_length=50, choices=EQUIPO_ESTADO_CHOICES, default=ESTADO_ACTIVO, verbose_name="Estado")
     fecha_adquisicion = models.DateField(blank=True, null=True, verbose_name="Fecha de Adquisición")
     fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
     
@@ -1524,11 +1571,11 @@ class Equipo(models.Model):
     @property
     def esta_prestado(self):
         """Verifica si el equipo está actualmente prestado."""
-        return self.prestamos.filter(estado_prestamo='ACTIVO').exists()
+        return self.prestamos.filter(estado_prestamo=PRESTAMO_ACTIVO).exists()
 
     def get_prestamo_activo(self):
         """Obtiene el préstamo activo del equipo, si existe."""
-        return self.prestamos.filter(estado_prestamo='ACTIVO').first()
+        return self.prestamos.filter(estado_prestamo=PRESTAMO_ACTIVO).first()
 
     @property
     def responsable_actual(self):
@@ -1962,8 +2009,8 @@ def set_equipo_de_baja(sender, instance, created, **kwargs):
     if created: # Solo actuar cuando se crea un nuevo registro de baja
         equipo = instance.equipo
         # Si el equipo no está ya 'De Baja', se cambia el estado
-        if equipo.estado != 'De Baja':
-            equipo.estado = 'De Baja'
+        if equipo.estado != ESTADO_DE_BAJA:
+            equipo.estado = ESTADO_DE_BAJA
             # Poner a None las próximas fechas si está de baja
             equipo.proxima_calibracion = None
             equipo.proximo_mantenimiento = None
@@ -1975,8 +2022,8 @@ def set_equipo_activo_on_delete_baja(sender, instance, **kwargs):
     equipo = instance.equipo
     # Solo cambiar a 'Activo' si NO quedan otros registros de baja para este equipo
     if not BajaEquipo.objects.filter(equipo=equipo).exists():
-        if equipo.estado == 'De Baja': # Solo cambiar si estaba en estado 'De Baja' por este registro
-            equipo.estado = 'Activo' # O el estado por defecto que desees
+        if equipo.estado == ESTADO_DE_BAJA: # Solo cambiar si estaba en estado 'De Baja' por este registro
+            equipo.estado = ESTADO_ACTIVO # O el estado por defecto que desees
             # Recalcular las próximas fechas después de reactivar
             equipo.calcular_proxima_calibracion()
             equipo.calcular_proximo_mantenimiento()
@@ -3338,12 +3385,8 @@ class PrestamoEquipo(models.Model):
     Registro de préstamos de equipos a personal interno o externo
     con trazabilidad completa y verificación funcional
     """
-    ESTADO_CHOICES = [
-        ('ACTIVO', 'En Préstamo'),
-        ('DEVUELTO', 'Devuelto'),
-        ('VENCIDO', 'Vencido (no devuelto a tiempo)'),
-        ('CANCELADO', 'Cancelado'),
-    ]
+    # Usar constantes centralizadas (importadas desde constants.py)
+    # ESTADO_CHOICES removido - usar PRESTAMO_ESTADO_CHOICES desde constants.py
 
     # Información del equipo
     equipo = models.ForeignKey(
@@ -3403,8 +3446,8 @@ class PrestamoEquipo(models.Model):
     # Estado y control
     estado_prestamo = models.CharField(
         max_length=20,
-        choices=ESTADO_CHOICES,
-        default='ACTIVO',
+        choices=PRESTAMO_ESTADO_CHOICES,
+        default=PRESTAMO_ACTIVO,
         verbose_name="Estado del Préstamo"
     )
 
@@ -3506,7 +3549,7 @@ class PrestamoEquipo(models.Model):
     @property
     def esta_vencido(self):
         """Verifica si el préstamo está vencido"""
-        if self.estado_prestamo == 'ACTIVO' and self.fecha_devolucion_programada:
+        if self.estado_prestamo == PRESTAMO_ACTIVO and self.fecha_devolucion_programada:
             return timezone.now().date() > self.fecha_devolucion_programada
         return False
 
@@ -3528,7 +3571,7 @@ class PrestamoEquipo(models.Model):
             observaciones: Observaciones adicionales de la devolución
         """
         self.fecha_devolucion_real = timezone.now()
-        self.estado_prestamo = 'DEVUELTO'
+        self.estado_prestamo = PRESTAMO_DEVUELTO
         self.recibido_por = user
         self.verificacion_entrada = verificacion_entrada_datos
         if observaciones:
@@ -3543,8 +3586,8 @@ class PrestamoEquipo(models.Model):
             user: Usuario que cancela
             motivo: Motivo de la cancelación
         """
-        if self.estado_prestamo == 'ACTIVO':
-            self.estado_prestamo = 'CANCELADO'
+        if self.estado_prestamo == PRESTAMO_ACTIVO:
+            self.estado_prestamo = PRESTAMO_CANCELADO
             self.recibido_por = user
             self.fecha_devolucion_real = timezone.now()
             if motivo:

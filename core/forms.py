@@ -16,6 +16,14 @@ from datetime import datetime
 import re
 import logging
 
+# Importar constantes centralizadas
+from .constants import (
+    ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_EN_CALIBRACION,
+    ESTADO_EN_COMPROBACION, ESTADO_EN_MANTENIMIENTO, ESTADO_DE_BAJA,
+    ESTADO_EN_PRESTAMO,
+    PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO, PRESTAMO_VENCIDO, PRESTAMO_CANCELADO,
+)
+
 logger = logging.getLogger('core')
 
 # Formulario de Autenticación personalizado para usar CustomUser
@@ -1082,9 +1090,9 @@ class PrestamoEquipoForm(forms.ModelForm):
             # Solo equipos disponibles de la empresa (no en préstamo activo ni dados de baja)
             equipos_disponibles = Equipo.objects.filter(
                 empresa=empresa,
-                estado__in=['Activo', 'En Mantenimiento', 'En Calibración', 'En Comprobación']
+                estado__in=[ESTADO_ACTIVO, ESTADO_EN_MANTENIMIENTO, ESTADO_EN_CALIBRACION, ESTADO_EN_COMPROBACION]
             ).exclude(
-                prestamos__estado_prestamo='ACTIVO',
+                prestamos__estado_prestamo=PRESTAMO_ACTIVO,
                 prestamos__fecha_devolucion_real__isnull=True
             ).order_by('codigo_interno')
 
@@ -1118,7 +1126,7 @@ class PrestamoEquipoForm(forms.ModelForm):
         # Validar que equipo no esté ya prestado
         prestamo_activo = PrestamoEquipo.objects.filter(
             equipo=equipo,
-            estado_prestamo='ACTIVO',
+            estado_prestamo=PRESTAMO_ACTIVO,
             fecha_devolucion_real__isnull=True
         ).exists()
 
@@ -1129,7 +1137,7 @@ class PrestamoEquipoForm(forms.ModelForm):
             )
 
         # Validar que equipo no esté de baja
-        if equipo.estado == 'De Baja':
+        if equipo.estado == ESTADO_DE_BAJA:
             raise ValidationError(
                 f'El equipo {equipo.codigo_interno} está dado de baja. '
                 'No se puede prestar un equipo dado de baja.'

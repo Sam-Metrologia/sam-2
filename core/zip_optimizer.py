@@ -12,6 +12,7 @@ from django.conf import settings
 from django.utils import timezone
 from io import BytesIO
 import logging
+from .constants import ESTADO_ACTIVO, ESTADO_EN_MANTENIMIENTO, ESTADO_EN_CALIBRACION, ESTADO_EN_COMPROBACION
 
 logger = logging.getLogger('core')
 
@@ -243,7 +244,7 @@ Email: {self.empresa.email or 'N/A'}
 Fecha de Generación: {timezone.now().strftime('%d/%m/%Y %H:%M')}
 Generado por: {self.user.get_full_name() or self.user.username}
 
-Total de Equipos: {self.empresa.equipos.filter(estado__in=['Activo', 'En Mantenimiento', 'En Calibración', 'En Comprobación']).count()}
+Total de Equipos: {self.empresa.equipos.filter(estado__in=[ESTADO_ACTIVO, ESTADO_EN_MANTENIMIENTO, ESTADO_EN_CALIBRACION, ESTADO_EN_COMPROBACION]).count()}
 """
 
             zip_file.writestr("Empresa/Informacion_Empresa.txt", empresa_info.encode('utf-8'))

@@ -16,17 +16,18 @@ Día 3 del Plan Consolidado
 ESTADO_ACTIVO = 'Activo'
 ESTADO_INACTIVO = 'Inactivo'
 ESTADO_EN_CALIBRACION = 'En Calibración'
+ESTADO_EN_COMPROBACION = 'En Comprobación'
 ESTADO_EN_MANTENIMIENTO = 'En Mantenimiento'
 ESTADO_DE_BAJA = 'De Baja'
 ESTADO_EN_PRESTAMO = 'En Préstamo'
 
 EQUIPO_ESTADO_CHOICES = [
     (ESTADO_ACTIVO, 'Activo'),
-    (ESTADO_INACTIVO, 'Inactivo'),
-    (ESTADO_EN_CALIBRACION, 'En Calibración'),
     (ESTADO_EN_MANTENIMIENTO, 'En Mantenimiento'),
+    (ESTADO_EN_CALIBRACION, 'En Calibración'),
+    (ESTADO_EN_COMPROBACION, 'En Comprobación'),
+    (ESTADO_INACTIVO, 'Inactivo'),
     (ESTADO_DE_BAJA, 'De Baja'),
-    (ESTADO_EN_PRESTAMO, 'En Préstamo'),
 ]
 
 # ============================================================================
