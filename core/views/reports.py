@@ -1482,23 +1482,19 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         return _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
 
 
-def _generate_dashboard_excel_content(equipos_queryset, empresa):
+def _add_excel_header(sheet, empresa):
     """
-    Genera un Excel profesional para el dashboard con formato mejorado y secciones completas.
-    Usado cuando se descarga desde el botón del dashboard.
+    Añade el encabezado profesional a una hoja Excel.
+
+    Args:
+        sheet: Hoja de Excel activa
+        empresa: Instancia de Empresa
+
+    Returns:
+        int: Siguiente fila disponible después del encabezado
     """
-    from collections import Counter
-    from datetime import datetime, timedelta
+    from datetime import datetime
     from openpyxl.styles import Alignment
-    import io
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Reporte Dashboard"
-
-    # ==============================================
-    # ENCABEZADO PROFESIONAL SAM METROLOGÍA
-    # ==============================================
 
     # Título principal profesional
     sheet.merge_cells('A1:F2')
@@ -1519,29 +1515,33 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     sheet['A4'].font = Font(bold=True, size=12)
     sheet['A4'].alignment = Alignment(horizontal="center")
 
-    # ==============================================
-    # DATOS ESTADÍSTICOS
-    # ==============================================
+    # Ajustar altura de filas del encabezado
+    sheet.row_dimensions[1].height = 40
+    sheet.row_dimensions[2].height = 25
 
-    equipos_list = list(equipos_queryset)
+    return 6  # Siguiente fila después del encabezado
+
+
+def _add_excel_resumen_section(sheet, equipos_list, row_start):
+    """
+    Añade la sección de resumen general a una hoja Excel.
+
+    Args:
+        sheet: Hoja de Excel activa
+        equipos_list: Lista de equipos
+        row_start: Fila donde empezar la sección
+
+    Returns:
+        int: Siguiente fila disponible después de la sección
+    """
+    from openpyxl.styles import Alignment
+
     total_equipos = len(equipos_list)
     equipos_activos = sum(1 for eq in equipos_list if eq.estado == ESTADO_ACTIVO)
     equipos_inactivos = sum(1 for eq in equipos_list if eq.estado == ESTADO_INACTIVO)
     equipos_baja = sum(1 for eq in equipos_list if eq.estado == 'De Baja')
 
-    # Estadísticas por tipo
-    tipos_count = Counter(eq.get_tipo_equipo_display() for eq in equipos_list)
-
-    # Fechas para análisis
-    hoy_date = hoy.date()
-    treinta_dias = hoy_date + timedelta(days=30)
-    ano_actual = hoy_date.year
-
-    # ==============================================
-    # SECCIÓN: RESUMEN GENERAL
-    # ==============================================
-
-    row = 6
+    row = row_start
     sheet[f'A{row}'] = '📊 RESUMEN GENERAL DE EQUIPOS'
     sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
     sheet.merge_cells(f'A{row}:F{row}')
@@ -1569,17 +1569,43 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         sheet.cell(row=row, column=3, value=porcentaje)
         row += 1
 
-    # ==============================================
-    # SECCIÓN: CÓDIGOS INTERNOS DE EQUIPOS
-    # ==============================================
+    return row
 
+
+def _generate_dashboard_excel_content(equipos_queryset, empresa):
+    """
+    Genera un Excel profesional para el dashboard con formato mejorado y secciones completas.
+    Usado cuando se descarga desde el botón del dashboard.
+    """
+    from collections import Counter
+    from datetime import datetime, timedelta
+    from openpyxl.styles import Alignment
+    import io
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Reporte Dashboard"
+
+    # Añadir encabezado profesional
+    row = _add_excel_header(sheet, empresa)
+
+    # Preparar datos
+    equipos_list = list(equipos_queryset)
+    hoy = datetime.now()
+    hoy_date = hoy.date()
+    treinta_dias = hoy_date + timedelta(days=30)
+    ano_actual = hoy_date.year
+
+    # Añadir sección de resumen general
+    row = _add_excel_resumen_section(sheet, equipos_list, row)
+
+    # Añadir sección de códigos internos
     row += 2
     sheet[f'A{row}'] = '🔧 CÓDIGOS INTERNOS DE EQUIPOS'
     sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
     sheet.merge_cells(f'A{row}:F{row}')
     row += 2
 
-    # Headers para códigos
     codigo_headers = ['Código Interno', 'Nombre del Equipo', 'Estado', 'Tipo']
     for col, header in enumerate(codigo_headers, 1):
         cell = sheet.cell(row=row, column=col, value=header)
@@ -1588,7 +1614,6 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         cell.alignment = Alignment(horizontal="center")
     row += 1
 
-    # Datos de equipos (limitado a primeros 15 para no sobrecargar)
     for equipo in equipos_list[:15]:
         sheet.cell(row=row, column=1, value=equipo.codigo_interno)
         sheet.cell(row=row, column=2, value=equipo.nombre)
