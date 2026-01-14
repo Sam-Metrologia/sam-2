@@ -19,6 +19,9 @@ import matplotlib
 matplotlib.use('Agg')  # Backend sin GUI
 import matplotlib.pyplot as plt
 import numpy as np
+import logging
+
+logger = logging.getLogger('core')
 
 
 def safe_float(value, default=0.0):
@@ -882,7 +885,7 @@ def generar_pdf_confirmacion(request, equipo_id):
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
-        print(f"Error generando PDF: {error_detail}")  # Log para debugging
+        logger.error(f"Error generando PDF: {error_detail}")
 
         from django.http import JsonResponse
         return JsonResponse({
@@ -920,7 +923,6 @@ def generar_pdf_intervalos(request, equipo_id):
 
     logger = logging.getLogger(__name__)
 
-    # DEBUG: Log de inicio de función
     logger.info(f"=== INICIO generar_pdf_intervalos ===")
     logger.info(f"User: {request.user.username} (ID: {request.user.id})")
     logger.info(f"Equipo ID: {equipo_id}")
@@ -929,7 +931,6 @@ def generar_pdf_intervalos(request, equipo_id):
 
     equipo = get_object_or_404(Equipo, id=equipo_id)
 
-    # DEBUG: Log de permisos
     logger.info(f"User.empresa: {request.user.empresa} (ID: {request.user.empresa.id if request.user.empresa else None})")
     logger.info(f"Equipo.empresa: {equipo.empresa} (ID: {equipo.empresa.id if equipo.empresa else None})")
     logger.info(f"User.is_superuser: {request.user.is_superuser}")

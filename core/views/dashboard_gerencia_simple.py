@@ -223,7 +223,7 @@ def dashboard_gerencia(request):
                 for empresa in empresas_queryset:
                     ingresos_anuales += empresa.get_ingresos_anuales_reales()
 
-                print(f"DEBUG: Ingresos anuales calculados con nuevo sistema: {ingresos_anuales}")
+                logger.debug(f"Ingresos anuales calculados con nuevo sistema: {ingresos_anuales}")
 
                 if ingresos_anuales == 0:
                     # Fallback al método anterior si no hay datos del nuevo sistema
@@ -300,7 +300,7 @@ def dashboard_gerencia(request):
                         if comp_count > 0:
                             costos_comp = (comp_count / actividades_año) * costos_totales
 
-                        print(f"DEBUG: Usando estimación de costos basada en {actividades_año} actividades")
+                        logger.debug(f"Usando estimación de costos basada en {actividades_año} actividades")
 
                 if ingresos_anuales > 0:
                     margen_bruto = ingresos_anuales - costos_totales

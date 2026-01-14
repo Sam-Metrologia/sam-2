@@ -512,7 +512,7 @@ def calcular_metricas_financieras_sam(empresas_queryset, current_year, previous_
             ingreso_año_anterior = actividades_año_anterior * 500  # $500 promedio por actividad
 
     except Exception as e:
-        print(f"Error calculando ingresos año anterior: {e}")
+        logger.error(f"Error calculando ingresos año anterior: {e}", exc_info=True)
 
     # 3. CRECIMIENTO DE INGRESOS
     if ingreso_año_anterior > 0:
