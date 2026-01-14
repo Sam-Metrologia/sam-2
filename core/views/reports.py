@@ -2542,24 +2542,17 @@ def valores_son_diferentes(valor_actual, nuevo_valor):
     return valor_actual != nuevo_valor
 
 
-def _process_excel_import(excel_file, user):
+def _validate_and_load_excel(excel_file):
     """
-    Procesa el archivo Excel importado y crea los equipos.
+    Valida y carga el archivo Excel, retornando el workbook, sheet y mapeo de columnas.
 
     Args:
         excel_file: Archivo Excel subido
-        user: Usuario que realiza la importación
 
     Returns:
-        dict: Resultado con success, imported, errors
+        dict: {'workbook': workbook, 'sheet': sheet, 'column_mapping': dict, 'error': str|None}
     """
-    result = {
-        'success': False,
-        'imported': 0,
-        'created': 0,
-        'updated': 0,
-        'errors': []
-    }
+    result = {'workbook': None, 'sheet': None, 'column_mapping': None, 'error': None}
 
     try:
         # Cargar el archivo Excel
@@ -2595,6 +2588,283 @@ def _process_excel_import(excel_file, user):
             'Y': 'frecuencia_comprobacion_meses'
         }
 
+        result['workbook'] = workbook
+        result['sheet'] = sheet
+        result['column_mapping'] = column_mapping
+
+    except Exception as e:
+        result['error'] = f"Error cargando archivo Excel: {str(e)}"
+
+    return result
+
+
+def _extract_row_data(sheet, row_num, column_mapping):
+    """
+    Extrae los datos de una fila del Excel.
+
+    Args:
+        sheet: Hoja de Excel activa
+        row_num: Número de fila a procesar
+        column_mapping: Diccionario con mapeo de columnas
+
+    Returns:
+        dict: Datos de la fila {field_name: value}
+    """
+    row_data = {}
+    for col, field in column_mapping.items():
+        cell_value = sheet[f'{col}{row_num}'].value
+        if cell_value is not None:
+            if isinstance(cell_value, str):
+                cell_value = cell_value.strip()
+            row_data[field] = cell_value
+    return row_data
+
+
+def _process_all_row_dates(row_data, row_num):
+    """
+    Procesa todas las fechas de una fila del Excel.
+
+    Args:
+        row_data: Datos de la fila
+        row_num: Número de fila (para mensajes de error)
+
+    Returns:
+        dict: {
+            'dates': {
+                'fecha_adquisicion': date|None,
+                'fecha_version_formato': date|None,
+                'fecha_ultima_calibracion': date|None,
+                'fecha_ultimo_mantenimiento': date|None,
+                'fecha_ultima_comprobacion': date|None
+            },
+            'errors': [lista_errores]
+        }
+    """
+    result = {
+        'dates': {
+            'fecha_adquisicion': None,
+            'fecha_version_formato': None,
+            'fecha_ultima_calibracion': None,
+            'fecha_ultimo_mantenimiento': None,
+            'fecha_ultima_comprobacion': None
+        },
+        'errors': []
+    }
+
+    # Mapeo de campos a nombres descriptivos
+    date_fields = [
+        ('fecha_adquisicion', 'Fecha de Adquisición'),
+        ('fecha_version_formato', 'Fecha de Versión'),
+        ('fecha_ultima_calibracion', 'Fecha Última Calibración'),
+        ('fecha_ultimo_mantenimiento', 'Fecha Último Mantenimiento'),
+        ('fecha_ultima_comprobacion', 'Fecha Última Comprobación')
+    ]
+
+    # Procesar cada fecha
+    for field_name, field_label in date_fields:
+        if row_data.get(field_name):
+            fecha_result = _parse_date(row_data[field_name], field_label)
+            if fecha_result['error']:
+                result['errors'].append(f"Fila {row_num}: {fecha_result['error']}")
+            else:
+                result['dates'][field_name] = fecha_result['date']
+
+    return result
+
+
+def _update_existing_equipment(equipo_existente, row_data, dates_dict):
+    """
+    Actualiza un equipo existente con los datos del Excel.
+
+    Args:
+        equipo_existente: Instancia de Equipo a actualizar
+        row_data: Datos de la fila del Excel
+        dates_dict: Diccionario con las fechas procesadas
+
+    Returns:
+        list: Lista de campos actualizados
+    """
+    campos_actualizados = []
+
+    # Actualizar solo campos que tengan valores en el Excel
+    if row_data.get('nombre'):
+        equipo_existente.nombre = row_data['nombre']
+        campos_actualizados.append('nombre')
+
+    if row_data.get('tipo_equipo'):
+        equipo_existente.tipo_equipo = row_data['tipo_equipo']
+        campos_actualizados.append('tipo_equipo')
+
+    if row_data.get('marca'):
+        equipo_existente.marca = row_data['marca']
+        campos_actualizados.append('marca')
+
+    if row_data.get('modelo'):
+        equipo_existente.modelo = row_data['modelo']
+        campos_actualizados.append('modelo')
+
+    if row_data.get('numero_serie'):
+        equipo_existente.numero_serie = row_data['numero_serie']
+        campos_actualizados.append('numero_serie')
+
+    if row_data.get('ubicacion_nombre'):
+        equipo_existente.ubicacion = row_data['ubicacion_nombre']
+        campos_actualizados.append('ubicacion')
+
+    if row_data.get('responsable'):
+        equipo_existente.responsable = row_data['responsable']
+        campos_actualizados.append('responsable')
+
+    if row_data.get('estado'):
+        equipo_existente.estado = row_data['estado']
+        campos_actualizados.append('estado')
+
+    if dates_dict.get('fecha_adquisicion'):
+        equipo_existente.fecha_adquisicion = dates_dict['fecha_adquisicion']
+        campos_actualizados.append('fecha_adquisicion')
+
+    if row_data.get('rango_medida'):
+        equipo_existente.rango_medida = row_data['rango_medida']
+        campos_actualizados.append('rango_medida')
+
+    if row_data.get('resolucion'):
+        equipo_existente.resolucion = row_data['resolucion']
+        campos_actualizados.append('resolucion')
+
+    if row_data.get('error_maximo_permisible'):
+        equipo_existente.error_maximo_permisible = row_data['error_maximo_permisible']
+        campos_actualizados.append('error_maximo_permisible')
+
+    if row_data.get('puntos_calibracion'):
+        equipo_existente.puntos_calibracion = row_data['puntos_calibracion']
+        campos_actualizados.append('puntos_calibracion')
+
+    if row_data.get('observaciones'):
+        equipo_existente.observaciones = row_data['observaciones']
+        campos_actualizados.append('observaciones')
+
+    if row_data.get('version_formato'):
+        equipo_existente.version_formato = row_data['version_formato']
+        campos_actualizados.append('version_formato')
+
+    if dates_dict.get('fecha_version_formato'):
+        equipo_existente.fecha_version_formato = dates_dict['fecha_version_formato']
+        campos_actualizados.append('fecha_version_formato')
+
+    if row_data.get('codificacion_formato'):
+        equipo_existente.codificacion_formato = row_data['codificacion_formato']
+        campos_actualizados.append('codificacion_formato')
+
+    # Frecuencias - actualizar solo si el valor no es None
+    freq_calib = _parse_decimal(row_data.get('frecuencia_calibracion_meses'))
+    if freq_calib is not None:
+        equipo_existente.frecuencia_calibracion_meses = freq_calib
+        campos_actualizados.append('frecuencia_calibracion_meses')
+
+    freq_mant = _parse_decimal(row_data.get('frecuencia_mantenimiento_meses'))
+    if freq_mant is not None:
+        equipo_existente.frecuencia_mantenimiento_meses = freq_mant
+        campos_actualizados.append('frecuencia_mantenimiento_meses')
+
+    freq_comp = _parse_decimal(row_data.get('frecuencia_comprobacion_meses'))
+    if freq_comp is not None:
+        equipo_existente.frecuencia_comprobacion_meses = freq_comp
+        campos_actualizados.append('frecuencia_comprobacion_meses')
+
+    # Fechas de última actividad - actualizar solo si se proporcionan
+    if dates_dict.get('fecha_ultima_calibracion'):
+        equipo_existente.fecha_ultima_calibracion = dates_dict['fecha_ultima_calibracion']
+        campos_actualizados.append('fecha_ultima_calibracion')
+
+    if dates_dict.get('fecha_ultimo_mantenimiento'):
+        equipo_existente.fecha_ultimo_mantenimiento = dates_dict['fecha_ultimo_mantenimiento']
+        campos_actualizados.append('fecha_ultimo_mantenimiento')
+
+    if dates_dict.get('fecha_ultima_comprobacion'):
+        equipo_existente.fecha_ultima_comprobacion = dates_dict['fecha_ultima_comprobacion']
+        campos_actualizados.append('fecha_ultima_comprobacion')
+
+    # Guardar cambios si hay campos actualizados
+    if campos_actualizados:
+        equipo_existente.save(update_fields=campos_actualizados)
+
+    return campos_actualizados
+
+
+def _create_new_equipment(row_data, empresa, dates_dict):
+    """
+    Crea un nuevo equipo con los datos del Excel.
+
+    Args:
+        row_data: Datos de la fila del Excel
+        empresa: Instancia de Empresa
+        dates_dict: Diccionario con las fechas procesadas
+
+    Returns:
+        Equipo: Nueva instancia de Equipo creada
+    """
+    equipo = Equipo.objects.create(
+        codigo_interno=row_data['codigo_interno'],
+        nombre=row_data['nombre'],
+        empresa=empresa,
+        tipo_equipo=row_data.get('tipo_equipo', 'Equipo de Medición'),
+        marca=row_data.get('marca', ''),
+        modelo=row_data.get('modelo', ''),
+        numero_serie=row_data.get('numero_serie', ''),
+        ubicacion=row_data.get('ubicacion_nombre', ''),
+        responsable=row_data.get('responsable', ''),
+        estado=row_data.get('estado', 'Activo'),
+        fecha_adquisicion=dates_dict.get('fecha_adquisicion'),
+        rango_medida=row_data.get('rango_medida', ''),
+        resolucion=row_data.get('resolucion', ''),
+        error_maximo_permisible=row_data.get('error_maximo_permisible', ''),
+        puntos_calibracion=row_data.get('puntos_calibracion', ''),
+        observaciones=row_data.get('observaciones', ''),
+        version_formato=row_data.get('version_formato', ''),
+        fecha_version_formato=dates_dict.get('fecha_version_formato'),
+        codificacion_formato=row_data.get('codificacion_formato', ''),
+        # Frecuencias
+        frecuencia_calibracion_meses=_parse_decimal(row_data.get('frecuencia_calibracion_meses')),
+        frecuencia_mantenimiento_meses=_parse_decimal(row_data.get('frecuencia_mantenimiento_meses')),
+        frecuencia_comprobacion_meses=_parse_decimal(row_data.get('frecuencia_comprobacion_meses')),
+        # Fechas de última actividad
+        fecha_ultima_calibracion=dates_dict.get('fecha_ultima_calibracion'),
+        fecha_ultimo_mantenimiento=dates_dict.get('fecha_ultimo_mantenimiento'),
+        fecha_ultima_comprobacion=dates_dict.get('fecha_ultima_comprobacion')
+    )
+
+    return equipo
+
+
+def _process_excel_import(excel_file, user):
+    """
+    Procesa el archivo Excel importado y crea los equipos.
+
+    Args:
+        excel_file: Archivo Excel subido
+        user: Usuario que realiza la importación
+
+    Returns:
+        dict: Resultado con success, imported, errors
+    """
+    result = {
+        'success': False,
+        'imported': 0,
+        'created': 0,
+        'updated': 0,
+        'errors': []
+    }
+
+    try:
+        # Cargar y validar archivo Excel
+        excel_data = _validate_and_load_excel(excel_file)
+        if excel_data['error']:
+            result['errors'] = [excel_data['error']]
+            return result
+
+        sheet = excel_data['sheet']
+        column_mapping = excel_data['column_mapping']
+
         # Comenzar desde la fila 8 (después de headers)
         start_row = 8
         imported_count = 0
@@ -2611,13 +2881,7 @@ def _process_excel_import(excel_file, user):
         for row_num in range(start_row, sheet.max_row + 1):
             try:
                 # Extraer datos de la fila
-                row_data = {}
-                for col, field in column_mapping.items():
-                    cell_value = sheet[f'{col}{row_num}'].value
-                    if cell_value is not None:
-                        if isinstance(cell_value, str):
-                            cell_value = cell_value.strip()
-                        row_data[field] = cell_value
+                row_data = _extract_row_data(sheet, row_num, column_mapping)
 
                 # Verificar si hay datos en la fila (al menos código interno)
                 if not row_data.get('codigo_interno'):
@@ -2646,189 +2910,31 @@ def _process_excel_import(excel_file, user):
 
                 es_actualizacion = equipo_existente is not None
 
-                # Procesar fechas con validación detallada
-                fecha_adquisicion = None
-                if row_data.get('fecha_adquisicion'):
-                    fecha_result = _parse_date(row_data['fecha_adquisicion'], 'Fecha de Adquisición')
-                    if fecha_result['error']:
-                        errors.append(f"Fila {row_num}: {fecha_result['error']}")
-                        continue
-                    fecha_adquisicion = fecha_result['date']
-
-                fecha_version_formato = None
-                if row_data.get('fecha_version_formato'):
-                    fecha_result = _parse_date(row_data['fecha_version_formato'], 'Fecha de Versión')
-                    if fecha_result['error']:
-                        errors.append(f"Fila {row_num}: {fecha_result['error']}")
-                        continue
-                    fecha_version_formato = fecha_result['date']
-
-                # Procesar fechas de última actividad para calcular próximas fechas
-                fecha_ultima_calibracion = None
-                if row_data.get('fecha_ultima_calibracion'):
-                    fecha_result = _parse_date(row_data['fecha_ultima_calibracion'], 'Fecha Última Calibración')
-                    if fecha_result['error']:
-                        errors.append(f"Fila {row_num}: {fecha_result['error']}")
-                        continue
-                    fecha_ultima_calibracion = fecha_result['date']
-
-                fecha_ultimo_mantenimiento = None
-                if row_data.get('fecha_ultimo_mantenimiento'):
-                    fecha_result = _parse_date(row_data['fecha_ultimo_mantenimiento'], 'Fecha Último Mantenimiento')
-                    if fecha_result['error']:
-                        errors.append(f"Fila {row_num}: {fecha_result['error']}")
-                        continue
-                    fecha_ultimo_mantenimiento = fecha_result['date']
-
-                fecha_ultima_comprobacion = None
-                if row_data.get('fecha_ultima_comprobacion'):
-                    fecha_result = _parse_date(row_data['fecha_ultima_comprobacion'], 'Fecha Última Comprobación')
-                    if fecha_result['error']:
-                        errors.append(f"Fila {row_num}: {fecha_result['error']}")
-                        continue
-                    fecha_ultima_comprobacion = fecha_result['date']
+                # Procesar todas las fechas de la fila
+                dates_result = _process_all_row_dates(row_data, row_num)
+                if dates_result['errors']:
+                    errors.extend(dates_result['errors'])
+                    continue
 
                 # Crear o actualizar el equipo en transacción individual
                 try:
                     with transaction.atomic():
                         if es_actualizacion:
-                            # Actualizar equipo existente solo con campos que no estén vacíos
+                            # Actualizar equipo existente
+                            campos_actualizados = _update_existing_equipment(
+                                equipo_existente,
+                                row_data,
+                                dates_result['dates']
+                            )
                             equipo = equipo_existente
-                            campos_actualizados = []
-
-                            # Actualizar solo campos que tengan valores en el Excel
-                            if row_data.get('nombre'):
-                                equipo.nombre = row_data['nombre']
-                                campos_actualizados.append('nombre')
-
-                            if row_data.get('tipo_equipo'):
-                                equipo.tipo_equipo = row_data['tipo_equipo']
-                                campos_actualizados.append('tipo_equipo')
-
-                            if row_data.get('marca'):
-                                equipo.marca = row_data['marca']
-                                campos_actualizados.append('marca')
-
-                            if row_data.get('modelo'):
-                                equipo.modelo = row_data['modelo']
-                                campos_actualizados.append('modelo')
-
-                            if row_data.get('numero_serie'):
-                                equipo.numero_serie = row_data['numero_serie']
-                                campos_actualizados.append('numero_serie')
-
-                            if row_data.get('ubicacion_nombre'):
-                                equipo.ubicacion = row_data['ubicacion_nombre']
-                                campos_actualizados.append('ubicacion')
-
-                            if row_data.get('responsable'):
-                                equipo.responsable = row_data['responsable']
-                                campos_actualizados.append('responsable')
-
-                            if row_data.get('estado'):
-                                equipo.estado = row_data['estado']
-                                campos_actualizados.append('estado')
-
-                            if fecha_adquisicion:
-                                equipo.fecha_adquisicion = fecha_adquisicion
-                                campos_actualizados.append('fecha_adquisicion')
-
-                            if row_data.get('rango_medida'):
-                                equipo.rango_medida = row_data['rango_medida']
-                                campos_actualizados.append('rango_medida')
-
-                            if row_data.get('resolucion'):
-                                equipo.resolucion = row_data['resolucion']
-                                campos_actualizados.append('resolucion')
-
-                            if row_data.get('error_maximo_permisible'):
-                                equipo.error_maximo_permisible = row_data['error_maximo_permisible']
-                                campos_actualizados.append('error_maximo_permisible')
-
-                            if row_data.get('puntos_calibracion'):
-                                equipo.puntos_calibracion = row_data['puntos_calibracion']
-                                campos_actualizados.append('puntos_calibracion')
-
-                            if row_data.get('observaciones'):
-                                equipo.observaciones = row_data['observaciones']
-                                campos_actualizados.append('observaciones')
-
-                            if row_data.get('version_formato'):
-                                equipo.version_formato = row_data['version_formato']
-                                campos_actualizados.append('version_formato')
-
-                            if fecha_version_formato:
-                                equipo.fecha_version_formato = fecha_version_formato
-                                campos_actualizados.append('fecha_version_formato')
-
-                            if row_data.get('codificacion_formato'):
-                                equipo.codificacion_formato = row_data['codificacion_formato']
-                                campos_actualizados.append('codificacion_formato')
-
-                            # Frecuencias - actualizar solo si el valor no es None
-                            freq_calib = _parse_decimal(row_data.get('frecuencia_calibracion_meses'))
-                            if freq_calib is not None:
-                                equipo.frecuencia_calibracion_meses = freq_calib
-                                campos_actualizados.append('frecuencia_calibracion_meses')
-
-                            freq_mant = _parse_decimal(row_data.get('frecuencia_mantenimiento_meses'))
-                            if freq_mant is not None:
-                                equipo.frecuencia_mantenimiento_meses = freq_mant
-                                campos_actualizados.append('frecuencia_mantenimiento_meses')
-
-                            freq_comp = _parse_decimal(row_data.get('frecuencia_comprobacion_meses'))
-                            if freq_comp is not None:
-                                equipo.frecuencia_comprobacion_meses = freq_comp
-                                campos_actualizados.append('frecuencia_comprobacion_meses')
-
-                            # Fechas de última actividad - actualizar solo si se proporcionan
-                            if fecha_ultima_calibracion:
-                                equipo.fecha_ultima_calibracion = fecha_ultima_calibracion
-                                campos_actualizados.append('fecha_ultima_calibracion')
-
-                            if fecha_ultimo_mantenimiento:
-                                equipo.fecha_ultimo_mantenimiento = fecha_ultimo_mantenimiento
-                                campos_actualizados.append('fecha_ultimo_mantenimiento')
-
-                            if fecha_ultima_comprobacion:
-                                equipo.fecha_ultima_comprobacion = fecha_ultima_comprobacion
-                                campos_actualizados.append('fecha_ultima_comprobacion')
-
-                            # Guardar cambios si hay campos actualizados
-                            if campos_actualizados:
-                                equipo.save(update_fields=campos_actualizados)
-
                         else:
                             # Crear nuevo equipo
-                            equipo = Equipo.objects.create(
-                                codigo_interno=row_data['codigo_interno'],
-                                nombre=row_data['nombre'],
-                                empresa=empresa,
-                                tipo_equipo=row_data.get('tipo_equipo', 'Equipo de Medición'),
-                                marca=row_data.get('marca', ''),
-                                modelo=row_data.get('modelo', ''),
-                                numero_serie=row_data.get('numero_serie', ''),
-                                ubicacion=row_data.get('ubicacion_nombre', ''),
-                                responsable=row_data.get('responsable', ''),
-                                estado=row_data.get('estado', 'Activo'),
-                                fecha_adquisicion=fecha_adquisicion,
-                                rango_medida=row_data.get('rango_medida', ''),
-                                resolucion=row_data.get('resolucion', ''),
-                                error_maximo_permisible=row_data.get('error_maximo_permisible', ''),
-                                puntos_calibracion=row_data.get('puntos_calibracion', ''),
-                                observaciones=row_data.get('observaciones', ''),
-                                version_formato=row_data.get('version_formato', ''),
-                                fecha_version_formato=fecha_version_formato,
-                                codificacion_formato=row_data.get('codificacion_formato', ''),
-                                # Frecuencias
-                                frecuencia_calibracion_meses=_parse_decimal(row_data.get('frecuencia_calibracion_meses')),
-                                frecuencia_mantenimiento_meses=_parse_decimal(row_data.get('frecuencia_mantenimiento_meses')),
-                                frecuencia_comprobacion_meses=_parse_decimal(row_data.get('frecuencia_comprobacion_meses')),
-                                # Fechas de última actividad
-                                fecha_ultima_calibracion=fecha_ultima_calibracion,
-                                fecha_ultimo_mantenimiento=fecha_ultimo_mantenimiento,
-                                fecha_ultima_comprobacion=fecha_ultima_comprobacion
+                            equipo = _create_new_equipment(
+                                row_data,
+                                empresa,
+                                dates_result['dates']
                             )
+                            campos_actualizados = []
 
                         # Calcular fechas próximas basadas en las fechas de última actividad y frecuencias
                         _calcular_fechas_proximas(equipo)
