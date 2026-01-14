@@ -1228,6 +1228,113 @@ def _generate_pdf_content(request, template_path, context):
         raise
 
 
+def _get_pdf_file_url(request, file_field):
+    """
+    Obtiene URL absoluta para archivos en PDF.
+
+    Args:
+        request: Request de Django para construir URLs absolutas
+        file_field: Campo de archivo del modelo
+
+    Returns:
+        str|None: URL absoluta del archivo o None si no existe
+    """
+    if not file_field or not file_field.name:
+        return None
+
+    try:
+        storage_name = default_storage.__class__.__name__
+
+        if 'S3' in storage_name or hasattr(default_storage, 'bucket'):
+            # Para S3, verificar que el archivo existe antes de generar URL
+            try:
+                if not default_storage.exists(file_field.name):
+                    logger.warning(f"Archivo no existe en S3: {file_field.name}")
+                    return None
+            except Exception:
+                pass  # Si falla la verificación, intentar generar URL anyway
+
+            # Para S3, usar URL con mayor tiempo de expiración para PDFs
+            try:
+                url = default_storage.url(file_field.name, expire=7200)  # 2 horas
+            except TypeError:
+                # Fallback si el storage no soporta expire
+                url = default_storage.url(file_field.name)
+
+            # Asegurar que sea URL absoluta
+            if url.startswith('//'):
+                url = 'https:' + url
+
+            return url
+        else:
+            # Para almacenamiento local (FileSystemStorage)
+            url = default_storage.url(file_field.name)
+            # Convertir a URL absoluta
+            if url.startswith('/'):
+                url = request.build_absolute_uri(url)
+
+            return url
+    except Exception as e:
+        logger.error(f"Error obteniendo URL para PDF: {file_field.name}, error: {str(e)}")
+        return None
+
+
+def _get_pdf_image_data(file_field):
+    """
+    Obtiene datos de imagen para PDF, convirtiendo a base64 si es necesario.
+
+    Args:
+        file_field: Campo de archivo de imagen
+
+    Returns:
+        str|None: Data URL en base64 o None si falla
+    """
+    if not file_field or not file_field.name:
+        return None
+
+    try:
+        # Verificar si es una imagen
+        file_extension = file_field.name.lower().split('.')[-1]
+        if file_extension not in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
+            return None
+
+        # Verificar tamaño del archivo antes de cargarlo (límite: 1MB para imágenes en PDF)
+        try:
+            if hasattr(default_storage, 'size'):
+                file_size = default_storage.size(file_field.name)
+                if file_size > 1024 * 1024:  # 1MB límite
+                    logger.warning(f"Imagen muy grande para PDF ({file_size} bytes): {file_field.name}")
+                    return None
+        except:
+            pass  # Si no se puede obtener el tamaño, continuar
+
+        # Obtener contenido del archivo de forma eficiente
+        try:
+            with default_storage.open(file_field.name, 'rb') as f:
+                file_content = f.read()
+
+            # Convertir a base64
+            import base64
+            base64_encoded = base64.b64encode(file_content).decode('utf-8')
+
+            # Limpiar file_content de memoria inmediatamente
+            del file_content
+
+            # Determinar el tipo MIME
+            mime_type = f"image/{file_extension}" if file_extension != 'jpg' else 'image/jpeg'
+
+            # Retornar como data URL
+            return f"data:{mime_type};base64,{base64_encoded}"
+
+        except Exception as e:
+            logger.warning(f"No se pudo convertir imagen a base64: {file_field.name}, error: {str(e)}")
+            return None
+
+    except Exception as e:
+        logger.error(f"Error procesando imagen para PDF: {file_field.name}, error: {str(e)}")
+        return None
+
+
 def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     """
     Genera el contenido PDF para la "Hoja de Vida" de un equipo con URLs seguras.
@@ -1307,120 +1414,29 @@ def _generate_equipment_hoja_vida_pdf_content(request, equipo):
         except BajaEquipo.DoesNotExist:
             pass
 
-        # Función helper mejorada para obtener URLs de archivos para PDF
-        def get_pdf_file_url(file_field):
-            """Obtiene URL absoluta para archivos en PDF"""
-            if not file_field or not file_field.name:
-                return None
-
-            try:
-                storage_name = default_storage.__class__.__name__
-
-                if 'S3' in storage_name or hasattr(default_storage, 'bucket'):
-                    # Para S3, verificar que el archivo existe antes de generar URL
-                    try:
-                        if not default_storage.exists(file_field.name):
-                            logger.warning(f"Archivo no existe en S3: {file_field.name}")
-                            return None
-                    except Exception:
-                        pass  # Si falla la verificación, intentar generar URL anyway
-
-                    # Para S3, usar URL con mayor tiempo de expiración para PDFs
-                    try:
-                        url = default_storage.url(file_field.name, expire=7200)  # 2 horas
-                    except TypeError:
-                        # Fallback si el storage no soporta expire
-                        url = default_storage.url(file_field.name)
-
-                    # Asegurar que sea URL absoluta
-                    if url.startswith('//'):
-                        url = 'https:' + url
-
-                    return url
-                else:
-                    # Para almacenamiento local (FileSystemStorage)
-                    url = default_storage.url(file_field.name)
-                    # Convertir a URL absoluta
-                    if url.startswith('/'):
-                        url = request.build_absolute_uri(url)
-
-                    return url
-            except Exception as e:
-                logger.error(f"Error obteniendo URL para PDF: {file_field.name}, error: {str(e)}")
-                return None
-
-        # Función especial para imágenes en PDF - optimizada para memoria
-        def get_pdf_image_data(file_field):
-            """Obtiene datos de imagen para PDF, convirtiendo a base64 si es necesario"""
-            if not file_field or not file_field.name:
-                return None
-
-            try:
-                # Verificar si es una imagen
-                file_extension = file_field.name.lower().split('.')[-1]
-                if file_extension not in ['jpg', 'jpeg', 'png', 'gif', 'bmp']:
-                    return None
-
-                # Verificar tamaño del archivo antes de cargarlo (límite: 1MB para imágenes en PDF)
-                try:
-                    if hasattr(default_storage, 'size'):
-                        file_size = default_storage.size(file_field.name)
-                        if file_size > 1024 * 1024:  # 1MB límite
-                            logger.warning(f"Imagen muy grande para PDF ({file_size} bytes): {file_field.name}")
-                            return None
-                except:
-                    pass  # Si no se puede obtener el tamaño, continuar
-
-                # Obtener contenido del archivo de forma eficiente
-                try:
-                    with default_storage.open(file_field.name, 'rb') as f:
-                        file_content = f.read()
-
-                    # Convertir a base64
-                    import base64
-                    base64_encoded = base64.b64encode(file_content).decode('utf-8')
-
-                    # Limpiar file_content de memoria inmediatamente
-                    del file_content
-
-                    # Determinar el tipo MIME
-                    mime_type = f"image/{file_extension}" if file_extension != 'jpg' else 'image/jpeg'
-
-                    # Retornar como data URL
-                    return f"data:{mime_type};base64,{base64_encoded}"
-
-                except Exception as e:
-                    logger.warning(f"No se pudo convertir imagen a base64: {file_field.name}, error: {str(e)}")
-                    # Fallback a URL normal
-                    return get_pdf_file_url(file_field)
-
-            except Exception as e:
-                logger.error(f"Error procesando imagen para PDF: {file_field.name}, error: {str(e)}")
-                return None
-
         # Obtener URLs de archivos con el nuevo sistema seguro
         # Para imágenes, usar la función especializada que convierte a base64
-        logo_empresa_url = get_pdf_image_data(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
-        imagen_equipo_url = get_pdf_image_data(equipo.imagen_equipo) if equipo.imagen_equipo else None
+        logo_empresa_url = _get_pdf_image_data(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+        imagen_equipo_url = _get_pdf_image_data(equipo.imagen_equipo) if equipo.imagen_equipo else None
         # SOLO mostrar documento de baja si el equipo realmente está dado de baja
-        documento_baja_url = (get_pdf_file_url(baja_registro.documento_baja)
+        documento_baja_url = (_get_pdf_file_url(request, baja_registro.documento_baja)
                              if baja_registro and baja_registro.documento_baja and equipo.estado == ESTADO_DE_BAJA
                              else None)
 
         for cal in calibraciones:
-            cal.documento_calibracion_url = get_pdf_file_url(cal.documento_calibracion)
-            cal.confirmacion_metrologica_pdf_url = get_pdf_file_url(cal.confirmacion_metrologica_pdf)
-            cal.intervalos_calibracion_pdf_url = get_pdf_file_url(cal.intervalos_calibracion_pdf)
+            cal.documento_calibracion_url = _get_pdf_file_url(request, cal.documento_calibracion)
+            cal.confirmacion_metrologica_pdf_url = _get_pdf_file_url(request, cal.confirmacion_metrologica_pdf)
+            cal.intervalos_calibracion_pdf_url = _get_pdf_file_url(request, cal.intervalos_calibracion_pdf)
 
         for mant in mantenimientos:
-            mant.documento_mantenimiento_url = get_pdf_file_url(mant.documento_mantenimiento)
+            mant.documento_mantenimiento_url = _get_pdf_file_url(request, mant.documento_mantenimiento)
         for comp in comprobaciones:
-            comp.documento_comprobacion_url = get_pdf_file_url(comp.documento_comprobacion)
+            comp.documento_comprobacion_url = _get_pdf_file_url(request, comp.documento_comprobacion)
 
-        archivo_compra_pdf_url = get_pdf_file_url(equipo.archivo_compra_pdf)
-        ficha_tecnica_pdf_url = get_pdf_file_url(equipo.ficha_tecnica_pdf)
-        manual_pdf_url = get_pdf_file_url(equipo.manual_pdf)
-        otros_documentos_pdf_url = get_pdf_file_url(equipo.otros_documentos_pdf)
+        archivo_compra_pdf_url = _get_pdf_file_url(request, equipo.archivo_compra_pdf)
+        ficha_tecnica_pdf_url = _get_pdf_file_url(request, equipo.ficha_tecnica_pdf)
+        manual_pdf_url = _get_pdf_file_url(request, equipo.manual_pdf)
+        otros_documentos_pdf_url = _get_pdf_file_url(request, equipo.otros_documentos_pdf)
 
         context = {
             'equipo': equipo,
