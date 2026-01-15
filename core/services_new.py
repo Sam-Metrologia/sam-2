@@ -102,7 +102,7 @@ class SecureFileUploadService:
 
         except ValidationError as e:
             logger.warning(f"Validación de archivo falló: {str(e)}", extra={
-                'filename': uploaded_file.name if uploaded_file else 'Unknown',
+                'uploaded_filename': uploaded_file.name if uploaded_file else 'Unknown',
                 'file_size': uploaded_file.size if uploaded_file else 0,
                 'empresa_id': empresa.id if empresa else None
             })
@@ -113,7 +113,7 @@ class SecureFileUploadService:
             }
         except Exception as e:
             logger.error(f"Error inesperado al subir archivo: {str(e)}", exc_info=True, extra={
-                'filename': uploaded_file.name if uploaded_file else 'Unknown',
+                'uploaded_filename': uploaded_file.name if uploaded_file else 'Unknown',
                 'empresa_id': empresa.id if empresa else None
             })
             return {
@@ -177,11 +177,11 @@ class OptimizedEquipmentService:
         try:
             # Consulta optimizada con select_related y prefetch_related
             equipos = Equipo.objects.select_related(
-                'empresa', 'ubicacion', 'proveedor'
+                'empresa'
             ).prefetch_related(
-                Prefetch('calibraciones', queryset=Calibracion.objects.order_by('-fecha_calibracion')[:5]),
-                Prefetch('mantenimientos', queryset=Mantenimiento.objects.order_by('-fecha_mantenimiento')[:5]),
-                Prefetch('comprobaciones', queryset=Comprobacion.objects.order_by('-fecha_comprobacion')[:5])
+                'calibraciones',
+                'mantenimientos',
+                'comprobaciones'
             ).filter(empresa=empresa)
 
             # Estadísticas agregadas en una sola consulta
@@ -388,20 +388,8 @@ class OptimizedEquipmentService:
         if not empresa_id:
             return
 
-        # Patrón para eliminar claves de cache relacionadas
-        cache_patterns = [
-            f"dashboard_data_{empresa_id}_*",
-            f"equipment_list_{empresa_id}_*",
-            f"equipment_stats_{empresa_id}"
-        ]
-
-        # Django no tiene eliminación por patrón nativa,
-        # pero podemos usar esto para versioning
-        cache.delete_many([
-            f"equipment_version_{empresa_id}"
-        ])
-
         # Incrementar versión para invalidar cache relacionado
+        # Esto invalida todas las claves de cache que usan el versionado
         version_key = f"equipment_version_{empresa_id}"
         current_version = cache.get(version_key, 0)
         cache.set(version_key, current_version + 1, None)  # Sin expiración

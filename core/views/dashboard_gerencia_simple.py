@@ -192,15 +192,17 @@ def dashboard_gerencia(request):
         selected_company_id = request.GET.get('empresa_id')
         empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
 
-        if user.is_superuser:
-            # Vista SAM - Superusuarios pueden ver todas las empresas
-            empresas_queryset = empresas_disponibles
-            if selected_company_id:
-                empresas_queryset = empresas_queryset.filter(id=selected_company_id)
-        elif getattr(user, 'rol_usuario', None) == 'GERENCIA' and user.empresa:
-            # Vista GERENCIA - Solo pueden ver su propia empresa pero en formato SAM
-            empresas_queryset = empresas_disponibles.filter(id=user.empresa.id)
-            selected_company_id = str(user.empresa.id)
+        if user.is_superuser or (getattr(user, 'rol_usuario', None) == 'GERENCIA' and user.empresa):
+            # Vista SAM - Para superusuarios y usuarios GERENCIA
+            if user.is_superuser:
+                # Superusuarios pueden ver todas las empresas
+                empresas_queryset = empresas_disponibles
+                if selected_company_id:
+                    empresas_queryset = empresas_queryset.filter(id=selected_company_id)
+            else:
+                # GERENCIA - Solo pueden ver su propia empresa pero en formato SAM
+                empresas_queryset = empresas_disponibles.filter(id=user.empresa.id)
+                selected_company_id = str(user.empresa.id)
 
             # Cálculos básicos
             num_empresas_activas = empresas_queryset.count()
