@@ -1,0 +1,18 @@
+[run]
+source = core
+omit =
+    */migrations/*
+    */tests/*
+    */__pycache__/*
+    */management/commands/*
+    */models_BACKUP_PILOTO/*
+    core/async_zip_improved.py
+    core/storage_optimizer.py
+    core/zip_optimizer.py
+    core/views_optimized.py
+    core/context_processors.py
+    core/test_prestamos.py
+
+[report]
+precision = 2
+show_missing = true
