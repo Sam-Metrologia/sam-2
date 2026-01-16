@@ -407,10 +407,10 @@ class NotificationScheduler:
     def check_all_reminders():
         """
         Revisa TODAS las empresas y envía recordatorios consolidados.
-        Solo para días configurados: 15, 7, 0 (día de vencimiento)
+        Solo para días configurados: 30, 15, 7, 0 (día de vencimiento)
         """
         today = timezone.localdate()
-        reminder_days = [15, 7, 0]  # Días antes del vencimiento (0 = día de vencimiento)
+        reminder_days = [30, 15, 7, 0]  # Días antes del vencimiento (0 = día de vencimiento)
 
         sent_count = 0
         total_companies = 0
