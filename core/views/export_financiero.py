@@ -245,6 +245,9 @@ def exportar_analisis_financiero_excel(request):
 
         row_cal = 5
 
+        # Headers comunes para todas las secciones (calibraciones, mantenimientos, comprobaciones)
+        headers_cal = ['Código', 'Nombre Equipo', 'Marca', 'Modelo', 'Costo']
+
         # Procesar cada mes
         for mes_data in presupuesto_calendario['presupuesto_por_mes']:
             # Si el mes no tiene actividades, saltar
@@ -274,7 +277,6 @@ def exportar_analisis_financiero_excel(request):
                 row_cal += 1
 
                 # Headers de columnas
-                headers_cal = ['Código', 'Nombre Equipo', 'Marca', 'Modelo', 'Costo']
                 for col, header in enumerate(headers_cal, 1):
                     cell = ws_calendario.cell(row=row_cal, column=col, value=header)
                     cell.font = Font(bold=True, size=9)
