@@ -487,11 +487,23 @@
 
             <!-- Proyección Próximo Año -->
             <div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; text-align: center;">
-                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">🔮 Presupuesto Estimado {{ current_year|add:1 }}</h4>
+                <!-- Selector de Año -->
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; opacity: 0.9; display: block; margin-bottom: 5px;">Seleccionar Año de Proyección:</label>
+                    <select id="año-selector" onchange="cambiarAñoPresupuesto()" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; padding: 8px 12px; font-size: 0.9rem; cursor: pointer; width: auto; min-width: 120px;">
+                        {% for i in "12345"|make_list %}
+                            {% with año=current_year|add:forloop.counter0 %}
+                                <option value="{{ año }}" {% if año == formula_presupuesto.año_proyeccion %}selected{% endif %}>{{ año }}</option>
+                            {% endwith %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <h4 style="font-size: 1rem; font-weight: bold; margin-bottom: 10px; opacity: 0.9;">🔮 Presupuesto Estimado {{ formula_presupuesto.año_proyeccion }}</h4>
                 <div style="font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; cursor: pointer;" onclick="togglePresupuestoDetalle()" title="Haga clic para ver el desglose de la fórmula">
                     ${{ proyeccion_gasto_proximo_año|floatformat:0 }} COP
                 </div>
-                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">Dinero que necesitará reservar para {{ current_year|add:1 }}</p>
+                <p style="margin: 0; font-size: 0.8rem; opacity: 0.8;">Dinero que necesitará reservar para {{ formula_presupuesto.año_proyeccion }}</p>
 
                 <!-- Actividades proyectadas -->
                 <div style="margin-top: 15px;">
@@ -502,48 +514,58 @@
                 <!-- Desglose de Presupuesto -->
                 {% if formula_presupuesto %}
                 <div id="presupuesto-detalle" style="display: none; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 15px; margin-top: 15px; text-align: left; font-size: 0.75rem;">
-                    <div style="color: white; margin-bottom: 8px; font-weight: bold;">📊 Desglose del Cálculo de Presupuesto:</div>
+                    <div style="color: white; margin-bottom: 10px; font-weight: bold;">📊 ¿Cómo se Calcula el Presupuesto?</div>
 
                     <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
-                        <strong>Metodología de Proyección:</strong>
+                        <strong>1️⃣ Identificación de Actividades:</strong>
                     </div>
                     <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        • Basado en frecuencias programadas de cada equipo
+                        • Solo incluye equipos que tengan actividades programadas para el año seleccionado
                     </div>
                     <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        • Costos históricos por marca y modelo de equipos similares
+                        • Considera tres tipos: calibraciones, mantenimientos y comprobaciones
                     </div>
-                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        • Solo actividades preventivas programadas
-                    </div>
-                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
-                        • No incluye mantenimientos correctivos imprevistos
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 10px;">
+                        • Usa las fechas de próxima actividad y las frecuencias configuradas
                     </div>
 
                     <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
-                        <strong>Fuentes de Datos:</strong>
+                        <strong>2️⃣ Estimación de Costos:</strong>
                     </div>
                     <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        📏 Calibraciones: Servicios de calibración contratados y facturados
+                        • Busca el último costo registrado del equipo específico
                     </div>
                     <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        🔧 Mantenimientos: Costos de reparaciones y mantenimientos realizados
+                        • Si no existe, calcula el promedio de equipos de la misma marca y modelo
                     </div>
-                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 8px;">
-                        ✅ Comprobaciones: Verificaciones internas realizadas en la empresa
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 10px;">
+                        • Si no hay datos históricos disponibles, excluye ese equipo del presupuesto
                     </div>
 
                     <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
-                        <strong>Cálculo de Proyección:</strong>
+                        <strong>3️⃣ Proyección Anual:</strong>
                     </div>
                     <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        • Para cada equipo: (12 meses ÷ frecuencia_meses) × costo_promedio
+                        • Calcula cuántas veces se realizará cada actividad en el año: (12 meses ÷ frecuencia_meses)
                     </div>
                     <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
-                        • Si no hay historial: buscar costo promedio por marca/modelo
+                        • Multiplica la cantidad de veces por el costo estimado de cada actividad
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 10px;">
+                        • Suma todos los costos proyectados para obtener el presupuesto total del año
+                    </div>
+
+                    <div style="color: rgba(255,255,255,0.9); margin-bottom: 6px;">
+                        <strong>⚠️ Consideraciones Importantes:</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Solo incluye actividades preventivas programadas (no eventos imprevistos)
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8); margin-bottom: 4px;">
+                        • Basado 100% en datos históricos reales de su empresa
                     </div>
                     <div style="color: rgba(255,255,255,0.8);">
-                        • Solo proyectar si existen datos históricos reales
+                        • Puede variar si cambian las frecuencias o se agregan/retiran equipos
                     </div>
                 </div>
                 {% endif %}
@@ -936,6 +958,16 @@
             if (content) {
                 content.style.display = content.style.display === 'none' ? 'block' : 'none';
             }
+        }
+
+        function cambiarAñoPresupuesto() {
+            const selector = document.getElementById('año-selector');
+            const añoSeleccionado = selector.value;
+
+            // Recargar la página con el parámetro año_proyeccion
+            const url = new URL(window.location.href);
+            url.searchParams.set('año_proyeccion', añoSeleccionado);
+            window.location.href = url.toString();
         }
 
         // Funciones para Alertas Predictivas

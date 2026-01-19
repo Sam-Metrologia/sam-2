@@ -499,7 +499,10 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
 
     # 4. ANÁLISIS FINANCIERO (NUEVO) - Gasto YTD y Proyección
     analisis_financiero = calcular_analisis_financiero_empresa(empresa, current_year, today)
-    proyeccion_costos = calcular_proyeccion_costos_empresa(empresa, current_year + 1)
+
+    # Permitir seleccionar año de proyección (por defecto: año siguiente)
+    año_proyeccion = int(request.GET.get('año_proyeccion', current_year + 1))
+    proyeccion_costos = calcular_proyeccion_costos_empresa(empresa, año_proyeccion)
 
     # Calcular variación proyectada con desglose
     if analisis_financiero['gasto_ytd_total'] > 0:
@@ -525,7 +528,7 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
     formula_presupuesto = {
         'total_proyectado': proyeccion_costos['proyeccion_gasto_proximo_año'],
         'actividades_proyectadas': proyeccion_costos['actividades_proyectadas_total'],
-        'año_proyeccion': current_year + 1,
+        'año_proyeccion': año_proyeccion,
         'metodologia': 'Basado en frecuencias de equipos y costos históricos por marca/modelo',
         'calculo_ejemplo': f"{proyeccion_costos['actividades_proyectadas_total']} actividades programadas × costos históricos promedio = ${proyeccion_costos['proyeccion_gasto_proximo_año']:,.0f} COP",
         'exclusiones': 'No incluye mantenimientos correctivos no programados'
