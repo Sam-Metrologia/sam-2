@@ -234,96 +234,69 @@ FUNCIONALIDAD_NO_CONFORME = 'No Conforme'
 
 ---
 
-#### ✂️ Días 5-7: REFACTORIZAR reports.py
+#### ✂️ Días 5-7: REFACTORIZAR reports.py (EN PROGRESO - 19 enero 2026)
 
-**Objetivo:** Dividir 3,201 líneas en 6 módulos <600 líneas
+**Objetivo:** Reducir complejidad de funciones grandes en reports.py
 
-**Día 5: Preparación y División Inicial**
+**Estado Actual:** 3,306 líneas, 49 funciones
+
+**Día 5: Refactorización Inicial** ✅ COMPLETADO
 ```
-[📁] Crear estructura (30min)
-  └─ mkdir core/reports/
-  └─ touch core/reports/__init__.py
-  └─ touch core/reports/pdf_generator.py
-  └─ touch core/reports/excel_generator.py
-  └─ touch core/reports/zip_manager.py
-  └─ touch core/reports/progress_api.py
-  └─ touch core/reports/monitoring.py
-  └─ touch core/reports/utils.py
+[✅] Análisis completo (COMPLETADO)
+  └─ ✅ ANALISIS_REPORTS_DIA5.md creado
+  └─ ✅ 10 funciones problemáticas identificadas
+  └─ ✅ Prioridades establecidas
 
-[📖] Leer y mapear funciones (2h)
-  └─ Crear tabla de contenidos de reports.py
-  └─ Agrupar funciones por módulo destino
-  └─ Identificar dependencias
+[✅] Refactorización _process_excel_import (COMPLETADO)
+  └─ ✅ Reducida de 366 → 178 líneas (-52%)
+  └─ ✅ 7 funciones helper extraídas
+  └─ ✅ Tests: 869 pasando (100%)
 
-[✂️] Dividir módulo utils.py (2h)
-  └─ Mover funciones helper comunes
-  └─ actualizar_equipo_selectivo
-  └─ es_valor_valido_para_actualizacion
-  └─ valores_son_diferentes
-  └─ Probar imports
+[⏳] Funciones grandes restantes identificadas:
+  └─ _generate_consolidated_excel_content: 201 líneas
+  └─ _generate_dashboard_excel_content: 171 líneas
+  └─ _generate_excel_template: 154 líneas
+  └─ _generate_equipment_hoja_vida_pdf_content: 147 líneas
 ```
 
-**Día 6: Módulos Principales**
+**Día 6: Refactorizar Funciones Excel** (EN PROGRESO)
 ```
-[✂️] Crear pdf_generator.py (~500 líneas) (3h)
-  └─ generar_certificado_calibracion_pdf
-  └─ generar_certificado_mantenimiento_pdf
-  └─ generar_certificado_comprobacion_pdf
-  └─ generar_hoja_vida_pdf
-  └─ Funciones helper de PDF
-  └─ Imports y dependencias
+[⏳] Refactorizar _generate_consolidated_excel_content (3h)
+  └─ 201 líneas → objetivo <100 líneas
+  └─ Extraer helpers para cada hoja
+  └─ Tests después de cada extracción
 
-[✂️] Crear excel_generator.py (~400 líneas) (2h)
-  └─ exportar_excel_equipos
-  └─ Funciones de estilo Excel
-  └─ Funciones de formateo
+[⏳] Refactorizar _generate_dashboard_excel_content (2h)
+  └─ 171 líneas → objetivo <100 líneas
+  └─ Extraer helpers para secciones
+  └─ Tests continuos
 ```
 
-**Día 7: Completar y Testing**
+**Día 7: Refactorizar Funciones PDF y Template** (PENDIENTE)
 ```
-[✂️] Crear zip_manager.py (~600 líneas) (2h)
-  └─ Funciones de generación ZIP
-  └─ Cola ZIP
-  └─ Limpieza ZIP
+[⏳] Refactorizar _generate_excel_template (2h)
+  └─ 154 líneas → objetivo <100 líneas
+  └─ Extraer helpers para headers, validaciones, instrucciones
+  └─ Tests continuos
 
-[✂️] Crear progress_api.py + monitoring.py (2h)
-  └─ APIs de progreso
-  └─ Dashboard de monitoreo
+[⏳] Refactorizar _generate_equipment_hoja_vida_pdf_content (2h)
+  └─ 147 líneas → objetivo <100 líneas
+  └─ Extraer helpers para secciones del PDF
+  └─ Tests continuos
 
-[🔧] Actualizar imports (1h)
-  └─ core/views/__init__.py
-  └─ core/urls.py
-  └─ Buscar imports de reports.py en todo el proyecto
-
-[✅] Testing exhaustivo (2h)
+[✅] Testing exhaustivo (1h)
   └─ Ejecutar todos los tests
-  └─ Probar generación de cada PDF
+  └─ Probar generación de PDFs
   └─ Probar exportación Excel
-  └─ Probar sistema ZIP
   └─ Verificar 0 regresiones
-
-[📦] Backup y limpieza (30min)
-  └─ cp reports.py reports.py.BACKUP_2026-01-10
-  └─ Eliminar reports.py original si todo funciona
-```
-
-**Estructura Final:**
-```
-core/reports/
-├── __init__.py              # Re-exports para compatibilidad
-├── utils.py                 # ~200 líneas - Helpers comunes
-├── pdf_generator.py         # ~500 líneas - PDFs
-├── excel_generator.py       # ~400 líneas - Excel
-├── zip_manager.py           # ~600 líneas - ZIP
-├── progress_api.py          # ~300 líneas - APIs
-└── monitoring.py            # ~300 líneas - Monitoreo
 ```
 
 **Meta Días 5-7:**
-- ✅ reports.py dividido en 6 archivos
-- ✅ Ningún archivo >600 líneas
-- ✅ Todos los tests pasando
+- ✅ Funciones grandes refactorizadas
+- ✅ Ninguna función >150 líneas
+- ✅ Todos los tests pasando (869)
 - ✅ 0 regresiones
+- ✅ Código más mantenible
 
 ---
 
