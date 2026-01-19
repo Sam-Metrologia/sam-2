@@ -5,16 +5,17 @@
 
 ---
 
-## 📊 ESTADO ACTUAL (Actualizado: 11 enero 2026)
+## 📊 ESTADO ACTUAL (Actualizado: 19 enero 2026)
 
 | Métrica | Valor | Progreso | Meta | Estado |
 |---------|-------|----------|------|--------|
 | **Puntuación** | 7.5/10 | → | 8.5/10 | 🔄 |
-| **Coverage** | 54.66% | → | 70% | 📊 |
-| **Tests** | 745/745 (100%) | ✅ | 800+ | ✅ |
+| **Coverage** | 54.30% | → | 70% | 📊 |
+| **Tests** | 869/869 (100%) | ✅ | 800+ | ✅ |
 | **Dashboard Tiempo** | <1s (primera), <50ms (cache) | ✅ | <1s | ✅ |
-| **reports.py** | 3,201 líneas | 📋 | <600/archivo | ⏳ |
+| **reports.py** | 3,306 líneas | 📋 | <600/archivo | ⏳ |
 | **Queries Dashboard** | <20 | ✅ | <20 | ✅ |
+| **constants.py** | 328 líneas | ✅ | Centralizado | ✅ |
 
 ---
 
@@ -111,30 +112,32 @@
 
 ---
 
-#### ⚙️ Día 3: CREAR constants.py
+#### ✅ Día 3: CREAR constants.py (COMPLETADO - 19 enero 2026)
 
-**Objetivo:** Centralizar constantes dispersas
+**Objetivo:** Centralizar constantes dispersas ✅
 
 **Tareas:**
 ```
-[📝] Crear core/constants.py (1h)
-  └─ Estados de préstamos
-  └─ Estados de equipos
-  └─ Tipos de mantenimiento
-  └─ Límites y configuración
+[✅] Crear core/constants.py (1h) - COMPLETADO
+  └─ ✅ 328 líneas con todas las constantes
+  └─ ✅ Estados de préstamos, equipos, mantenimiento
+  └─ ✅ Límites, formatos, paginación, cache
+  └─ ✅ Mensajes del sistema y configuración
 
-[🔧] Actualizar imports en models.py (1h)
-  └─ Reemplazar strings por constantes
-  └─ Buscar y reemplazar
+[✅] Actualizar imports en models.py (1h) - COMPLETADO
+  └─ ✅ 50 líneas de imports agregadas
+  └─ ✅ Todas las constantes usadas correctamente
 
-[🔧] Actualizar imports en views (1h)
-  └─ prestamos.py
-  └─ equipment.py
-  └─ Otros archivos que usen strings hardcodeados
+[✅] Actualizar imports en views (1h) - COMPLETADO
+  └─ ✅ 8 archivos de views usando constantes
+  └─ ✅ prestamos.py: PRESTAMO_ACTIVO
+  └─ ✅ reports.py: ESTADO_ACTIVO
+  └─ ✅ Todos los strings hardcodeados reemplazados
 
-[✅] Testing (30min)
-  └─ Ejecutar todos los tests
-  └─ Verificar que no rompió nada
+[✅] Testing (30min) - COMPLETADO
+  └─ ✅ 869 tests pasando (100%)
+  └─ ✅ 0 tests fallando
+  └─ ✅ Sin regresiones
 ```
 
 **Archivo a crear:**
