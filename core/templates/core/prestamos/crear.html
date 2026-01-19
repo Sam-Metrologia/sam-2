@@ -139,7 +139,8 @@
                     </div>
                 </div>
 
-                <div class="bg-gray-50 p-4 rounded">
+                <!-- Medición para equipo individual -->
+                <div id="medicion-individual" class="bg-gray-50 p-4 rounded">
                     <h3 class="font-medium text-gray-700 mb-3">Medición (Opcional)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
@@ -154,6 +155,18 @@
                             <label class="block text-sm font-medium text-gray-700 mb-2">{{ form.valor_medido_salida.label }}</label>
                             {{ form.valor_medido_salida }}
                         </div>
+                    </div>
+                </div>
+
+                <!-- Mediciones para múltiples equipos -->
+                <div id="mediciones-multiples" class="hidden">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                        <p class="text-blue-800 text-sm">
+                            <strong>Mediciones individuales:</strong> Puedes registrar mediciones específicas para cada equipo seleccionado.
+                        </p>
+                    </div>
+                    <div id="contenedor-mediciones-equipos" class="space-y-4">
+                        <!-- Aquí se generarán dinámicamente los campos por equipo -->
                     </div>
                 </div>
             </div>
@@ -216,18 +229,75 @@ $(document).ready(function() {
         }
     });
 
+    // Función para generar campos de medición por equipo
+    function generarCamposMedicionPorEquipo(equipos) {
+        const contenedor = $('#contenedor-mediciones-equipos');
+        contenedor.empty();
+
+        equipos.forEach(function(equipo) {
+            const equipoId = equipo.id;
+            const equipoTexto = equipo.text;
+
+            const html = `
+                <div class="bg-gray-50 p-4 rounded border-l-4 border-blue-400" data-equipo-id="${equipoId}">
+                    <h4 class="font-semibold text-gray-800 mb-3">📦 ${equipoTexto}</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Parámetro Medido</label>
+                            <input type="text"
+                                   name="medicion_equipo_${equipoId}_punto"
+                                   class="form-input w-full border border-gray-300 rounded px-3 py-2"
+                                   placeholder="Ej: Temperatura">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Valor Referencia</label>
+                            <input type="text"
+                                   name="medicion_equipo_${equipoId}_referencia"
+                                   class="form-input w-full border border-gray-300 rounded px-3 py-2"
+                                   placeholder="Ej: 25.0°C">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Valor Medido</label>
+                            <input type="text"
+                                   name="medicion_equipo_${equipoId}_medido"
+                                   class="form-input w-full border border-gray-300 rounded px-3 py-2"
+                                   placeholder="Ej: 25.1°C">
+                        </div>
+                    </div>
+                </div>
+            `;
+            contenedor.append(html);
+        });
+    }
+
     // Lógica para asegurar que solo se use una opción a la vez
     $('#id_equipo').on('change', function() {
         if ($(this).val()) {
             // Si se selecciona un equipo individual, limpiar múltiples
             $('#id_equipos').val(null).trigger('change');
+            // Mostrar medición individual
+            $('#medicion-individual').removeClass('hidden');
+            $('#mediciones-multiples').addClass('hidden');
         }
     });
 
     $('#id_equipos').on('change', function() {
-        if ($(this).val() && $(this).val().length > 0) {
+        const equiposSeleccionados = $(this).select2('data');
+
+        if (equiposSeleccionados && equiposSeleccionados.length > 0) {
             // Si se seleccionan múltiples, limpiar individual
             $('#id_equipo').val(null).trigger('change');
+
+            // Ocultar medición individual y mostrar múltiples
+            $('#medicion-individual').addClass('hidden');
+            $('#mediciones-multiples').removeClass('hidden');
+
+            // Generar campos para cada equipo
+            generarCamposMedicionPorEquipo(equiposSeleccionados);
+        } else {
+            // Si no hay equipos seleccionados, mostrar medición individual
+            $('#medicion-individual').removeClass('hidden');
+            $('#mediciones-multiples').addClass('hidden');
         }
     });
 });

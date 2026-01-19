@@ -104,12 +104,17 @@ def crear_prestamo(request):
                     empresa=request.user.empresa
                 )
 
-                # Obtener verificación de salida una vez
-                verificacion_salida_data = form.get_verificacion_salida_data(request.user)
-
                 # Crear préstamos individuales para cada equipo
+                # CADA EQUIPO TIENE SU PROPIA VERIFICACIÓN CON MEDICIONES ESPECÍFICAS
                 prestamos_creados = []
                 for equipo in equipos_seleccionados:
+                    # Obtener verificación de salida específica para este equipo
+                    verificacion_salida_data = form.get_verificacion_salida_por_equipo(
+                        request.user,
+                        equipo.id,
+                        request.POST
+                    )
+
                     prestamo = PrestamoEquipo(
                         equipo=equipo,
                         empresa=request.user.empresa,

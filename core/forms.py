@@ -1158,6 +1158,7 @@ class PrestamoEquipoForm(forms.ModelForm):
     def get_verificacion_salida_data(self, user):
         """
         Construye el JSON de verificación de salida del equipo.
+        Para préstamo individual (un solo equipo).
         """
         data = self.cleaned_data
 
@@ -1168,6 +1169,37 @@ class PrestamoEquipoForm(forms.ModelForm):
                 'punto': data.get('punto_medicion_salida'),
                 'valor_referencia': data.get('valor_referencia_salida', ''),
                 'valor_medido': data.get('valor_medido_salida', '')
+            }
+
+        return {
+            'fecha_verificacion': timezone.now().isoformat(),
+            'verificado_por': user.get_full_name() or user.username,
+            'estado_fisico': data.get('estado_fisico_salida'),
+            'funcionalidad': data.get('funcionalidad_salida'),
+            'resultado_general': data.get('funcionalidad_salida'),
+            'punto_medicion': punto_medicion_data
+        }
+
+    def get_verificacion_salida_por_equipo(self, user, equipo_id, request_post):
+        """
+        Construye el JSON de verificación de salida para un equipo específico
+        en préstamos múltiples.
+        Extrae los datos de medición desde request.POST usando el patrón:
+        medicion_equipo_{id}_punto, medicion_equipo_{id}_referencia, medicion_equipo_{id}_medido
+        """
+        data = self.cleaned_data
+
+        # Extraer datos de medición específicos para este equipo
+        punto_key = f'medicion_equipo_{equipo_id}_punto'
+        referencia_key = f'medicion_equipo_{equipo_id}_referencia'
+        medido_key = f'medicion_equipo_{equipo_id}_medido'
+
+        punto_medicion_data = None
+        if request_post.get(punto_key):
+            punto_medicion_data = {
+                'punto': request_post.get(punto_key, ''),
+                'valor_referencia': request_post.get(referencia_key, ''),
+                'valor_medido': request_post.get(medido_key, '')
             }
 
         return {
