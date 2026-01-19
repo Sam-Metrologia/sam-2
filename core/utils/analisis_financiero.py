@@ -229,19 +229,21 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
                 # Determinar mes de inicio basado en la última calibración o fecha de adquisición
                 mes_inicio = _calcular_mes_inicio_actividad(equipo, 'calibracion', year)
 
-                # Proyectar calibraciones a lo largo del año
-                mes_actual = mes_inicio
-                while mes_actual <= 12:
-                    presupuesto_mensual[mes_actual - 1]['calibraciones'].append({
-                        'equipo': equipo,
-                        'codigo': equipo.codigo_interno,
-                        'nombre': equipo.nombre,
-                        'marca': equipo.marca or 'N/A',
-                        'modelo': equipo.modelo or 'N/A',
-                        'costo': float(costo_calibracion)
-                    })
-                    presupuesto_mensual[mes_actual - 1]['total_calibraciones'] += float(costo_calibracion)
-                    mes_actual += frecuencia_meses
+                # SOLO incluir si hay actividad programada en este año
+                if mes_inicio is not None:
+                    # Proyectar calibraciones a lo largo del año
+                    mes_actual = mes_inicio
+                    while mes_actual <= 12:
+                        presupuesto_mensual[mes_actual - 1]['calibraciones'].append({
+                            'equipo': equipo,
+                            'codigo': equipo.codigo_interno,
+                            'nombre': equipo.nombre,
+                            'marca': equipo.marca or 'N/A',
+                            'modelo': equipo.modelo or 'N/A',
+                            'costo': float(costo_calibracion)
+                        })
+                        presupuesto_mensual[mes_actual - 1]['total_calibraciones'] += float(costo_calibracion)
+                        mes_actual += frecuencia_meses
 
         # MANTENIMIENTOS
         if equipo.frecuencia_mantenimiento_meses and int(equipo.frecuencia_mantenimiento_meses) > 0:
@@ -254,19 +256,21 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
                 # Determinar mes de inicio
                 mes_inicio = _calcular_mes_inicio_actividad(equipo, 'mantenimiento', year)
 
-                # Proyectar mantenimientos a lo largo del año
-                mes_actual = mes_inicio
-                while mes_actual <= 12:
-                    presupuesto_mensual[mes_actual - 1]['mantenimientos'].append({
-                        'equipo': equipo,
-                        'codigo': equipo.codigo_interno,
-                        'nombre': equipo.nombre,
-                        'marca': equipo.marca or 'N/A',
-                        'modelo': equipo.modelo or 'N/A',
-                        'costo': float(costo_mantenimiento)
-                    })
-                    presupuesto_mensual[mes_actual - 1]['total_mantenimientos'] += float(costo_mantenimiento)
-                    mes_actual += frecuencia_meses
+                # SOLO incluir si hay actividad programada en este año
+                if mes_inicio is not None:
+                    # Proyectar mantenimientos a lo largo del año
+                    mes_actual = mes_inicio
+                    while mes_actual <= 12:
+                        presupuesto_mensual[mes_actual - 1]['mantenimientos'].append({
+                            'equipo': equipo,
+                            'codigo': equipo.codigo_interno,
+                            'nombre': equipo.nombre,
+                            'marca': equipo.marca or 'N/A',
+                            'modelo': equipo.modelo or 'N/A',
+                            'costo': float(costo_mantenimiento)
+                        })
+                        presupuesto_mensual[mes_actual - 1]['total_mantenimientos'] += float(costo_mantenimiento)
+                        mes_actual += frecuencia_meses
 
         # COMPROBACIONES
         if equipo.frecuencia_comprobacion_meses and int(equipo.frecuencia_comprobacion_meses) > 0:
@@ -279,19 +283,21 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
                 # Determinar mes de inicio
                 mes_inicio = _calcular_mes_inicio_actividad(equipo, 'comprobacion', year)
 
-                # Proyectar comprobaciones a lo largo del año
-                mes_actual = mes_inicio
-                while mes_actual <= 12:
-                    presupuesto_mensual[mes_actual - 1]['comprobaciones'].append({
-                        'equipo': equipo,
-                        'codigo': equipo.codigo_interno,
-                        'nombre': equipo.nombre,
-                        'marca': equipo.marca or 'N/A',
-                        'modelo': equipo.modelo or 'N/A',
-                        'costo': float(costo_comprobacion)
-                    })
-                    presupuesto_mensual[mes_actual - 1]['total_comprobaciones'] += float(costo_comprobacion)
-                    mes_actual += frecuencia_meses
+                # SOLO incluir si hay actividad programada en este año
+                if mes_inicio is not None:
+                    # Proyectar comprobaciones a lo largo del año
+                    mes_actual = mes_inicio
+                    while mes_actual <= 12:
+                        presupuesto_mensual[mes_actual - 1]['comprobaciones'].append({
+                            'equipo': equipo,
+                            'codigo': equipo.codigo_interno,
+                            'nombre': equipo.nombre,
+                            'marca': equipo.marca or 'N/A',
+                            'modelo': equipo.modelo or 'N/A',
+                            'costo': float(costo_comprobacion)
+                        })
+                        presupuesto_mensual[mes_actual - 1]['total_comprobaciones'] += float(costo_comprobacion)
+                        mes_actual += frecuencia_meses
 
     # Calcular totales mensuales
     total_anual = 0
@@ -417,8 +423,11 @@ def _obtener_costo_estimado_comprobacion(equipo, empresa, year):
 
 def _calcular_mes_inicio_actividad(equipo, tipo_actividad, year):
     """
-    Calcula el mes de inicio para una actividad en el año proyectado
-    Basado en la última actividad realizada o la fecha de adquisición
+    Calcula el mes de inicio para una actividad en el año proyectado.
+    Retorna el mes (1-12) si hay actividad en ese año, o None si no hay actividad.
+
+    Basado en la última actividad realizada o la fecha de adquisición.
+    SOLO incluye equipos que realmente tienen actividad programada en el año específico.
     """
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -438,13 +447,17 @@ def _calcular_mes_inicio_actividad(equipo, tipo_actividad, year):
         frecuencia = equipo.frecuencia_comprobacion_meses
 
     if not frecuencia or int(frecuencia) <= 0:
-        return 1  # Default: enero
+        return None  # Sin frecuencia, no se puede calcular
 
     frecuencia = int(frecuencia)
 
     # Si hay una fecha próxima programada y es en el año proyectado
     if fecha_proxima and fecha_proxima.year == year:
         return fecha_proxima.month
+
+    # Si hay fecha próxima pero es para OTRO año, no incluir
+    if fecha_proxima and fecha_proxima.year != year:
+        return None
 
     # Si hay una última actividad, calcular la próxima basándose en ella
     if ultima_actividad:
@@ -460,8 +473,11 @@ def _calcular_mes_inicio_actividad(equipo, tipo_actividad, year):
         while fecha_siguiente.year < year:
             fecha_siguiente = fecha_siguiente + relativedelta(months=frecuencia)
 
+        # SOLO retornar si cae exactamente en el año proyectado
         if fecha_siguiente.year == year:
             return fecha_siguiente.month
+        else:
+            return None  # La próxima actividad no es en este año
 
     # Si no hay datos, usar fecha de adquisición como referencia
     if equipo.fecha_adquisicion:
@@ -470,12 +486,14 @@ def _calcular_mes_inicio_actividad(equipo, tipo_actividad, year):
         while fecha_siguiente.year < year:
             fecha_siguiente = fecha_siguiente + relativedelta(months=frecuencia)
 
+        # SOLO retornar si cae exactamente en el año proyectado
         if fecha_siguiente.year == year:
             return fecha_siguiente.month
+        else:
+            return None  # La próxima actividad no es en este año
 
-    # Default: distribuir uniformemente a lo largo del año
-    # Usar un offset basado en el ID del equipo para evitar que todo caiga en enero
-    return ((equipo.id - 1) % 12) + 1
+    # Si no hay ninguna referencia, no se puede determinar
+    return None
 
 
 def calcular_metricas_financieras_sam(empresas_queryset, current_year, previous_year):
