@@ -29,6 +29,9 @@ def exportar_analisis_financiero_excel(request):
     today = date.today()
     current_year = today.year
 
+    # Obtener año de proyección desde parámetro GET (por defecto: año siguiente)
+    año_proyeccion = int(request.GET.get('año_proyeccion', current_year + 1))
+
     # Crear workbook
     wb = openpyxl.Workbook()
 
@@ -116,8 +119,8 @@ def exportar_analisis_financiero_excel(request):
 
         # Calcular análisis financiero
         analisis_financiero = calcular_analisis_financiero_empresa(empresa, current_year, today)
-        proyeccion_costos = calcular_proyeccion_costos_empresa(empresa, current_year + 1)
-        presupuesto_calendario = calcular_presupuesto_mensual_detallado(empresa, current_year + 1)
+        proyeccion_costos = calcular_proyeccion_costos_empresa(empresa, año_proyeccion)
+        presupuesto_calendario = calcular_presupuesto_mensual_detallado(empresa, año_proyeccion)
 
         # HOJA 1: RESUMEN EJECUTIVO
         ws = wb.active
@@ -173,7 +176,7 @@ def exportar_analisis_financiero_excel(request):
         # Sección 2: Proyección
         row += 3
         ws.merge_cells(f'A{row}:F{row}')
-        ws[f'A{row}'] = f"🔮 PROYECCIÓN DE COSTOS {current_year + 1}"
+        ws[f'A{row}'] = f"🔮 PROYECCIÓN DE COSTOS {año_proyeccion}"
         ws[f'A{row}'].font = subheader_font
         ws[f'A{row}'].fill = subheader_fill
         ws[f'A{row}'].alignment = Alignment(horizontal='center')
@@ -214,7 +217,7 @@ def exportar_analisis_financiero_excel(request):
         ws[f'A{row}'].alignment = Alignment(horizontal='center')
 
         # HOJA 2: PRESUPUESTO CALENDARIO DETALLADO
-        ws_calendario = wb.create_sheet(title=f"Presupuesto {current_year + 1}")
+        ws_calendario = wb.create_sheet(title=f"Presupuesto {año_proyeccion}")
 
         # Estilos específicos para calendario
         calibracion_fill = PatternFill(start_color="DBEAFE", end_color="DBEAFE", fill_type="solid")  # Azul claro
@@ -227,7 +230,7 @@ def exportar_analisis_financiero_excel(request):
 
         # Header principal
         ws_calendario.merge_cells('A1:E1')
-        ws_calendario['A1'] = f"📅 PRESUPUESTO CALENDARIO {current_year + 1} - {empresa.nombre}"
+        ws_calendario['A1'] = f"📅 PRESUPUESTO CALENDARIO {año_proyeccion} - {empresa.nombre}"
         ws_calendario['A1'].font = Font(bold=True, size=14, color="1F2937")
         ws_calendario['A1'].alignment = Alignment(horizontal='center')
 
@@ -257,7 +260,7 @@ def exportar_analisis_financiero_excel(request):
             # HEADER DEL MES
             ws_calendario.merge_cells(f'A{row_cal}:E{row_cal}')
             cell_mes = ws_calendario[f'A{row_cal}']
-            cell_mes.value = f"🗓️  {mes_data['nombre_mes'].upper()} {current_year + 1} - Total: ${mes_data['total_mes']:,.0f}"
+            cell_mes.value = f"🗓️  {mes_data['nombre_mes'].upper()} {año_proyeccion} - Total: ${mes_data['total_mes']:,.0f}"
             cell_mes.font = mes_header_font
             cell_mes.fill = mes_header_fill
             cell_mes.alignment = Alignment(horizontal='center', vertical='center')

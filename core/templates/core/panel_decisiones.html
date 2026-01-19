@@ -655,7 +655,7 @@
 
         <!-- Botón de exportación funcional -->
         <div style="text-align: center; margin-top: 25px;">
-            <a href="{% url 'core:exportar_analisis_financiero' %}" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 12px 20px; display: inline-block; font-size: 0.9rem; color: white; text-decoration: none; transition: all 0.3s ease;">
+            <a id="exportar-excel-btn" href="{% url 'core:exportar_analisis_financiero' %}?año_proyeccion={{ formula_presupuesto.año_proyeccion }}" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 12px 20px; display: inline-block; font-size: 0.9rem; color: white; text-decoration: none; transition: all 0.3s ease;">
                 📊 Exportar Análisis Financiero a Excel
             </a>
         </div>
@@ -963,6 +963,14 @@
         function cambiarAñoPresupuesto() {
             const selector = document.getElementById('año-selector');
             const añoSeleccionado = selector.value;
+
+            // Actualizar el enlace de exportación a Excel antes de recargar
+            const exportBtn = document.getElementById('exportar-excel-btn');
+            if (exportBtn) {
+                const exportUrl = new URL(exportBtn.href);
+                exportUrl.searchParams.set('año_proyeccion', añoSeleccionado);
+                exportBtn.href = exportUrl.toString();
+            }
 
             // Recargar la página con el parámetro año_proyeccion
             const url = new URL(window.location.href);
