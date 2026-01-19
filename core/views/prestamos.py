@@ -225,7 +225,7 @@ def devolver_equipo(request, pk):
         return HttpResponseForbidden("No tienes permiso para modificar este préstamo.")
 
     # Verificar que el préstamo esté activo
-    if prestamo.estado_prestamo != 'ACTIVO':
+    if prestamo.estado_prestamo != PRESTAMO_ACTIVO:
         messages.warning(
             request,
             f'Este préstamo ya fue devuelto el {prestamo.fecha_devolucion_real.strftime("%d/%m/%Y")}.'

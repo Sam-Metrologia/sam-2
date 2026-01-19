@@ -2854,7 +2854,7 @@ def _create_new_equipment(row_data, empresa, dates_dict):
         numero_serie=row_data.get('numero_serie', ''),
         ubicacion=row_data.get('ubicacion_nombre', ''),
         responsable=row_data.get('responsable', ''),
-        estado=row_data.get('estado', 'Activo'),
+        estado=row_data.get('estado', ESTADO_ACTIVO),
         fecha_adquisicion=dates_dict.get('fecha_adquisicion'),
         rango_medida=row_data.get('rango_medida', ''),
         resolucion=row_data.get('resolucion', ''),
