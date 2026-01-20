@@ -1743,34 +1743,77 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     return excel_buffer.getvalue()
 
 
-def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset):
+def _add_professional_sheet_header(sheet, title_text, merge_range, generation_date):
     """
-    Genera un Excel consolidado con 4 hojas: Equipos, Proveedores, Procedimientos y Reporte Dashboard.
-    Usado para el ZIP completo con todas las funcionalidades.
+    Helper: Agrega header profesional a una hoja Excel.
+
+    Args:
+        sheet: Hoja de Excel
+        title_text: Texto del título
+        merge_range: Rango de celdas a fusionar (ej: 'A1:AB2')
+        generation_date: Fecha de generación
     """
     from django.utils import timezone
     from openpyxl.styles import Alignment
-    import io
-    workbook = Workbook()
 
-    # === HOJA 1: EQUIPOS ===
-    sheet_equipos = workbook.active
-    sheet_equipos.title = "Equipos"
-
-    # Agregar título profesional a hoja de Equipos
-    sheet_equipos.merge_cells('A1:AB2')
-    title_cell = sheet_equipos['A1']
-    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
+    # Título profesional
+    sheet.merge_cells(merge_range)
+    title_cell = sheet[merge_range.split(':')[0]]
+    title_cell.value = title_text
     title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
     title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Información de generación
-    sheet_equipos['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
-    sheet_equipos['A3'].font = Font(name="Arial", size=10, italic=True)
-    sheet_equipos['A3'].alignment = Alignment(horizontal="left")
+    sheet['A3'] = f"Generado el: {generation_date.strftime('%d/%m/%Y %H:%M:%S')}"
+    sheet['A3'].font = Font(name="Arial", size=10, italic=True)
+    sheet['A3'].alignment = Alignment(horizontal="left")
 
-    headers_equipos = [
+
+def _add_sheet_headers(sheet, headers, row_num=5):
+    """
+    Helper: Agrega headers de columna a una hoja Excel.
+
+    Args:
+        sheet: Hoja de Excel
+        headers: Lista de textos para headers
+        row_num: Número de fila donde agregar headers (default: 5)
+    """
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+
+    for col_num, header_text in enumerate(headers, 1):
+        cell = sheet.cell(row=row_num, column=col_num, value=header_text)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+
+def _add_equipos_sheet(workbook, equipos_queryset, generation_date):
+    """
+    Helper: Crea y llena la hoja de Equipos.
+
+    Args:
+        workbook: Workbook de Excel
+        equipos_queryset: QuerySet de equipos
+        generation_date: Fecha de generación
+
+    Returns:
+        sheet: Hoja de equipos creada
+    """
+    sheet = workbook.active
+    sheet.title = "Equipos"
+
+    # Header profesional
+    _add_professional_sheet_header(
+        sheet,
+        "INFORMES GENERADOS POR SAM METROLOGÍA SAS",
+        'A1:AB2',
+        generation_date
+    )
+
+    # Headers de columnas
+    headers = [
         "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
         "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
         "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración", "Fecha de Registro",
@@ -1779,17 +1822,9 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
         "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
         "Próxima Comprobación", "Frecuencia Comprobación (meses)"
     ]
+    _add_sheet_headers(sheet, headers, row_num=5)
 
-    # Agregar headers en fila 5
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    for col_num, header_text in enumerate(headers_equipos, 1):
-        cell = sheet_equipos.cell(row=5, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Agregar datos de equipos empezando desde la fila 6
+    # Datos de equipos
     current_row = 6
     for equipo in equipos_queryset:
         row_data = [
@@ -1797,83 +1832,93 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
             equipo.marca, equipo.modelo, equipo.numero_serie,
             equipo.ubicacion or "", equipo.responsable, equipo.estado,
             equipo.fecha_adquisicion, equipo.rango_medida, equipo.resolucion,
-            equipo.error_maximo_permisible, equipo.puntos_calibracion, equipo.fecha_registro.replace(tzinfo=None) if equipo.fecha_registro else None, equipo.observaciones,
+            equipo.error_maximo_permisible, equipo.puntos_calibracion,
+            equipo.fecha_registro.replace(tzinfo=None) if equipo.fecha_registro else None,
+            equipo.observaciones,
             equipo.fecha_ultima_calibracion, equipo.proxima_calibracion, equipo.frecuencia_calibracion_meses,
             equipo.fecha_ultimo_mantenimiento, equipo.proximo_mantenimiento, equipo.frecuencia_mantenimiento_meses,
             equipo.fecha_ultima_comprobacion, equipo.proxima_comprobacion, equipo.frecuencia_comprobacion_meses
         ]
         for col_num, value in enumerate(row_data, 1):
-            sheet_equipos.cell(row=current_row, column=col_num, value=value)
+            sheet.cell(row=current_row, column=col_num, value=value)
         current_row += 1
 
-    # === HOJA 2: PROVEEDORES ===
-    sheet_proveedores = workbook.create_sheet(title="Proveedores")
+    return sheet
 
-    # Agregar título profesional a hoja de Proveedores
-    sheet_proveedores.merge_cells('A1:H2')
-    title_cell = sheet_proveedores['A1']
-    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
-    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
-    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-    title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Información de generación
-    sheet_proveedores['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
-    sheet_proveedores['A3'].font = Font(name="Arial", size=10, italic=True)
-    sheet_proveedores['A3'].alignment = Alignment(horizontal="left")
+def _add_proveedores_sheet(workbook, proveedores_queryset, generation_date):
+    """
+    Helper: Crea y llena la hoja de Proveedores.
 
-    headers_proveedores = [
+    Args:
+        workbook: Workbook de Excel
+        proveedores_queryset: QuerySet de proveedores
+        generation_date: Fecha de generación
+
+    Returns:
+        sheet: Hoja de proveedores creada
+    """
+    sheet = workbook.create_sheet(title="Proveedores")
+
+    # Header profesional
+    _add_professional_sheet_header(
+        sheet,
+        "INFORMES GENERADOS POR SAM METROLOGÍA SAS",
+        'A1:H2',
+        generation_date
+    )
+
+    # Headers de columnas
+    headers = [
         "Nombre Empresa", "Nombre Contacto", "Correo Electrónico", "Número Contacto",
         "Tipo Servicio", "Alcance", "Servicio Prestado", "Página Web"
     ]
+    _add_sheet_headers(sheet, headers, row_num=5)
 
-    # Agregar headers en fila 5
-    for col_num, header_text in enumerate(headers_proveedores, 1):
-        cell = sheet_proveedores.cell(row=5, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Agregar datos de proveedores empezando desde la fila 6
+    # Datos de proveedores
     current_row = 6
     for proveedor in proveedores_queryset:
         row_data = [
             proveedor.nombre_empresa, proveedor.nombre_contacto, proveedor.correo_electronico,
-            proveedor.numero_contacto, proveedor.tipo_servicio, proveedor.alcance, proveedor.servicio_prestado,
-            proveedor.pagina_web
+            proveedor.numero_contacto, proveedor.tipo_servicio, proveedor.alcance,
+            proveedor.servicio_prestado, proveedor.pagina_web
         ]
         for col_num, value in enumerate(row_data, 1):
-            sheet_proveedores.cell(row=current_row, column=col_num, value=value)
+            sheet.cell(row=current_row, column=col_num, value=value)
         current_row += 1
 
-    # === HOJA 3: PROCEDIMIENTOS ===
-    sheet_procedimientos = workbook.create_sheet(title="Procedimientos")
+    return sheet
 
-    # Agregar título profesional a hoja de Procedimientos
-    sheet_procedimientos.merge_cells('A1:E2')
-    title_cell = sheet_procedimientos['A1']
-    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
-    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
-    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-    title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Información de generación
-    sheet_procedimientos['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
-    sheet_procedimientos['A3'].font = Font(name="Arial", size=10, italic=True)
-    sheet_procedimientos['A3'].alignment = Alignment(horizontal="left")
+def _add_procedimientos_sheet(workbook, procedimientos_queryset, generation_date):
+    """
+    Helper: Crea y llena la hoja de Procedimientos.
 
-    headers_procedimientos = [
+    Args:
+        workbook: Workbook de Excel
+        procedimientos_queryset: QuerySet de procedimientos
+        generation_date: Fecha de generación
+
+    Returns:
+        sheet: Hoja de procedimientos creada
+    """
+    sheet = workbook.create_sheet(title="Procedimientos")
+
+    # Header profesional
+    _add_professional_sheet_header(
+        sheet,
+        "INFORMES GENERADOS POR SAM METROLOGÍA SAS",
+        'A1:E2',
+        generation_date
+    )
+
+    # Headers de columnas
+    headers = [
         "Código", "Nombre", "Observaciones", "Versión", "Fecha de Emisión"
     ]
+    _add_sheet_headers(sheet, headers, row_num=5)
 
-    # Agregar headers en fila 5
-    for col_num, header_text in enumerate(headers_procedimientos, 1):
-        cell = sheet_procedimientos.cell(row=5, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Agregar datos de procedimientos empezando desde la fila 6
+    # Datos de procedimientos
     current_row = 6
     for procedimiento in procedimientos_queryset:
         row_data = [
@@ -1881,27 +1926,35 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
             procedimiento.version, procedimiento.fecha_emision
         ]
         for col_num, value in enumerate(row_data, 1):
-            sheet_procedimientos.cell(row=current_row, column=col_num, value=value)
+            sheet.cell(row=current_row, column=col_num, value=value)
         current_row += 1
 
-    # === HOJA 4: DASHBOARD DETALLADO ===
-    sheet_dashboard = workbook.create_sheet(title="Dashboard")
+    return sheet
 
-    # Agregar título profesional a hoja de Dashboard
-    sheet_dashboard.merge_cells('A1:F2')
-    title_cell = sheet_dashboard['A1']
-    title_cell.value = "INFORMES GENERADOS POR SAM METROLOGÍA SAS"
-    title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
-    title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-    title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Información de generación
-    sheet_dashboard['A3'] = f"Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}"
-    sheet_dashboard['A3'].font = Font(name="Arial", size=10, italic=True)
-    sheet_dashboard['A3'].alignment = Alignment(horizontal="left")
+def _add_dashboard_sheet(workbook, equipos_queryset, generation_date):
+    """
+    Helper: Crea y llena la hoja de Dashboard con estadísticas.
 
+    Args:
+        workbook: Workbook de Excel
+        equipos_queryset: QuerySet de equipos
+        generation_date: Fecha de generación
+
+    Returns:
+        sheet: Hoja de dashboard creada
+    """
     from datetime import date
-    today = date.today()
+
+    sheet = workbook.create_sheet(title="Dashboard")
+
+    # Header profesional
+    _add_professional_sheet_header(
+        sheet,
+        "INFORMES GENERADOS POR SAM METROLOGÍA SAS",
+        'A1:F2',
+        generation_date
+    )
 
     # Configurar estilos
     title_font = Font(bold=True, size=14, color="FFFFFF")
@@ -1911,9 +1964,9 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
 
     row = 5
 
-    # === ESTADÍSTICAS GENERALES ===
-    sheet_dashboard.merge_cells(f'A{row}:F{row}')
-    cell = sheet_dashboard[f'A{row}']
+    # Estadísticas generales
+    sheet.merge_cells(f'A{row}:F{row}')
+    cell = sheet[f'A{row}']
     cell.value = "📊 ESTADÍSTICAS GENERALES"
     cell.font = title_font
     cell.fill = title_fill
@@ -1925,19 +1978,41 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
         estado = equipo.estado
         stats[estado] = stats.get(estado, 0) + 1
 
-    sheet_dashboard[f'A{row}'] = "Estado"
-    sheet_dashboard[f'B{row}'] = "Cantidad"
-    for cell in [sheet_dashboard[f'A{row}'], sheet_dashboard[f'B{row}']]:
+    sheet[f'A{row}'] = "Estado"
+    sheet[f'B{row}'] = "Cantidad"
+    for cell in [sheet[f'A{row}'], sheet[f'B{row}']]:
         cell.font = header_font
         cell.fill = header_fill
     row += 1
 
     for estado, cantidad in stats.items():
-        sheet_dashboard[f'A{row}'] = estado
-        sheet_dashboard[f'B{row}'] = cantidad
+        sheet[f'A{row}'] = estado
+        sheet[f'B{row}'] = cantidad
         row += 1
 
-    # Finalizar función con return de bytes
+    return sheet
+
+
+def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset):
+    """
+    Genera un Excel consolidado con 4 hojas: Equipos, Proveedores, Procedimientos y Reporte Dashboard.
+    Usado para el ZIP completo con todas las funcionalidades.
+
+    Refactorizada: 201 líneas → 25 líneas (usa 6 helpers)
+    """
+    from django.utils import timezone
+    import io
+
+    workbook = Workbook()
+    generation_date = timezone.now()
+
+    # Crear las 4 hojas usando helpers
+    _add_equipos_sheet(workbook, equipos_queryset, generation_date)
+    _add_proveedores_sheet(workbook, proveedores_queryset, generation_date)
+    _add_procedimientos_sheet(workbook, procedimientos_queryset, generation_date)
+    _add_dashboard_sheet(workbook, equipos_queryset, generation_date)
+
+    # Retornar bytes del Excel
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
     excel_buffer.seek(0)
