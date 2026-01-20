@@ -1572,40 +1572,24 @@ def _add_excel_resumen_section(sheet, equipos_list, row_start):
     return row
 
 
-def _generate_dashboard_excel_content(equipos_queryset, empresa):
+def _add_codigos_internos_section(sheet, equipos_list, row):
     """
-    Genera un Excel profesional para el dashboard con formato mejorado y secciones completas.
-    Usado cuando se descarga desde el botón del dashboard.
+    Helper: Agrega sección de códigos internos de equipos al Excel.
+
+    Args:
+        sheet: Hoja de Excel
+        equipos_list: Lista de equipos
+        row: Fila actual
+
+    Returns:
+        row: Nueva fila actual después de agregar sección
     """
-    from collections import Counter
-    from datetime import datetime, timedelta
-    from openpyxl.styles import Alignment
-    import io
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Reporte Dashboard"
-
-    # Añadir encabezado profesional
-    row = _add_excel_header(sheet, empresa)
-
-    # Preparar datos
-    equipos_list = list(equipos_queryset)
-    hoy = datetime.now()
-    hoy_date = hoy.date()
-    treinta_dias = hoy_date + timedelta(days=30)
-    ano_actual = hoy_date.year
-
-    # Añadir sección de resumen general
-    row = _add_excel_resumen_section(sheet, equipos_list, row)
-
-    # Añadir sección de códigos internos
-    row += 2
     sheet[f'A{row}'] = '🔧 CÓDIGOS INTERNOS DE EQUIPOS'
     sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
     sheet.merge_cells(f'A{row}:F{row}')
     row += 2
 
+    # Headers
     codigo_headers = ['Código Interno', 'Nombre del Equipo', 'Estado', 'Tipo']
     for col, header in enumerate(codigo_headers, 1):
         cell = sheet.cell(row=row, column=col, value=header)
@@ -1614,6 +1598,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         cell.alignment = Alignment(horizontal="center")
     row += 1
 
+    # Datos (máximo 15 equipos)
     for equipo in equipos_list[:15]:
         sheet.cell(row=row, column=1, value=equipo.codigo_interno)
         sheet.cell(row=row, column=2, value=equipo.nombre)
@@ -1621,25 +1606,43 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         sheet.cell(row=row, column=4, value=equipo.get_tipo_equipo_display())
         row += 1
 
+    # Mensaje si hay más equipos
     if len(equipos_list) > 15:
         sheet.cell(row=row, column=1, value=f"... y {len(equipos_list) - 15} equipos más")
         sheet[f'A{row}'].font = Font(italic=True, color="666666")
         row += 1
 
-    # ==============================================
-    # SECCIÓN: ACTIVIDADES PROGRAMADAS
-    # ==============================================
+    return row
 
-    row += 2
+
+def _add_actividades_programadas_section(sheet, equipos_list, empresa, row):
+    """
+    Helper: Agrega sección de actividades programadas al Excel.
+
+    Args:
+        sheet: Hoja de Excel
+        equipos_list: Lista de equipos
+        empresa: Objeto Empresa
+        row: Fila actual
+
+    Returns:
+        row: Nueva fila actual después de agregar sección
+    """
+    from datetime import datetime, timedelta
+    from core.models import Calibracion, Mantenimiento, Comprobacion
+
     sheet[f'A{row}'] = '📅 ACTIVIDADES PROGRAMADAS Y REALIZADAS'
     sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
     sheet.merge_cells(f'A{row}:F{row}')
     row += 2
 
-    # Calcular estadísticas de actividades
-    from core.models import Calibracion, Mantenimiento, Comprobacion
+    # Preparar fechas
+    hoy = datetime.now()
+    hoy_date = hoy.date()
+    treinta_dias = hoy_date + timedelta(days=30)
+    ano_actual = hoy_date.year
 
-    # Calibraciones
+    # Calcular estadísticas de calibraciones
     cal_programadas = Calibracion.objects.filter(
         equipo__empresa=empresa,
         fecha_calibracion__year=ano_actual
@@ -1649,7 +1652,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     cal_proximas = sum(1 for eq in equipos_list
                       if eq.proxima_calibracion and hoy_date <= eq.proxima_calibracion <= treinta_dias)
 
-    # Mantenimientos
+    # Calcular estadísticas de mantenimientos
     mant_programados = Mantenimiento.objects.filter(
         equipo__empresa=empresa,
         fecha_mantenimiento__year=ano_actual
@@ -1659,7 +1662,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     mant_proximos = sum(1 for eq in equipos_list
                        if eq.proximo_mantenimiento and hoy_date <= eq.proximo_mantenimiento <= treinta_dias)
 
-    # Comprobaciones
+    # Calcular estadísticas de comprobaciones
     comp_programadas = Comprobacion.objects.filter(
         equipo__empresa=empresa,
         fecha_comprobacion__year=ano_actual
@@ -1669,7 +1672,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     comp_proximas = sum(1 for eq in equipos_list
                        if eq.proxima_comprobacion and hoy_date <= eq.proxima_comprobacion <= treinta_dias)
 
-    # Tabla de actividades
+    # Headers
     act_headers = ['Tipo de Actividad', f'Realizadas {ano_actual}', 'Vencidas', 'Próximas (30 días)']
     for col, header in enumerate(act_headers, 1):
         cell = sheet.cell(row=row, column=col, value=header)
@@ -1678,6 +1681,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         cell.alignment = Alignment(horizontal="center")
     row += 1
 
+    # Datos
     actividades_data = [
         ('Calibraciones', cal_programadas, cal_vencidas, cal_proximas),
         ('Mantenimientos', mant_programados, mant_vencidos, mant_proximos),
@@ -1691,17 +1695,31 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         sheet.cell(row=row, column=4, value=proximas)
         row += 1
 
-    # ==============================================
-    # SECCIÓN: ACTIVIDADES NO PROGRAMADAS
-    # ==============================================
+    return row
 
-    row += 2
+
+def _add_actividades_correctivas_section(sheet, empresa, row):
+    """
+    Helper: Agrega sección de actividades correctivas al Excel.
+
+    Args:
+        sheet: Hoja de Excel
+        empresa: Objeto Empresa
+        row: Fila actual
+
+    Returns:
+        row: Nueva fila actual después de agregar sección
+    """
+    from datetime import datetime
+    from core.models import Mantenimiento
+
     sheet[f'A{row}'] = '⚠️ ACTIVIDADES NO PROGRAMADAS (CORRECTIVAS)'
     sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
     sheet.merge_cells(f'A{row}:F{row}')
     row += 2
 
-    # Mantenimientos correctivos (no programados)
+    # Obtener mantenimientos correctivos
+    ano_actual = datetime.now().date().year
     mantenimientos_correctivos = Mantenimiento.objects.filter(
         equipo__empresa=empresa,
         tipo_mantenimiento='Correctivo',
@@ -1709,7 +1727,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     )
 
     if mantenimientos_correctivos.exists():
-        # Headers para correctivos
+        # Headers
         correctivos_headers = ['Equipo', 'Fecha', 'Descripción', 'Responsable']
         for col, header in enumerate(correctivos_headers, 1):
             cell = sheet.cell(row=row, column=col, value=header)
@@ -1718,7 +1736,8 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
             cell.alignment = Alignment(horizontal="center")
         row += 1
 
-        for mant in mantenimientos_correctivos[:10]:  # Limitar a 10
+        # Datos (máximo 10 registros)
+        for mant in mantenimientos_correctivos[:10]:
             sheet.cell(row=row, column=1, value=mant.equipo.codigo_interno)
             sheet.cell(row=row, column=2, value=mant.fecha_mantenimiento.strftime("%d/%m/%Y"))
             sheet.cell(row=row, column=3, value=mant.descripcion or "Mantenimiento correctivo")
@@ -1729,6 +1748,43 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
         sheet[f'A{row}'].font = Font(bold=True, color="27AE60")
         row += 1
 
+    return row
+
+
+def _generate_dashboard_excel_content(equipos_queryset, empresa):
+    """
+    Genera un Excel profesional para el dashboard con formato mejorado y secciones completas.
+    Usado cuando se descarga desde el botón del dashboard.
+
+    Refactorizada: 171 líneas → 43 líneas (usa 3 helpers)
+    """
+    import io
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Reporte Dashboard"
+
+    # Añadir encabezado profesional
+    row = _add_excel_header(sheet, empresa)
+
+    # Preparar datos
+    equipos_list = list(equipos_queryset)
+
+    # Añadir sección de resumen general
+    row = _add_excel_resumen_section(sheet, equipos_list, row)
+
+    # Añadir sección de códigos internos
+    row += 2
+    row = _add_codigos_internos_section(sheet, equipos_list, row)
+
+    # Añadir sección de actividades programadas
+    row += 2
+    row = _add_actividades_programadas_section(sheet, equipos_list, empresa, row)
+
+    # Añadir sección de actividades correctivas
+    row += 2
+    row = _add_actividades_correctivas_section(sheet, empresa, row)
+
     # Ajustar anchos de columnas
     for col in ['A', 'B', 'C', 'D', 'E', 'F']:
         sheet.column_dimensions[col].width = 20
@@ -1737,6 +1793,7 @@ def _generate_dashboard_excel_content(equipos_queryset, empresa):
     sheet.row_dimensions[1].height = 40
     sheet.row_dimensions[2].height = 25
 
+    # Retornar bytes del Excel
     excel_buffer = io.BytesIO()
     workbook.save(excel_buffer)
     excel_buffer.seek(0)
