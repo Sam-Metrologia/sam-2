@@ -47,6 +47,9 @@
             root.setAttribute(THEME_ATTRIBUTE, 'dark');
         }
 
+        // Forzar repaint del navegador
+        void root.offsetHeight;
+
         // Actualizar icono del toggle si existe
         updateToggleIcon(theme);
 
@@ -54,6 +57,22 @@
         document.dispatchEvent(new CustomEvent('themeChanged', {
             detail: { theme }
         }));
+
+        // Forzar actualización de todos los elementos con estilos inline problemáticos
+        forceStyleRefresh();
+    }
+
+    /**
+     * Fuerza la actualización de estilos en elementos problemáticos
+     */
+    function forceStyleRefresh() {
+        // Forzar recalculo de estilos en chart containers
+        const chartContainers = document.querySelectorAll('.chart-container, .pie-chart-card');
+        chartContainers.forEach(el => {
+            el.style.display = 'none';
+            void el.offsetHeight; // Trigger reflow
+            el.style.display = '';
+        });
     }
 
     /**

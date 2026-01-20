@@ -10,24 +10,24 @@
      * Obtiene los colores según el tema actual
      */
     function getChartColors() {
-        const isDark = !document.documentElement.hasAttribute('data-theme') ||
-                       document.documentElement.getAttribute('data-theme') === 'dark';
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const isDark = currentTheme === 'dark';
 
         if (isDark) {
             return {
                 text: '#e6edf3',
-                grid: '#21262d',
-                border: '#30363d',
-                tooltipBackground: '#141920',
-                tooltipBorder: '#30363d'
+                grid: '#374151',
+                border: '#4b5563',
+                tooltipBackground: '#1f2937',
+                tooltipBorder: '#4b5563'
             };
         } else {
             return {
                 text: '#1f2937',
                 grid: '#e5e7eb',
-                border: '#d0d7de',
+                border: '#d1d5db',
                 tooltipBackground: '#ffffff',
-                tooltipBorder: '#d0d7de'
+                tooltipBorder: '#d1d5db'
             };
         }
     }
@@ -122,6 +122,14 @@
                 chart.options.plugins.legend.labels.color = colors.text;
             }
 
+            // Actualizar colores de tooltips
+            if (chart.options.plugins && chart.options.plugins.tooltip) {
+                chart.options.plugins.tooltip.backgroundColor = colors.tooltipBackground;
+                chart.options.plugins.tooltip.titleColor = colors.text;
+                chart.options.plugins.tooltip.bodyColor = colors.text;
+                chart.options.plugins.tooltip.borderColor = colors.tooltipBorder;
+            }
+
             // Actualizar colores de ejes
             if (chart.options.scales) {
                 if (chart.options.scales.x) {
@@ -134,7 +142,8 @@
                 }
             }
 
-            chart.update();
+            // Forzar re-render completo
+            chart.update('active');
         });
     }
 

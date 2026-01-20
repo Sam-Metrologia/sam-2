@@ -497,8 +497,48 @@
 /* Contenedores de gráficas */
 [data-theme="dark"] .chart-container,
 [data-theme="dark"] [class*="chart"] {
+    background: var(--bg-card) !important;
     background-color: var(--bg-card) !important;
     color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Forzar background en modo oscuro para containers con gradientes inline */
+[data-theme="dark"] div.chart-container {
+    background-image: none !important;
+    background: var(--bg-card) !important;
+}
+
+/* Tarjetas de gráficas (pie-chart-card) en dark mode */
+[data-theme="dark"] .pie-chart-card {
+    background: var(--bg-card) !important;
+    background-image: none !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+[data-theme="dark"] .pie-chart-card-title {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .pie-chart-section-title {
+    color: var(--text-primary) !important;
+}
+
+/* Tablas de resumen en gráficas */
+[data-theme="dark"] .summary-table {
+    background-color: transparent !important;
+}
+
+[data-theme="dark"] .summary-table th {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .summary-table td {
+    color: var(--text-secondary) !important;
+    border-color: var(--border-color) !important;
 }
 
 /* ============================================
