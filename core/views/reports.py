@@ -675,21 +675,16 @@ def importar_equipos_excel(request):
         })
 
 
-def _generate_excel_template():
+def _add_template_header(sheet):
     """
-    Genera plantilla Excel mejorada con validaciones, instrucciones y ejemplos.
+    Helper: Agrega encabezado profesional a plantilla Excel.
+
+    Args:
+        sheet: Hoja de Excel
     """
-    from openpyxl.styles import Font, PatternFill, Alignment, Protection
-    from openpyxl.worksheet.datavalidation import DataValidation
-    from openpyxl.comments import Comment
-    from datetime import datetime, date
-    import io
+    from datetime import datetime
 
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Plantilla Equipos"
-
-    # Encabezado profesional
+    # Título principal
     sheet.merge_cells('A1:Z3')
     title_cell = sheet['A1']
     title_cell.value = "PLANTILLA DE IMPORTACIÓN DE EQUIPOS - SAM METROLOGÍA SAS"
@@ -697,14 +692,24 @@ def _generate_excel_template():
     title_cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Información importante
+    # Información
     sheet.merge_cells('A4:Z4')
     info_cell = sheet['A4']
     info_cell.value = f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Complete SOLO las filas de datos (fila 8 en adelante)"
     info_cell.font = Font(name="Arial", size=11, bold=True, color="1F4E79")
     info_cell.alignment = Alignment(horizontal="center")
 
-    # Headers principales
+
+def _add_template_headers_row(sheet):
+    """
+    Helper: Agrega filas de headers (técnicos y legibles) a plantilla Excel.
+
+    Args:
+        sheet: Hoja de Excel
+    """
+    from openpyxl.utils import get_column_letter
+
+    # Headers técnicos
     headers = [
         "codigo_interno", "nombre", "empresa_nombre", "tipo_equipo", "marca", "modelo",
         "numero_serie", "ubicacion_nombre", "responsable", "estado", "fecha_adquisicion",
@@ -724,14 +729,13 @@ def _generate_excel_template():
         "Freq. Cal. (meses)", "Freq. Mant. (meses)", "Freq. Comp. (meses)"
     ]
 
-    # Aplicar headers
+    # Aplicar headers técnicos (fila 6)
     for i, header in enumerate(headers, 1):
-        from openpyxl.utils import get_column_letter
         column_letter = get_column_letter(i)
         sheet[f'{column_letter}6'] = header
 
+    # Aplicar headers legibles (fila 7)
     for i, header_legible in enumerate(headers_legibles, 1):
-        from openpyxl.utils import get_column_letter
         column_letter = get_column_letter(i)
         cell = sheet[f'{column_letter}7']
         cell.value = header_legible
@@ -739,13 +743,22 @@ def _generate_excel_template():
         cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    # Obtener opciones para validaciones
+
+def _add_template_validations(sheet):
+    """
+    Helper: Agrega validaciones de datos a plantilla Excel.
+
+    Args:
+        sheet: Hoja de Excel
+    """
+    from openpyxl.worksheet.datavalidation import DataValidation
     from ..models import Equipo, Empresa
+
+    # Obtener opciones para validaciones
     tipos_equipo = [choice[0] for choice in Equipo.TIPO_EQUIPO_CHOICES]
     estados_equipo = [choice[0] for choice in Equipo.ESTADO_CHOICES]
     empresas_disponibles = list(Empresa.objects.values_list('nombre', flat=True))
 
-    # Crear validaciones
     start_row = 8
     end_row = 1000
 
@@ -783,6 +796,22 @@ def _generate_excel_template():
     dv_estado.add(f"J{start_row}:J{end_row}")
     sheet.add_data_validation(dv_estado)
 
+
+def _add_template_example_row(sheet):
+    """
+    Helper: Agrega fila de ejemplo a plantilla Excel.
+
+    Args:
+        sheet: Hoja de Excel
+    """
+    from openpyxl.utils import get_column_letter
+    from ..models import Equipo, Empresa
+
+    # Obtener datos de ejemplo
+    tipos_equipo = [choice[0] for choice in Equipo.TIPO_EQUIPO_CHOICES]
+    estados_equipo = [choice[0] for choice in Equipo.ESTADO_CHOICES]
+    empresas_disponibles = list(Empresa.objects.values_list('nombre', flat=True))
+
     # Fila de ejemplo
     ejemplo_data = [
         "EQ-001", "Balanza Analítica Ejemplo",
@@ -795,18 +824,27 @@ def _generate_excel_template():
         "V1.0", "01/01/2023", "CAL-001", "12", "6", "3"
     ]
 
+    # Aplicar ejemplo en fila 8
     for i, value in enumerate(ejemplo_data, 1):
-        from openpyxl.utils import get_column_letter
         column_letter = get_column_letter(i)
         cell = sheet[f'{column_letter}8']
         cell.value = value
         cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
         cell.font = Font(name="Arial", size=9, italic=True)
 
+
+def _apply_template_formatting(sheet):
+    """
+    Helper: Aplica formato final a plantilla Excel (anchos, alturas, congelar paneles).
+
+    Args:
+        sheet: Hoja de Excel
+    """
+    from openpyxl.utils import get_column_letter
+
     # Ajustar anchos de columna
     anchos = [15, 25, 20, 18, 15, 15, 15, 20, 20, 15, 15, 18, 18, 18, 15, 15, 15, 25, 15, 15, 15, 10, 10, 10]
     for i, ancho in enumerate(anchos, 1):
-        from openpyxl.utils import get_column_letter
         column_letter = get_column_letter(i)
         sheet.column_dimensions[column_letter].width = ancho
 
@@ -816,6 +854,34 @@ def _generate_excel_template():
 
     # Congelar paneles
     sheet.freeze_panes = "A8"
+
+
+def _generate_excel_template():
+    """
+    Genera plantilla Excel mejorada con validaciones, instrucciones y ejemplos.
+
+    Refactorizada: 154 líneas → 30 líneas (usa 5 helpers)
+    """
+    import io
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Plantilla Equipos"
+
+    # Agregar header profesional
+    _add_template_header(sheet)
+
+    # Agregar headers (técnicos y legibles)
+    _add_template_headers_row(sheet)
+
+    # Agregar validaciones de datos
+    _add_template_validations(sheet)
+
+    # Agregar fila de ejemplo
+    _add_template_example_row(sheet)
+
+    # Aplicar formato final
+    _apply_template_formatting(sheet)
 
     # Crear buffer y guardar
     excel_buffer = io.BytesIO()
