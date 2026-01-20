@@ -1401,133 +1401,235 @@ def _get_pdf_image_data(file_field):
         return None
 
 
+def _generate_hoja_vida_cache_key(equipo):
+    """
+    Helper: Genera clave de caché para hoja de vida de equipo.
+
+    Args:
+        equipo: Objeto Equipo
+
+    Returns:
+        str: Clave de caché única
+    """
+    import hashlib
+
+    cache_data = {
+        'equipo_id': equipo.id,
+        'equipo_updated': equipo.fecha_actualizacion.isoformat() if hasattr(equipo, 'fecha_actualizacion') else '',
+        'calibraciones_count': equipo.calibraciones.count(),
+        'mantenimientos_count': equipo.mantenimientos.count(),
+        'comprobaciones_count': equipo.comprobaciones.count(),
+        'estado': equipo.estado,
+        'last_calibration': equipo.calibraciones.first().fecha_calibracion.isoformat() if equipo.calibraciones.exists() else '',
+        'last_maintenance': equipo.mantenimientos.first().fecha_mantenimiento.isoformat() if equipo.mantenimientos.exists() else '',
+        'codificacion_formato': equipo.codificacion_formato or '',
+        'version_formato': equipo.version_formato or '',
+        'fecha_version_formato': equipo.fecha_version_formato.isoformat() if equipo.fecha_version_formato else '',
+    }
+
+    cache_key_data = str(cache_data).encode('utf-8')
+    cache_key = f"hoja_vida_{equipo.id}_{hashlib.md5(cache_key_data).hexdigest()}"
+
+    return cache_key
+
+
+def _get_hoja_vida_activities(equipo):
+    """
+    Helper: Obtiene actividades optimizadas para hoja de vida.
+
+    Args:
+        equipo: Objeto Equipo
+
+    Returns:
+        tuple: (calibraciones, mantenimientos, comprobaciones)
+    """
+    calibraciones = equipo.calibraciones.select_related('proveedor').order_by('-fecha_calibracion')
+    mantenimientos = equipo.mantenimientos.select_related('proveedor').order_by('-fecha_mantenimiento')
+    comprobaciones = equipo.comprobaciones.select_related('proveedor').order_by('-fecha_comprobacion')
+
+    return calibraciones, mantenimientos, comprobaciones
+
+
+def _generate_hoja_vida_charts(calibraciones, comprobaciones):
+    """
+    Helper: Genera gráficas históricas para hoja de vida.
+
+    Args:
+        calibraciones: QuerySet de calibraciones
+        comprobaciones: QuerySet de comprobaciones
+
+    Returns:
+        tuple: (grafica_hist_confirmaciones, grafica_hist_comprobaciones)
+    """
+    from core.views.equipment import _generar_grafica_hist_confirmaciones, _generar_grafica_hist_comprobaciones
+
+    # Obtener últimas 5 confirmaciones con datos JSON
+    calibraciones_con_datos = []
+    for cal in calibraciones[:5]:
+        if (hasattr(cal, 'confirmacion_metrologica_datos') and
+            cal.confirmacion_metrologica_datos and
+            cal.confirmacion_metrologica_datos.get('puntos_medicion')):
+            calibraciones_con_datos.append({
+                'fecha': cal.fecha_calibracion,
+                'puntos': cal.confirmacion_metrologica_datos['puntos_medicion']
+            })
+
+    # Obtener últimas 5 comprobaciones con datos JSON
+    comprobaciones_con_datos = []
+    for comp in comprobaciones[:5]:
+        if (hasattr(comp, 'datos_comprobacion') and
+            comp.datos_comprobacion and
+            comp.datos_comprobacion.get('puntos_medicion')):
+            comprobaciones_con_datos.append({
+                'fecha': comp.fecha_comprobacion,
+                'puntos': comp.datos_comprobacion['puntos_medicion']
+            })
+
+    # Generar gráficas SVG
+    grafica_hist_confirmaciones = None
+    if len(calibraciones_con_datos) > 0:
+        grafica_hist_confirmaciones = _generar_grafica_hist_confirmaciones(calibraciones_con_datos)
+
+    grafica_hist_comprobaciones = None
+    if len(comprobaciones_con_datos) > 0:
+        grafica_hist_comprobaciones = _generar_grafica_hist_comprobaciones(comprobaciones_con_datos)
+
+    return grafica_hist_confirmaciones, grafica_hist_comprobaciones
+
+
+def _get_hoja_vida_file_urls(request, equipo, calibraciones, mantenimientos, comprobaciones):
+    """
+    Helper: Obtiene URLs de archivos para hoja de vida.
+
+    Args:
+        request: Objeto request de Django
+        equipo: Objeto Equipo
+        calibraciones: QuerySet de calibraciones
+        mantenimientos: QuerySet de mantenimientos
+        comprobaciones: QuerySet de comprobaciones
+
+    Returns:
+        dict: Diccionario con todas las URLs de archivos
+    """
+    # Obtener registro de baja
+    baja_registro = None
+    try:
+        baja_registro = equipo.baja_registro
+    except BajaEquipo.DoesNotExist:
+        pass
+
+    # URLs de imágenes (convertidas a base64)
+    logo_empresa_url = _get_pdf_image_data(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
+    imagen_equipo_url = _get_pdf_image_data(equipo.imagen_equipo) if equipo.imagen_equipo else None
+
+    # URL de documento de baja (solo si está dado de baja)
+    documento_baja_url = (_get_pdf_file_url(request, baja_registro.documento_baja)
+                         if baja_registro and baja_registro.documento_baja and equipo.estado == ESTADO_DE_BAJA
+                         else None)
+
+    # URLs de documentos de calibraciones
+    for cal in calibraciones:
+        cal.documento_calibracion_url = _get_pdf_file_url(request, cal.documento_calibracion)
+        cal.confirmacion_metrologica_pdf_url = _get_pdf_file_url(request, cal.confirmacion_metrologica_pdf)
+        cal.intervalos_calibracion_pdf_url = _get_pdf_file_url(request, cal.intervalos_calibracion_pdf)
+
+    # URLs de documentos de mantenimientos
+    for mant in mantenimientos:
+        mant.documento_mantenimiento_url = _get_pdf_file_url(request, mant.documento_mantenimiento)
+
+    # URLs de documentos de comprobaciones
+    for comp in comprobaciones:
+        comp.documento_comprobacion_url = _get_pdf_file_url(request, comp.documento_comprobacion)
+
+    # URLs de documentos del equipo
+    archivo_compra_pdf_url = _get_pdf_file_url(request, equipo.archivo_compra_pdf)
+    ficha_tecnica_pdf_url = _get_pdf_file_url(request, equipo.ficha_tecnica_pdf)
+    manual_pdf_url = _get_pdf_file_url(request, equipo.manual_pdf)
+    otros_documentos_pdf_url = _get_pdf_file_url(request, equipo.otros_documentos_pdf)
+
+    return {
+        'baja_registro': baja_registro,
+        'logo_empresa_url': logo_empresa_url,
+        'imagen_equipo_url': imagen_equipo_url,
+        'documento_baja_url': documento_baja_url,
+        'archivo_compra_pdf_url': archivo_compra_pdf_url,
+        'ficha_tecnica_pdf_url': ficha_tecnica_pdf_url,
+        'manual_pdf_url': manual_pdf_url,
+        'otros_documentos_pdf_url': otros_documentos_pdf_url,
+    }
+
+
+def _build_hoja_vida_context(equipo, calibraciones, mantenimientos, comprobaciones, file_urls, charts):
+    """
+    Helper: Construye contexto para hoja de vida PDF.
+
+    Args:
+        equipo: Objeto Equipo
+        calibraciones: QuerySet de calibraciones
+        mantenimientos: QuerySet de mantenimientos
+        comprobaciones: QuerySet de comprobaciones
+        file_urls: Dict con URLs de archivos
+        charts: Tuple con gráficas (confirmaciones, comprobaciones)
+
+    Returns:
+        dict: Contexto para el template
+    """
+    grafica_hist_confirmaciones, grafica_hist_comprobaciones = charts
+
+    context = {
+        'equipo': equipo,
+        'calibraciones': calibraciones,
+        'mantenimientos': mantenimientos,
+        'comprobaciones': comprobaciones,
+        'baja_registro': file_urls['baja_registro'] if equipo.estado == ESTADO_DE_BAJA else None,
+        'logo_empresa_url': file_urls['logo_empresa_url'],
+        'imagen_equipo_url': file_urls['imagen_equipo_url'],
+        'documento_baja_url': file_urls['documento_baja_url'],
+        'archivo_compra_pdf_url': file_urls['archivo_compra_pdf_url'],
+        'ficha_tecnica_pdf_url': file_urls['ficha_tecnica_pdf_url'],
+        'manual_pdf_url': file_urls['manual_pdf_url'],
+        'otros_documentos_pdf_url': file_urls['otros_documentos_pdf_url'],
+        'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
+        'grafica_hist_confirmaciones': grafica_hist_confirmaciones,
+        'grafica_hist_comprobaciones': grafica_hist_comprobaciones,
+    }
+
+    return context
+
+
 def _generate_equipment_hoja_vida_pdf_content(request, equipo):
     """
     Genera el contenido PDF para la "Hoja de Vida" de un equipo con URLs seguras.
     Optimizado para uso eficiente de memoria con sistema de caché inteligente.
+
+    Refactorizada: 147 líneas → 50 líneas (usa 5 helpers)
     """
     from django.core.cache import cache
-    import hashlib
 
     try:
-        # Generar clave de caché basada en datos que afectan la hoja de vida
-        cache_data = {
-            'equipo_id': equipo.id,
-            'equipo_updated': equipo.fecha_actualizacion.isoformat() if hasattr(equipo, 'fecha_actualizacion') else '',
-            'calibraciones_count': equipo.calibraciones.count(),
-            'mantenimientos_count': equipo.mantenimientos.count(),
-            'comprobaciones_count': equipo.comprobaciones.count(),
-            'estado': equipo.estado,
-            'last_calibration': equipo.calibraciones.first().fecha_calibracion.isoformat() if equipo.calibraciones.exists() else '',
-            'last_maintenance': equipo.mantenimientos.first().fecha_mantenimiento.isoformat() if equipo.mantenimientos.exists() else '',
-            'codificacion_formato': equipo.codificacion_formato or '',
-            'version_formato': equipo.version_formato or '',
-            'fecha_version_formato': equipo.fecha_version_formato.isoformat() if equipo.fecha_version_formato else '',
-        }
-
-        # Crear hash único para esta configuración
-        cache_key_data = str(cache_data).encode('utf-8')
-        cache_key = f"hoja_vida_{equipo.id}_{hashlib.md5(cache_key_data).hexdigest()}"
-
-        # Intentar obtener del caché
+        # Verificar caché
+        cache_key = _generate_hoja_vida_cache_key(equipo)
         cached_pdf = cache.get(cache_key)
         if cached_pdf:
             logger.info(f"Hoja de vida obtenida del caché para equipo {equipo.codigo_interno}")
             return cached_pdf
-        # Optimizar consultas con select_related pero mantener historial completo
-        calibraciones = equipo.calibraciones.select_related('proveedor').order_by('-fecha_calibracion')
-        mantenimientos = equipo.mantenimientos.select_related('proveedor').order_by('-fecha_mantenimiento')
-        comprobaciones = equipo.comprobaciones.select_related('proveedor').order_by('-fecha_comprobacion')
 
-        # ========== GRÁFICAS HISTÓRICAS PARA PDF ==========
-        # Importar funciones de equipment.py para generar gráficas
-        from core.views.equipment import _generar_grafica_hist_confirmaciones, _generar_grafica_hist_comprobaciones
+        # Obtener actividades optimizadas
+        calibraciones, mantenimientos, comprobaciones = _get_hoja_vida_activities(equipo)
 
-        # Obtener últimas 5 confirmaciones con datos JSON
-        calibraciones_con_datos = []
-        for cal in calibraciones[:5]:
-            if (hasattr(cal, 'confirmacion_metrologica_datos') and
-                cal.confirmacion_metrologica_datos and
-                cal.confirmacion_metrologica_datos.get('puntos_medicion')):
-                calibraciones_con_datos.append({
-                    'fecha': cal.fecha_calibracion,
-                    'puntos': cal.confirmacion_metrologica_datos['puntos_medicion']
-                })
+        # Generar gráficas históricas
+        charts = _generate_hoja_vida_charts(calibraciones, comprobaciones)
 
-        # Obtener últimas 5 comprobaciones con datos JSON
-        comprobaciones_con_datos = []
-        for comp in comprobaciones[:5]:
-            if (hasattr(comp, 'datos_comprobacion') and
-                comp.datos_comprobacion and
-                comp.datos_comprobacion.get('puntos_medicion')):
-                comprobaciones_con_datos.append({
-                    'fecha': comp.fecha_comprobacion,
-                    'puntos': comp.datos_comprobacion['puntos_medicion']
-                })
+        # Obtener URLs de archivos
+        file_urls = _get_hoja_vida_file_urls(request, equipo, calibraciones, mantenimientos, comprobaciones)
 
-        # Generar gráficas SVG
-        grafica_hist_confirmaciones = None
-        if len(calibraciones_con_datos) > 0:
-            grafica_hist_confirmaciones = _generar_grafica_hist_confirmaciones(calibraciones_con_datos)
-
-        grafica_hist_comprobaciones = None
-        if len(comprobaciones_con_datos) > 0:
-            grafica_hist_comprobaciones = _generar_grafica_hist_comprobaciones(comprobaciones_con_datos)
-
-        baja_registro = None
-        try:
-            baja_registro = equipo.baja_registro
-        except BajaEquipo.DoesNotExist:
-            pass
-
-        # Obtener URLs de archivos con el nuevo sistema seguro
-        # Para imágenes, usar la función especializada que convierte a base64
-        logo_empresa_url = _get_pdf_image_data(equipo.empresa.logo_empresa) if equipo.empresa and equipo.empresa.logo_empresa else None
-        imagen_equipo_url = _get_pdf_image_data(equipo.imagen_equipo) if equipo.imagen_equipo else None
-        # SOLO mostrar documento de baja si el equipo realmente está dado de baja
-        documento_baja_url = (_get_pdf_file_url(request, baja_registro.documento_baja)
-                             if baja_registro and baja_registro.documento_baja and equipo.estado == ESTADO_DE_BAJA
-                             else None)
-
-        for cal in calibraciones:
-            cal.documento_calibracion_url = _get_pdf_file_url(request, cal.documento_calibracion)
-            cal.confirmacion_metrologica_pdf_url = _get_pdf_file_url(request, cal.confirmacion_metrologica_pdf)
-            cal.intervalos_calibracion_pdf_url = _get_pdf_file_url(request, cal.intervalos_calibracion_pdf)
-
-        for mant in mantenimientos:
-            mant.documento_mantenimiento_url = _get_pdf_file_url(request, mant.documento_mantenimiento)
-        for comp in comprobaciones:
-            comp.documento_comprobacion_url = _get_pdf_file_url(request, comp.documento_comprobacion)
-
-        archivo_compra_pdf_url = _get_pdf_file_url(request, equipo.archivo_compra_pdf)
-        ficha_tecnica_pdf_url = _get_pdf_file_url(request, equipo.ficha_tecnica_pdf)
-        manual_pdf_url = _get_pdf_file_url(request, equipo.manual_pdf)
-        otros_documentos_pdf_url = _get_pdf_file_url(request, equipo.otros_documentos_pdf)
-
-        context = {
-            'equipo': equipo,
-            'calibraciones': calibraciones,
-            'mantenimientos': mantenimientos,
-            'comprobaciones': comprobaciones,
-            'baja_registro': baja_registro if equipo.estado == ESTADO_DE_BAJA else None,
-            'logo_empresa_url': logo_empresa_url,
-            'imagen_equipo_url': imagen_equipo_url,
-            'documento_baja_url': documento_baja_url,
-            'archivo_compra_pdf_url': archivo_compra_pdf_url,
-            'ficha_tecnica_pdf_url': ficha_tecnica_pdf_url,
-            'manual_pdf_url': manual_pdf_url,
-            'otros_documentos_pdf_url': otros_documentos_pdf_url,
-            'titulo_pagina': f'Hoja de Vida de {equipo.nombre}',
-            # Gráficas históricas (NUEVO 2025-12-04)
-            'grafica_hist_confirmaciones': grafica_hist_confirmaciones,
-            'grafica_hist_comprobaciones': grafica_hist_comprobaciones,
-        }
+        # Construir contexto
+        context = _build_hoja_vida_context(equipo, calibraciones, mantenimientos, comprobaciones, file_urls, charts)
 
         # Generar PDF
         pdf_content = _generate_pdf_content(request, 'core/hoja_vida_pdf.html', context)
 
         # Guardar en caché por 1 hora (3600 segundos)
-        # Solo cachear si el PDF se generó correctamente
         if pdf_content and len(pdf_content) > 1000:  # Verificar que sea un PDF válido
             cache.set(cache_key, pdf_content, timeout=3600)
             logger.info(f"Hoja de vida guardada en caché para equipo {equipo.codigo_interno}")
