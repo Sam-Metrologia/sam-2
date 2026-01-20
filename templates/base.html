@@ -23,6 +23,7 @@
 
     <!-- Sistema de Temas -->
     <link rel="stylesheet" href="{% static 'core/css/themes.css' %}?v=16.0">
+    <link rel="stylesheet" href="{% static 'core/css/responsive.css' %}?v=1.0">
     <script src="{% static 'core/js/theme-toggle.js' %}?v=6.0"></script>
     <script src="{% static 'core/js/chart-theme.js' %}?v=5.0" defer></script>
     <script src="{% static 'core/js/dark-mode-enforcer.js' %}?v=5.0"></script>
@@ -456,15 +457,24 @@
                     // Add/remove overlay for mobile
                     if (sidebar.classList.contains('show')) {
                         document.body.classList.add('overflow-hidden'); // Prevent scrolling body
-                        const overlay = document.createElement('div');
-                        overlay.id = 'sidebar-overlay';
-                        overlay.className = 'fixed inset-0 bg-black opacity-50 z-999';
-                        document.body.appendChild(overlay);
-                        overlay.addEventListener('click', toggleSidebar); // Close sidebar on overlay click
+                        let overlay = document.getElementById('sidebar-overlay');
+                        if (!overlay) {
+                            overlay = document.createElement('div');
+                            overlay.id = 'sidebar-overlay';
+                            overlay.className = 'sidebar-overlay active';
+                            document.body.appendChild(overlay);
+                            overlay.addEventListener('click', toggleSidebar); // Close sidebar on overlay click
+                        } else {
+                            overlay.classList.add('active');
+                        }
                     } else {
                         document.body.classList.remove('overflow-hidden');
                         const overlay = document.getElementById('sidebar-overlay');
-                        if (overlay) overlay.remove();
+                        if (overlay) {
+                            overlay.classList.remove('active');
+                            // Remover después de la transición
+                            setTimeout(() => overlay.remove(), 300);
+                        }
                     }
                 } else {
                     // On large screens, toggle 'hidden' class for sidebar and 'expanded' for main content

@@ -1,0 +1,402 @@
+/**
+ * Mejoras Responsive - Día 10
+ * Mejoras adicionales para diseño responsive en móviles y tablets
+ */
+
+/* ============================================
+   TABLAS RESPONSIVE
+   ============================================ */
+
+/* Mejoras para tablas con scroll horizontal */
+.overflow-x-auto {
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+    scrollbar-width: thin; /* Firefox */
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+    height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Dark mode para scrollbars */
+[data-theme="dark"] .overflow-x-auto::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+[data-theme="dark"] .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #6b7280;
+}
+
+[data-theme="dark"] .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Tablas: mejoras responsive */
+@media (max-width: 768px) {
+    table {
+        font-size: 0.875rem; /* 14px */
+    }
+
+    table th,
+    table td {
+        padding: 0.5rem !important; /* Menos padding en móvil */
+        white-space: nowrap; /* Evitar que el texto se rompa */
+    }
+
+    /* Primera columna sticky en móvil para contexto */
+    table th:first-child,
+    table td:first-child {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 10;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    }
+
+    [data-theme="dark"] table th:first-child,
+    [data-theme="dark"] table td:first-child {
+        background-color: var(--bg-secondary);
+    }
+}
+
+/* ============================================
+   BOTONES TOUCH-FRIENDLY
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Botones más grandes para touch */
+    .btn,
+    button:not(.menu-toggle):not(.user-menu-button),
+    a.btn,
+    input[type="submit"],
+    input[type="button"] {
+        min-height: 44px; /* Mínimo recomendado para touch targets */
+        min-width: 44px;
+        padding: 0.75rem 1.25rem !important;
+        font-size: 0.9375rem !important; /* 15px */
+    }
+
+    /* Botones pequeños específicos */
+    .btn-sm {
+        min-height: 38px;
+        padding: 0.5rem 1rem !important;
+    }
+
+    /* Íconos en botones más grandes */
+    .btn i,
+    button i {
+        font-size: 1.125rem; /* 18px */
+    }
+
+    /* Links como botones */
+    a.inline-flex,
+    a.flex {
+        min-height: 44px;
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* ============================================
+   CARDS RESPONSIVE
+   ============================================ */
+
+/* Info cards del dashboard */
+@media (max-width: 640px) {
+    .info-card {
+        padding: 1.25rem !important;
+    }
+
+    .info-card h3 {
+        font-size: 1rem !important; /* 16px */
+    }
+
+    .info-card p {
+        font-size: 1.875rem !important; /* 30px en lugar de 36px */
+    }
+
+    .info-card i {
+        font-size: 1.5rem !important;
+    }
+}
+
+/* ============================================
+   GRID RESPONSIVE MEJORADO
+   ============================================ */
+
+/* Asegurar que los grids colapsen bien en móvil */
+@media (max-width: 640px) {
+    .grid {
+        gap: 1rem !important; /* Menos gap en móvil */
+    }
+
+    /* Forzar columna única en muy pequeño */
+    .grid-cols-2,
+    .grid-cols-3,
+    .grid-cols-4,
+    .sm\:grid-cols-2,
+    .md\:grid-cols-2,
+    .md\:grid-cols-3,
+    .lg\:grid-cols-2,
+    .lg\:grid-cols-3,
+    .lg\:grid-cols-4 {
+        grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    }
+}
+
+/* ============================================
+   MENÚ HAMBURGUESA MEJORADO
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Botón de menú más visible */
+    .menu-toggle {
+        min-height: 44px;
+        min-width: 44px;
+        font-size: 1.5rem !important;
+        background-color: var(--bg-tertiary) !important;
+    }
+
+    /* Overlay cuando el sidebar está abierto */
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    /* Sidebar con mejor animación */
+    .sidebar {
+        width: 280px; /* Más ancho en móvil para mejor legibilidad */
+        box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    /* Links del sidebar más grandes en móvil */
+    .sidebar ul li a {
+        padding: 1rem 1.25rem !important;
+        font-size: 1rem !important;
+    }
+
+    .sidebar ul li a i {
+        font-size: 1.25rem !important;
+        margin-right: 1rem !important;
+    }
+}
+
+/* ============================================
+   FORMULARIOS RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Inputs más grandes para touch */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    select,
+    textarea {
+        min-height: 44px;
+        font-size: 16px !important; /* Evita zoom en iOS */
+        padding: 0.75rem !important;
+    }
+
+    /* Labels más visibles */
+    label {
+        font-size: 0.9375rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.5rem !important;
+    }
+}
+
+/* ============================================
+   MODALES RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .modal-content,
+    [class*="modal"] > div {
+        margin: 1rem !important;
+        max-width: calc(100% - 2rem) !important;
+        max-height: calc(100vh - 2rem) !important;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 1rem !important;
+        position: sticky;
+        top: 0;
+        background-color: white;
+        z-index: 10;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    [data-theme="dark"] .modal-header {
+        background-color: var(--bg-secondary);
+        border-bottom-color: var(--border-color);
+    }
+}
+
+/* ============================================
+   NAVBAR RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+    .navbar {
+        padding: 0.75rem 1rem !important;
+        flex-wrap: wrap;
+    }
+
+    /* User menu más compacto */
+    .user-menu-button span {
+        display: none; /* Ocultar nombre en muy pequeño */
+    }
+
+    .user-menu-button {
+        padding: 0.5rem !important;
+    }
+}
+
+/* ============================================
+   ALERTAS Y NOTIFICACIONES RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .alert,
+    [class*="alert-"] {
+        padding: 0.875rem !important;
+        font-size: 0.875rem !important;
+    }
+
+    .alert button {
+        min-height: 32px !important;
+        min-width: 32px !important;
+    }
+}
+
+/* ============================================
+   GRÁFICAS RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .chart-container {
+        height: 220px !important;
+        padding: 0.75rem !important;
+    }
+
+    /* Leyendas de gráficas más pequeñas */
+    canvas + div {
+        font-size: 0.75rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        height: 200px !important;
+        padding: 0.5rem !important;
+    }
+}
+
+/* ============================================
+   UTILIDADES RESPONSIVE
+   ============================================ */
+
+/* Ocultar elementos en móvil */
+.hidden-mobile {
+    display: none !important;
+}
+
+@media (min-width: 769px) {
+    .hidden-mobile {
+        display: block !important;
+    }
+}
+
+/* Mostrar solo en móvil */
+.mobile-only {
+    display: block !important;
+}
+
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none !important;
+    }
+}
+
+/* Texto responsive */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.75rem !important; /* 28px */
+    }
+
+    h2 {
+        font-size: 1.5rem !important; /* 24px */
+    }
+
+    h3 {
+        font-size: 1.25rem !important; /* 20px */
+    }
+}
+
+/* ============================================
+   MEJORAS DE ACCESIBILIDAD
+   ============================================ */
+
+/* Focus visible para navegación por teclado */
+@media (max-width: 768px) {
+    a:focus,
+    button:focus,
+    input:focus,
+    select:focus,
+    textarea:focus {
+        outline: 3px solid var(--accent-primary) !important;
+        outline-offset: 2px !important;
+    }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE
+   ============================================ */
+
+@media (max-width: 768px) and (orientation: landscape) {
+    /* Reducir altura de elementos en landscape */
+    .sidebar {
+        padding-top: 1rem;
+    }
+
+    .navbar {
+        padding: 0.5rem 1rem !important;
+    }
+
+    .chart-container {
+        height: 180px !important;
+    }
+}
