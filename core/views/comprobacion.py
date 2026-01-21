@@ -164,6 +164,12 @@ def guardar_comprobacion_json(request, equipo_id):
         # Guardar datos JSON
         comprobacion.datos_comprobacion = datos
 
+        # Guardar datos del equipo de referencia en el modelo
+        comprobacion.equipo_referencia_nombre = datos.get('equipo_ref_nombre', '')
+        comprobacion.equipo_referencia_marca = datos.get('equipo_ref_marca', '')
+        comprobacion.equipo_referencia_modelo = datos.get('equipo_ref_modelo', '')
+        comprobacion.equipo_referencia_certificado = datos.get('equipo_ref_certificado', '')
+
         # Determinar resultado basado en conformidad
         puntos = datos.get('puntos_medicion', [])
         no_conforme = any(p.get('conformidad') == 'NO CONFORME' for p in puntos)

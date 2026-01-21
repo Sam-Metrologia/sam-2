@@ -1784,6 +1784,36 @@ class Comprobacion(models.Model):
         help_text="Técnico que supervisó la comprobación"
     )
 
+    # Campos para Equipo de Referencia (usado en comprobaciones)
+    equipo_referencia_nombre = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Equipo de Referencia - Nombre",
+        help_text="Nombre del equipo de referencia utilizado en la comprobación"
+    )
+    equipo_referencia_marca = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Equipo de Referencia - Marca",
+        help_text="Marca del equipo de referencia"
+    )
+    equipo_referencia_modelo = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Equipo de Referencia - Modelo",
+        help_text="Modelo del equipo de referencia"
+    )
+    equipo_referencia_certificado = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Equipo de Referencia - Certificado de Calibración",
+        help_text="Número de certificado de calibración del equipo de referencia"
+    )
+
     class Meta:
         verbose_name = "Comprobación"
         verbose_name_plural = "Comprobaciones"

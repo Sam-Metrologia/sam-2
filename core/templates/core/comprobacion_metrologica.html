@@ -191,11 +191,53 @@
         </div>
     </div>
 
-    <!-- SECCIÓN 2: PUNTOS DE MEDICIÓN -->
+    <!-- SECCIÓN 2: EQUIPO DE REFERENCIA -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-check-circle text-green-600 mr-3"></i>
+            2. EQUIPO DE REFERENCIA
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">Información del equipo patrón o de referencia utilizado para realizar la comprobación.</p>
+
+        <div class="overflow-x-auto">
+            <table class="tabla-comprobacion">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Nombre del Equipo</th>
+                        <th style="width: 25%;">Marca</th>
+                        <th style="width: 25%;">Modelo</th>
+                        <th style="width: 25%;">Certificado de Calibración</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <input type="text" id="equipo-ref-nombre" placeholder="Ej: Calibrador Multiparámetro"
+                                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td>
+                            <input type="text" id="equipo-ref-marca" placeholder="Ej: Fluke"
+                                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td>
+                            <input type="text" id="equipo-ref-modelo" placeholder="Ej: 5500A"
+                                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <td>
+                            <input type="text" id="equipo-ref-certificado" placeholder="Ej: CAL-2024-001"
+                                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 3: PUNTOS DE MEDICIÓN -->
     <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
             <i class="fas fa-clipboard-check text-blue-600 mr-3"></i>
-            2. PUNTOS DE MEDICIÓN Y CONFORMIDAD
+            3. PUNTOS DE MEDICIÓN Y CONFORMIDAD
         </h2>
 
         <div class="overflow-x-auto">
@@ -752,7 +794,12 @@ async function generarPDF() {
         comprobacion_id: comprobacionId,
         unidad_equipo: document.getElementById('unidad-equipo').value,
         puntos_medicion: puntos,
-        fecha: new Date().toISOString()
+        fecha: new Date().toISOString(),
+        // Equipo de referencia
+        equipo_ref_nombre: document.getElementById('equipo-ref-nombre').value || '',
+        equipo_ref_marca: document.getElementById('equipo-ref-marca').value || '',
+        equipo_ref_modelo: document.getElementById('equipo-ref-modelo').value || '',
+        equipo_ref_certificado: document.getElementById('equipo-ref-certificado').value || ''
     };
 
     mostrarLoading(true);
@@ -945,6 +992,20 @@ window.addEventListener('DOMContentLoaded', () => {
 
             calcularFila(ultimaFila.querySelector('.nominal'));
         });
+
+        // Cargar datos del equipo de referencia si existen
+        if (datos.equipo_ref_nombre) {
+            document.getElementById('equipo-ref-nombre').value = datos.equipo_ref_nombre;
+        }
+        if (datos.equipo_ref_marca) {
+            document.getElementById('equipo-ref-marca').value = datos.equipo_ref_marca;
+        }
+        if (datos.equipo_ref_modelo) {
+            document.getElementById('equipo-ref-modelo').value = datos.equipo_ref_modelo;
+        }
+        if (datos.equipo_ref_certificado) {
+            document.getElementById('equipo-ref-certificado').value = datos.equipo_ref_certificado;
+        }
     } else {
         // Siempre agregar 5 filas vacías por defecto si no hay datos existentes
         for (let i = 0; i < 5; i++) {
