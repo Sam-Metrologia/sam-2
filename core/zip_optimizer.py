@@ -316,11 +316,11 @@ Total de Equipos: {self.empresa.equipos.filter(estado__in=[ESTADO_ACTIVO, ESTADO
                         subfolder = f"{mant_folder}Documentos_Externos/"
                         self._add_file_to_zip(zip_file, mantenimiento.documento_externo, subfolder)
 
-                    # Análisis Interno
-                    if mantenimiento.analisis_interno:
-                        logger.info(f"[DEBUG] -> Agregando analisis_interno: {mantenimiento.analisis_interno.name}")
-                        subfolder = f"{mant_folder}Analisis_Internos/"
-                        self._add_file_to_zip(zip_file, mantenimiento.analisis_interno, subfolder)
+                    # Documento Interno (CORREGIDO: era analisis_interno)
+                    if mantenimiento.documento_interno:
+                        logger.info(f"[DEBUG] -> Agregando documento_interno: {mantenimiento.documento_interno.name}")
+                        subfolder = f"{mant_folder}Documentos_Internos/"
+                        self._add_file_to_zip(zip_file, mantenimiento.documento_interno, subfolder)
 
                     # Documento General
                     if mantenimiento.documento_mantenimiento:
@@ -343,17 +343,23 @@ Total de Equipos: {self.empresa.equipos.filter(estado__in=[ESTADO_ACTIVO, ESTADO
                 comp_folder = f"{equipo_folder}Comprobaciones/"
                 for comprobacion in comprobaciones:
                     logger.info(f"[DEBUG] Procesando comprobacion ID:{comprobacion.pk}")
+                    # Comprobación PDF (certificados principales)
+                    if comprobacion.comprobacion_pdf:
+                        logger.info(f"[DEBUG] -> Agregando comprobacion_pdf: {comprobacion.comprobacion_pdf.name}")
+                        subfolder = f"{comp_folder}Certificados_Comprobacion/"
+                        self._add_file_to_zip(zip_file, comprobacion.comprobacion_pdf, subfolder)
+
                     # Documento Externo
                     if comprobacion.documento_externo:
                         logger.info(f"[DEBUG] -> Agregando documento_externo: {comprobacion.documento_externo.name}")
                         subfolder = f"{comp_folder}Documentos_Externos/"
                         self._add_file_to_zip(zip_file, comprobacion.documento_externo, subfolder)
 
-                    # Análisis Interno
-                    if comprobacion.analisis_interno:
-                        logger.info(f"[DEBUG] -> Agregando analisis_interno: {comprobacion.analisis_interno.name}")
-                        subfolder = f"{comp_folder}Analisis_Internos/"
-                        self._add_file_to_zip(zip_file, comprobacion.analisis_interno, subfolder)
+                    # Documento Interno (CORREGIDO: era analisis_interno)
+                    if comprobacion.documento_interno:
+                        logger.info(f"[DEBUG] -> Agregando documento_interno: {comprobacion.documento_interno.name}")
+                        subfolder = f"{comp_folder}Documentos_Internos/"
+                        self._add_file_to_zip(zip_file, comprobacion.documento_interno, subfolder)
 
                     # Documento General
                     if comprobacion.documento_comprobacion:

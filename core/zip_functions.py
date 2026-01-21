@@ -668,16 +668,16 @@ def descarga_directa_rapida(request, empresa):
                         except Exception as e:
                             logger.error(f"Error añadiendo documento externo mantenimiento: {e}")
 
-                    # Análisis Interno
-                    if mant.analisis_interno:
+                    # Documento Interno (CORREGIDO: era analisis_interno)
+                    if mant.documento_interno:
                         try:
-                            if default_storage.exists(mant.analisis_interno.name):
-                                with default_storage.open(mant.analisis_interno.name, 'rb') as f:
+                            if default_storage.exists(mant.documento_interno.name):
+                                with default_storage.open(mant.documento_interno.name, 'rb') as f:
                                     content = f.read()
-                                    filename = os.path.basename(mant.analisis_interno.name)
-                                    zf.writestr(f"{equipo_folder}/Mantenimientos/Analisis_Internos/{filename}", content)
+                                    filename = os.path.basename(mant.documento_interno.name)
+                                    zf.writestr(f"{equipo_folder}/Mantenimientos/Documentos_Internos/{filename}", content)
                         except Exception as e:
-                            logger.error(f"Error añadiendo análisis interno mantenimiento: {e}")
+                            logger.error(f"Error añadiendo documento interno mantenimiento: {e}")
 
                     # Documento General
                     if mant.documento_mantenimiento:
@@ -692,7 +692,20 @@ def descarga_directa_rapida(request, empresa):
 
                 # Comprobaciones
                 comprobaciones = equipo.comprobaciones.all()
+                comp_cert_idx = 1
                 for comp_idx, comp in enumerate(comprobaciones, 1):
+                    # Comprobación PDF (certificados principales)
+                    if comp.comprobacion_pdf:
+                        try:
+                            if default_storage.exists(comp.comprobacion_pdf.name):
+                                with default_storage.open(comp.comprobacion_pdf.name, 'rb') as f:
+                                    content = f.read()
+                                    filename = f"comp_{comp_cert_idx}.pdf"
+                                    zf.writestr(f"{equipo_folder}/Comprobaciones/Certificados_Comprobacion/{filename}", content)
+                                    comp_cert_idx += 1
+                        except Exception as e:
+                            logger.error(f"Error añadiendo certificado comprobación: {e}")
+
                     # Documento Externo
                     if comp.documento_externo:
                         try:
@@ -704,16 +717,16 @@ def descarga_directa_rapida(request, empresa):
                         except Exception as e:
                             logger.error(f"Error añadiendo documento externo comprobación: {e}")
 
-                    # Análisis Interno
-                    if comp.analisis_interno:
+                    # Documento Interno (CORREGIDO: era analisis_interno)
+                    if comp.documento_interno:
                         try:
-                            if default_storage.exists(comp.analisis_interno.name):
-                                with default_storage.open(comp.analisis_interno.name, 'rb') as f:
+                            if default_storage.exists(comp.documento_interno.name):
+                                with default_storage.open(comp.documento_interno.name, 'rb') as f:
                                     content = f.read()
-                                    filename = os.path.basename(comp.analisis_interno.name)
-                                    zf.writestr(f"{equipo_folder}/Comprobaciones/Analisis_Internos/{filename}", content)
+                                    filename = os.path.basename(comp.documento_interno.name)
+                                    zf.writestr(f"{equipo_folder}/Comprobaciones/Documentos_Internos/{filename}", content)
                         except Exception as e:
-                            logger.error(f"Error añadiendo análisis interno comprobación: {e}")
+                            logger.error(f"Error añadiendo documento interno comprobación: {e}")
 
                     # Documento General
                     if comp.documento_comprobacion:
