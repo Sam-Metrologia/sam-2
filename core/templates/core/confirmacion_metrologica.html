@@ -1237,78 +1237,95 @@
     }
 
     // Inicializar al cargar
-    // ==================== NAVEGACIÓN CON FLECHAS ====================
+    // ==================== NAVEGACIÓN CON FLECHAS (MEJORADA) ====================
     function setupKeyboardNavigation() {
         const tbody = document.getElementById('tbody-mediciones');
 
         tbody.addEventListener('keydown', function(e) {
             const target = e.target;
-            if (target.tagName !== 'INPUT') return;
+            if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT') return;
 
             const cell = target.parentElement;
             const row = cell.parentElement;
-            const cellIndex = Array.from(row.cells).indexOf(cell);
-            const rowIndex = Array.from(tbody.rows).indexOf(row);
 
-            let newRow, newCell;
+            // Obtener TODAS las celdas editables de la fila actual
+            const todasLasCeldas = Array.from(row.querySelectorAll('input, select'));
+            const cellIndex = todasLasCeldas.indexOf(target);
+
+            // Obtener todas las filas
+            const todasLasFilas = Array.from(tbody.querySelectorAll('tr'));
+            const rowIndex = todasLasFilas.indexOf(row);
+
+            let nuevoFoco = null;
 
             switch(e.key) {
                 case 'ArrowUp':
                     e.preventDefault();
-                    newRow = tbody.rows[rowIndex - 1];
-                    if (newRow) {
-                        newCell = newRow.cells[cellIndex];
-                        const input = newCell.querySelector('input');
-                        if (input) input.focus();
+                    // Moverse a la fila anterior, misma columna
+                    if (rowIndex > 0) {
+                        const filaAnterior = todasLasFilas[rowIndex - 1];
+                        const celdasAnterior = Array.from(filaAnterior.querySelectorAll('input, select'));
+                        nuevoFoco = celdasAnterior[cellIndex] || celdasAnterior[0];
                     }
                     break;
 
                 case 'ArrowDown':
                     e.preventDefault();
-                    newRow = tbody.rows[rowIndex + 1];
-                    if (newRow) {
-                        newCell = newRow.cells[cellIndex];
-                        const input = newCell.querySelector('input');
-                        if (input) input.focus();
+                    // Moverse a la fila siguiente, misma columna
+                    if (rowIndex < todasLasFilas.length - 1) {
+                        const filaSiguiente = todasLasFilas[rowIndex + 1];
+                        const celdasSiguiente = Array.from(filaSiguiente.querySelectorAll('input, select'));
+                        nuevoFoco = celdasSiguiente[cellIndex] || celdasSiguiente[0];
                     }
                     break;
 
                 case 'ArrowLeft':
                     e.preventDefault();
-                    // Moverse a la celda anterior (índice 1, 2 o 3)
-                    if (cellIndex > 1) {
-                        newCell = row.cells[cellIndex - 1];
-                        const input = newCell.querySelector('input');
-                        if (input) input.focus();
+                    // Moverse a la celda anterior en la misma fila
+                    if (cellIndex > 0) {
+                        nuevoFoco = todasLasCeldas[cellIndex - 1];
                     }
                     break;
 
                 case 'ArrowRight':
-                case 'Enter':
                     e.preventDefault();
-                    // Moverse a la siguiente celda (hasta índice 3)
-                    if (cellIndex < 3) {
-                        newCell = row.cells[cellIndex + 1];
-                        const input = newCell.querySelector('input');
-                        if (input) input.focus();
-                    } else {
-                        // Si está en la última columna, ir a la siguiente fila
-                        newRow = tbody.rows[rowIndex + 1];
-                        if (newRow) {
-                            newCell = newRow.cells[1]; // Primera celda editable
-                            const input = newCell.querySelector('input');
-                            if (input) input.focus();
-                        } else {
-                            // Si no hay siguiente fila, agregar una nueva
-                            agregarFila();
-                            setTimeout(() => {
-                                const nuevaFila = tbody.rows[tbody.rows.length - 1];
-                                const primerInput = nuevaFila.cells[1].querySelector('input');
-                                if (primerInput) primerInput.focus();
-                            }, 100);
-                        }
+                    // Moverse a la siguiente celda en la misma fila
+                    if (cellIndex < todasLasCeldas.length - 1) {
+                        nuevoFoco = todasLasCeldas[cellIndex + 1];
+                    } else if (rowIndex < todasLasFilas.length - 1) {
+                        // Si estamos en la última celda, ir a la primera celda de la siguiente fila
+                        const filaSiguiente = todasLasFilas[rowIndex + 1];
+                        const celdasSiguiente = Array.from(filaSiguiente.querySelectorAll('input, select'));
+                        nuevoFoco = celdasSiguiente[0];
                     }
                     break;
+
+                case 'Enter':
+                    e.preventDefault();
+                    // Enter: Ir a la primera celda de la siguiente fila
+                    if (rowIndex < todasLasFilas.length - 1) {
+                        const filaSiguiente = todasLasFilas[rowIndex + 1];
+                        const celdasSiguiente = Array.from(filaSiguiente.querySelectorAll('input, select'));
+                        nuevoFoco = celdasSiguiente[0];
+                    } else {
+                        // Si estamos en la última fila, agregar una nueva
+                        agregarFila();
+                        setTimeout(() => {
+                            const nuevaFila = tbody.querySelectorAll('tr')[tbody.querySelectorAll('tr').length - 1];
+                            const primerInput = nuevaFila.querySelector('input, select');
+                            if (primerInput) primerInput.focus();
+                        }, 100);
+                    }
+                    break;
+            }
+
+            // Aplicar el nuevo foco
+            if (nuevoFoco) {
+                nuevoFoco.focus();
+                // Seleccionar el contenido del input para facilitar edición
+                if (nuevoFoco.tagName === 'INPUT' && nuevoFoco.type !== 'checkbox') {
+                    nuevoFoco.select();
+                }
             }
         });
     }
