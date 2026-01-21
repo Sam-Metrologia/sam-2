@@ -22,7 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Sistema de Temas -->
-    <link rel="stylesheet" href="{% static 'core/css/themes.css' %}?v=17.0">
+    <link rel="stylesheet" href="{% static 'core/css/themes.css' %}?v=18.0">
     <link rel="stylesheet" href="{% static 'core/css/responsive.css' %}?v=1.0">
     <script src="{% static 'core/js/theme-toggle.js' %}?v=6.0"></script>
     <script src="{% static 'core/js/chart-theme.js' %}?v=6.0" defer></script>
@@ -206,10 +206,10 @@
         .user-dropdown {
             position: absolute;
             right: 0;
-            background-color: #ffffff;
-            border: 1px solid var(--color-border);
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15); /* Sombra más profunda */
+            box-shadow: var(--shadow-lg);
             min-width: 200px; /* Ancho mínimo */
             z-index: 1000;
             opacity: 0;
@@ -226,43 +226,43 @@
         .user-dropdown a {
             display: block;
             padding: 10px 20px;
-            color: var(--color-text-dark);
+            color: var(--text-primary);
             text-decoration: none;
             transition: background-color 0.2s;
             font-weight: 500;
         }
         .user-dropdown a:hover {
-            background-color: var(--color-background-light);
-            color: var(--color-primary); /* Texto azul al pasar el ratón */
+            background-color: var(--bg-tertiary);
+            color: var(--accent-primary);
         }
 
-        /* Alertas (mantener Tailwind por consistencia) */
+        /* Alertas - adaptadas para dark mode */
         .alert {
             padding: 1rem;
             margin-bottom: 1rem;
-            border-radius: 0.5rem; /* Bordes más redondeados */
+            border-radius: 0.5rem;
             border: 1px solid transparent;
             font-weight: 500;
         }
         .alert-success {
-            background-color: #d1fae5; /* Verde muy claro */
-            border-color: #34d399; /* Verde más oscuro */
-            color: #065f46; /* Verde oscuro */
+            background-color: rgba(16, 185, 129, 0.1);
+            border-color: var(--color-success);
+            color: var(--color-success);
         }
         .alert-info {
-            background-color: #dbeafe; /* Azul muy claro */
-            border-color: #60a5fa; /* Azul más oscuro */
-            color: #1e40af; /* Azul oscuro */
+            background-color: rgba(59, 130, 246, 0.1);
+            border-color: var(--color-info);
+            color: var(--color-info);
         }
         .alert-warning {
-            background-color: #fffbeb; /* Amarillo muy claro */
-            border-color: #fbbf24; /* Amarillo más oscuro */
-            color: #92400e; /* Naranja oscuro */
+            background-color: rgba(245, 158, 11, 0.1);
+            border-color: var(--color-warning);
+            color: var(--color-warning);
         }
         .alert-error {
-            background-color: #fee2e2; /* Rojo muy claro */
-            border-color: #f87171; /* Rojo más oscuro */
-            color: #991b1b; /* Rojo oscuro */
+            background-color: rgba(239, 68, 68, 0.1);
+            border-color: var(--color-error);
+            color: var(--color-error);
         }
 
         /* Footer */
@@ -270,19 +270,20 @@
             margin-top: auto; /* Empuja el footer al final */
             padding: 20px;
             text-align: center;
-            background-color: #ffffff;
-            border-top: 1px solid var(--color-border);
-            color: var(--color-secondary);
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
             font-size: 0.9rem;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+            box-shadow: var(--shadow-md);
         }
         .main-footer a {
-            color: var(--color-primary);
+            color: var(--accent-primary);
             text-decoration: none;
             font-weight: 600;
         }
         .main-footer a:hover {
             text-decoration: underline;
+            color: var(--accent-primary-hover);
         }
 
         /* Responsive adjustments */
@@ -713,10 +714,10 @@
 
     <!-- Loading Overlay para mejorar UX -->
     <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
+        <div class="loading-card rounded-lg p-6 max-w-sm mx-4">
             <div class="flex items-center space-x-3">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span class="text-gray-700 font-medium">Cargando...</span>
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 loading-spinner"></div>
+                <span class="loading-text font-medium">Cargando...</span>
             </div>
         </div>
     </div>

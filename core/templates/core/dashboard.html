@@ -20,6 +20,13 @@
             padding: 20px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
+
+        /* Dark mode: Chart container */
+        [data-theme="dark"] .chart-container {
+            background: linear-gradient(to bottom, #374151, #1f2937) !important;
+            border-color: #4b5563 !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+        }
         canvas {
             max-width: 100% !important;
             max-height: 100% !important;
@@ -240,6 +247,12 @@
             position: relative;
         }
 
+        /* Dark mode: Progress bar */
+        [data-theme="dark"] .storage-progress-bar {
+            background-color: #374151 !important;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3) !important;
+        }
+
         .storage-progress-fill {
             height: 100%;
             border-radius: 10px;
@@ -281,6 +294,23 @@
             border-radius: 12px;
             margin: 8px;
             padding: 20px;
+        }
+
+        /* Dark mode: Storage card */
+        [data-theme="dark"] .storage-card {
+            background: linear-gradient(135deg, #4c1d95 0%, #581c87 100%) !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4) !important;
+        }
+
+        [data-theme="dark"] .storage-card-content {
+            background: rgba(31, 41, 55, 0.95) !important;
+        }
+
+        [data-theme="dark"] .storage-info-display {
+            background: linear-gradient(135deg, #a78bfa, #c084fc) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
         }
 
         .storage-info-display {
@@ -327,6 +357,23 @@
             border-radius: 12px;
             margin: 8px;
             padding: 20px;
+        }
+
+        /* Dark mode: Equipment card */
+        [data-theme="dark"] .equipment-card {
+            background: linear-gradient(135deg, #065f46 0%, #047857 100%) !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4) !important;
+        }
+
+        [data-theme="dark"] .equipment-card-content {
+            background: rgba(31, 41, 55, 0.95) !important;
+        }
+
+        [data-theme="dark"] .equipment-info-display {
+            background: linear-gradient(135deg, #34d399, #6ee7b7) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
         }
 
         .equipment-info-display {

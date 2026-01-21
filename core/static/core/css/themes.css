@@ -2217,3 +2217,79 @@
 [data-theme="dark"] .informes-tecnico-message .text-yellow-600 {
     color: #fbbf24 !important;
 }
+
+/* =========================================
+   LOADING OVERLAY - ADAPTADO DARK MODE
+   ========================================= */
+
+/* Modo claro */
+.loading-card {
+    background-color: #ffffff;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.loading-spinner {
+    border-color: #2563eb;
+}
+
+.loading-text {
+    color: #374151;
+}
+
+/* Modo oscuro */
+[data-theme="dark"] .loading-card {
+    background-color: var(--bg-secondary);
+    box-shadow: var(--shadow-xl);
+}
+
+[data-theme="dark"] .loading-spinner {
+    border-color: var(--accent-primary);
+}
+
+[data-theme="dark"] .loading-text {
+    color: var(--text-primary);
+}
+
+/* =========================================
+   TOAST NOTIFICATIONS - DARK MODE
+   ========================================= */
+
+[data-theme="dark"] #toastContainer .bg-green-600 {
+    background-color: rgba(34, 197, 94, 0.9) !important;
+}
+
+[data-theme="dark"] #toastContainer .bg-red-600 {
+    background-color: rgba(239, 68, 68, 0.9) !important;
+}
+
+[data-theme="dark"] #toastContainer .bg-yellow-600 {
+    background-color: rgba(245, 158, 11, 0.9) !important;
+}
+
+[data-theme="dark"] #toastContainer .bg-blue-600 {
+    background-color: rgba(59, 130, 246, 0.9) !important;
+}
+
+/* =========================================
+   ZIP NOTIFICATION - DARK MODE
+   ========================================= */
+
+[data-theme="dark"] #zipNotificationContainer .bg-blue-600 {
+    background-color: rgba(59, 130, 246, 0.9) !important;
+}
+
+[data-theme="dark"] #zipNotificationContainer .bg-green-600 {
+    background-color: rgba(34, 197, 94, 0.9) !important;
+}
+
+[data-theme="dark"] #zipNotificationContainer .bg-blue-800 {
+    background-color: rgba(30, 64, 175, 0.9) !important;
+}
+
+[data-theme="dark"] #zipNotificationContainer .bg-green-800 {
+    background-color: rgba(21, 128, 61, 0.9) !important;
+}
+
+[data-theme="dark"] #zipNotificationContainer .bg-gray-600 {
+    background-color: var(--bg-tertiary) !important;
+}
