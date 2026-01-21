@@ -53,15 +53,30 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
         str: Imagen en base64 para incluir en HTML
     """
     try:
-        # Filtrar puntos válidos
-        puntos_validos = [p for p in puntos_medicion if p.get('nominal') and p.get('error')]
+        # Filtrar puntos válidos: deben tener nominal y (error O lectura)
+        # Si tienen lectura pero no error, calcularemos el error
+        puntos_validos = [p for p in puntos_medicion
+                         if p.get('nominal') and (p.get('error') is not None or p.get('lectura') is not None)]
 
         if not puntos_validos:
             return None
 
-        # Extraer datos
+        # Extraer datos y calcular error si no existe
         nominales = [safe_float(p.get('nominal', 0), 0) for p in puntos_validos]
-        errores = [safe_float(p.get('error', 0), 0) for p in puntos_validos]
+
+        # Calcular errores: usar error si existe, sino calcular de lectura - nominal
+        errores = []
+        for p in puntos_validos:
+            if p.get('error') is not None:
+                errores.append(safe_float(p.get('error', 0), 0))
+            elif p.get('lectura') is not None:
+                nominal = safe_float(p.get('nominal', 0), 0)
+                lectura = safe_float(p.get('lectura', 0), 0)
+                error = lectura - nominal
+                errores.append(error)
+            else:
+                errores.append(0)
+
         # Calcular medidos: medido = nominal + error
         medidos = [n + e for n, e in zip(nominales, errores)]
         incertidumbres = [safe_float(p.get('incertidumbre', 0), 0) for p in puntos_validos]
