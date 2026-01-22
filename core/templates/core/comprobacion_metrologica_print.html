@@ -305,10 +305,12 @@
                 COMPROBACIÓN METROLÓGICA
             </td>
             <td class="header-info-cell">
-                <p><strong>Código:</strong> {{ datos_comprobacion.formato_codigo|default:"SAM-COMP-001" }}</p>
-                <p><strong>Versión:</strong> {{ datos_comprobacion.formato_version|default:"01" }}</p>
-                {% if datos_comprobacion.formato_fecha or comprobacion.equipo.empresa.comprobacion_fecha_formato %}
-                <p><strong>Fecha:</strong> {{ datos_comprobacion.formato_fecha|default:comprobacion.equipo.empresa.comprobacion_fecha_formato|date:"d/m/Y" }}</p>
+                <p><strong>Código:</strong> {{ datos_comprobacion.formato_codigo|default:equipo.empresa.comprobacion_codigo|default:"SAM-COMP-001" }}</p>
+                <p><strong>Versión:</strong> {{ datos_comprobacion.formato_version|default:equipo.empresa.comprobacion_version|default:"01" }}</p>
+                {% if formato_fecha_formateada %}
+                    <p><strong>Fecha:</strong> {{ formato_fecha_formateada }}</p>
+                {% elif equipo.empresa.comprobacion_fecha_formato %}
+                    <p><strong>Fecha:</strong> {{ equipo.empresa.comprobacion_fecha_formato|date:"d/m/Y" }}</p>
                 {% endif %}
             </td>
         </tr>
@@ -483,7 +485,6 @@
     <!-- PIE DE PÁGINA -->
     <div class="footer">
         <p><strong>{{ empresa.nombre }}</strong></p>
-        <p>Documento generado el {{ fecha_generacion|date:"d/m/Y H:i" }}</p>
     </div>
 </body>
 </html>

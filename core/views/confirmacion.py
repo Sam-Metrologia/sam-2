@@ -315,12 +315,27 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         formato_version = equipo.empresa.confirmacion_version or '01'
         formato_fecha = equipo.empresa.confirmacion_fecha_formato or None
 
+    # Formatear fecha del formato si existe
+    formato_fecha_formateada = None
+    if formato_fecha:
+        try:
+            if isinstance(formato_fecha, str):
+                # Si es string, convertir a date y formatear
+                from datetime import datetime as dt
+                fecha_obj = dt.strptime(formato_fecha, '%Y-%m-%d')
+                formato_fecha_formateada = fecha_obj.strftime('%d/%m/%Y')
+            else:
+                # Si ya es date object, solo formatear
+                formato_fecha_formateada = formato_fecha.strftime('%d/%m/%Y')
+        except:
+            formato_fecha_formateada = str(formato_fecha)
+
     # Preparar estructura datos_confirmacion para el template de impresión
     datos_confirmacion_template = {
         'formato': {
             'codigo': formato_codigo,
             'version': formato_version,
-            'fecha': formato_fecha,
+            'fecha': formato_fecha_formateada,
         },
         'equipo': {
             'nombre': datos_confirmacion.get('equipo', {}).get('nombre', equipo.nombre) if datos_confirmacion else equipo.nombre,
@@ -1095,6 +1110,19 @@ def generar_pdf_intervalos(request, equipo_id):
         logger = logging.getLogger(__name__)
         logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
         logo_empresa_url = None
+
+    # Formatear fecha del formato si existe en datos_intervalos
+    formato_fecha_formateada_int = None
+    if datos_intervalos.get('formato', {}).get('fecha'):
+        try:
+            fecha_str = datos_intervalos['formato']['fecha']
+            from datetime import datetime as dt
+            fecha_obj = dt.strptime(fecha_str, '%Y-%m-%d')
+            formato_fecha_formateada_int = fecha_obj.strftime('%d/%m/%Y')
+            # Reemplazar en datos_intervalos con la fecha formateada
+            datos_intervalos['formato']['fecha'] = formato_fecha_formateada_int
+        except:
+            pass
 
     # Preparar contexto para el PDF
     context = {

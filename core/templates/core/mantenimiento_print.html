@@ -245,10 +245,12 @@
                 REPORTE DE MANTENIMIENTO
             </td>
             <td class="header-info-cell">
-                <p><strong>Código:</strong> {{ empresa.mantenimiento_codigo|default:"SAM-MANT-001" }}</p>
-                <p><strong>Versión:</strong> {{ empresa.mantenimiento_version|default:"01" }}</p>
-                {% if empresa.mantenimiento_fecha_formato %}
-                <p><strong>Fecha:</strong> {{ empresa.mantenimiento_fecha_formato|date:"d/m/Y" }}</p>
+                <p><strong>Código:</strong> {{ datos_mantenimiento.formato_codigo|default:empresa.mantenimiento_codigo|default:"SAM-MANT-001" }}</p>
+                <p><strong>Versión:</strong> {{ datos_mantenimiento.formato_version|default:empresa.mantenimiento_version|default:"01" }}</p>
+                {% if formato_fecha_formateada %}
+                    <p><strong>Fecha:</strong> {{ formato_fecha_formateada }}</p>
+                {% elif empresa.mantenimiento_fecha_formato %}
+                    <p><strong>Fecha:</strong> {{ empresa.mantenimiento_fecha_formato|date:"d/m/Y" }}</p>
                 {% endif %}
             </td>
         </tr>
@@ -354,7 +356,6 @@
     <!-- PIE DE PÁGINA -->
     <div class="footer">
         <p><strong>{{ empresa.nombre }}</strong></p>
-        <p>Documento generado el {{ fecha_generacion|date:"d/m/Y H:i" }}</p>
         <p style="margin-top: 10px; font-size: 7pt; color: #9CA3AF;">
             Este reporte fue generado automáticamente por SAM Metrología
         </p>

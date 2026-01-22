@@ -172,7 +172,6 @@ def guardar_mantenimiento_json(request, equipo_id):
                 empresa.mantenimiento_version = datos['formato_version']
             if 'formato_fecha' in datos and datos['formato_fecha']:
                 try:
-                    from datetime import datetime
                     empresa.mantenimiento_fecha_formato = datetime.strptime(datos['formato_fecha'], '%Y-%m-%d').date()
                 except:
                     pass
@@ -243,6 +242,15 @@ def generar_pdf_mantenimiento(request, equipo_id):
             logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
             logo_empresa_url = None
 
+        # Formatear fecha del formato si existe
+        formato_fecha_formateada = None
+        if datos_mantenimiento.get('formato_fecha'):
+            try:
+                fecha_obj = datetime.strptime(datos_mantenimiento['formato_fecha'], '%Y-%m-%d')
+                formato_fecha_formateada = fecha_obj.strftime('%d/%m/%Y')
+            except:
+                formato_fecha_formateada = datos_mantenimiento['formato_fecha']
+
         # Preparar datos para el template (solo checklist, sin gráficas)
         context = {
             'equipo': equipo,
@@ -251,6 +259,7 @@ def generar_pdf_mantenimiento(request, equipo_id):
             'empresa': equipo.empresa,
             'logo_empresa_url': logo_empresa_url,
             'fecha_generacion': datetime.now(),
+            'formato_fecha_formateada': formato_fecha_formateada,
         }
 
         # Renderizar template
