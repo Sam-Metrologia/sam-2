@@ -297,23 +297,23 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
             # La conversión se hace en JavaScript
 
     # ==================== CONTEXTO ====================
-    # Determinar valores de formato (usar POST si está disponible, sino empresa)
+    # Determinar valores de formato específico de CONFIRMACIÓN (usar POST si está disponible, sino empresa)
     if datos_confirmacion and 'formato' in datos_confirmacion:
-        formato_codigo = datos_confirmacion['formato'].get('codigo', equipo.empresa.formato_codificacion_empresa or 'REG-SAM-CM-001')
-        formato_version = datos_confirmacion['formato'].get('version', equipo.empresa.formato_version_empresa or '3.0')
+        formato_codigo = datos_confirmacion['formato'].get('codigo', equipo.empresa.confirmacion_codigo or 'SAM-CONF-001')
+        formato_version = datos_confirmacion['formato'].get('version', equipo.empresa.confirmacion_version or '01')
         formato_fecha_str = datos_confirmacion['formato'].get('fecha')
         if formato_fecha_str:
             from datetime import datetime as dt
             try:
                 formato_fecha = dt.strptime(formato_fecha_str, '%Y-%m-%d').date()
             except (ValueError, TypeError):
-                formato_fecha = equipo.empresa.formato_fecha_version_empresa or datetime.now().date()
+                formato_fecha = equipo.empresa.confirmacion_fecha_formato or None
         else:
-            formato_fecha = equipo.empresa.formato_fecha_version_empresa or datetime.now().date()
+            formato_fecha = equipo.empresa.confirmacion_fecha_formato or None
     else:
-        formato_codigo = equipo.empresa.formato_codificacion_empresa or 'REG-SAM-CM-001'
-        formato_version = equipo.empresa.formato_version_empresa or '3.0'
-        formato_fecha = equipo.empresa.formato_fecha_version_empresa or datetime.now().date()
+        formato_codigo = equipo.empresa.confirmacion_codigo or 'SAM-CONF-001'
+        formato_version = equipo.empresa.confirmacion_version or '01'
+        formato_fecha = equipo.empresa.confirmacion_fecha_formato or None
 
     # Preparar estructura datos_confirmacion para el template de impresión
     datos_confirmacion_template = {
@@ -704,12 +704,12 @@ def intervalos_calibracion(request, equipo_id):
         'error_maximo_info': error_maximo_info,
         'puntos_metodo1b': json.dumps(puntos_metodo1b),  # Serializar para JavaScript
 
-        # Metadatos para el PDF
+        # Metadatos para el PDF - usar campos específicos de INTERVALOS
         'nombre_empresa': equipo.empresa.nombre,
         'logo_empresa_url': equipo.empresa.logo_empresa.url if equipo.empresa.logo_empresa else None,
-        'formato_codigo': equipo.empresa.formato_codificacion_empresa or 'REG-SAM-IC-001',
-        'formato_version': equipo.empresa.formato_version_empresa or '3.0',
-        'formato_fecha': equipo.empresa.formato_fecha_version_empresa or datetime.now().date(),
+        'formato_codigo': equipo.empresa.intervalos_codigo or 'SAM-INT-001',
+        'formato_version': equipo.empresa.intervalos_version or '01',
+        'formato_fecha': equipo.empresa.intervalos_fecha_formato or None,
     }
 
     return render(request, 'core/intervalos_calibracion.html', context)
@@ -768,16 +768,16 @@ def generar_pdf_confirmacion(request, equipo_id):
             formato_data = datos_confirmacion['formato']
             empresa = equipo.empresa
 
-            # Actualizar campos de formato de la empresa
+            # Actualizar campos específicos de CONFIRMACIÓN METROLÓGICA de la empresa
             if 'codigo' in formato_data:
-                empresa.formato_codificacion_empresa = formato_data['codigo']
+                empresa.confirmacion_codigo = formato_data['codigo']
             if 'version' in formato_data:
-                empresa.formato_version_empresa = formato_data['version']
+                empresa.confirmacion_version = formato_data['version']
             if 'fecha' in formato_data:
                 # Convertir string de fecha a objeto date
                 from datetime import datetime as dt
                 try:
-                    empresa.formato_fecha_version_empresa = dt.strptime(formato_data['fecha'], '%Y-%m-%d').date()
+                    empresa.confirmacion_fecha_formato = dt.strptime(formato_data['fecha'], '%Y-%m-%d').date()
                 except (ValueError, TypeError):
                     pass  # Si hay error en el formato, mantener valor actual
 
@@ -1235,6 +1235,12 @@ def actualizar_formato_empresa(request):
     """
     Actualiza la información del formato (código, versión, fecha) de la empresa.
     Estos cambios se aplican a todos los equipos de la empresa.
+
+    Requiere parámetro 'tipo' en el JSON para especificar qué formato actualizar:
+    - 'intervalos': Actualiza intervalos_codigo, intervalos_version, intervalos_fecha_formato
+    - 'mantenimiento': Actualiza mantenimiento_codigo, mantenimiento_version, mantenimiento_fecha_formato
+    - 'confirmacion': Actualiza confirmacion_codigo, confirmacion_version, confirmacion_fecha_formato
+    - 'comprobacion': Actualiza comprobacion_codigo, comprobacion_version, comprobacion_fecha_formato
     """
     from django.http import JsonResponse
     from core.models import Empresa
@@ -1252,31 +1258,73 @@ def actualizar_formato_empresa(request):
         if not empresa:
             return JsonResponse({'success': False, 'message': 'Usuario no tiene empresa asociada'}, status=400)
 
-        # Actualizar los campos de formato
-        if 'codigo' in datos:
-            empresa.formato_codificacion_empresa = datos['codigo']
+        # Determinar qué tipo de formato actualizar
+        tipo = datos.get('tipo', 'intervalos')  # Default a intervalos por compatibilidad
 
-        if 'version' in datos:
-            empresa.formato_version_empresa = datos['version']
+        # Mapeo de campos según el tipo
+        campos_map = {
+            'intervalos': {
+                'codigo': 'intervalos_codigo',
+                'version': 'intervalos_version',
+                'fecha': 'intervalos_fecha_formato'
+            },
+            'mantenimiento': {
+                'codigo': 'mantenimiento_codigo',
+                'version': 'mantenimiento_version',
+                'fecha': 'mantenimiento_fecha_formato'
+            },
+            'confirmacion': {
+                'codigo': 'confirmacion_codigo',
+                'version': 'confirmacion_version',
+                'fecha': 'confirmacion_fecha_formato'
+            },
+            'comprobacion': {
+                'codigo': 'comprobacion_codigo',
+                'version': 'comprobacion_version',
+                'fecha': 'comprobacion_fecha_formato'
+            }
+        }
+
+        if tipo not in campos_map:
+            return JsonResponse({'success': False, 'message': f'Tipo de formato inválido: {tipo}'}, status=400)
+
+        campos = campos_map[tipo]
+
+        # Actualizar los campos específicos del tipo de formato
+        if 'codigo' in datos and datos['codigo']:
+            setattr(empresa, campos['codigo'], datos['codigo'])
+
+        if 'version' in datos and datos['version']:
+            setattr(empresa, campos['version'], datos['version'])
 
         if 'fecha' in datos:
             try:
                 # Convertir string de fecha a objeto date
                 fecha_str = datos['fecha']
-                fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-                empresa.formato_fecha_version_empresa = fecha_obj
+                if fecha_str:
+                    fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    setattr(empresa, campos['fecha'], fecha_obj)
+                else:
+                    setattr(empresa, campos['fecha'], None)
             except (ValueError, TypeError):
                 pass  # Si hay error en la fecha, no actualizar
 
         empresa.save()
 
+        # Obtener valores actualizados para respuesta
+        codigo_actual = getattr(empresa, campos['codigo']) or ''
+        version_actual = getattr(empresa, campos['version']) or ''
+        fecha_actual = getattr(empresa, campos['fecha'])
+        fecha_str = fecha_actual.strftime('%Y-%m-%d') if fecha_actual else ''
+
         return JsonResponse({
             'success': True,
-            'message': 'Formato actualizado correctamente para todos los equipos de la empresa',
+            'message': f'Formato de {tipo} actualizado correctamente para todos los equipos de la empresa',
             'datos': {
-                'codigo': empresa.formato_codificacion_empresa or '',
-                'version': empresa.formato_version_empresa or '',
-                'fecha': empresa.formato_fecha_version_empresa.strftime('%Y-%m-%d') if empresa.formato_fecha_version_empresa else ''
+                'codigo': codigo_actual,
+                'version': version_actual,
+                'fecha': fecha_str,
+                'tipo': tipo
             }
         })
 

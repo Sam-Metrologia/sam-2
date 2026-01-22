@@ -234,23 +234,119 @@ class Empresa(models.Model):
     #     null=True
     # )
 
-    # Nuevos campos para la información de formato por empresa
+    # Nuevos campos para la información de formato por empresa (DEPRECADOS - usar campos específicos)
     formato_version_empresa = models.CharField(
         max_length=50,
         blank=True,
         null=True,
-        verbose_name="Versión del Formato (Empresa)"
+        verbose_name="Versión del Formato (Empresa) - DEPRECADO"
     )
     formato_fecha_version_empresa = models.DateField(
         blank=True,
         null=True,
-        verbose_name="Fecha de Versión del Formato (Empresa)"
+        verbose_name="Fecha de Versión del Formato (Empresa) - DEPRECADO"
     )
     formato_codificacion_empresa = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="Codificación del Formato (Empresa)"
+        verbose_name="Codificación del Formato (Empresa) - DEPRECADO"
+    )
+
+    # Campos específicos para CONFIRMACIÓN METROLÓGICA
+    confirmacion_codigo = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="SAM-CONF-001",
+        verbose_name="Código Formato - Confirmación Metrológica",
+        help_text="Código del formato de confirmación metrológica (ej: SAM-CONF-001)"
+    )
+    confirmacion_version = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default="01",
+        verbose_name="Versión Formato - Confirmación Metrológica",
+        help_text="Versión del formato de confirmación metrológica (ej: 01, 02, 03)"
+    )
+    confirmacion_fecha_formato = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha del Formato - Confirmación Metrológica",
+        help_text="Fecha de emisión/actualización del formato de confirmación metrológica"
+    )
+
+    # Campos específicos para INTERVALOS DE CALIBRACIÓN
+    intervalos_codigo = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="SAM-INT-001",
+        verbose_name="Código Formato - Intervalos de Calibración",
+        help_text="Código del formato de intervalos de calibración (ej: SAM-INT-001)"
+    )
+    intervalos_version = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default="01",
+        verbose_name="Versión Formato - Intervalos de Calibración",
+        help_text="Versión del formato de intervalos de calibración (ej: 01, 02, 03)"
+    )
+    intervalos_fecha_formato = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha del Formato - Intervalos de Calibración",
+        help_text="Fecha de emisión/actualización del formato de intervalos de calibración"
+    )
+
+    # Campos específicos para MANTENIMIENTO
+    mantenimiento_codigo = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="SAM-MANT-001",
+        verbose_name="Código Formato - Mantenimiento",
+        help_text="Código del formato de mantenimiento (ej: SAM-MANT-001)"
+    )
+    mantenimiento_version = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default="01",
+        verbose_name="Versión Formato - Mantenimiento",
+        help_text="Versión del formato de mantenimiento (ej: 01, 02, 03)"
+    )
+    mantenimiento_fecha_formato = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha del Formato - Mantenimiento",
+        help_text="Fecha de emisión/actualización del formato de mantenimiento"
+    )
+
+    # Campos específicos para COMPROBACIÓN METROLÓGICA
+    comprobacion_codigo = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="SAM-COMP-001",
+        verbose_name="Código Formato - Comprobación Metrológica",
+        help_text="Código del formato de comprobación metrológica (ej: SAM-COMP-001)"
+    )
+    comprobacion_version = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default="01",
+        verbose_name="Versión Formato - Comprobación Metrológica",
+        help_text="Versión del formato de comprobación metrológica (ej: 01, 02, 03)"
+    )
+    comprobacion_fecha_formato = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha del Formato - Comprobación Metrológica",
+        help_text="Fecha de emisión/actualización del formato de comprobación metrológica"
     )
 
 

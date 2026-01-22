@@ -119,7 +119,7 @@
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-700">FECHA:</label>
-                    <input type="date" id="formato-fecha" value="{{ formato_fecha|date:'Y-m-d' }}"
+                    <input type="date" id="formato-fecha" value="{% if formato_fecha %}{{ formato_fecha|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
                            class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500">
                 </div>
             </div>
@@ -1673,6 +1673,7 @@ function guardarFormatoEmpresa() {
             'X-CSRFToken': csrftoken
         },
         body: JSON.stringify({
+            tipo: 'intervalos',
             codigo: codigo,
             version: version,
             fecha: fecha

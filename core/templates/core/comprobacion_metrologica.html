@@ -133,7 +133,7 @@
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-700">FECHA:</label>
-                    <input type="date" id="formato-fecha" value="{% now 'Y-m-d' %}"
+                    <input type="date" id="formato-fecha" value="{% if formato_fecha %}{{ formato_fecha|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
                            class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
@@ -799,7 +799,11 @@ async function generarPDF() {
         equipo_ref_nombre: document.getElementById('equipo-ref-nombre').value || '',
         equipo_ref_marca: document.getElementById('equipo-ref-marca').value || '',
         equipo_ref_modelo: document.getElementById('equipo-ref-modelo').value || '',
-        equipo_ref_certificado: document.getElementById('equipo-ref-certificado').value || ''
+        equipo_ref_certificado: document.getElementById('equipo-ref-certificado').value || '',
+        // Formato del documento (código, versión, fecha)
+        formato_codigo: document.getElementById('formato-codigo').value || '',
+        formato_version: document.getElementById('formato-version').value || '',
+        formato_fecha: document.getElementById('formato-fecha').value || ''
     };
 
     mostrarLoading(true);

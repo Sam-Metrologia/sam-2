@@ -104,10 +104,10 @@ def mantenimiento_actividades_view(request, equipo_id):
             except:
                 logo_empresa_url = None
 
-    # Obtener información de formato de la empresa
-    formato_codigo = equipo.empresa.formato_codificacion_empresa or 'SAM-MANT-001'
-    formato_version = equipo.empresa.formato_version_empresa or '01'
-    formato_fecha = equipo.empresa.formato_fecha_version_empresa or datetime.now().date()
+    # Obtener información de formato específico de MANTENIMIENTO de la empresa
+    formato_codigo = equipo.empresa.mantenimiento_codigo or 'SAM-MANT-001'
+    formato_version = equipo.empresa.mantenimiento_version or '01'
+    formato_fecha = equipo.empresa.mantenimiento_fecha_formato or None
 
     context = {
         'equipo': equipo,
@@ -162,6 +162,21 @@ def guardar_mantenimiento_json(request, equipo_id):
                 responsable=datos.get('responsable', ''),
                 descripcion=datos.get('descripcion', ''),
             )
+
+        # Guardar formato de MANTENIMIENTO en la empresa (aplica a todos los equipos de la empresa)
+        if 'formato_codigo' in datos or 'formato_version' in datos or 'formato_fecha' in datos:
+            empresa = equipo.empresa
+            if 'formato_codigo' in datos and datos['formato_codigo']:
+                empresa.mantenimiento_codigo = datos['formato_codigo']
+            if 'formato_version' in datos and datos['formato_version']:
+                empresa.mantenimiento_version = datos['formato_version']
+            if 'formato_fecha' in datos and datos['formato_fecha']:
+                try:
+                    from datetime import datetime
+                    empresa.mantenimiento_fecha_formato = datetime.strptime(datos['formato_fecha'], '%Y-%m-%d').date()
+                except:
+                    pass
+            empresa.save()
 
         # Guardar datos JSON de actividades
         mantenimiento.actividades_realizadas = datos

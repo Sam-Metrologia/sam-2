@@ -270,6 +270,9 @@
             <td class="header-info-cell">
                 <p><strong>CÓDIGO:</strong> {{ datos_intervalos.formato.codigo }}</p>
                 <p><strong>VERSIÓN:</strong> {{ datos_intervalos.formato.version }}</p>
+                {% if datos_intervalos.formato.fecha %}
+                <p><strong>FECHA:</strong> {{ datos_intervalos.formato.fecha }}</p>
+                {% endif %}
             </td>
         </tr>
     </table>

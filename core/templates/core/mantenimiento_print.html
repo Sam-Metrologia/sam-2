@@ -245,8 +245,11 @@
                 REPORTE DE MANTENIMIENTO
             </td>
             <td class="header-info-cell">
-                <p><strong>Código:</strong> SAM-MANT-001</p>
-                <p><strong>Versión:</strong> 01</p>
+                <p><strong>Código:</strong> {{ empresa.mantenimiento_codigo|default:"SAM-MANT-001" }}</p>
+                <p><strong>Versión:</strong> {{ empresa.mantenimiento_version|default:"01" }}</p>
+                {% if empresa.mantenimiento_fecha_formato %}
+                <p><strong>Fecha:</strong> {{ empresa.mantenimiento_fecha_formato|date:"d/m/Y" }}</p>
+                {% endif %}
             </td>
         </tr>
     </table>

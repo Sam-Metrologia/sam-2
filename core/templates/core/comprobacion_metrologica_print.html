@@ -307,6 +307,9 @@
             <td class="header-info-cell">
                 <p><strong>Código:</strong> {{ datos_comprobacion.formato_codigo|default:"SAM-COMP-001" }}</p>
                 <p><strong>Versión:</strong> {{ datos_comprobacion.formato_version|default:"01" }}</p>
+                {% if datos_comprobacion.formato_fecha or comprobacion.equipo.empresa.comprobacion_fecha_formato %}
+                <p><strong>Fecha:</strong> {{ datos_comprobacion.formato_fecha|default:comprobacion.equipo.empresa.comprobacion_fecha_formato|date:"d/m/Y" }}</p>
+                {% endif %}
             </td>
         </tr>
     </table>

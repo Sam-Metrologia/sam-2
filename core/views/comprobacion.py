@@ -99,6 +99,7 @@ def comprobacion_metrologica_view(request, equipo_id):
     nombre_empresa = "Sin Empresa"
     formato_codigo = "SAM-COMP-001"
     formato_version = "01"
+    formato_fecha = None
 
     if equipo.empresa:
         nombre_empresa = equipo.empresa.nombre
@@ -108,11 +109,13 @@ def comprobacion_metrologica_view(request, equipo_id):
             except:
                 logo_empresa_url = None
 
-        # Obtener formato de la empresa si existe
-        if hasattr(equipo.empresa, 'formato_codigo') and equipo.empresa.formato_codigo:
-            formato_codigo = equipo.empresa.formato_codigo
-        if hasattr(equipo.empresa, 'formato_version') and equipo.empresa.formato_version:
-            formato_version = equipo.empresa.formato_version
+        # Obtener formato específico de COMPROBACIÓN de la empresa
+        if equipo.empresa.comprobacion_codigo:
+            formato_codigo = equipo.empresa.comprobacion_codigo
+        if equipo.empresa.comprobacion_version:
+            formato_version = equipo.empresa.comprobacion_version
+        if equipo.empresa.comprobacion_fecha_formato:
+            formato_fecha = equipo.empresa.comprobacion_fecha_formato
 
     context = {
         'equipo': equipo,
@@ -125,6 +128,7 @@ def comprobacion_metrologica_view(request, equipo_id):
         'nombre_empresa': nombre_empresa,
         'formato_codigo': formato_codigo,
         'formato_version': formato_version,
+        'formato_fecha': formato_fecha,
     }
 
     return render(request, 'core/comprobacion_metrologica.html', context)
@@ -169,6 +173,20 @@ def guardar_comprobacion_json(request, equipo_id):
         comprobacion.equipo_referencia_marca = datos.get('equipo_ref_marca', '')
         comprobacion.equipo_referencia_modelo = datos.get('equipo_ref_modelo', '')
         comprobacion.equipo_referencia_certificado = datos.get('equipo_ref_certificado', '')
+
+        # Guardar formato de COMPROBACIÓN en la empresa (aplica a todos los equipos de la empresa)
+        if 'formato_codigo' in datos or 'formato_version' in datos or 'formato_fecha' in datos:
+            empresa = equipo.empresa
+            if 'formato_codigo' in datos and datos['formato_codigo']:
+                empresa.comprobacion_codigo = datos['formato_codigo']
+            if 'formato_version' in datos and datos['formato_version']:
+                empresa.comprobacion_version = datos['formato_version']
+            if 'formato_fecha' in datos and datos['formato_fecha']:
+                try:
+                    empresa.comprobacion_fecha_formato = datetime.strptime(datos['formato_fecha'], '%Y-%m-%d').date()
+                except:
+                    pass
+            empresa.save()
 
         # Determinar resultado basado en conformidad
         puntos = datos.get('puntos_medicion', [])
