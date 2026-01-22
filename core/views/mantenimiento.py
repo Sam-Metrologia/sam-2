@@ -242,12 +242,12 @@ def generar_pdf_mantenimiento(request, equipo_id):
             logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
             logo_empresa_url = None
 
-        # Formatear fecha del formato si existe
+        # Formatear fecha del formato si existe (formato: YYYY-MM-DD)
         formato_fecha_formateada = None
         if datos_mantenimiento.get('formato_fecha'):
             try:
                 fecha_obj = datetime.strptime(datos_mantenimiento['formato_fecha'], '%Y-%m-%d')
-                formato_fecha_formateada = fecha_obj.strftime('%d/%m/%Y')
+                formato_fecha_formateada = fecha_obj.strftime('%Y-%m-%d')
             except:
                 formato_fecha_formateada = datos_mantenimiento['formato_fecha']
 

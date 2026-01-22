@@ -250,7 +250,7 @@
                 {% if formato_fecha_formateada %}
                     <p><strong>Fecha:</strong> {{ formato_fecha_formateada }}</p>
                 {% elif empresa.mantenimiento_fecha_formato %}
-                    <p><strong>Fecha:</strong> {{ empresa.mantenimiento_fecha_formato|date:"d/m/Y" }}</p>
+                    <p><strong>Fecha:</strong> {{ empresa.mantenimiento_fecha_formato|date:"Y-m-d" }}</p>
                 {% endif %}
             </td>
         </tr>

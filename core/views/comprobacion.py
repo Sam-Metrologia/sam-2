@@ -369,13 +369,13 @@ def generar_pdf_comprobacion(request, equipo_id):
             logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
             logo_empresa_url = None
 
-        # Formatear fecha del formato si existe
+        # Formatear fecha del formato si existe (formato: YYYY-MM-DD)
         formato_fecha_formateada = None
         if datos_comprobacion.get('formato_fecha'):
             try:
                 from datetime import datetime as dt
                 fecha_obj = dt.strptime(datos_comprobacion['formato_fecha'], '%Y-%m-%d')
-                formato_fecha_formateada = fecha_obj.strftime('%d/%m/%Y')
+                formato_fecha_formateada = fecha_obj.strftime('%Y-%m-%d')
             except:
                 formato_fecha_formateada = datos_comprobacion['formato_fecha']
 

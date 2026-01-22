@@ -310,7 +310,7 @@
                 {% if formato_fecha_formateada %}
                     <p><strong>Fecha:</strong> {{ formato_fecha_formateada }}</p>
                 {% elif equipo.empresa.comprobacion_fecha_formato %}
-                    <p><strong>Fecha:</strong> {{ equipo.empresa.comprobacion_fecha_formato|date:"d/m/Y" }}</p>
+                    <p><strong>Fecha:</strong> {{ equipo.empresa.comprobacion_fecha_formato|date:"Y-m-d" }}</p>
                 {% endif %}
             </td>
         </tr>
