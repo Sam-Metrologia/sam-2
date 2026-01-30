@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Calendario de Actividades{% endblock %}
+
+{% block extra_head %}
+<!-- FullCalendar v6 CDN -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.11/locales/es.global.min.js"></script>
+
+<style>
+    /* ============================================
+       CALENDARIO - ESTILOS GENERALES
+       ============================================ */
+    .calendario-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .calendario-filtros {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+        padding: 1rem;
+        background: var(--bg-card, #ffffff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .calendario-filtros label {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--text-primary, #111827);
+    }
+
+    .calendario-filtros select {
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        background: var(--bg-secondary, #ffffff);
+        color: var(--text-primary, #111827);
+    }
+
+    .calendario-leyenda {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-left: auto;
+    }
+
+    .leyenda-item {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary, #6b7280);
+    }
+
+    .leyenda-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .calendario-acciones {
+        display: flex;
+        gap: 0.5rem;
+        margin-left: 1rem;
+    }
+
+    #calendar {
+        background: var(--bg-card, #ffffff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+
+    /* ============================================
+       MODAL DE DETALLE
+       ============================================ */
+    .cal-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .cal-modal-overlay.active {
+        display: flex;
+    }
+
+    .cal-modal {
+        background: var(--bg-card, #ffffff);
+        border-radius: 0.75rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        max-width: 480px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .cal-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+
+    .cal-modal-header h3 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--text-primary, #111827);
+        margin: 0;
+    }
+
+    .cal-modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: var(--text-muted, #9ca3af);
+        cursor: pointer;
+        padding: 0.25rem;
+        line-height: 1;
+    }
+
+    .cal-modal-close:hover {
+        color: var(--text-primary, #111827);
+    }
+
+    .cal-modal-body {
+        padding: 1.25rem;
+    }
+
+    .cal-modal-field {
+        margin-bottom: 0.75rem;
+    }
+
+    .cal-modal-field dt {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted, #9ca3af);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.125rem;
+    }
+
+    .cal-modal-field dd {
+        font-size: 0.9375rem;
+        color: var(--text-primary, #111827);
+        margin: 0;
+    }
+
+    .cal-modal-badge {
+        display: inline-block;
+        padding: 0.125rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .cal-modal-badge.programado {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+    }
+
+    .cal-modal-badge.realizado {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .cal-modal-footer {
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid var(--border-color, #e5e7eb);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    /* ============================================
+       FULLCALENDAR OVERRIDES
+       ============================================ */
+    .fc .fc-toolbar-title {
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        color: var(--text-primary, #111827) !important;
+    }
+
+    .fc .fc-button {
+        background-color: var(--accent-primary, #2563eb) !important;
+        border-color: var(--accent-primary, #2563eb) !important;
+        font-size: 0.8125rem !important;
+        padding: 0.375rem 0.75rem !important;
+    }
+
+    .fc .fc-button:hover {
+        background-color: var(--accent-primary-hover, #1d4ed8) !important;
+        border-color: var(--accent-primary-hover, #1d4ed8) !important;
+    }
+
+    .fc .fc-button-active {
+        background-color: var(--accent-primary-active, #1e40af) !important;
+        border-color: var(--accent-primary-active, #1e40af) !important;
+    }
+
+    .fc .fc-col-header-cell {
+        background: var(--bg-tertiary, #f1f5f9);
+    }
+
+    .fc .fc-col-header-cell-cushion {
+        color: var(--text-primary, #111827);
+        font-weight: 600;
+        font-size: 0.8125rem;
+        text-decoration: none;
+    }
+
+    .fc .fc-daygrid-day-number {
+        color: var(--text-secondary, #6b7280);
+        text-decoration: none;
+        font-size: 0.875rem;
+    }
+
+    .fc .fc-daygrid-day.fc-day-today {
+        background: var(--accent-subtle, #eff6ff) !important;
+    }
+
+    .fc .fc-event {
+        border: none !important;
+        border-radius: 0.25rem !important;
+        font-size: 0.75rem !important;
+        padding: 1px 4px !important;
+        cursor: pointer !important;
+    }
+
+    .fc .fc-daygrid-event-dot {
+        display: none;
+    }
+
+    .fc .fc-list-event-title a {
+        color: var(--text-primary, #111827) !important;
+    }
+
+    .fc td, .fc th {
+        border-color: var(--border-color, #e5e7eb) !important;
+    }
+
+    .fc .fc-scrollgrid {
+        border-color: var(--border-color, #e5e7eb) !important;
+    }
+
+    /* ============================================
+       DARK MODE - FULLCALENDAR
+       ============================================ */
+    [data-theme="dark"] #calendar {
+        background: var(--bg-card) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-col-header-cell {
+        background: var(--bg-tertiary) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-col-header-cell-cushion {
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-daygrid-day-number {
+        color: var(--text-secondary) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-daygrid-day.fc-day-today {
+        background: var(--accent-subtle) !important;
+    }
+
+    [data-theme="dark"] .fc td,
+    [data-theme="dark"] .fc th {
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-scrollgrid {
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-toolbar-title {
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-list-event-title a {
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-list-day-cushion {
+        background: var(--bg-tertiary) !important;
+    }
+
+    [data-theme="dark"] .fc .fc-list-day-text,
+    [data-theme="dark"] .fc .fc-list-day-side-text {
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .calendario-filtros {
+        background: var(--bg-card) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .calendario-filtros select {
+        background-color: #4b5563 !important;
+        color: #ffffff !important;
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .cal-modal {
+        background: var(--bg-card) !important;
+    }
+
+    [data-theme="dark"] .cal-modal-header {
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .cal-modal-header h3 {
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .cal-modal-field dt {
+        color: var(--text-muted) !important;
+    }
+
+    [data-theme="dark"] .cal-modal-field dd {
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .cal-modal-footer {
+        border-color: var(--border-color) !important;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .calendario-filtros {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .calendario-leyenda {
+            margin-left: 0;
+        }
+        .calendario-acciones {
+            margin-left: 0;
+        }
+    }
+</style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="calendario-container p-4">
+    <!-- Titulo -->
+    <h1 class="text-2xl font-bold mb-4" style="color: var(--text-primary, #111827);">
+        <i class="fas fa-calendar-alt mr-2" style="color: var(--accent-primary, #2563eb);"></i>
+        Calendario de Actividades
+    </h1>
+
+    <!-- Filtros + Leyenda -->
+    <div class="calendario-filtros">
+        <div>
+            <label for="filtro-tipo">Tipo:</label>
+            <select id="filtro-tipo">
+                <option value="">Todas</option>
+                <option value="calibracion">Calibraciones</option>
+                <option value="mantenimiento">Mantenimientos</option>
+                <option value="comprobacion">Comprobaciones</option>
+            </select>
+        </div>
+        <div>
+            <label for="filtro-responsable">Responsable:</label>
+            <select id="filtro-responsable">
+                <option value="">Todos</option>
+                {% for resp in responsables %}
+                <option value="{{ resp }}">{{ resp }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="calendario-leyenda">
+            <span class="leyenda-item">
+                <span class="leyenda-dot" style="background:#3b82f6;"></span> Cal. programada
+            </span>
+            <span class="leyenda-item">
+                <span class="leyenda-dot" style="background:#93c5fd;"></span> Cal. realizada
+            </span>
+            <span class="leyenda-item">
+                <span class="leyenda-dot" style="background:#10b981;"></span> Mant. programado
+            </span>
+            <span class="leyenda-item">
+                <span class="leyenda-dot" style="background:#6ee7b7;"></span> Mant. realizado
+            </span>
+            <span class="leyenda-item">
+                <span class="leyenda-dot" style="background:#f59e0b;"></span> Comp. programada
+            </span>
+            <span class="leyenda-item">
+                <span class="leyenda-dot" style="background:#fcd34d;"></span> Comp. realizada
+            </span>
+        </div>
+
+        <div class="calendario-acciones">
+            <a id="btn-exportar-ical"
+               href="{% url 'core:calendario_exportar_ical' %}"
+               class="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition"
+               title="Exportar calendario iCal">
+                <i class="fas fa-download mr-1"></i> Exportar iCal
+            </a>
+        </div>
+    </div>
+
+    <!-- Calendario -->
+    <div id="calendar"></div>
+</div>
+
+<!-- Modal de detalle -->
+<div id="cal-modal-overlay" class="cal-modal-overlay">
+    <div class="cal-modal">
+        <div class="cal-modal-header">
+            <h3 id="cal-modal-title">Detalle del Evento</h3>
+            <button class="cal-modal-close" id="cal-modal-close-btn" title="Cerrar">&times;</button>
+        </div>
+        <div class="cal-modal-body" id="cal-modal-body">
+            <!-- Contenido dinámico -->
+        </div>
+        <div class="cal-modal-footer">
+            <a id="cal-modal-link" href="#" class="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
+                <i class="fas fa-external-link-alt mr-1"></i> Ver Equipo
+            </a>
+            <button id="cal-modal-close-btn2" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-300 transition">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ============================================
+    // Inicializar FullCalendar
+    // ============================================
+    var calendarEl = document.getElementById('calendar');
+    var filtroTipo = document.getElementById('filtro-tipo');
+    var filtroResponsable = document.getElementById('filtro-responsable');
+
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'es',
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listMonth'
+        },
+        buttonText: {
+            today: 'Hoy',
+            month: 'Mes',
+            list: 'Lista'
+        },
+        height: 'auto',
+        navLinks: false,
+        editable: false,
+        dayMaxEvents: 4,
+        moreLinkText: 'más',
+        events: function(info, successCallback, failureCallback) {
+            var params = new URLSearchParams({
+                start: info.startStr,
+                end: info.endStr,
+                tipo: filtroTipo.value,
+                responsable: filtroResponsable.value
+            });
+            fetch("{% url 'core:calendario_eventos_api' %}?" + params.toString())
+                .then(function(response) { return response.json(); })
+                .then(function(data) { successCallback(data); })
+                .catch(function(err) { failureCallback(err); });
+        },
+        eventClick: function(info) {
+            mostrarModalEvento(info.event);
+        }
+    });
+
+    calendar.render();
+
+    // ============================================
+    // Filtros: refetch al cambiar
+    // ============================================
+    filtroTipo.addEventListener('change', function() {
+        calendar.refetchEvents();
+        actualizarLinkExportar();
+    });
+    filtroResponsable.addEventListener('change', function() {
+        calendar.refetchEvents();
+        actualizarLinkExportar();
+    });
+
+    function actualizarLinkExportar() {
+        var base = "{% url 'core:calendario_exportar_ical' %}";
+        var params = new URLSearchParams();
+        if (filtroTipo.value) params.set('tipo', filtroTipo.value);
+        if (filtroResponsable.value) params.set('responsable', filtroResponsable.value);
+        var qs = params.toString();
+        document.getElementById('btn-exportar-ical').href = base + (qs ? '?' + qs : '');
+    }
+
+    // ============================================
+    // Modal de detalle del evento
+    // ============================================
+    var overlay = document.getElementById('cal-modal-overlay');
+    var modalBody = document.getElementById('cal-modal-body');
+    var modalTitle = document.getElementById('cal-modal-title');
+    var modalLink = document.getElementById('cal-modal-link');
+
+    function cerrarModal() {
+        overlay.classList.remove('active');
+    }
+
+    document.getElementById('cal-modal-close-btn').addEventListener('click', cerrarModal);
+    document.getElementById('cal-modal-close-btn2').addEventListener('click', cerrarModal);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) cerrarModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') cerrarModal();
+    });
+
+    var TIPO_LABELS = {
+        'calibracion': 'Calibración',
+        'mantenimiento': 'Mantenimiento',
+        'comprobacion': 'Comprobación'
+    };
+
+    function mostrarModalEvento(event) {
+        var props = event.extendedProps || {};
+        var tipo = props.tipo || '';
+        var estado = props.estado || '';
+
+        modalTitle.textContent = event.title;
+
+        var estadoClass = estado === 'programado' ? 'programado' : 'realizado';
+        var estadoLabel = estado === 'programado' ? 'Programado' : 'Realizado';
+
+        var html = '<dl>';
+        html += '<div class="cal-modal-field"><dt>Tipo de Actividad</dt><dd>' + (TIPO_LABELS[tipo] || tipo) + '</dd></div>';
+        html += '<div class="cal-modal-field"><dt>Estado</dt><dd><span class="cal-modal-badge ' + estadoClass + '">' + estadoLabel + '</span></dd></div>';
+        html += '<div class="cal-modal-field"><dt>Fecha</dt><dd>' + (event.startStr || '') + '</dd></div>';
+        html += '<div class="cal-modal-field"><dt>Equipo</dt><dd>' + (props.equipo_nombre || '') + ' (' + (props.equipo_codigo || '') + ')</dd></div>';
+
+        if (props.responsable) {
+            html += '<div class="cal-modal-field"><dt>Responsable</dt><dd>' + props.responsable + '</dd></div>';
+        }
+        if (props.resultado) {
+            html += '<div class="cal-modal-field"><dt>Resultado</dt><dd>' + props.resultado + '</dd></div>';
+        }
+        if (props.certificado) {
+            html += '<div class="cal-modal-field"><dt>Certificado</dt><dd>' + props.certificado + '</dd></div>';
+        }
+        if (props.tipo_mantenimiento) {
+            html += '<div class="cal-modal-field"><dt>Tipo Mantenimiento</dt><dd>' + props.tipo_mantenimiento + '</dd></div>';
+        }
+        if (props.descripcion) {
+            html += '<div class="cal-modal-field"><dt>Descripción</dt><dd>' + props.descripcion + '</dd></div>';
+        }
+
+        html += '</dl>';
+        modalBody.innerHTML = html;
+
+        // Link al equipo
+        if (props.equipo_id) {
+            modalLink.href = '/core/equipos/' + props.equipo_id + '/';
+            modalLink.style.display = '';
+        } else {
+            modalLink.style.display = 'none';
+        }
+
+        overlay.classList.add('active');
+    }
+});
+</script>
+{% endblock %}

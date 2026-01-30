@@ -2293,3 +2293,45 @@
 [data-theme="dark"] #zipNotificationContainer .bg-gray-600 {
     background-color: var(--bg-tertiary) !important;
 }
+
+/* =========================================
+   FULLCALENDAR - DARK MODE
+   ========================================= */
+
+[data-theme="dark"] .fc {
+    --fc-border-color: var(--border-color);
+    --fc-page-bg-color: var(--bg-card);
+    --fc-neutral-bg-color: var(--bg-tertiary);
+    --fc-list-event-hover-bg-color: var(--bg-tertiary);
+    --fc-today-bg-color: var(--accent-subtle);
+    --fc-event-text-color: #ffffff;
+}
+
+[data-theme="dark"] .fc .fc-col-header-cell {
+    background: var(--bg-tertiary) !important;
+}
+
+[data-theme="dark"] .fc .fc-col-header-cell-cushion {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .fc .fc-daygrid-day-number {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .fc .fc-toolbar-title {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .fc .fc-list-day-cushion {
+    background: var(--bg-tertiary) !important;
+}
+
+[data-theme="dark"] .fc .fc-list-day-text,
+[data-theme="dark"] .fc .fc-list-day-side-text {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .fc .fc-list-event-title a {
+    color: var(--text-primary) !important;
+}

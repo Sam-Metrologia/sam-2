@@ -152,6 +152,11 @@ urlpatterns = [
     path('informes/exportar_excel/', views.exportar_equipos_excel, name='exportar_equipos_excel'),
     path('informes/hoja_vida_pdf/<int:pk>/', views.generar_hoja_vida_pdf, name='generar_hoja_vida_pdf'),
 
+    # Calendario de Actividades
+    path('calendario/', views.calendario_actividades, name='calendario_actividades'),
+    path('api/calendario/eventos/', views.calendario_eventos_api, name='calendario_eventos_api'),
+    path('calendario/exportar-ical/', views.calendario_exportar_ical, name='calendario_exportar_ical'),
+
     # URL para AJAX de actualización de formato de empresa (se mantiene para usos AJAX específicos)
     path('update_empresa_formato/', views.update_empresa_formato, name='update_empresa_formato'),
     # NUEVA: URL para el endpoint AJAX de añadir mensajes

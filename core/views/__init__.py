@@ -72,6 +72,13 @@ from .mantenimiento import (
     generar_pdf_mantenimiento
 )
 
+# Calendario de Actividades
+from .calendario import (
+    calendario_actividades,
+    calendario_eventos_api,
+    calendario_exportar_ical,
+)
+
 # Sistema de Aprobaciones
 from .aprobaciones import (
     pagina_aprobaciones,

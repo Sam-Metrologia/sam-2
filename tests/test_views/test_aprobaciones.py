@@ -329,3 +329,216 @@ class TestPaginaAprobaciones:
         assert response.context['es_aprobador'] is False
         # El técnico ve su propio documento pendiente
         assert calibracion_con_confirmacion in response.context['confirmaciones_pendientes']
+
+    def test_requiere_login(self, client):
+        url = reverse('core:aprobaciones')
+        response = client.get(url)
+        assert response.status_code == 302
+        assert '/login/' in response.url
+
+    def test_gerencia_es_aprobador(self, empresa, equipo):
+        """Un usuario con rol GERENCIA también es aprobador."""
+        gerente = CustomUser.objects.create_user(
+            username="gerente_test",
+            email="gerente@test.com",
+            password="testpass123",
+            empresa=empresa,
+            rol_usuario="GERENCIA",
+        )
+        client = Client()
+        client.login(username="gerente_test", password="testpass123")
+
+        url = reverse('core:aprobaciones')
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.context['es_aprobador'] is True
+
+
+# ===================== Tests de Rechazo de Intervalos =====================
+
+@pytest.mark.django_db
+class TestRechazarIntervalos:
+
+    def test_rechazar_intervalos_guarda_motivo(self, admin_client, calibracion_con_intervalos):
+        url = reverse('core:rechazar_intervalos', args=[calibracion_con_intervalos.id])
+        motivo = "Los intervalos no corresponden al tipo de equipo"
+        response = admin_client.post(
+            url,
+            data=json.dumps({'observaciones': motivo}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data['success'] is True
+
+        calibracion_con_intervalos.refresh_from_db()
+        assert calibracion_con_intervalos.intervalos_estado_aprobacion == 'rechazado'
+        assert calibracion_con_intervalos.intervalos_observaciones_rechazo == motivo
+
+    def test_rechazar_intervalos_sin_observaciones_falla(self, admin_client, calibracion_con_intervalos):
+        url = reverse('core:rechazar_intervalos', args=[calibracion_con_intervalos.id])
+        response = admin_client.post(
+            url,
+            data=json.dumps({'observaciones': ''}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 400
+
+        calibracion_con_intervalos.refresh_from_db()
+        assert calibracion_con_intervalos.intervalos_estado_aprobacion == 'pendiente'
+
+    def test_tecnico_no_puede_rechazar_intervalos(self, tecnico_client, calibracion_con_intervalos):
+        url = reverse('core:rechazar_intervalos', args=[calibracion_con_intervalos.id])
+        response = tecnico_client.post(
+            url,
+            data=json.dumps({'observaciones': 'Rechazo de tecnico'}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 403
+
+        calibracion_con_intervalos.refresh_from_db()
+        assert calibracion_con_intervalos.intervalos_estado_aprobacion == 'pendiente'
+
+
+# ===================== Tests de Seguridad y Permisos =====================
+
+@pytest.mark.django_db
+class TestAprobacionesSeguridad:
+
+    def test_aprobar_confirmacion_requiere_login(self, client, calibracion_con_confirmacion):
+        url = reverse('core:aprobar_confirmacion', args=[calibracion_con_confirmacion.id])
+        response = client.post(url)
+        assert response.status_code == 302
+        assert '/login/' in response.url
+
+    def test_rechazar_confirmacion_requiere_login(self, client, calibracion_con_confirmacion):
+        url = reverse('core:rechazar_confirmacion', args=[calibracion_con_confirmacion.id])
+        response = client.post(url)
+        assert response.status_code == 302
+        assert '/login/' in response.url
+
+    def test_aprobar_comprobacion_requiere_login(self, client, comprobacion_pendiente):
+        url = reverse('core:aprobar_comprobacion', args=[comprobacion_pendiente.id])
+        response = client.post(url)
+        assert response.status_code == 302
+        assert '/login/' in response.url
+
+    def test_aprobar_confirmacion_requiere_post(self, admin_client, calibracion_con_confirmacion):
+        url = reverse('core:aprobar_confirmacion', args=[calibracion_con_confirmacion.id])
+        response = admin_client.get(url)
+        assert response.status_code == 405
+
+    def test_rechazar_comprobacion_requiere_post(self, admin_client, comprobacion_pendiente):
+        url = reverse('core:rechazar_comprobacion', args=[comprobacion_pendiente.id])
+        response = admin_client.get(url)
+        assert response.status_code == 405
+
+    def test_aprobar_confirmacion_inexistente(self, admin_client):
+        url = reverse('core:aprobar_confirmacion', args=[99999])
+        response = admin_client.post(url)
+        # La vista envuelve get_object_or_404 en try/except, retorna 500 con error
+        assert response.status_code in [404, 500]
+        data = response.json()
+        assert data['success'] is False
+
+    def test_aprobar_comprobacion_inexistente(self, admin_client):
+        url = reverse('core:aprobar_comprobacion', args=[99999])
+        response = admin_client.post(url)
+        assert response.status_code in [404, 500]
+        data = response.json()
+        assert data['success'] is False
+
+    def test_no_auto_aprobacion_confirmacion(self, empresa, equipo):
+        """Un admin no puede aprobar su propio documento."""
+        from datetime import date
+        admin = CustomUser.objects.create_user(
+            username="admin_auto",
+            email="adminauto@test.com",
+            password="testpass123",
+            empresa=empresa,
+            rol_usuario="ADMINISTRADOR",
+        )
+        cal = Calibracion.objects.create(
+            equipo=equipo,
+            fecha_calibracion=date.today(),
+            nombre_proveedor="Lab",
+            resultado="Aprobado",
+            creado_por=admin,
+            confirmacion_estado_aprobacion='pendiente',
+            confirmacion_metrologica_datos={'puntos': [1]},
+        )
+        cal.confirmacion_metrologica_pdf.save(
+            'test.pdf', ContentFile(b'%PDF-1.4'), save=True,
+        )
+
+        client = Client()
+        client.login(username="admin_auto", password="testpass123")
+
+        url = reverse('core:aprobar_confirmacion', args=[cal.id])
+        response = client.post(url)
+        assert response.status_code == 403
+
+        cal.refresh_from_db()
+        assert cal.confirmacion_estado_aprobacion == 'pendiente'
+
+    def test_tecnico_no_puede_aprobar_comprobacion(self, tecnico_client, comprobacion_pendiente):
+        url = reverse('core:aprobar_comprobacion', args=[comprobacion_pendiente.id])
+        response = tecnico_client.post(url)
+
+        assert response.status_code == 403
+
+        comprobacion_pendiente.refresh_from_db()
+        assert comprobacion_pendiente.estado_aprobacion == 'pendiente'
+
+    def test_rechazar_comprobacion_sin_observaciones_falla(self, admin_client, comprobacion_pendiente):
+        url = reverse('core:rechazar_comprobacion', args=[comprobacion_pendiente.id])
+        response = admin_client.post(
+            url,
+            data=json.dumps({'observaciones': ''}),
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+
+        comprobacion_pendiente.refresh_from_db()
+        assert comprobacion_pendiente.estado_aprobacion == 'pendiente'
+
+
+# ===================== Tests de puede_aprobar con GERENCIA =====================
+
+@pytest.mark.django_db
+class TestPuedeAprobarGerencia:
+
+    def test_gerencia_puede_aprobar(self, empresa, calibracion_con_confirmacion):
+        from core.views.aprobaciones import puede_aprobar
+        gerente = CustomUser.objects.create_user(
+            username="gerente_apr",
+            email="gerente_apr@test.com",
+            password="testpass123",
+            empresa=empresa,
+            rol_usuario="GERENCIA",
+        )
+        assert puede_aprobar(gerente, calibracion_con_confirmacion) is True
+
+    def test_gerencia_no_auto_aprueba(self, empresa, equipo):
+        from datetime import date
+        from core.views.aprobaciones import puede_aprobar
+
+        gerente = CustomUser.objects.create_user(
+            username="gerente_self",
+            email="gerente_self@test.com",
+            password="testpass123",
+            empresa=empresa,
+            rol_usuario="GERENCIA",
+        )
+        cal = Calibracion.objects.create(
+            equipo=equipo,
+            fecha_calibracion=date.today(),
+            nombre_proveedor="Lab",
+            resultado="Aprobado",
+            creado_por=gerente,
+            confirmacion_estado_aprobacion='pendiente',
+        )
+        assert puede_aprobar(gerente, cal) is False

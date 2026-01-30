@@ -382,6 +382,9 @@
                 <li><a href="{% url 'core:informes' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'informes' %}active{% endif %}">
                     <i class="fas fa-chart-line"></i> Informes
                 </a></li>
+                <li><a href="{% url 'core:calendario_actividades' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'calendario_actividades' %}active{% endif %}">
+                    <i class="fas fa-calendar-alt"></i> Calendario
+                </a></li>
                 <li><a href="{% url 'core:aprobaciones' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'aprobaciones' %}active{% endif %}">
                     <i class="fas fa-check-circle"></i> Aprobaciones
                 </a></li>
