@@ -575,6 +575,15 @@ def _process_calibracion_files(calibracion, files):
             default_storage.save(ruta_final, archivo_subido)
             setattr(calibracion, campo, ruta_final)
 
+    # Documentos subidos manualmente NO entran en flujo de aprobación.
+    # Se establece estado_aprobacion=None para excluirlos.
+    if 'confirmacion_metrologica_pdf' in files:
+        calibracion.confirmacion_estado_aprobacion = None
+        calibracion.confirmacion_metrologica_datos = None
+    if 'intervalos_calibracion_pdf' in files:
+        calibracion.intervalos_estado_aprobacion = None
+        calibracion.intervalos_calibracion_datos = None
+
 
 def _process_single_file(instance, files, field_name):
     """Procesa y guarda un solo archivo PDF."""

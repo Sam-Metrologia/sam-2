@@ -68,7 +68,7 @@ def equipo(empresa):
 
 @pytest.fixture
 def calibracion_con_confirmacion(equipo, tecnico_user):
-    """Calibración con confirmación metrológica pendiente de aprobación."""
+    """Calibración con confirmación metrológica pendiente de aprobación (generada por plataforma)."""
     from datetime import date
     cal = Calibracion.objects.create(
         equipo=equipo,
@@ -77,6 +77,7 @@ def calibracion_con_confirmacion(equipo, tecnico_user):
         resultado="Aprobado",
         creado_por=tecnico_user,
         confirmacion_estado_aprobacion='pendiente',
+        confirmacion_metrologica_datos={'puntos_medicion': [{'valor': 1.0}]},
     )
     cal.confirmacion_metrologica_pdf.save(
         'test_confirmacion.pdf',
@@ -88,7 +89,7 @@ def calibracion_con_confirmacion(equipo, tecnico_user):
 
 @pytest.fixture
 def calibracion_con_intervalos(equipo, tecnico_user):
-    """Calibración con intervalos pendientes de aprobación."""
+    """Calibración con intervalos pendientes de aprobación (generada por plataforma)."""
     from datetime import date
     cal = Calibracion.objects.create(
         equipo=equipo,
@@ -97,6 +98,7 @@ def calibracion_con_intervalos(equipo, tecnico_user):
         resultado="Aprobado",
         creado_por=tecnico_user,
         intervalos_estado_aprobacion='pendiente',
+        intervalos_calibracion_datos={'metodo': 'test', 'puntos_medicion': []},
     )
     cal.intervalos_calibracion_pdf.save(
         'test_intervalos.pdf',
@@ -108,7 +110,7 @@ def calibracion_con_intervalos(equipo, tecnico_user):
 
 @pytest.fixture
 def comprobacion_pendiente(equipo, tecnico_user):
-    """Comprobación metrológica pendiente de aprobación."""
+    """Comprobación metrológica pendiente de aprobación (generada por plataforma)."""
     from datetime import date
     comp = Comprobacion.objects.create(
         equipo=equipo,
@@ -116,6 +118,7 @@ def comprobacion_pendiente(equipo, tecnico_user):
         resultado="Aprobado",
         creado_por=tecnico_user,
         estado_aprobacion='pendiente',
+        datos_comprobacion={'puntos_medicion': [{'valor': 1.0, 'conformidad': 'CONFORME'}]},
     )
     comp.comprobacion_pdf.save(
         'test_comprobacion.pdf',
