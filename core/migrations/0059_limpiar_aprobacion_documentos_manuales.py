@@ -1,12 +1,14 @@
 """
-Migración de datos: Limpiar estado de aprobación de documentos manuales.
+Migración: Permitir null en estado_aprobacion de Comprobacion y limpiar
+documentos manuales del flujo de aprobación.
 
 Los documentos subidos manualmente (sin datos JSON) no deben estar en el
-flujo de aprobación. Esta migración establece su estado como NULL para
-que no aparezcan en la página de aprobaciones.
+flujo de aprobación. Esta migración:
+1. Permite NULL en Comprobacion.estado_aprobacion (igual que Calibracion)
+2. Establece estado_aprobacion=NULL para documentos sin datos JSON
 """
 
-from django.db import migrations
+from django.db import migrations, models
 
 
 def limpiar_aprobacion_documentos_manuales(apps, schema_editor):
@@ -22,7 +24,6 @@ def limpiar_aprobacion_documentos_manuales(apps, schema_editor):
         confirmacion_metrologica_pdf__isnull=False,
         confirmacion_estado_aprobacion='pendiente',
     ).filter(
-        # Sin datos JSON = subida manual
         confirmacion_metrologica_datos__isnull=True
     )
     count_conf = cal_confirmaciones.update(confirmacion_estado_aprobacion=None)
@@ -105,6 +106,24 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Paso 1: Permitir NULL en estado_aprobacion de Comprobacion
+        migrations.AlterField(
+            model_name='comprobacion',
+            name='estado_aprobacion',
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ('pendiente', 'Pendiente de Aprobación'),
+                    ('aprobado', 'Aprobado'),
+                    ('rechazado', 'Rechazado'),
+                ],
+                default='pendiente',
+                max_length=20,
+                null=True,
+                verbose_name='Estado de Aprobación',
+            ),
+        ),
+        # Paso 2: Limpiar datos de documentos manuales
         migrations.RunPython(
             limpiar_aprobacion_documentos_manuales,
             reverse_code=revertir,

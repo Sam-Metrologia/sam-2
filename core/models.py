@@ -2197,6 +2197,8 @@ class Comprobacion(models.Model):
             ('rechazado', 'Rechazado')
         ],
         default='pendiente',
+        null=True,
+        blank=True,
         verbose_name="Estado de Aprobación"
     )
     observaciones_rechazo = models.TextField(
