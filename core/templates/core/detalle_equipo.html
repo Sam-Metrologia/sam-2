@@ -302,10 +302,14 @@
                                             <span class="text-red-600 text-xs" title="Rechazado: {{ cal.confirmacion_observaciones_rechazo }}">
                                                 <i class="fas fa-times-circle mr-1"></i> Confirmación Rechazada
                                             </span>
-                                        {% else %}
+                                        {% elif cal.confirmacion_estado_aprobacion == 'pendiente' %}
                                             <span class="text-yellow-600 text-xs" title="Pendiente de aprobación por Admin/Gerente">
                                                 <i class="fas fa-clock mr-1"></i> Confirmación Pendiente
                                             </span>
+                                        {% else %}
+                                            <a href="{{ cal.confirmacion_metrologica_pdf.url }}" target="_blank" class="text-blue-600 hover:underline text-xs">
+                                                <i class="fas fa-file-pdf mr-1"></i> Confirmación Metrológica
+                                            </a>
                                         {% endif %}
                                     {% endif %}
                                     {% if cal.intervalos_calibracion_pdf %}
@@ -317,10 +321,14 @@
                                             <span class="text-red-600 text-xs" title="Rechazado: {{ cal.intervalos_observaciones_rechazo }}">
                                                 <i class="fas fa-times-circle mr-1"></i> Intervalos Rechazados
                                             </span>
-                                        {% else %}
+                                        {% elif cal.intervalos_estado_aprobacion == 'pendiente' %}
                                             <span class="text-yellow-600 text-xs" title="Pendiente de aprobación por Admin/Gerente">
                                                 <i class="fas fa-clock mr-1"></i> Intervalos Pendientes
                                             </span>
+                                        {% else %}
+                                            <a href="{{ cal.intervalos_calibracion_pdf.url }}" target="_blank" class="text-purple-600 hover:underline text-xs">
+                                                <i class="fas fa-file-pdf mr-1"></i> Intervalos de Calibración
+                                            </a>
                                         {% endif %}
                                     {% endif %}
                                     {% if not cal.documento_calibracion and not cal.confirmacion_metrologica_pdf and not cal.intervalos_calibracion_pdf %}
@@ -526,10 +534,14 @@
                                             <span class="text-red-600 text-xs" title="Rechazado: {{ comp.observaciones_rechazo }}">
                                                 <i class="fas fa-times-circle mr-1"></i> Comprobación Rechazada
                                             </span>
-                                        {% else %}
+                                        {% elif comp.estado_aprobacion == 'pendiente' %}
                                             <span class="text-yellow-600 text-xs" title="Pendiente de aprobación por Admin/Gerente">
                                                 <i class="fas fa-clock mr-1"></i> Comprobación Pendiente
                                             </span>
+                                        {% else %}
+                                            <a href="{{ comp.comprobacion_pdf.url }}" target="_blank" class="text-blue-600 hover:underline text-xs">
+                                                <i class="fas fa-file-pdf mr-1"></i> Comprobación Metrológica
+                                            </a>
                                         {% endif %}
                                     {% endif %}
                                     {% if comp.documento_comprobacion %}
