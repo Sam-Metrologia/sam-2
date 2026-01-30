@@ -58,6 +58,12 @@
                         {{ form.responsable }}
                         {% for error in form.responsable.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
                     </div>
+                    <div>
+                        <label for="{{ form.costo_comprobacion.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.costo_comprobacion.label }}:</label>
+                        {{ form.costo_comprobacion }}
+                        {% if form.costo_comprobacion.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.costo_comprobacion.help_text }}</p>{% endif %}
+                        {% for error in form.costo_comprobacion.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
                 </div>
             </div>
 

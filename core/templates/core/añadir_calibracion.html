@@ -52,6 +52,12 @@
                         {{ form.numero_certificado }}
                         {% for error in form.numero_certificado.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
                     </div>
+                    <div>
+                        <label for="{{ form.costo_calibracion.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.costo_calibracion.label }}:</label>
+                        {{ form.costo_calibracion }}
+                        {% if form.costo_calibracion.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.costo_calibracion.help_text }}</p>{% endif %}
+                        {% for error in form.costo_calibracion.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
                 </div>
             </div>
 

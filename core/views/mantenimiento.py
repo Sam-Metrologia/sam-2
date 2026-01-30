@@ -157,6 +157,7 @@ def guardar_mantenimiento_json(request, equipo_id):
             mantenimiento.tipo_mantenimiento = datos.get('tipo_mantenimiento', mantenimiento.tipo_mantenimiento)
             mantenimiento.responsable = datos.get('responsable', mantenimiento.responsable)
             mantenimiento.descripcion = datos.get('descripcion', mantenimiento.descripcion)
+            mantenimiento.costo = datos.get('costo') or None
         else:
             # Crear nuevo mantenimiento
             mantenimiento = Mantenimiento.objects.create(
@@ -165,6 +166,7 @@ def guardar_mantenimiento_json(request, equipo_id):
                 tipo_mantenimiento=datos.get('tipo_mantenimiento', 'Preventivo'),
                 responsable=datos.get('responsable', ''),
                 descripcion=datos.get('descripcion', ''),
+                costo=datos.get('costo') or None,
             )
 
         # Guardar formato de MANTENIMIENTO en la empresa (aplica a todos los equipos de la empresa)

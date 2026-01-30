@@ -506,7 +506,7 @@ class CalibracionForm(forms.ModelForm):
             'intervalos_fecha_aprobacion_ajustable',
             # Campos internos
             'creado_por', 'confirmacion_metrologica_datos', 'intervalos_calibracion_datos',
-            'costo_calibracion', 'tiempo_empleado_horas', 'tecnico_asignado_sam',
+            'tiempo_empleado_horas', 'tecnico_asignado_sam',
         )
         widgets = {
             'proveedor': forms.Select(attrs={'class': 'form-select'}),
@@ -517,6 +517,7 @@ class CalibracionForm(forms.ModelForm):
             'confirmacion_metrologica_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
             'intervalos_calibracion_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
             'observaciones': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'maxlength': '1000'}),
+            'costo_calibracion': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'min': '0', 'placeholder': '0.00'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -622,7 +623,7 @@ class ComprobacionForm(forms.ModelForm):
             'fecha_realizacion', 'fecha_emision', 'fecha_aprobacion_ajustable',
             # Campos internos
             'comprobacion_pdf', 'datos_comprobacion',
-            'costo_comprobacion', 'tiempo_empleado_horas', 'tecnico_asignado_sam',
+            'tiempo_empleado_horas', 'tecnico_asignado_sam',
             'equipo_referencia_nombre', 'equipo_referencia_marca',
             'equipo_referencia_modelo', 'equipo_referencia_certificado',
             # Campos de terceros (gestionados en comprobacion_metrologica view)
@@ -640,6 +641,7 @@ class ComprobacionForm(forms.ModelForm):
             'documento_externo': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf,.xlsx,.xls'}),
             'analisis_interno': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf,.xlsx,.xls'}),
             'documento_comprobacion': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
+            'costo_comprobacion': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'min': '0', 'placeholder': '0.00'}),
         }
 
     def __init__(self, *args, **kwargs):
