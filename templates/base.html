@@ -132,17 +132,26 @@
 
         /* Main Content */
         .main-content {
-            margin-left: 250px; /* Default margin for desktop */
+            margin-left: 250px;
             transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
-            padding: 0; /* Padding se manejará dentro de main > div */
-            width: calc(100% - 250px); /* Default width for desktop */
-            min-height: 100vh; /* Asegura que el contenido principal ocupe toda la altura */
+            padding: 0;
+            width: calc(100% - 250px);
+            min-height: 100vh;
             display: flex;
-            flex-direction: column; /* Contenido principal como columna flex */
+            flex-direction: column;
+        }
+        /* Forzar ancho con ID selector (máxima especificidad) */
+        #main-content {
+            max-width: calc(100% - 250px);
+            min-width: 0;
+            box-sizing: border-box;
         }
         .main-content.expanded {
             margin-left: 0;
             width: 100%;
+        }
+        #main-content.expanded {
+            max-width: 100%;
         }
 
         /* Navbar */
@@ -265,23 +274,36 @@
             color: var(--color-error);
         }
 
-        /* Footer */
-        .main-footer {
-            margin-top: auto; /* Empuja el footer al final */
+        /* Contenedor: forzar ancho completo dentro del main-content */
+        #main-content .container {
+            max-width: 100% !important;
+        }
+        /* Main: forzar flex-grow y scroll horizontal para tablas anchas */
+        #main-content > main {
+            flex: 1 1 auto !important;
+            overflow-x: auto;
+            min-width: 0;
+        }
+
+        /* Footer: forzar centrado y ancho completo con máxima especificidad */
+        #main-content > footer.main-footer {
+            margin-top: auto;
             padding: 20px;
-            text-align: center;
+            text-align: center !important;
+            width: 100% !important;
             background-color: var(--bg-secondary);
             border-top: 1px solid var(--border-color);
             color: var(--text-secondary);
             font-size: 0.9rem;
             box-shadow: var(--shadow-md);
+            flex-shrink: 0;
         }
-        .main-footer a {
+        #main-content > footer.main-footer a {
             color: var(--accent-primary);
             text-decoration: none;
             font-weight: 600;
         }
-        .main-footer a:hover {
+        #main-content > footer.main-footer a:hover {
             text-decoration: underline;
             color: var(--accent-primary-hover);
         }
@@ -302,9 +324,11 @@
                 transform: translateX(0);
                 box-shadow: 2px 0 10px rgba(0,0,0,0.15); /* Sombra al mostrar en móvil */
             }
-            .main-content {
-                margin-left: 0; /* Siempre 0 en móvil */
-                width: 100%; /* Siempre 100% en móvil */
+            .main-content,
+            #main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
             }
             /* Cuando el sidebar está abierto en móvil, el main-content no cambia su margen,
                simplemente el sidebar se superpone. */
@@ -357,6 +381,9 @@
                 {% endif %}
                 <li><a href="{% url 'core:informes' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'informes' %}active{% endif %}">
                     <i class="fas fa-chart-line"></i> Informes
+                </a></li>
+                <li><a href="{% url 'core:aprobaciones' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'aprobaciones' %}active{% endif %}">
+                    <i class="fas fa-check-circle"></i> Aprobaciones
                 </a></li>
                 {% if user.is_superuser %}
                 <li><a href="{% url 'core:admin_dashboard' %}" class="{% if 'admin' in request.resolver_match.url_name %}active{% endif %}">

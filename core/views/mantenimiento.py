@@ -109,6 +109,9 @@ def mantenimiento_actividades_view(request, equipo_id):
     formato_version = equipo.empresa.mantenimiento_version or '01'
     formato_fecha = equipo.empresa.mantenimiento_fecha_formato or None
 
+    # Obtener el campo _display que preserva el formato original (YYYY-MM o YYYY-MM-DD)
+    formato_fecha_display = equipo.empresa.mantenimiento_fecha_formato_display or (formato_fecha.strftime('%Y-%m-%d') if formato_fecha else '')
+
     context = {
         'equipo': equipo,
         'mantenimiento': mantenimiento,
@@ -120,6 +123,7 @@ def mantenimiento_actividades_view(request, equipo_id):
         'formato_codigo': formato_codigo,
         'formato_version': formato_version,
         'formato_fecha': formato_fecha,
+        'formato_fecha_display': formato_fecha_display,
     }
 
     return render(request, 'core/mantenimiento_actividades.html', context)
@@ -171,8 +175,18 @@ def guardar_mantenimiento_json(request, equipo_id):
             if 'formato_version' in datos and datos['formato_version']:
                 empresa.mantenimiento_version = datos['formato_version']
             if 'formato_fecha' in datos and datos['formato_fecha']:
+                fecha_str = datos['formato_fecha'].strip()
+                # Guardar el campo _display con el formato original (YYYY-MM o YYYY-MM-DD)
+                empresa.mantenimiento_fecha_formato_display = fecha_str
                 try:
-                    empresa.mantenimiento_fecha_formato = datetime.strptime(datos['formato_fecha'], '%Y-%m-%d').date()
+                    # Para el DateField, necesitamos una fecha completa
+                    import re
+                    if re.match(r'^\d{4}-\d{2}$', fecha_str):
+                        # Formato YYYY-MM: agregar día 01
+                        empresa.mantenimiento_fecha_formato = datetime.strptime(fecha_str + '-01', '%Y-%m-%d').date()
+                    else:
+                        # Formato YYYY-MM-DD
+                        empresa.mantenimiento_fecha_formato = datetime.strptime(fecha_str, '%Y-%m-%d').date()
                 except:
                     pass
             empresa.save()
@@ -242,14 +256,15 @@ def generar_pdf_mantenimiento(request, equipo_id):
             logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
             logo_empresa_url = None
 
-        # Formatear fecha del formato si existe (formato: YYYY-MM-DD)
+        # Formatear fecha del formato si existe
+        # IMPORTANTE: Respetar el campo _display que puede ser YYYY-MM o YYYY-MM-DD
         formato_fecha_formateada = None
-        if datos_mantenimiento.get('formato_fecha'):
-            try:
-                fecha_obj = datetime.strptime(datos_mantenimiento['formato_fecha'], '%Y-%m-%d')
-                formato_fecha_formateada = fecha_obj.strftime('%Y-%m-%d')
-            except:
-                formato_fecha_formateada = datos_mantenimiento['formato_fecha']
+        # Primero intentar usar el campo _display que preserva el formato original
+        if equipo.empresa.mantenimiento_fecha_formato_display:
+            formato_fecha_formateada = equipo.empresa.mantenimiento_fecha_formato_display
+        elif datos_mantenimiento.get('formato_fecha'):
+            # Usar el valor existente sin forzar formato
+            formato_fecha_formateada = datos_mantenimiento['formato_fecha']
 
         # Preparar datos para el template (solo checklist, sin gráficas)
         context = {

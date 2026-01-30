@@ -8,7 +8,7 @@
 {% block content %}
 <div class="container mx-auto p-4 sm:p-6 lg:p-8">
     <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Formulario de Mantenimiento</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Formulario de Mantenimiento</h2>
 
         {% if messages %}
             <div class="mb-4">
@@ -20,33 +20,96 @@
             </div>
         {% endif %}
 
-        <form method="post" enctype="multipart/form-data" class="space-y-6">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            
-            {# Mostrar el código interno del equipo (no es un campo del formulario de mantenimiento) #}
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Código Interno del Equipo:</label>
-                <p class="form-input bg-gray-100 cursor-not-allowed">{{ equipo.codigo_interno }}</p>
+
+            {# === SECCIÓN: Información del Equipo === #}
+            <div class="bg-gray-50 border-l-4 border-orange-500 p-4 rounded mb-5">
+                <p class="text-sm text-gray-700"><strong>Equipo:</strong> {{ equipo.nombre }} &mdash; <strong>Código:</strong> {{ equipo.codigo_interno }}</p>
             </div>
 
-            {% for field in form %}
-                <div class="mb-4">
-                    <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">{{ field.label }}:</label>
-                    {{ field }}
-                    {% if field.help_text %}
-                        <p class="text-gray-600 text-xs italic mt-1">{{ field.help_text }}</p>
-                    {% endif %}
-                    {% for error in field.errors %}
-                        <p class="text-red-500 text-xs italic">{{ error }}</p>
-                    {% endfor %}
+            {# === SECCIÓN: Datos del Mantenimiento === #}
+            <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                <h3 class="text-sm font-semibold text-orange-700 uppercase tracking-wide mb-3">Datos del Mantenimiento</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                        <label for="{{ form.fecha_mantenimiento.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.fecha_mantenimiento.label }}:</label>
+                        {{ form.fecha_mantenimiento }}
+                        {% if form.fecha_mantenimiento.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.fecha_mantenimiento.help_text }}</p>{% endif %}
+                        {% for error in form.fecha_mantenimiento.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.tipo_mantenimiento.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.tipo_mantenimiento.label }}:</label>
+                        {{ form.tipo_mantenimiento }}
+                        {% for error in form.tipo_mantenimiento.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.proveedor.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.proveedor.label }}:</label>
+                        {{ form.proveedor }}
+                        {% for error in form.proveedor.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.nombre_proveedor.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.nombre_proveedor.label }}:</label>
+                        {{ form.nombre_proveedor }}
+                        {% for error in form.nombre_proveedor.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.responsable.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.responsable.label }}:</label>
+                        {{ form.responsable }}
+                        {% for error in form.responsable.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.costo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.costo.label }}:</label>
+                        {{ form.costo }}
+                        {% if form.costo.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.costo.help_text }}</p>{% endif %}
+                        {% for error in form.costo.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
                 </div>
-            {% endfor %}
+            </div>
 
-            <div class="flex items-center justify-end space-x-4">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+            {# === SECCIÓN: Descripción === #}
+            <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                <h3 class="text-sm font-semibold text-orange-700 uppercase tracking-wide mb-3">Descripción</h3>
+                <div>
+                    {{ form.descripcion }}
+                    {% if form.descripcion.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.descripcion.help_text }}</p>{% endif %}
+                    {% for error in form.descripcion.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                </div>
+            </div>
+
+            {# === SECCIÓN: Documentos === #}
+            <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                <h3 class="text-sm font-semibold text-orange-700 uppercase tracking-wide mb-3">Documentos</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                        <label for="{{ form.documento_externo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.documento_externo.label }}:</label>
+                        {{ form.documento_externo }}
+                        {% for error in form.documento_externo.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.analisis_interno.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.analisis_interno.label }}:</label>
+                        {{ form.analisis_interno }}
+                        {% for error in form.analisis_interno.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.documento_mantenimiento.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.documento_mantenimiento.label }}:</label>
+                        {{ form.documento_mantenimiento }}
+                        {% for error in form.documento_mantenimiento.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% if form.non_field_errors %}
+                <div class="bg-red-50 border-l-4 border-red-500 p-3 mb-4 rounded">
+                    {% for error in form.non_field_errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="flex items-center justify-end space-x-4 pt-2">
+                <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300">
                     Guardar Mantenimiento
                 </button>
-                <a href="{% url 'core:detalle_equipo' equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                <a href="{% url 'core:detalle_equipo' equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
                     Cancelar
                 </a>
             </div>
@@ -54,4 +117,3 @@
     </div>
 </div>
 {% endblock %}
-

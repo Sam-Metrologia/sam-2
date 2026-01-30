@@ -246,6 +246,13 @@ class Empresa(models.Model):
         null=True,
         verbose_name="Fecha de Versión del Formato (Empresa) - DEPRECADO"
     )
+    formato_fecha_version_empresa_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Empresa (General)",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
+    )
     formato_codificacion_empresa = models.CharField(
         max_length=100,
         blank=True,
@@ -276,6 +283,13 @@ class Empresa(models.Model):
         verbose_name="Fecha del Formato - Confirmación Metrológica",
         help_text="Fecha de emisión/actualización del formato de confirmación metrológica"
     )
+    confirmacion_fecha_formato_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Confirmación",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
+    )
 
     # Campos específicos para INTERVALOS DE CALIBRACIÓN
     intervalos_codigo = models.CharField(
@@ -299,6 +313,13 @@ class Empresa(models.Model):
         null=True,
         verbose_name="Fecha del Formato - Intervalos de Calibración",
         help_text="Fecha de emisión/actualización del formato de intervalos de calibración"
+    )
+    intervalos_fecha_formato_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Intervalos",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
     )
 
     # Campos específicos para MANTENIMIENTO
@@ -324,6 +345,13 @@ class Empresa(models.Model):
         verbose_name="Fecha del Formato - Mantenimiento",
         help_text="Fecha de emisión/actualización del formato de mantenimiento"
     )
+    mantenimiento_fecha_formato_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Mantenimiento",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
+    )
 
     # Campos específicos para COMPROBACIÓN METROLÓGICA
     comprobacion_codigo = models.CharField(
@@ -348,7 +376,53 @@ class Empresa(models.Model):
         verbose_name="Fecha del Formato - Comprobación Metrológica",
         help_text="Fecha de emisión/actualización del formato de comprobación metrológica"
     )
+    comprobacion_fecha_formato_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Comprobación",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
+    )
 
+    # Campos específicos para LISTADO DE EQUIPOS
+    listado_codigo = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="SAM-LIST-001",
+        verbose_name="Código Formato - Listado de Equipos",
+        help_text="Código del formato de listado de equipos (ej: SAM-LIST-001)"
+    )
+    listado_version = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        default="01",
+        verbose_name="Versión Formato - Listado de Equipos",
+        help_text="Versión del formato de listado de equipos (ej: 01, 02, 03)"
+    )
+    listado_fecha_formato = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha del Formato - Listado de Equipos",
+        help_text="Fecha de emisión/actualización del formato de listado de equipos"
+    )
+    listado_fecha_formato_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Listado de Equipos",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
+    )
+
+    # Prefijo para consecutivo de comprobaciones
+    comprobacion_prefijo_consecutivo = models.CharField(
+        max_length=10,
+        default='CB',
+        blank=True,
+        verbose_name="Prefijo Consecutivo Comprobaciones",
+        help_text="Prefijo para numerar comprobaciones (ej: CB, COMP). Resultado: CB-001, CB-002..."
+    )
 
     # Campos para la lógica de suscripción (Simplificados - DEPRECADOS)
     es_periodo_prueba = models.BooleanField(default=True, verbose_name="¿Es Período de Prueba? (Deprecado)")
@@ -1422,6 +1496,7 @@ class Equipo(models.Model):
     marca = models.CharField(max_length=100, blank=True, null=True, verbose_name="Marca")
     modelo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
     numero_serie = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número de Serie")
+    proveedor = models.CharField(max_length=200, blank=True, null=True, verbose_name="Proveedor", help_text="Empresa que vendió el equipo (ej: Multiples, Amazon, etc.)")
 
     # Campo para la ubicación - ahora como TextField
     ubicacion = models.CharField(max_length=255, blank=True, null=True, verbose_name="Ubicación") # Ahora CharField
@@ -1447,6 +1522,13 @@ class Equipo(models.Model):
     # Campos de formato (para hoja de vida)
     version_formato = models.CharField(max_length=50, blank=True, null=True, verbose_name="Versión del Formato")
     fecha_version_formato = models.DateField(blank=True, null=True, verbose_name="Fecha de Versión del Formato")
+    fecha_version_formato_display = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name="Fecha Formato Display - Hoja de Vida",
+        help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
+    )
     codificacion_formato = models.CharField(max_length=50, blank=True, null=True, verbose_name="Codificación del Formato")
 
     # Campos para fechas de próximas actividades y frecuencias (Frecuencia en DecimalField)
@@ -1704,6 +1786,12 @@ class Calibracion(models.Model):
         verbose_name="Datos de Confirmación Metrológica",
         help_text="Datos JSON con puntos de medición, incertidumbres y cálculos"
     )
+    intervalos_calibracion_datos = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Datos de Intervalos de Calibración",
+        help_text="Datos JSON con método, cálculos y decisión de intervalos"
+    )
     observaciones = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
@@ -1730,6 +1818,153 @@ class Calibracion(models.Model):
         blank=True,
         verbose_name="Técnico Asignado",
         help_text="Técnico que supervisó la calibración"
+    )
+
+    # Sistema de Aprobación - Usuario que creó los documentos
+    creado_por = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='calibraciones_creadas',
+        verbose_name="Creado por",
+        help_text="Usuario que creó el documento"
+    )
+
+    # DEPRECATED: Campos legacy mantenidos por compatibilidad
+    # Usar confirmacion_* o intervalos_* según el tipo de documento
+    aprobado_por = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='calibraciones_aprobadas',
+        verbose_name="Aprobado por (legacy)",
+        help_text="DEPRECATED - Usar confirmacion_aprobado_por o intervalos_aprobado_por"
+    )
+    fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación (legacy)"
+    )
+    estado_aprobacion = models.CharField(
+        max_length=20,
+        choices=[
+            ('pendiente', 'Pendiente de Aprobación'),
+            ('aprobado', 'Aprobado'),
+            ('rechazado', 'Rechazado')
+        ],
+        default='pendiente',
+        verbose_name="Estado de Aprobación (legacy)"
+    )
+    observaciones_rechazo = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Observaciones de Rechazo (legacy)"
+    )
+
+    # Sistema de Aprobación - CONFIRMACIÓN METROLÓGICA
+    confirmacion_estado_aprobacion = models.CharField(
+        max_length=20,
+        choices=[
+            ('pendiente', 'Pendiente de Aprobación'),
+            ('aprobado', 'Aprobado'),
+            ('rechazado', 'Rechazado')
+        ],
+        default='pendiente',
+        null=True,
+        blank=True,
+        verbose_name="Estado de Aprobación - Confirmación"
+    )
+    confirmacion_aprobado_por = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='confirmaciones_aprobadas',
+        verbose_name="Aprobado por - Confirmación"
+    )
+    confirmacion_fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación - Confirmación"
+    )
+    confirmacion_observaciones_rechazo = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Observaciones de Rechazo - Confirmación"
+    )
+
+    # Fechas ajustables para auditoría - CONFIRMACIÓN
+    confirmacion_fecha_realizacion = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Realización - Confirmación",
+        help_text="Fecha en que se realizó la actividad (ajustable para auditoría)"
+    )
+    confirmacion_fecha_emision = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Emisión PDF - Confirmación",
+        help_text="Fecha de emisión del documento (ajustable para auditoría)"
+    )
+    confirmacion_fecha_aprobacion_ajustable = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación Ajustable - Confirmación",
+        help_text="Fecha de aprobación mostrada en PDF (ajustable para auditoría)"
+    )
+
+    # Sistema de Aprobación - INTERVALOS DE CALIBRACIÓN
+    intervalos_estado_aprobacion = models.CharField(
+        max_length=20,
+        choices=[
+            ('pendiente', 'Pendiente de Aprobación'),
+            ('aprobado', 'Aprobado'),
+            ('rechazado', 'Rechazado')
+        ],
+        default='pendiente',
+        null=True,
+        blank=True,
+        verbose_name="Estado de Aprobación - Intervalos"
+    )
+    intervalos_aprobado_por = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='intervalos_aprobados',
+        verbose_name="Aprobado por - Intervalos"
+    )
+    intervalos_fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación - Intervalos"
+    )
+    intervalos_observaciones_rechazo = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Observaciones de Rechazo - Intervalos"
+    )
+
+    # Fechas ajustables para auditoría - INTERVALOS
+    intervalos_fecha_realizacion = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Realización - Intervalos",
+        help_text="Fecha en que se realizó la actividad (ajustable para auditoría)"
+    )
+    intervalos_fecha_emision = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Emisión PDF - Intervalos",
+        help_text="Fecha de emisión del documento (ajustable para auditoría)"
+    )
+    intervalos_fecha_aprobacion_ajustable = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación Ajustable - Intervalos",
+        help_text="Fecha de aprobación mostrada en PDF (ajustable para auditoría)"
     )
 
     class Meta:
@@ -1808,6 +2043,26 @@ class Mantenimiento(models.Model):
         blank=True,
         verbose_name="Costo Interno",
         help_text="Costo interno para realizar este mantenimiento"
+    )
+
+    # Fechas ajustables para auditoría - MANTENIMIENTO
+    fecha_realizacion = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Realización",
+        help_text="Fecha en que se realizó la actividad (ajustable para auditoría)"
+    )
+    fecha_emision = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Emisión PDF",
+        help_text="Fecha de emisión del documento (ajustable para auditoría)"
+    )
+    fecha_aprobacion_ajustable = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación Ajustable",
+        help_text="Fecha de aprobación mostrada en PDF (ajustable para auditoría)"
     )
 
     class Meta:
@@ -1910,6 +2165,120 @@ class Comprobacion(models.Model):
         help_text="Número de certificado de calibración del equipo de referencia"
     )
 
+    # Sistema de Aprobación
+    creado_por = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='comprobaciones_creadas',
+        verbose_name="Creado por",
+        help_text="Usuario que creó el documento"
+    )
+    aprobado_por = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='comprobaciones_aprobadas',
+        verbose_name="Aprobado por",
+        help_text="Usuario que aprobó la comprobación"
+    )
+    fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación"
+    )
+    estado_aprobacion = models.CharField(
+        max_length=20,
+        choices=[
+            ('pendiente', 'Pendiente de Aprobación'),
+            ('aprobado', 'Aprobado'),
+            ('rechazado', 'Rechazado')
+        ],
+        default='pendiente',
+        verbose_name="Estado de Aprobación"
+    )
+    observaciones_rechazo = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Observaciones de Rechazo",
+        help_text="Razón por la cual se rechazó el documento"
+    )
+
+    # Fechas ajustables para auditoría - COMPROBACIÓN
+    fecha_realizacion = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Realización",
+        help_text="Fecha en que se realizó la actividad (ajustable para auditoría)"
+    )
+    fecha_emision = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Emisión PDF",
+        help_text="Fecha de emisión del documento (ajustable para auditoría)"
+    )
+    fecha_aprobacion_ajustable = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación Ajustable",
+        help_text="Fecha de aprobación mostrada en PDF (ajustable para auditoría)"
+    )
+
+    # Consecutivo único por empresa
+    consecutivo = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Consecutivo (interno)",
+        help_text="Número consecutivo interno de comprobación por empresa"
+    )
+
+    consecutivo_texto = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="Consecutivo",
+        help_text="Consecutivo visible en el PDF (texto libre, ej: CB-001, COMP-2026-01)"
+    )
+
+    # Empresa cliente (para comprobaciones a terceros)
+    es_servicio_terceros = models.BooleanField(
+        default=False,
+        verbose_name="Servicio a terceros",
+        help_text="Indica si esta comprobación es un servicio para un cliente externo"
+    )
+    empresa_cliente = models.ForeignKey(
+        'Empresa',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='comprobaciones_como_cliente',
+        verbose_name="Empresa Cliente (existente)",
+        help_text="Empresa cliente registrada en el sistema"
+    )
+    empresa_cliente_nombre = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Nombre Empresa Cliente",
+        help_text="Nombre de la empresa cliente (si no está registrada)"
+    )
+    empresa_cliente_nit = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name="NIT Empresa Cliente",
+        help_text="NIT de la empresa cliente"
+    )
+    empresa_cliente_direccion = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Dirección Empresa Cliente",
+        help_text="Dirección de la empresa cliente"
+    )
+
     class Meta:
         verbose_name = "Comprobación"
         verbose_name_plural = "Comprobaciones"
@@ -1920,8 +2289,58 @@ class Comprobacion(models.Model):
             ("can_delete_comprobacion", "Can delete comprobacion"),
         ]
 
+    def save(self, *args, **kwargs):
+        # Auto-generar consecutivo numérico por empresa si no existe
+        if self.consecutivo is None and self.equipo and self.equipo.empresa:
+            empresa = self.equipo.empresa
+            ultimo = Comprobacion.objects.filter(
+                equipo__empresa=empresa,
+                consecutivo__isnull=False
+            ).order_by('-consecutivo').values_list('consecutivo', flat=True).first()
+            self.consecutivo = (ultimo or 0) + 1
+
+        # Auto-generar consecutivo_texto si no se proporcionó
+        if not self.consecutivo_texto and self.consecutivo is not None and self.equipo and self.equipo.empresa:
+            prefijo = self.equipo.empresa.comprobacion_prefijo_consecutivo or 'CB'
+            self.consecutivo_texto = f"{prefijo}-{self.consecutivo:03d}"
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Comprobación de {self.equipo.nombre} ({self.fecha_comprobacion})"
+
+    @property
+    def consecutivo_formateado(self):
+        """Retorna el consecutivo visible. Prioriza texto libre, luego formato automático."""
+        if self.consecutivo_texto:
+            return self.consecutivo_texto
+        if self.consecutivo is None:
+            return ''
+        prefijo = 'CB'
+        if self.equipo and self.equipo.empresa:
+            prefijo = self.equipo.empresa.comprobacion_prefijo_consecutivo or 'CB'
+        return f"{prefijo}-{self.consecutivo:03d}"
+
+    @property
+    def nombre_empresa_cliente_display(self):
+        """Retorna el nombre de la empresa cliente (existente o manual)."""
+        if self.empresa_cliente:
+            return self.empresa_cliente.nombre
+        return self.empresa_cliente_nombre or ''
+
+    @property
+    def nit_empresa_cliente_display(self):
+        """Retorna el NIT de la empresa cliente (existente o manual)."""
+        if self.empresa_cliente:
+            return self.empresa_cliente.nit or ''
+        return self.empresa_cliente_nit or ''
+
+    @property
+    def direccion_empresa_cliente_display(self):
+        """Retorna la dirección de la empresa cliente (existente o manual)."""
+        if self.empresa_cliente:
+            return self.empresa_cliente.direccion or ''
+        return self.empresa_cliente_direccion or ''
 
     @property
     def proxima_actividad_para_este_registro(self):

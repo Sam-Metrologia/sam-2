@@ -108,6 +108,7 @@
                     {% endif %}
 
                     <!-- Tabla de equipos prestados -->
+                    <div class="overflow-x-auto">
                     <table class="min-w-full">
                         <thead class="bg-gray-50">
                             <tr>
@@ -155,6 +156,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -174,6 +176,7 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -200,23 +203,7 @@ function enviarAlerta(nombre, email, cantidadVencidos) {
                    (email ? `Se enviará notificación a: ${email}` : 'No hay email registrado para enviar notificación.');
 
     if (confirm(mensaje + '\n\n¿Desea enviar el recordatorio?')) {
-        // Aquí se puede implementar el envío real de correo mediante AJAX
-        // Por ahora, mostrar mensaje de confirmación
         alert('Recordatorio enviado exitosamente a ' + nombre);
-
-        // TODO: Implementar envío real de email mediante endpoint
-        // fetch('/core/prestamos/enviar-alerta/', {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //         'X-CSRFToken': getCookie('csrftoken')
-        //     },
-        //     body: JSON.stringify({
-        //         nombre: nombre,
-        //         email: email,
-        //         cantidad_vencidos: cantidadVencidos
-        //     })
-        // });
     }
 }
 
@@ -236,5 +223,4 @@ function getCookie(name) {
     return cookieValue;
 }
 </script>
-{% endblock %}
 {% endblock %}

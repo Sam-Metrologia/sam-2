@@ -1,44 +1,104 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Añadir Calibración{% endblock %} {# Cambiado el título para reflejar "Añadir" #}
+{% block title %}Añadir Calibración{% endblock %}
 
 {% block header_title %}Añadir Calibración para {{ equipo.nombre }} ({{ equipo.codigo_interno }}){% endblock %}
 
 {% block content %}
 <div class="container mx-auto p-4 sm:p-6 lg:p-8">
     <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Formulario de Nueva Calibración</h2> {# Cambiado el título #}
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Formulario de Nueva Calibración</h2>
 
         {% include 'core/includes/messages_display.html' %}
 
-        <form method="post" enctype="multipart/form-data" class="space-y-6">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            
-            {# Mostrar el código interno del equipo (no es un campo del formulario de calibración) #}
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Código Interno del Equipo:</label>
-                <p class="form-input bg-gray-100 cursor-not-allowed">{{ equipo.codigo_interno }}</p>
+
+            {# === SECCIÓN: Información del Equipo === #}
+            <div class="bg-gray-50 border-l-4 border-blue-500 p-4 rounded mb-5">
+                <p class="text-sm text-gray-700"><strong>Equipo:</strong> {{ equipo.nombre }} &mdash; <strong>Código:</strong> {{ equipo.codigo_interno }}</p>
             </div>
 
-            {% for field in form %}
-                <div class="mb-4">
-                    <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">{{ field.label }}:</label>
-                    {{ field }}
-                    {% if field.help_text %}
-                        <p class="text-gray-600 text-xs italic mt-1">{{ field.help_text }}</p>
-                    {% endif %}
-                    {% for error in field.errors %}
-                        <p class="text-red-500 text-xs italic">{{ error }}</p>
-                    {% endfor %}
+            {# === SECCIÓN: Datos de la Calibración === #}
+            <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                <h3 class="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-3">Datos de la Calibración</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                        <label for="{{ form.fecha_calibracion.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.fecha_calibracion.label }}:</label>
+                        {{ form.fecha_calibracion }}
+                        {% if form.fecha_calibracion.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.fecha_calibracion.help_text }}</p>{% endif %}
+                        {% for error in form.fecha_calibracion.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.resultado.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.resultado.label }}:</label>
+                        {{ form.resultado }}
+                        {% for error in form.resultado.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.proveedor.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.proveedor.label }}:</label>
+                        {{ form.proveedor }}
+                        {% if form.proveedor.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.proveedor.help_text }}</p>{% endif %}
+                        {% for error in form.proveedor.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.nombre_proveedor.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.nombre_proveedor.label }}:</label>
+                        {{ form.nombre_proveedor }}
+                        {% if form.nombre_proveedor.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.nombre_proveedor.help_text }}</p>{% endif %}
+                        {% for error in form.nombre_proveedor.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.numero_certificado.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.numero_certificado.label }}:</label>
+                        {{ form.numero_certificado }}
+                        {% for error in form.numero_certificado.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
                 </div>
-            {% endfor %}
+            </div>
 
-            <div class="flex items-center justify-end space-x-4">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
-                    Añadir Calibración {# Cambiado el texto del botón #}
+            {# === SECCIÓN: Documentos === #}
+            <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                <h3 class="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-3">Documentos</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    <div>
+                        <label for="{{ form.documento_calibracion.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.documento_calibracion.label }}:</label>
+                        {{ form.documento_calibracion }}
+                        {% if form.documento_calibracion.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.documento_calibracion.help_text }}</p>{% endif %}
+                        {% for error in form.documento_calibracion.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.confirmacion_metrologica_pdf.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.confirmacion_metrologica_pdf.label }}:</label>
+                        {{ form.confirmacion_metrologica_pdf }}
+                        {% for error in form.confirmacion_metrologica_pdf.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.intervalos_calibracion_pdf.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ form.intervalos_calibracion_pdf.label }}:</label>
+                        {{ form.intervalos_calibracion_pdf }}
+                        {% for error in form.intervalos_calibracion_pdf.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# === SECCIÓN: Observaciones === #}
+            <div class="border border-gray-200 rounded-lg p-4 mb-5">
+                <h3 class="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-3">Observaciones</h3>
+                <div>
+                    {{ form.observaciones }}
+                    {% if form.observaciones.help_text %}<p class="text-gray-500 text-xs mt-1">{{ form.observaciones.help_text }}</p>{% endif %}
+                    {% for error in form.observaciones.errors %}<p class="text-red-500 text-xs">{{ error }}</p>{% endfor %}
+                </div>
+            </div>
+
+            {% if form.non_field_errors %}
+                <div class="bg-red-50 border-l-4 border-red-500 p-3 mb-4 rounded">
+                    {% for error in form.non_field_errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="flex items-center justify-end space-x-4 pt-2">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300">
+                    Añadir Calibración
                 </button>
-                <a href="{% url 'core:detalle_equipo' equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                <a href="{% url 'core:detalle_equipo' equipo.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
                     Cancelar
                 </a>
             </div>

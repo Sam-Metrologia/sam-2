@@ -110,9 +110,9 @@
             </div>
         </div>
         <div class="text-sm text-gray-700 md:text-right mt-4 md:mt-0">
-            <p><strong>Versión del Formato:</strong> {{ current_company_format_info.formato_version_empresa|default:"N/A" }}</p>
-            <p><strong>Fecha de Versión:</strong> {{ current_company_format_info.formato_fecha_version_empresa|date:"Y-m-d"|default:"N/A" }}</p>
-            <p><strong>Codificación del Formato:</strong> {{ current_company_format_info.formato_codificacion_empresa|default:"N/A" }}</p>
+            <p><strong>Código:</strong> {{ current_company_format_info.listado_codigo|default:"N/A" }}</p>
+            <p><strong>Versión:</strong> {{ current_company_format_info.listado_version|default:"N/A" }}</p>
+            <p><strong>Fecha:</strong> {% if current_company_format_info.listado_fecha_formato_display %}{{ current_company_format_info.listado_fecha_formato_display }}{% elif current_company_format_info.listado_fecha_formato %}{{ current_company_format_info.listado_fecha_formato|date:"Y-m-d" }}{% else %}N/A{% endif %}</p>
             {# Botón para editar la información de formato de la empresa #}
             {% if request.user.is_superuser or request.user.empresa == current_company_format_info %}
             <div class="mt-4">

@@ -142,6 +142,7 @@
                 <p><strong>Responsable:</strong> {{ equipo.responsable|default:"N/A" }}</p>
                 <p><strong>Estado:</strong> <span class="font-bold {% if equipo.estado == 'Activo' %}text-green-600{% elif equipo.estado == 'De Baja' %}text-red-600{% elif equipo.estado == 'Inactivo' %}text-yellow-600{% else %}text-gray-600{% endif %}">{{ equipo.estado }}</span></p>
                 <p><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"Y-m-d"|default:"N/A" }}</p>
+                <p><strong>Proveedor:</strong> {{ equipo.proveedor|default:"N/A" }}</p>
                 <p><strong>Fecha de Registro:</strong> {{ equipo.fecha_registro|date:"Y-m-d"|default:"N/A" }}</p> {# CORRECCIÓN: Se eliminó el formato de hora #}
                 <p><strong>Observaciones:</strong> {{ equipo.observaciones|default:"N/A" }}</p>
             </div>
@@ -293,14 +294,34 @@
                                         </a>
                                     {% endif %}
                                     {% if cal.confirmacion_metrologica_pdf %}
-                                        <a href="{{ cal.confirmacion_metrologica_pdf.url }}" target="_blank" class="text-green-600 hover:underline text-xs">
-                                            <i class="fas fa-file-pdf mr-1"></i> Confirmación Metrológica
-                                        </a>
+                                        {% if cal.confirmacion_estado_aprobacion == 'aprobado' %}
+                                            <a href="{{ cal.confirmacion_metrologica_pdf.url }}" target="_blank" class="text-green-600 hover:underline text-xs">
+                                                <i class="fas fa-file-pdf mr-1"></i> Confirmación Metrológica
+                                            </a>
+                                        {% elif cal.confirmacion_estado_aprobacion == 'rechazado' %}
+                                            <span class="text-red-600 text-xs" title="Rechazado: {{ cal.confirmacion_observaciones_rechazo }}">
+                                                <i class="fas fa-times-circle mr-1"></i> Confirmación Rechazada
+                                            </span>
+                                        {% else %}
+                                            <span class="text-yellow-600 text-xs" title="Pendiente de aprobación por Admin/Gerente">
+                                                <i class="fas fa-clock mr-1"></i> Confirmación Pendiente
+                                            </span>
+                                        {% endif %}
                                     {% endif %}
                                     {% if cal.intervalos_calibracion_pdf %}
-                                        <a href="{{ cal.intervalos_calibracion_pdf.url }}" target="_blank" class="text-purple-600 hover:underline text-xs">
-                                            <i class="fas fa-file-pdf mr-1"></i> Intervalos de Calibración
-                                        </a>
+                                        {% if cal.intervalos_estado_aprobacion == 'aprobado' %}
+                                            <a href="{{ cal.intervalos_calibracion_pdf.url }}" target="_blank" class="text-purple-600 hover:underline text-xs">
+                                                <i class="fas fa-file-pdf mr-1"></i> Intervalos de Calibración
+                                            </a>
+                                        {% elif cal.intervalos_estado_aprobacion == 'rechazado' %}
+                                            <span class="text-red-600 text-xs" title="Rechazado: {{ cal.intervalos_observaciones_rechazo }}">
+                                                <i class="fas fa-times-circle mr-1"></i> Intervalos Rechazados
+                                            </span>
+                                        {% else %}
+                                            <span class="text-yellow-600 text-xs" title="Pendiente de aprobación por Admin/Gerente">
+                                                <i class="fas fa-clock mr-1"></i> Intervalos Pendientes
+                                            </span>
+                                        {% endif %}
                                     {% endif %}
                                     {% if not cal.documento_calibracion and not cal.confirmacion_metrologica_pdf and not cal.intervalos_calibracion_pdf %}
                                         <span class="text-gray-400">N/A</span>
@@ -497,9 +518,19 @@
                                         </a>
                                     {% endif %}
                                     {% if comp.comprobacion_pdf %}
-                                        <a href="{{ comp.comprobacion_pdf.url }}" target="_blank" class="text-blue-600 hover:underline text-xs">
-                                            <i class="fas fa-file-pdf mr-1"></i> Comprobación Metrológica
-                                        </a>
+                                        {% if comp.estado_aprobacion == 'aprobado' %}
+                                            <a href="{{ comp.comprobacion_pdf.url }}" target="_blank" class="text-blue-600 hover:underline text-xs">
+                                                <i class="fas fa-file-pdf mr-1"></i> Comprobación Metrológica
+                                            </a>
+                                        {% elif comp.estado_aprobacion == 'rechazado' %}
+                                            <span class="text-red-600 text-xs" title="Rechazado: {{ comp.observaciones_rechazo }}">
+                                                <i class="fas fa-times-circle mr-1"></i> Comprobación Rechazada
+                                            </span>
+                                        {% else %}
+                                            <span class="text-yellow-600 text-xs" title="Pendiente de aprobación por Admin/Gerente">
+                                                <i class="fas fa-clock mr-1"></i> Comprobación Pendiente
+                                            </span>
+                                        {% endif %}
                                     {% endif %}
                                     {% if comp.documento_comprobacion %}
                                         <a href="{{ comp.documento_comprobacion.url }}" target="_blank" class="text-purple-600 hover:underline text-xs">

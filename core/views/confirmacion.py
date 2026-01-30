@@ -315,17 +315,19 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         formato_version = equipo.empresa.confirmacion_version or '01'
         formato_fecha = equipo.empresa.confirmacion_fecha_formato or None
 
-    # Formatear fecha del formato si existe (formato: YYYY-MM-DD)
+    # Formatear fecha del formato si existe
+    # IMPORTANTE: Respetar el campo _display que puede ser YYYY-MM o YYYY-MM-DD
     formato_fecha_formateada = None
-    if formato_fecha:
+    # Primero intentar usar el campo _display que preserva el formato original
+    if equipo.empresa.confirmacion_fecha_formato_display:
+        formato_fecha_formateada = equipo.empresa.confirmacion_fecha_formato_display
+    elif formato_fecha:
         try:
             if isinstance(formato_fecha, str):
-                # Si es string, convertir a date y formatear
-                from datetime import datetime as dt
-                fecha_obj = dt.strptime(formato_fecha, '%Y-%m-%d')
-                formato_fecha_formateada = fecha_obj.strftime('%Y-%m-%d')
+                # Si es string, usarlo directamente
+                formato_fecha_formateada = formato_fecha
             else:
-                # Si ya es date object, solo formatear
+                # Si ya es date object, formatear como YYYY-MM-DD
                 formato_fecha_formateada = formato_fecha.strftime('%Y-%m-%d')
         except:
             formato_fecha_formateada = str(formato_fecha)
@@ -383,6 +385,7 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         'formato_codigo': formato_codigo,
         'formato_version': formato_version,
         'formato_fecha': formato_fecha,
+        'formato_fecha_display': equipo.empresa.confirmacion_fecha_formato_display or (formato_fecha.strftime('%Y-%m-%d') if formato_fecha else ''),
 
         # ID de calibración específica (si viene por GET)
         'calibracion_id': ultima_calibracion.id if ultima_calibracion else None,
@@ -725,6 +728,7 @@ def intervalos_calibracion(request, equipo_id):
         'formato_codigo': equipo.empresa.intervalos_codigo or 'SAM-INT-001',
         'formato_version': equipo.empresa.intervalos_version or '01',
         'formato_fecha': equipo.empresa.intervalos_fecha_formato or None,
+        'formato_fecha_display': equipo.empresa.intervalos_fecha_formato_display or (equipo.empresa.intervalos_fecha_formato.strftime('%Y-%m-%d') if equipo.empresa.intervalos_fecha_formato else ''),
     }
 
     return render(request, 'core/intervalos_calibracion.html', context)
@@ -772,6 +776,17 @@ def generar_pdf_confirmacion(request, equipo_id):
         messages.error(request, "No hay calibraciones registradas para generar confirmación metrológica")
         return redirect('core:detalle_equipo', pk=equipo_id)
 
+    # Si es GET y ya existe PDF guardado, servirlo directamente
+    if request.method == 'GET' and calibracion_id and ultima_calibracion.confirmacion_metrologica_pdf:
+        try:
+            pdf_file = ultima_calibracion.confirmacion_metrologica_pdf.read()
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="confirmacion_{equipo.codigo_interno}.pdf"'
+            return response
+        except Exception as e:
+            logger.error(f"Error al servir PDF existente: {e}")
+            # Si falla, continuar con la generación
+
     # Si es POST, recibir datos del formulario
     datos_confirmacion = {}
     if request.method == 'POST' and request.content_type == 'application/json':
@@ -788,11 +803,20 @@ def generar_pdf_confirmacion(request, equipo_id):
                 empresa.confirmacion_codigo = formato_data['codigo']
             if 'version' in formato_data:
                 empresa.confirmacion_version = formato_data['version']
-            if 'fecha' in formato_data:
-                # Convertir string de fecha a objeto date
+            if 'fecha' in formato_data and formato_data['fecha']:
+                fecha_str = formato_data['fecha'].strip()
+                # Guardar el campo _display con el formato original (YYYY-MM o YYYY-MM-DD)
+                empresa.confirmacion_fecha_formato_display = fecha_str
+                # Convertir string de fecha a objeto date para el DateField
                 from datetime import datetime as dt
+                import re
                 try:
-                    empresa.confirmacion_fecha_formato = dt.strptime(formato_data['fecha'], '%Y-%m-%d').date()
+                    if re.match(r'^\d{4}-\d{2}$', fecha_str):
+                        # Formato YYYY-MM: agregar día 01
+                        empresa.confirmacion_fecha_formato = dt.strptime(fecha_str + '-01', '%Y-%m-%d').date()
+                    else:
+                        # Formato YYYY-MM-DD
+                        empresa.confirmacion_fecha_formato = dt.strptime(fecha_str, '%Y-%m-%d').date()
                 except (ValueError, TypeError):
                     pass  # Si hay error en el formato, mantener valor actual
 
@@ -875,11 +899,20 @@ def generar_pdf_confirmacion(request, equipo_id):
                 'puntos_medicion': puntos_procesados,
                 'desviacion_maxima': desviacion_maxima,
                 'emp_valor': safe_float(datos_confirmacion.get('emp', 0), 0),
+                'emp': safe_float(datos_confirmacion.get('emp', 0), 0),
                 'emp_unidad': datos_confirmacion.get('emp_unidad', '%'),
                 'unidad_equipo': datos_confirmacion.get('unidad_equipo', ''),
                 'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U'),
                 'decision': datos_confirmacion.get('conclusion', {}).get('decision', 'Pendiente'),
-                'responsable': datos_confirmacion.get('conclusion', {}).get('responsable', request.user.get_full_name() or request.user.username)
+                'responsable': datos_confirmacion.get('conclusion', {}).get('responsable', request.user.get_full_name() or request.user.username),
+                'laboratorio': datos_confirmacion.get('laboratorio', ''),
+                'fecha_certificado': datos_confirmacion.get('fecha_certificado', ''),
+                'numero_certificado': datos_confirmacion.get('numero_certificado', ''),
+                'conclusion': datos_confirmacion.get('conclusion', {
+                    'decision': 'Pendiente',
+                    'observaciones': '',
+                    'responsable': request.user.get_full_name() or request.user.username
+                }),
             }
 
         # GUARDAR EN BD - Campo confirmacion_metrologica_pdf de Calibracion
@@ -887,8 +920,16 @@ def generar_pdf_confirmacion(request, equipo_id):
         ultima_calibracion.confirmacion_metrologica_pdf.save(
             filename,
             ContentFile(pdf_file),
-            save=True
+            save=False  # No guardar aún
         )
+
+        # ============ SISTEMA DE APROBACIÓN - CONFIRMACIÓN ============
+        # Establecer creado_por y estado pendiente para CONFIRMACIÓN
+        ultima_calibracion.creado_por = request.user
+        ultima_calibracion.confirmacion_estado_aprobacion = 'pendiente'
+        ultima_calibracion.confirmacion_aprobado_por = None
+        ultima_calibracion.confirmacion_fecha_aprobacion = None
+        ultima_calibracion.confirmacion_observaciones_rechazo = None
 
         # ============ REGISTRAR EN OBSERVACIONES DE CALIBRACIÓN ============
         # DESHABILITADO: Las observaciones se diligencian manualmente por el cliente
@@ -925,7 +966,6 @@ def generar_pdf_confirmacion(request, equipo_id):
 
 
 @login_required
-@require_http_methods(["POST"])
 @safe_pdf_response
 def generar_pdf_intervalos(request, equipo_id):
     """
@@ -988,6 +1028,17 @@ def generar_pdf_intervalos(request, equipo_id):
             'success': False,
             'message': 'No hay calibraciones registradas para generar intervalos de calibración'
         }, status=400)
+
+    # Si es GET y ya existe PDF guardado, servirlo directamente
+    if request.method == 'GET' and calibracion_id and calibracion_actual.intervalos_calibracion_pdf:
+        try:
+            pdf_file = calibracion_actual.intervalos_calibracion_pdf.read()
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="intervalos_{equipo.codigo_interno}.pdf"'
+            return response
+        except Exception as e:
+            logger.error(f"Error al servir PDF existente: {e}")
+            # Si falla, continuar con la generación
 
     # Si es POST, recibir datos del formulario (usando FormData)
     datos_json = request.POST.get('datos_intervalos')
@@ -1111,18 +1162,16 @@ def generar_pdf_intervalos(request, equipo_id):
         logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
         logo_empresa_url = None
 
-    # Formatear fecha del formato si existe en datos_intervalos (formato: YYYY-MM-DD)
+    # Formatear fecha del formato si existe
+    # IMPORTANTE: Respetar el campo _display que puede ser YYYY-MM o YYYY-MM-DD
     formato_fecha_formateada_int = None
-    if datos_intervalos.get('formato', {}).get('fecha'):
-        try:
-            fecha_str = datos_intervalos['formato']['fecha']
-            from datetime import datetime as dt
-            fecha_obj = dt.strptime(fecha_str, '%Y-%m-%d')
-            formato_fecha_formateada_int = fecha_obj.strftime('%Y-%m-%d')
-            # Reemplazar en datos_intervalos con la fecha formateada
-            datos_intervalos['formato']['fecha'] = formato_fecha_formateada_int
-        except:
-            pass
+    # Primero intentar usar el campo _display que preserva el formato original
+    if equipo.empresa.intervalos_fecha_formato_display:
+        formato_fecha_formateada_int = equipo.empresa.intervalos_fecha_formato_display
+        datos_intervalos['formato']['fecha'] = formato_fecha_formateada_int
+    elif datos_intervalos.get('formato', {}).get('fecha'):
+        # Usar el valor existente sin forzar formato
+        formato_fecha_formateada_int = datos_intervalos['formato']['fecha']
 
     # Preparar contexto para el PDF
     context = {
@@ -1178,8 +1227,22 @@ def generar_pdf_intervalos(request, equipo_id):
             calibracion_actual.intervalos_calibracion_pdf.save(
                 filename,
                 ContentFile(pdf_file),
-                save=True
+                save=False  # No guardar aún
             )
+
+            # ============ GUARDAR DATOS DE INTERVALOS PARA REGENERACIÓN ============
+            calibracion_actual.intervalos_calibracion_datos = datos_intervalos
+
+            # ============ SISTEMA DE APROBACIÓN ============
+            # Establecer creado_por y estado pendiente para INTERVALOS
+            calibracion_actual.creado_por = request.user
+            calibracion_actual.intervalos_estado_aprobacion = 'pendiente'
+            calibracion_actual.intervalos_aprobado_por = None
+            calibracion_actual.intervalos_fecha_aprobacion = None
+            calibracion_actual.intervalos_observaciones_rechazo = None
+
+            # Ahora sí guardar
+            calibracion_actual.save()
         finally:
             # Reactivar el signal
             post_save.connect(update_equipo_calibracion_info, sender=Calibracion)
@@ -1279,6 +1342,13 @@ def actualizar_formato_empresa(request):
         return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
 
     try:
+        # RESTRICCIÓN: Solo Admin y Gerente pueden cambiar formatos
+        if request.user.rol_usuario == 'TECNICO':
+            return JsonResponse({
+                'success': False,
+                'message': 'Solo Administradores y Gerentes pueden modificar los formatos'
+            }, status=403)
+
         datos = json.loads(request.body)
 
         # Obtener la empresa del usuario

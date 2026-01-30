@@ -45,9 +45,21 @@
                     {% if field.name == 'documento_calibracion' and field.value %}
                         <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/certificados/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
                     {% elif field.name == 'confirmacion_metrologica_pdf' and field.value %}
-                        <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/confirmaciones/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
-                    {% elif field.name == 'intervalos_calibracion_pdf' and field.value %} {# NUEVA LÓGICA PARA INTERVALOS PDF #}
-                        <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/intervalos/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
+                        {% if calibracion.estado_aprobacion == 'aprobado' %}
+                            <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/confirmaciones/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
+                        {% elif calibracion.estado_aprobacion == 'rechazado' %}
+                            <p class="text-sm text-red-600 mt-2">Confirmación Rechazada - Pendiente de corrección</p>
+                        {% else %}
+                            <p class="text-sm text-yellow-600 mt-2">Confirmación Pendiente de Aprobación - No disponible para descarga</p>
+                        {% endif %}
+                    {% elif field.name == 'intervalos_calibracion_pdf' and field.value %}
+                        {% if calibracion.estado_aprobacion == 'aprobado' %}
+                            <p class="text-sm text-gray-600 mt-2">Archivo actual: <a href="{{ field.value.url }}" target="_blank" class="text-blue-500 hover:underline">{{ field.value.name|cut:"calibraciones/intervalos/"|cut:"equipos/"|cut:equipo.codigo_interno|cut:"/" }}</a></p>
+                        {% elif calibracion.estado_aprobacion == 'rechazado' %}
+                            <p class="text-sm text-red-600 mt-2">Intervalos Rechazados - Pendiente de corrección</p>
+                        {% else %}
+                            <p class="text-sm text-yellow-600 mt-2">Intervalos Pendientes de Aprobación - No disponible para descarga</p>
+                        {% endif %}
                     {% endif %}
                 </div>
             {% endfor %}

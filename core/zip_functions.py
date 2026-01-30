@@ -521,9 +521,15 @@ def descarga_directa_rapida(request, empresa):
             'baja_registro'
         ).order_by('codigo_interno')
 
-        # Optimizar consultas de proveedores y procedimientos
+        # Optimizar consultas de proveedores, procedimientos y préstamos
         proveedores_empresa = Proveedor.objects.filter(empresa=empresa).select_related('empresa').order_by('nombre_empresa')
         procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).select_related('empresa').order_by('codigo')
+
+        # Obtener préstamos de la empresa (incluir equipos relacionados)
+        from .models import PrestamoEquipo
+        prestamos_empresa = PrestamoEquipo.objects.filter(
+            empresa=empresa
+        ).select_related('equipo', 'empresa').order_by('-fecha_prestamo')
 
         # Crear ZIP en memoria con compresión adaptativa
         zip_buffer = io.BytesIO()
@@ -546,7 +552,7 @@ def descarga_directa_rapida(request, empresa):
             try:
                 from .views.reports import _generate_consolidated_excel_content
                 excel_consolidado = _generate_consolidated_excel_content(
-                    equipos_empresa, proveedores_empresa, procedimientos_empresa
+                    equipos_empresa, proveedores_empresa, procedimientos_empresa, prestamos_empresa
                 )
                 zf.writestr(f"{empresa_nombre}/Informe_Consolidado.xlsx", excel_consolidado)
             except ImportError as e:

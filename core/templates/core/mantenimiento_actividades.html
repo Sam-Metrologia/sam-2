@@ -117,25 +117,25 @@
                 <p class="text-sm text-gray-500 mt-1">Empresa: {{ nombre_empresa }}</p>
             </div>
 
-            <!-- Información del Documento EDITABLE -->
-            <div class="text-right border-2 border-blue-300 p-3 rounded flex-shrink-0 bg-blue-50">
+            <!-- Información del Documento (Solo lectura - se edita desde Editar Formato) -->
+            <div class="text-right border-2 border-gray-300 p-3 rounded flex-shrink-0 bg-gray-50">
                 <div class="mb-2">
                     <label class="text-xs font-semibold text-gray-700">CÓDIGO:</label>
                     <input type="text" id="formato-codigo" value="{{ formato_codigo }}"
-                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                           onchange="guardarFormatoEmpresa()">
+                           class="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-600"
+                           disabled title="Se edita desde Editar Formato de Empresa">
                 </div>
                 <div class="mb-2">
                     <label class="text-xs font-semibold text-gray-700">VERSIÓN:</label>
                     <input type="text" id="formato-version" value="{{ formato_version }}"
-                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                           onchange="guardarFormatoEmpresa()">
+                           class="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-600"
+                           disabled title="Se edita desde Editar Formato de Empresa">
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-700">FECHA:</label>
-                    <input type="date" id="formato-fecha" value="{% if formato_fecha %}{{ formato_fecha|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
-                           class="w-full text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                           onchange="guardarFormatoEmpresa()">
+                    <input type="text" id="formato-fecha" value="{{ formato_fecha_display }}"
+                           class="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-600"
+                           disabled title="Se edita desde Editar Formato de Empresa">
                 </div>
             </div>
         </div>
@@ -562,44 +562,6 @@ function limpiarFormulario() {
     document.getElementById('fechaMantenimiento').valueAsDate = new Date();
 }
 
-// ========== GUARDAR FORMATO DE EMPRESA ==========
-function guardarFormatoEmpresa() {
-    const codigo = document.getElementById('formato-codigo').value;
-    const version = document.getElementById('formato-version').value;
-    const fecha = document.getElementById('formato-fecha').value;
-
-    fetch('{% url "core:actualizar_formato_empresa" %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({
-            tipo: 'mantenimiento',
-            codigo: codigo,
-            version: version,
-            fecha: fecha
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Formato actualizado correctamente para toda la empresa');
-            // Mostrar mensaje sutil de confirmación
-            const mensaje = document.createElement('div');
-            mensaje.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
-            mensaje.innerHTML = '<i class="fas fa-check mr-2"></i>Formato guardado para todos los equipos';
-            document.body.appendChild(mensaje);
-            setTimeout(() => mensaje.remove(), 3000);
-        } else {
-            console.error('Error al actualizar formato:', data.message);
-            alert('Error al guardar formato: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error al comunicarse con el servidor');
-    });
-}
+// Formato de empresa: ahora es solo lectura, se edita desde Editar Formato de Empresa
 </script>
 {% endblock %}

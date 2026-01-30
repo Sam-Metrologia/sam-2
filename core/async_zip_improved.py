@@ -207,6 +207,12 @@ class AsyncZipProcessor:
                 empresa=empresa
             ).select_related('empresa').order_by('codigo')
 
+            # Obtener préstamos de la empresa (incluir equipos relacionados)
+            from .models import PrestamoEquipo
+            prestamos_empresa = PrestamoEquipo.objects.filter(
+                empresa=empresa
+            ).select_related('equipo', 'empresa').order_by('-fecha_prestamo')
+
             # Crear archivo temporal para el ZIP
             temp_zip = tempfile.NamedTemporaryFile(
                 delete=False,
@@ -263,7 +269,7 @@ class AsyncZipProcessor:
                     ).order_by('codigo_interno')
 
                     excel_consolidado = _generate_consolidated_excel_content(
-                        todos_equipos_empresa, proveedores_empresa, procedimientos_empresa
+                        todos_equipos_empresa, proveedores_empresa, procedimientos_empresa, prestamos_empresa
                     )
                     zf.writestr(f"{empresa_nombre}/Informe_Consolidado.xlsx", excel_consolidado)
                     logger.info(f"✅ Excel consolidado agregado (con {todos_equipos_empresa.count()} equipos totales)")
@@ -385,16 +391,52 @@ class AsyncZipProcessor:
                                 except Exception as e:
                                     logger.error(f"Error añadiendo archivo mantenimiento: {e}")
 
-                        # d) Comprobaciones (MISMA estructura)
+                        # d) Comprobaciones (ESTRUCTURA COMPLETA con todos los campos)
                         comprobaciones = equipo.comprobaciones.all()
+                        comp_cert_idx = 1
                         for comp_idx, comp in enumerate(comprobaciones, 1):
+                            # Comprobación PDF (certificados principales - generados en plataforma)
+                            if comp.comprobacion_pdf:
+                                try:
+                                    if default_storage.exists(comp.comprobacion_pdf.name):
+                                        with default_storage.open(comp.comprobacion_pdf.name, 'rb') as f:
+                                            content = f.read()
+                                            filename = f"comp_{comp_cert_idx}.pdf"
+                                            zf.writestr(f"{equipo_folder}/Comprobaciones/Certificados_Comprobacion/{filename}", content)
+                                            comp_cert_idx += 1
+                                except Exception as e:
+                                    logger.error(f"Error añadiendo certificado comprobación: {e}")
+
+                            # Documento Externo (proveedor)
+                            if comp.documento_externo:
+                                try:
+                                    if default_storage.exists(comp.documento_externo.name):
+                                        with default_storage.open(comp.documento_externo.name, 'rb') as f:
+                                            content = f.read()
+                                            filename = os.path.basename(comp.documento_externo.name)
+                                            zf.writestr(f"{equipo_folder}/Comprobaciones/Documentos_Externos/{filename}", content)
+                                except Exception as e:
+                                    logger.error(f"Error añadiendo documento externo comprobación: {e}")
+
+                            # Documento Interno (SAM)
+                            if comp.documento_interno:
+                                try:
+                                    if default_storage.exists(comp.documento_interno.name):
+                                        with default_storage.open(comp.documento_interno.name, 'rb') as f:
+                                            content = f.read()
+                                            filename = os.path.basename(comp.documento_interno.name)
+                                            zf.writestr(f"{equipo_folder}/Comprobaciones/Documentos_Internos/{filename}", content)
+                                except Exception as e:
+                                    logger.error(f"Error añadiendo documento interno comprobación: {e}")
+
+                            # Documento General (documentos manuales subidos)
                             if comp.documento_comprobacion:
                                 try:
                                     if default_storage.exists(comp.documento_comprobacion.name):
                                         with default_storage.open(comp.documento_comprobacion.name, 'rb') as f:
                                             content = f.read()
-                                            filename = f"comp_{comp_idx}.pdf"
-                                            zf.writestr(f"{equipo_folder}/Comprobaciones/{filename}", content)
+                                            filename = os.path.basename(comp.documento_comprobacion.name)
+                                            zf.writestr(f"{equipo_folder}/Comprobaciones/Documentos_Generales/{filename}", content)
                                 except Exception as e:
                                     logger.error(f"Error añadiendo archivo comprobación: {e}")
 

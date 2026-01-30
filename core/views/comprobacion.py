@@ -117,6 +117,20 @@ def comprobacion_metrologica_view(request, equipo_id):
         if equipo.empresa.comprobacion_fecha_formato:
             formato_fecha = equipo.empresa.comprobacion_fecha_formato
 
+    # Obtener el campo _display que preserva el formato original (YYYY-MM o YYYY-MM-DD)
+    formato_fecha_display = equipo.empresa.comprobacion_fecha_formato_display or (formato_fecha.strftime('%Y-%m-%d') if formato_fecha else '')
+
+    # Calcular siguiente consecutivo sugerido
+    siguiente_consecutivo = ''
+    if equipo.empresa:
+        prefijo = equipo.empresa.comprobacion_prefijo_consecutivo or 'CB'
+        ultimo_num = Comprobacion.objects.filter(
+            equipo__empresa=equipo.empresa,
+            consecutivo__isnull=False
+        ).order_by('-consecutivo').values_list('consecutivo', flat=True).first()
+        siguiente_num = (ultimo_num or 0) + 1
+        siguiente_consecutivo = f"{prefijo}-{siguiente_num:03d}"
+
     context = {
         'equipo': equipo,
         'comprobacion': comprobacion,
@@ -129,6 +143,9 @@ def comprobacion_metrologica_view(request, equipo_id):
         'formato_codigo': formato_codigo,
         'formato_version': formato_version,
         'formato_fecha': formato_fecha,
+        'formato_fecha_display': formato_fecha_display,
+        'puede_servicio_terceros': request.user.is_superuser or request.user.is_staff,
+        'siguiente_consecutivo': siguiente_consecutivo,
     }
 
     return render(request, 'core/comprobacion_metrologica.html', context)
@@ -158,15 +175,24 @@ def guardar_comprobacion_json(request, equipo_id):
                 equipo=equipo
             )
         else:
-            # Crear nueva comprobación
+            # Crear nueva comprobación con sistema de aprobación
             comprobacion = Comprobacion.objects.create(
                 equipo=equipo,
                 fecha_comprobacion=datetime.now().date(),
                 resultado='Aprobado',  # Se actualizará según conformidad
+                creado_por=request.user,
+                estado_aprobacion='pendiente'
             )
 
         # Guardar datos JSON
         comprobacion.datos_comprobacion = datos
+
+        # Si está actualizando una comprobación rechazada, resetear a pendiente
+        if comprobacion_id and comprobacion.estado_aprobacion == 'rechazado':
+            comprobacion.estado_aprobacion = 'pendiente'
+            comprobacion.observaciones_rechazo = None
+            comprobacion.aprobado_por = None
+            comprobacion.fecha_aprobacion = None
 
         # Guardar datos del equipo de referencia en el modelo
         comprobacion.equipo_referencia_nombre = datos.get('equipo_ref_nombre', '')
@@ -182,11 +208,45 @@ def guardar_comprobacion_json(request, equipo_id):
             if 'formato_version' in datos and datos['formato_version']:
                 empresa.comprobacion_version = datos['formato_version']
             if 'formato_fecha' in datos and datos['formato_fecha']:
+                fecha_str = datos['formato_fecha'].strip()
+                # Guardar el campo _display con el formato original (YYYY-MM o YYYY-MM-DD)
+                empresa.comprobacion_fecha_formato_display = fecha_str
                 try:
-                    empresa.comprobacion_fecha_formato = datetime.strptime(datos['formato_fecha'], '%Y-%m-%d').date()
+                    # Para el DateField, necesitamos una fecha completa
+                    import re
+                    if re.match(r'^\d{4}-\d{2}$', fecha_str):
+                        # Formato YYYY-MM: agregar día 01
+                        empresa.comprobacion_fecha_formato = datetime.strptime(fecha_str + '-01', '%Y-%m-%d').date()
+                    else:
+                        # Formato YYYY-MM-DD
+                        empresa.comprobacion_fecha_formato = datetime.strptime(fecha_str, '%Y-%m-%d').date()
                 except:
                     pass
             empresa.save()
+
+        # Guardar consecutivo de texto libre
+        consecutivo_texto = datos.get('consecutivo_texto', '').strip()
+        if consecutivo_texto:
+            comprobacion.consecutivo_texto = consecutivo_texto
+            # Extraer y guardar prefijo en la empresa (antes del primer guión)
+            if '-' in consecutivo_texto:
+                prefijo = consecutivo_texto.rsplit('-', 1)[0]
+                empresa = equipo.empresa
+                if empresa and empresa.comprobacion_prefijo_consecutivo != prefijo:
+                    empresa.comprobacion_prefijo_consecutivo = prefijo
+                    empresa.save(update_fields=['comprobacion_prefijo_consecutivo'])
+
+        # Guardar datos de servicio a terceros (solo staff/superusuarios)
+        if (request.user.is_superuser or request.user.is_staff) and datos.get('es_servicio_terceros'):
+            comprobacion.es_servicio_terceros = True
+            comprobacion.empresa_cliente_nombre = datos.get('empresa_cliente_nombre', '')
+            comprobacion.empresa_cliente_nit = datos.get('empresa_cliente_nit', '')
+            comprobacion.empresa_cliente_direccion = datos.get('empresa_cliente_direccion', '')
+        elif not datos.get('es_servicio_terceros'):
+            comprobacion.es_servicio_terceros = False
+            comprobacion.empresa_cliente_nombre = ''
+            comprobacion.empresa_cliente_nit = ''
+            comprobacion.empresa_cliente_direccion = ''
 
         # Determinar resultado basado en conformidad
         puntos = datos.get('puntos_medicion', [])
@@ -315,7 +375,6 @@ def generar_grafica_svg_comprobacion(puntos, unidad='mm'):
 
 
 @login_required
-@require_http_methods(["POST"])
 @safe_pdf_response
 def generar_pdf_comprobacion(request, equipo_id):
     """
@@ -340,6 +399,17 @@ def generar_pdf_comprobacion(request, equipo_id):
             id=comprobacion_id,
             equipo=equipo
         )
+
+        # Si es GET y ya existe PDF guardado, servirlo directamente
+        if request.method == 'GET' and comprobacion.comprobacion_pdf:
+            try:
+                pdf_file = comprobacion.comprobacion_pdf.read()
+                response = HttpResponse(pdf_file, content_type='application/pdf')
+                response['Content-Disposition'] = f'inline; filename="comprobacion_{equipo.codigo_interno}.pdf"'
+                return response
+            except Exception as e:
+                logger.error(f"Error al servir PDF existente: {e}")
+                # Si falla, continuar con la generación
 
         # Obtener datos del POST
         datos_json = request.POST.get('datos_comprobacion')
@@ -369,15 +439,15 @@ def generar_pdf_comprobacion(request, equipo_id):
             logger.warning(f"No se pudo obtener logo de empresa: {logo_error}")
             logo_empresa_url = None
 
-        # Formatear fecha del formato si existe (formato: YYYY-MM-DD)
+        # Formatear fecha del formato si existe
+        # IMPORTANTE: Respetar el campo _display que puede ser YYYY-MM o YYYY-MM-DD
         formato_fecha_formateada = None
-        if datos_comprobacion.get('formato_fecha'):
-            try:
-                from datetime import datetime as dt
-                fecha_obj = dt.strptime(datos_comprobacion['formato_fecha'], '%Y-%m-%d')
-                formato_fecha_formateada = fecha_obj.strftime('%Y-%m-%d')
-            except:
-                formato_fecha_formateada = datos_comprobacion['formato_fecha']
+        # Primero intentar usar el campo _display que preserva el formato original
+        if equipo.empresa.comprobacion_fecha_formato_display:
+            formato_fecha_formateada = equipo.empresa.comprobacion_fecha_formato_display
+        elif datos_comprobacion.get('formato_fecha'):
+            # Usar el valor existente sin forzar formato
+            formato_fecha_formateada = datos_comprobacion['formato_fecha']
 
         # Preparar datos para el template
         context = {
@@ -403,7 +473,18 @@ def generar_pdf_comprobacion(request, equipo_id):
         # Guardar PDF en el modelo
         fecha_str = comprobacion.fecha_comprobacion.strftime('%Y%m%d')
         filename = f'comprobacion_{equipo.codigo_interno}_{fecha_str}.pdf'
-        comprobacion.comprobacion_pdf.save(filename, ContentFile(pdf_file), save=True)
+        comprobacion.comprobacion_pdf.save(filename, ContentFile(pdf_file), save=False)
+
+        # ============ SISTEMA DE APROBACIÓN ============
+        # Establecer creado_por y estado pendiente
+        comprobacion.creado_por = request.user
+        comprobacion.estado_aprobacion = 'pendiente'
+        comprobacion.aprobado_por = None
+        comprobacion.fecha_aprobacion = None
+        comprobacion.observaciones_rechazo = None
+
+        # Guardar todos los cambios
+        comprobacion.save()
 
         return JsonResponse({
             'success': True,

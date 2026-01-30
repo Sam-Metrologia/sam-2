@@ -310,12 +310,6 @@ class EquipoForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
         input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
     )
-    fecha_version_formato = forms.DateField(
-        label="Fecha de Versión del Formato",
-        required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'DD/MM/YYYY', 'class': 'form-input'}),
-        input_formats=['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']
-    )
     fecha_ultima_calibracion = forms.DateField(
         label="Fecha Última Calibración",
         required=False,
@@ -337,7 +331,8 @@ class EquipoForm(forms.ModelForm):
 
     class Meta:
         model = Equipo
-        exclude = ('fecha_registro', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion')
+        exclude = ('fecha_registro', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion',
+                   'fecha_version_formato', 'fecha_version_formato_display', 'version_formato', 'codificacion_formato')
         widgets = {
             'codigo_interno': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
             'nombre': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '200'}),
@@ -349,6 +344,7 @@ class EquipoForm(forms.ModelForm):
             'ubicacion': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '255'}),
             'responsable': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
             'estado': forms.Select(attrs={'class': 'form-select'}),
+            'proveedor': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '200', 'placeholder': 'Ej: Multiples, Amazon, etc.'}),
             'rango_medida': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
             'resolucion': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
             'error_maximo_permisible': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
@@ -358,8 +354,6 @@ class EquipoForm(forms.ModelForm):
             'manual_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
             'otros_documentos_pdf': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.pdf'}),
             'imagen_equipo': ClearableFileInput(attrs={'class': 'form-input-file', 'accept': '.jpg,.jpeg,.png'}),
-            'version_formato': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
-            'codificacion_formato': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
             'frecuencia_calibracion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.01', 'max': '120', 'step': '0.01'}),
             'frecuencia_mantenimiento_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.01', 'max': '120', 'step': '0.01'}),
             'frecuencia_comprobacion_meses': forms.NumberInput(attrs={'class': 'form-input', 'min': '0.01', 'max': '120', 'step': '0.01'}),
@@ -478,13 +472,13 @@ class EquipoForm(forms.ModelForm):
                         raise ValidationError(f"La empresa ya alcanzó su límite de {limite_equipos} equipos.")
 
         instance = super().save(commit=commit)
-        
+
         # Log de auditoría
         if self.request:
             from .services import AuditService
             action = "created" if not self.instance.pk else "updated"
             AuditService.log_equipment_action(action, instance, self.request.user)
-        
+
         return instance
 
 
@@ -498,7 +492,22 @@ class CalibracionForm(forms.ModelForm):
 
     class Meta:
         model = Calibracion
-        exclude = ('equipo',)
+        exclude = (
+            'equipo',
+            # Campos de aprobación (gestionados programáticamente)
+            'estado_aprobacion', 'aprobado_por', 'fecha_aprobacion', 'observaciones_rechazo',
+            'confirmacion_estado_aprobacion', 'confirmacion_aprobado_por',
+            'confirmacion_fecha_aprobacion', 'confirmacion_observaciones_rechazo',
+            'confirmacion_fecha_realizacion', 'confirmacion_fecha_emision',
+            'confirmacion_fecha_aprobacion_ajustable',
+            'intervalos_estado_aprobacion', 'intervalos_aprobado_por',
+            'intervalos_fecha_aprobacion', 'intervalos_observaciones_rechazo',
+            'intervalos_fecha_realizacion', 'intervalos_fecha_emision',
+            'intervalos_fecha_aprobacion_ajustable',
+            # Campos internos
+            'creado_por', 'confirmacion_metrologica_datos', 'intervalos_calibracion_datos',
+            'costo_calibracion', 'tiempo_empleado_horas', 'tecnico_asignado_sam',
+        )
         widgets = {
             'proveedor': forms.Select(attrs={'class': 'form-select'}),
             'nombre_proveedor': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '255'}),
@@ -605,7 +614,23 @@ class ComprobacionForm(forms.ModelForm):
 
     class Meta:
         model = Comprobacion
-        exclude = ('equipo',)
+        exclude = (
+            'equipo',
+            # Campos de aprobación (gestionados programáticamente)
+            'estado_aprobacion', 'aprobado_por', 'fecha_aprobacion', 'observaciones_rechazo',
+            'creado_por',
+            'fecha_realizacion', 'fecha_emision', 'fecha_aprobacion_ajustable',
+            # Campos internos
+            'comprobacion_pdf', 'datos_comprobacion',
+            'costo_comprobacion', 'tiempo_empleado_horas', 'tecnico_asignado_sam',
+            'equipo_referencia_nombre', 'equipo_referencia_marca',
+            'equipo_referencia_modelo', 'equipo_referencia_certificado',
+            # Campos de terceros (gestionados en comprobacion_metrologica view)
+            'es_servicio_terceros', 'empresa_cliente', 'empresa_cliente_nombre',
+            'empresa_cliente_nit', 'empresa_cliente_direccion',
+            # Consecutivo (gestionado en comprobacion_metrologica view)
+            'consecutivo', 'consecutivo_texto',
+        )
         widgets = {
             'proveedor': forms.Select(attrs={'class': 'form-select'}),
             'nombre_proveedor': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '255'}),
@@ -959,24 +984,234 @@ class DocumentoForm(forms.ModelForm):
 
 # Formulario específico para formato de empresa
 class EmpresaFormatoForm(forms.ModelForm):
+    # Campos de texto personalizados para fechas display (aceptan YYYY-MM o YYYY-MM-DD)
+    confirmacion_fecha_display = forms.CharField(
+        max_length=10,
+        required=False,
+        label="Fecha Formato Confirmación",
+        help_text="Formato: YYYY-MM o YYYY-MM-DD",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '2026-01 o 2026-01-24'})
+    )
+    intervalos_fecha_display = forms.CharField(
+        max_length=10,
+        required=False,
+        label="Fecha Formato Intervalos",
+        help_text="Formato: YYYY-MM o YYYY-MM-DD",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '2026-01 o 2026-01-24'})
+    )
+    comprobacion_fecha_display = forms.CharField(
+        max_length=10,
+        required=False,
+        label="Fecha Formato Comprobación",
+        help_text="Formato: YYYY-MM o YYYY-MM-DD",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '2026-01 o 2026-01-24'})
+    )
+    mantenimiento_fecha_display = forms.CharField(
+        max_length=10,
+        required=False,
+        label="Fecha Formato Mantenimiento",
+        help_text="Formato: YYYY-MM o YYYY-MM-DD",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '2026-01 o 2026-01-24'})
+    )
+    listado_fecha_display = forms.CharField(
+        max_length=10,
+        required=False,
+        label="Fecha Formato Listado de Equipos",
+        help_text="Formato: YYYY-MM o YYYY-MM-DD",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '2026-01 o 2026-01-24'})
+    )
+    formato_fecha_empresa_display = forms.CharField(
+        max_length=10,
+        required=False,
+        label="Fecha Formato General",
+        help_text="Formato: YYYY-MM o YYYY-MM-DD",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '2026-01 o 2026-01-24'})
+    )
+
     class Meta:
         model = Empresa
-        fields = ['formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa']
+        fields = ['formato_version_empresa', 'formato_codificacion_empresa',
+                  'confirmacion_codigo', 'confirmacion_version',
+                  'intervalos_codigo', 'intervalos_version',
+                  'comprobacion_codigo', 'comprobacion_version',
+                  'mantenimiento_codigo', 'mantenimiento_version',
+                  'listado_codigo', 'listado_version']
         widgets = {
             'formato_version_empresa': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
-            'formato_fecha_version_empresa': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
             'formato_codificacion_empresa': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '100'}),
+            'confirmacion_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
+            'confirmacion_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
+            'intervalos_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
+            'intervalos_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
+            'comprobacion_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
+            'comprobacion_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
+            'mantenimiento_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
+            'mantenimiento_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
+            'listado_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
+            'listado_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
         }
         labels = {
-            'formato_version_empresa': "Versión del Formato",
-            'formato_codificacion_empresa': "Codificación del Formato",
+            'formato_version_empresa': "Versión Hoja de Vida",
+            'formato_codificacion_empresa': "Código Hoja de Vida",
+            'confirmacion_codigo': "Código Confirmación",
+            'confirmacion_version': "Versión Confirmación",
+            'intervalos_codigo': "Código Intervalos",
+            'intervalos_version': "Versión Intervalos",
+            'comprobacion_codigo': "Código Comprobación",
+            'comprobacion_version': "Versión Comprobación",
+            'mantenimiento_codigo': "Código Mantenimiento",
+            'mantenimiento_version': "Versión Mantenimiento",
+            'listado_codigo': "Código Listado de Equipos",
+            'listado_version': "Versión Listado de Equipos",
         }
 
-    def clean_formato_fecha_version_empresa(self):
-        fecha = self.cleaned_data.get('formato_fecha_version_empresa')
-        if fecha and fecha > timezone.localdate():
-            raise ValidationError("La fecha de versión no puede ser en el futuro.")
-        return fecha
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Prellenar los campos display con valores existentes
+        if self.instance and self.instance.pk:
+            self.fields['confirmacion_fecha_display'].initial = (
+                self.instance.confirmacion_fecha_formato_display or
+                (self.instance.confirmacion_fecha_formato.strftime('%Y-%m-%d') if self.instance.confirmacion_fecha_formato else '')
+            )
+            self.fields['intervalos_fecha_display'].initial = (
+                self.instance.intervalos_fecha_formato_display or
+                (self.instance.intervalos_fecha_formato.strftime('%Y-%m-%d') if self.instance.intervalos_fecha_formato else '')
+            )
+            self.fields['comprobacion_fecha_display'].initial = (
+                self.instance.comprobacion_fecha_formato_display or
+                (self.instance.comprobacion_fecha_formato.strftime('%Y-%m-%d') if self.instance.comprobacion_fecha_formato else '')
+            )
+            self.fields['mantenimiento_fecha_display'].initial = (
+                self.instance.mantenimiento_fecha_formato_display or
+                (self.instance.mantenimiento_fecha_formato.strftime('%Y-%m-%d') if self.instance.mantenimiento_fecha_formato else '')
+            )
+            self.fields['listado_fecha_display'].initial = (
+                self.instance.listado_fecha_formato_display or
+                (self.instance.listado_fecha_formato.strftime('%Y-%m-%d') if self.instance.listado_fecha_formato else '')
+            )
+            self.fields['formato_fecha_empresa_display'].initial = (
+                self.instance.formato_fecha_version_empresa_display or
+                (self.instance.formato_fecha_version_empresa.strftime('%Y-%m-%d') if self.instance.formato_fecha_version_empresa else '')
+            )
+
+    def _validar_y_normalizar_fecha(self, fecha_str, nombre_campo):
+        """
+        Valida que la fecha esté en formato YYYY-MM o YYYY-MM-DD.
+        Retorna tupla (fecha_normalizada, fecha_display).
+        """
+        if not fecha_str:
+            return None, None
+
+        fecha_str = fecha_str.strip()
+
+        # Validar formato YYYY-MM
+        if re.match(r'^\d{4}-\d{2}$', fecha_str):
+            try:
+                # Normalizar a primer día del mes para DateField
+                fecha_obj = datetime.strptime(fecha_str + '-01', '%Y-%m-%d').date()
+                return fecha_obj, fecha_str
+            except ValueError:
+                raise ValidationError(f"{nombre_campo}: Mes inválido en formato YYYY-MM.")
+
+        # Validar formato YYYY-MM-DD
+        elif re.match(r'^\d{4}-\d{2}-\d{2}$', fecha_str):
+            try:
+                fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                return fecha_obj, fecha_str
+            except ValueError:
+                raise ValidationError(f"{nombre_campo}: Fecha inválida en formato YYYY-MM-DD.")
+
+        else:
+            raise ValidationError(
+                f"{nombre_campo}: Formato inválido. Use YYYY-MM (ej: 2026-01) o YYYY-MM-DD (ej: 2026-01-24)."
+            )
+
+    def clean_confirmacion_fecha_display(self):
+        fecha_str = self.cleaned_data.get('confirmacion_fecha_display')
+        if fecha_str:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(fecha_str, "Fecha Confirmación")
+            return fecha_disp
+        return None
+
+    def clean_intervalos_fecha_display(self):
+        fecha_str = self.cleaned_data.get('intervalos_fecha_display')
+        if fecha_str:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(fecha_str, "Fecha Intervalos")
+            return fecha_disp
+        return None
+
+    def clean_comprobacion_fecha_display(self):
+        fecha_str = self.cleaned_data.get('comprobacion_fecha_display')
+        if fecha_str:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(fecha_str, "Fecha Comprobación")
+            return fecha_disp
+        return None
+
+    def clean_mantenimiento_fecha_display(self):
+        fecha_str = self.cleaned_data.get('mantenimiento_fecha_display')
+        if fecha_str:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(fecha_str, "Fecha Mantenimiento")
+            return fecha_disp
+        return None
+
+    def clean_listado_fecha_display(self):
+        fecha_str = self.cleaned_data.get('listado_fecha_display')
+        if fecha_str:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(fecha_str, "Fecha Listado de Equipos")
+            return fecha_disp
+        return None
+
+    def clean_formato_fecha_empresa_display(self):
+        fecha_str = self.cleaned_data.get('formato_fecha_empresa_display')
+        if fecha_str:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(fecha_str, "Fecha Formato General")
+            return fecha_disp
+        return None
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        # Procesar y guardar cada fecha display
+        confirmacion_disp = self.cleaned_data.get('confirmacion_fecha_display')
+        if confirmacion_disp:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(confirmacion_disp, "Confirmación")
+            instance.confirmacion_fecha_formato = fecha_norm
+            instance.confirmacion_fecha_formato_display = fecha_disp
+
+        intervalos_disp = self.cleaned_data.get('intervalos_fecha_display')
+        if intervalos_disp:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(intervalos_disp, "Intervalos")
+            instance.intervalos_fecha_formato = fecha_norm
+            instance.intervalos_fecha_formato_display = fecha_disp
+
+        comprobacion_disp = self.cleaned_data.get('comprobacion_fecha_display')
+        if comprobacion_disp:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(comprobacion_disp, "Comprobación")
+            instance.comprobacion_fecha_formato = fecha_norm
+            instance.comprobacion_fecha_formato_display = fecha_disp
+
+        mantenimiento_disp = self.cleaned_data.get('mantenimiento_fecha_display')
+        if mantenimiento_disp:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(mantenimiento_disp, "Mantenimiento")
+            instance.mantenimiento_fecha_formato = fecha_norm
+            instance.mantenimiento_fecha_formato_display = fecha_disp
+
+        listado_disp = self.cleaned_data.get('listado_fecha_display')
+        if listado_disp:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(listado_disp, "Listado de Equipos")
+            instance.listado_fecha_formato = fecha_norm
+            instance.listado_fecha_formato_display = fecha_disp
+
+        formato_fecha_disp = self.cleaned_data.get('formato_fecha_empresa_display')
+        if formato_fecha_disp:
+            fecha_norm, fecha_disp = self._validar_y_normalizar_fecha(formato_fecha_disp, "Formato General")
+            instance.formato_fecha_version_empresa = fecha_norm
+            instance.formato_fecha_version_empresa_display = fecha_disp
+
+        if commit:
+            instance.save()
+
+        return instance
 
 
 # ==============================================================================

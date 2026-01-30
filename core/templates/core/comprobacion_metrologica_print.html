@@ -309,12 +309,47 @@
                 <p><strong>Versión:</strong> {{ datos_comprobacion.formato_version|default:equipo.empresa.comprobacion_version|default:"01" }}</p>
                 {% if formato_fecha_formateada %}
                     <p><strong>Fecha:</strong> {{ formato_fecha_formateada }}</p>
-                {% elif equipo.empresa.comprobacion_fecha_formato %}
-                    <p><strong>Fecha:</strong> {{ equipo.empresa.comprobacion_fecha_formato|date:"Y-m-d" }}</p>
+                {% elif equipo.empresa.comprobacion_fecha_formato_display or equipo.empresa.comprobacion_fecha_formato %}
+                    <p><strong>Fecha:</strong> {% if equipo.empresa.comprobacion_fecha_formato_display %}{{ equipo.empresa.comprobacion_fecha_formato_display }}{% elif equipo.empresa.comprobacion_fecha_formato %}{{ equipo.empresa.comprobacion_fecha_formato|date:"Y-m-d" }}{% endif %}</p>
                 {% endif %}
             </td>
         </tr>
     </table>
+
+    <!-- ==================== CONSECUTIVO Y FECHAS ==================== -->
+    <div style="background: #EBF5FB; border: 1px solid #3498DB; padding: 6px 12px; margin-bottom: 10px; border-radius: 3px; font-size: 9pt;">
+        {% if comprobacion.consecutivo_formateado %}
+        <strong>N°:</strong> {{ comprobacion.consecutivo_formateado }}
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        {% endif %}
+        {% if comprobacion.fecha_realizacion %}
+        <strong>FECHA DE REALIZACIÓN:</strong> {{ comprobacion.fecha_realizacion|date:"Y-m-d" }}
+        {% endif %}
+        {% if comprobacion.fecha_emision %}
+        &nbsp;&nbsp;|&nbsp;&nbsp;<strong>FECHA DE EMISIÓN:</strong> {{ comprobacion.fecha_emision|date:"Y-m-d" }}
+        {% endif %}
+    </div>
+
+    <!-- SECCIÓN CLIENTE (solo para servicio a terceros) -->
+    {% if comprobacion.es_servicio_terceros %}
+    <div class="section">
+        <div class="section-title">INFORMACIÓN DEL CLIENTE</div>
+        <div class="info-grid-3">
+            <div class="info-item">
+                <strong>EMPRESA CLIENTE</strong>
+                <div class="info-value">{{ comprobacion.nombre_empresa_cliente_display|default:"N/A" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>NIT</strong>
+                <div class="info-value">{{ comprobacion.nit_empresa_cliente_display|default:"N/A" }}</div>
+            </div>
+            <div class="info-item">
+                <strong>DIRECCIÓN</strong>
+                <div class="info-value">{{ comprobacion.direccion_empresa_cliente_display|default:"N/A" }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- SECCIÓN 1: INFORMACIÓN DEL EQUIPO -->
     <div class="section">
@@ -479,6 +514,44 @@
                 <strong>NO CUMPLE</strong> con las tolerancias establecidas. Se requiere acción correctiva.
                 {% endif %}
             </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN DE FIRMAS Y APROBACIÓN ==================== -->
+    <div class="section" style="margin-top: 25px;">
+        <h2 class="section-title">FIRMAS Y APROBACIÓN</h2>
+        <div class="info-grid" style="margin-top: 15px;">
+            <div class="info-item">
+                <strong>REALIZADO POR</strong>
+                {% if comprobacion.creado_por %}
+                    <div class="info-value">{{ comprobacion.creado_por.get_full_name|default:comprobacion.creado_por.username }}</div>
+                    {% if comprobacion.estado_aprobacion == 'aprobado' and comprobacion.fecha_realizacion %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ comprobacion.fecha_realizacion|date:"Y-m-d" }}</div>
+                    {% else %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ comprobacion.fecha_registro|date:"Y-m-d" }}</div>
+                    {% endif %}
+                {% else %}
+                    <div class="info-value">{{ datos_comprobacion.responsable|default:"Por definir" }}</div>
+                    <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ comprobacion.fecha_comprobacion|date:"Y-m-d"|default:"--" }}</div>
+                {% endif %}
+            </div>
+            <div class="info-item">
+                <strong>APROBADO POR</strong>
+                {% if comprobacion.estado_aprobacion == 'aprobado' and comprobacion.aprobado_por %}
+                    <div class="info-value">{{ comprobacion.aprobado_por.get_full_name|default:comprobacion.aprobado_por.username }}</div>
+                    {% if comprobacion.fecha_aprobacion_ajustable %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ comprobacion.fecha_aprobacion_ajustable|date:"Y-m-d" }}</div>
+                    {% else %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ comprobacion.fecha_aprobacion|date:"Y-m-d" }}</div>
+                    {% endif %}
+                {% elif comprobacion.estado_aprobacion == 'rechazado' %}
+                    <div class="info-value" style="color: #dc2626;">RECHAZADO</div>
+                    <div class="info-value" style="font-size: 9pt; color: #666;">{{ comprobacion.observaciones_rechazo|default:"Sin observaciones" }}</div>
+                {% else %}
+                    <div class="info-value" style="color: #f59e0b;">PENDIENTE DE APROBACIÓN</div>
+                    <div class="info-value" style="font-size: 9pt; color: #666;">Requiere aprobación de Admin/Gerente</div>
+                {% endif %}
+            </div>
         </div>
     </div>
 

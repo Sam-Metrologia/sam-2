@@ -282,12 +282,22 @@
             <td class="header-info-cell">
                 <p><strong>CÓDIGO:</strong> {{ datos_confirmacion.formato.codigo }}</p>
                 <p><strong>VERSIÓN:</strong> {{ datos_confirmacion.formato.version }}</p>
-                {% if datos_confirmacion.formato.fecha %}
-                <p><strong>FECHA:</strong> {{ datos_confirmacion.formato.fecha }}</p>
+                {% if equipo.empresa.confirmacion_fecha_formato_display or equipo.empresa.confirmacion_fecha_formato %}
+                <p><strong>FECHA:</strong> {% if equipo.empresa.confirmacion_fecha_formato_display %}{{ equipo.empresa.confirmacion_fecha_formato_display }}{% elif equipo.empresa.confirmacion_fecha_formato %}{{ equipo.empresa.confirmacion_fecha_formato|date:"Y-m-d" }}{% endif %}</p>
                 {% endif %}
             </td>
         </tr>
     </table>
+
+    <!-- ==================== FECHA DE REALIZACIÓN ==================== -->
+    {% if ultima_calibracion.confirmacion_fecha_realizacion %}
+    <div style="background: #EBF5FB; border: 1px solid #3498DB; padding: 6px 12px; margin-bottom: 10px; border-radius: 3px; font-size: 9pt;">
+        <strong>FECHA DE REALIZACIÓN:</strong> {{ ultima_calibracion.confirmacion_fecha_realizacion|date:"Y-m-d" }}
+        {% if ultima_calibracion.confirmacion_fecha_emision %}
+        &nbsp;&nbsp;|&nbsp;&nbsp;<strong>FECHA DE EMISIÓN:</strong> {{ ultima_calibracion.confirmacion_fecha_emision|date:"Y-m-d" }}
+        {% endif %}
+    </div>
+    {% endif %}
 
     <!-- ==================== SECCIÓN 1: INFORMACIÓN DEL EQUIPO ==================== -->
     <div class="section">
@@ -550,7 +560,49 @@
             </div>
             <div class="info-item">
                 <strong>FECHA DE EMISIÓN</strong>
-                <div class="info-value">{{ fecha_actual }}</div>
+                {% if ultima_calibracion.confirmacion_estado_aprobacion == 'aprobado' and ultima_calibracion.confirmacion_fecha_emision %}
+                    <div class="info-value">{{ ultima_calibracion.confirmacion_fecha_emision|date:"Y-m-d" }}</div>
+                {% else %}
+                    <div class="info-value">{{ fecha_actual }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN DE FIRMAS Y APROBACIÓN ==================== -->
+    <div class="section" style="margin-top: 25px;">
+        <h2 class="section-title">FIRMAS Y APROBACIÓN</h2>
+        <div class="info-grid" style="margin-top: 15px;">
+            <div class="info-item">
+                <strong>REALIZADO POR</strong>
+                {% if ultima_calibracion.creado_por %}
+                    <div class="info-value">{{ ultima_calibracion.creado_por.get_full_name|default:ultima_calibracion.creado_por.username }}</div>
+                    {% if ultima_calibracion.confirmacion_estado_aprobacion == 'aprobado' and ultima_calibracion.confirmacion_fecha_realizacion %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ ultima_calibracion.confirmacion_fecha_realizacion|date:"Y-m-d" }}</div>
+                    {% else %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ ultima_calibracion.fecha_registro|date:"Y-m-d" }}</div>
+                    {% endif %}
+                {% else %}
+                    <div class="info-value">{{ datos_confirmacion.conclusion.responsable|default:"Por definir" }}</div>
+                    <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ ultima_calibracion.fecha_registro|date:"Y-m-d"|default:"--" }}</div>
+                {% endif %}
+            </div>
+            <div class="info-item">
+                <strong>APROBADO POR</strong>
+                {% if ultima_calibracion.confirmacion_estado_aprobacion == 'aprobado' and ultima_calibracion.confirmacion_aprobado_por %}
+                    <div class="info-value">{{ ultima_calibracion.confirmacion_aprobado_por.get_full_name|default:ultima_calibracion.confirmacion_aprobado_por.username }}</div>
+                    {% if ultima_calibracion.confirmacion_fecha_aprobacion_ajustable %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ ultima_calibracion.confirmacion_fecha_aprobacion_ajustable|date:"Y-m-d" }}</div>
+                    {% else %}
+                        <div class="info-value" style="font-size: 9pt; color: #666;">Fecha: {{ ultima_calibracion.confirmacion_fecha_aprobacion|date:"Y-m-d" }}</div>
+                    {% endif %}
+                {% elif ultima_calibracion.confirmacion_estado_aprobacion == 'rechazado' %}
+                    <div class="info-value" style="color: #dc2626;">RECHAZADO</div>
+                    <div class="info-value" style="font-size: 9pt; color: #666;">{{ ultima_calibracion.confirmacion_observaciones_rechazo|default:"Sin observaciones" }}</div>
+                {% else %}
+                    <div class="info-value" style="color: #f59e0b;">PENDIENTE DE APROBACIÓN</div>
+                    <div class="info-value" style="font-size: 9pt; color: #666;">Requiere aprobación de Admin/Gerente</div>
+                {% endif %}
             </div>
         </div>
     </div>

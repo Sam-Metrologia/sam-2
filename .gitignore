@@ -79,8 +79,8 @@ backups/*.json
 *_backup.py
 *_old.py
 
-# Test files
-test_*.py
+# Test files (solo en raíz, no en tests/)
+/test_*.py
 debug_*.py
 diagnostico_*.py
 crear_*.py

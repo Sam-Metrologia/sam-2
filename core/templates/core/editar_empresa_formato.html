@@ -22,26 +22,246 @@
     <div class="bg-white p-6 rounded-lg shadow-md">
         <form method="post">
             {% csrf_token %}
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {% for field in form %}
+
+            {# SECCIÓN: Hoja de Vida (Detalle de Equipo) #}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-blue-500 pb-2">
+                    <i class="fas fa-file-medical mr-2"></i> Hoja de Vida (Detalle de Equipo)
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="mb-4">
-                        <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
-                            {{ field.label }}
-                            {% if field.field.required %}
-                                <span class="text-red-500">*</span>
-                            {% endif %}
+                        <label for="{{ form.formato_version_empresa.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.formato_version_empresa.label }}
                         </label>
-                        {{ field }}
-                        
-                        {% if field.help_text %}
-                            <p class="text-gray-600 text-xs italic mt-1">{{ field.help_text }}</p>
+                        {{ form.formato_version_empresa }}
+                        {% if form.formato_version_empresa.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.formato_version_empresa.help_text }}</p>
                         {% endif %}
-                        {% for error in field.errors %}
+                        {% for error in form.formato_version_empresa.errors %}
                             <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
                         {% endfor %}
                     </div>
-                {% endfor %}
+                    <div class="mb-4">
+                        <label for="{{ form.formato_codificacion_empresa.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.formato_codificacion_empresa.label }}
+                        </label>
+                        {{ form.formato_codificacion_empresa }}
+                        {% if form.formato_codificacion_empresa.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.formato_codificacion_empresa.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.formato_codificacion_empresa.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.formato_fecha_empresa_display.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.formato_fecha_empresa_display.label }}
+                        </label>
+                        {{ form.formato_fecha_empresa_display }}
+                        {% if form.formato_fecha_empresa_display.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.formato_fecha_empresa_display.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.formato_fecha_empresa_display.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# SECCIÓN: Confirmación Metrológica #}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-green-500 pb-2">
+                    <i class="fas fa-check-circle mr-2"></i> Confirmación Metrológica
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="mb-4">
+                        <label for="{{ form.confirmacion_codigo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.confirmacion_codigo.label }}
+                        </label>
+                        {{ form.confirmacion_codigo }}
+                        {% for error in form.confirmacion_codigo.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.confirmacion_version.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.confirmacion_version.label }}
+                        </label>
+                        {{ form.confirmacion_version }}
+                        {% for error in form.confirmacion_version.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.confirmacion_fecha_display.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.confirmacion_fecha_display.label }}
+                        </label>
+                        {{ form.confirmacion_fecha_display }}
+                        {% if form.confirmacion_fecha_display.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.confirmacion_fecha_display.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.confirmacion_fecha_display.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# SECCIÓN: Intervalos de Calibración #}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-purple-500 pb-2">
+                    <i class="fas fa-calendar-alt mr-2"></i> Intervalos de Calibración
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="mb-4">
+                        <label for="{{ form.intervalos_codigo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.intervalos_codigo.label }}
+                        </label>
+                        {{ form.intervalos_codigo }}
+                        {% for error in form.intervalos_codigo.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.intervalos_version.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.intervalos_version.label }}
+                        </label>
+                        {{ form.intervalos_version }}
+                        {% for error in form.intervalos_version.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.intervalos_fecha_display.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.intervalos_fecha_display.label }}
+                        </label>
+                        {{ form.intervalos_fecha_display }}
+                        {% if form.intervalos_fecha_display.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.intervalos_fecha_display.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.intervalos_fecha_display.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# SECCIÓN: Comprobación Metrológica #}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-yellow-500 pb-2">
+                    <i class="fas fa-clipboard-check mr-2"></i> Comprobación Metrológica
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="mb-4">
+                        <label for="{{ form.comprobacion_codigo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.comprobacion_codigo.label }}
+                        </label>
+                        {{ form.comprobacion_codigo }}
+                        {% for error in form.comprobacion_codigo.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.comprobacion_version.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.comprobacion_version.label }}
+                        </label>
+                        {{ form.comprobacion_version }}
+                        {% for error in form.comprobacion_version.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.comprobacion_fecha_display.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.comprobacion_fecha_display.label }}
+                        </label>
+                        {{ form.comprobacion_fecha_display }}
+                        {% if form.comprobacion_fecha_display.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.comprobacion_fecha_display.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.comprobacion_fecha_display.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# SECCIÓN: Mantenimiento #}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-red-500 pb-2">
+                    <i class="fas fa-wrench mr-2"></i> Mantenimiento
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="mb-4">
+                        <label for="{{ form.mantenimiento_codigo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.mantenimiento_codigo.label }}
+                        </label>
+                        {{ form.mantenimiento_codigo }}
+                        {% for error in form.mantenimiento_codigo.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.mantenimiento_version.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.mantenimiento_version.label }}
+                        </label>
+                        {{ form.mantenimiento_version }}
+                        {% for error in form.mantenimiento_version.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.mantenimiento_fecha_display.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.mantenimiento_fecha_display.label }}
+                        </label>
+                        {{ form.mantenimiento_fecha_display }}
+                        {% if form.mantenimiento_fecha_display.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.mantenimiento_fecha_display.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.mantenimiento_fecha_display.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# SECCIÓN: Listado de Equipos #}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-teal-500 pb-2">
+                    <i class="fas fa-list-alt mr-2"></i> Listado de Equipos
+                </h2>
+                <p class="text-gray-500 text-sm mb-4">Formato para el listado de equipos en la página principal y la exportación a Excel.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="mb-4">
+                        <label for="{{ form.listado_codigo.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.listado_codigo.label }}
+                        </label>
+                        {{ form.listado_codigo }}
+                        {% for error in form.listado_codigo.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.listado_version.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.listado_version.label }}
+                        </label>
+                        {{ form.listado_version }}
+                        {% for error in form.listado_version.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        <label for="{{ form.listado_fecha_display.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                            {{ form.listado_fecha_display.label }}
+                        </label>
+                        {{ form.listado_fecha_display }}
+                        {% if form.listado_fecha_display.help_text %}
+                            <p class="text-gray-600 text-xs italic mt-1">{{ form.listado_fecha_display.help_text }}</p>
+                        {% endif %}
+                        {% for error in form.listado_fecha_display.errors %}
+                            <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
 
             {% if form.non_field_errors %}

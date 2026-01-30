@@ -40,11 +40,16 @@ class TestDashboardQueries:
                 empresa=self.empresa,
                 tipo_equipo="Equipo de Medición",
                 estado=ESTADO_ACTIVO if i % 3 != 0 else ESTADO_EN_CALIBRACION,
+            )
+            equipos.append(equipo)
+
+        # Usar .update() por equipo para asignar fechas sin que save() las recalcule
+        for i, equipo in enumerate(equipos):
+            Equipo.objects.filter(pk=equipo.pk).update(
                 proxima_calibracion=self.today + timedelta(days=(i % 90) - 30),
                 proximo_mantenimiento=self.today + timedelta(days=(i % 60) - 20),
                 proxima_comprobacion=self.today + timedelta(days=(i % 45) - 15),
             )
-            equipos.append(equipo)
         return equipos
 
     @pytest.mark.performance
@@ -192,7 +197,7 @@ class TestDashboardQueries:
             Calibracion.objects.create(
                 equipo=equipo,
                 fecha_calibracion=self.today - timedelta(days=i),
-                tipo='Externa',
+                nombre_proveedor='Laboratorio Externo',
             )
 
         start_time = time.time()

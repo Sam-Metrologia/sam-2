@@ -154,12 +154,10 @@ class TestDashboardPerformance:
         assert response.status_code == 200
         assert elapsed < 2.0, f"Estadísticas con 200 equipos tomó {elapsed:.2f}s"
 
-        # Verificar que las estadísticas están en el contexto
-        assert 'estadisticas_actividades' in response.context
-        stats = response.context['estadisticas_actividades']
-        assert 'vencidos_calibracion' in stats
-        assert 'vencidos_mantenimiento' in stats
-        assert 'vencidos_comprobacion' in stats
+        # Verificar que las estadísticas de actividades están en el contexto
+        assert 'calibraciones_vencidas' in response.context
+        assert 'mantenimientos_vencidos' in response.context
+        assert 'comprobaciones_vencidas' in response.context
 
         print(f"\n✓ Estadísticas actividades (200 equipos): {elapsed:.3f}s")
 
@@ -192,10 +190,11 @@ class TestDashboardPerformance:
 
         # Crear 400 equipos, 25% vencidos
         equipos = self._create_equipos_batch(400, with_dates=False)
-        for i, equipo in enumerate(equipos):
-            if i % 4 == 0:  # 25% vencidos
-                equipo.proxima_calibracion = today - timedelta(days=10)
-                equipo.save()
+        # Usar .update() para evitar que save() recalcule las fechas
+        vencido_ids = [equipos[i].pk for i in range(0, len(equipos), 4)]
+        Equipo.objects.filter(pk__in=vencido_ids).update(
+            proxima_calibracion=today - timedelta(days=10)
+        )
 
         # Medir query de vencidos
         start_time = time.time()

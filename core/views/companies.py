@@ -409,14 +409,21 @@ def update_empresa_formato(request):
 def editar_empresa_formato(request, pk):
     """
     Maneja la edición de información de formato de empresa (página dedicada).
-    Superusuarios pueden editar cualquier empresa, usuarios regulares solo la suya.
+    Solo Admin y Gerente pueden editar. Superusuarios pueden editar cualquier empresa.
     """
     empresa = get_object_or_404(Empresa, pk=pk)
 
-    # Verificar permisos
-    if not request.user.is_superuser and request.user.empresa != empresa:
-        messages.error(request, 'No tienes permiso para editar la información de formato de esta empresa.')
-        return redirect('core:home')
+    # Verificar permisos: Solo superusuario, ADMINISTRADOR o GERENCIA
+    if not request.user.is_superuser:
+        # Verificar que pertenece a la empresa
+        if request.user.empresa != empresa:
+            messages.error(request, 'No tienes permiso para editar la información de formato de esta empresa.')
+            return redirect('core:home')
+
+        # Verificar que sea ADMINISTRADOR o GERENCIA
+        if request.user.rol_usuario not in ['ADMINISTRADOR', 'GERENCIA']:
+            messages.error(request, 'Solo usuarios con rol Administrador o Gerencia pueden editar la información de formato.')
+            return redirect('core:home')
 
     if request.method == 'POST':
         form = EmpresaFormatoForm(request.POST, instance=empresa)

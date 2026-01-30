@@ -64,6 +64,15 @@ urlpatterns = [
     path('equipos/<int:equipo_id>/confirmacion-metrologica/guardar/', views.guardar_confirmacion, name='guardar_confirmacion'),
     path('empresas/actualizar-formato/', confirmacion.actualizar_formato_empresa, name='actualizar_formato_empresa'),
 
+    # Sistema de Aprobaciones
+    path('aprobaciones/', views.pagina_aprobaciones, name='aprobaciones'),
+    path('calibracion/<int:calibracion_id>/aprobar-confirmacion/', views.aprobar_confirmacion, name='aprobar_confirmacion'),
+    path('calibracion/<int:calibracion_id>/rechazar-confirmacion/', views.rechazar_confirmacion, name='rechazar_confirmacion'),
+    path('calibracion/<int:calibracion_id>/aprobar-intervalos/', views.aprobar_intervalos, name='aprobar_intervalos'),
+    path('calibracion/<int:calibracion_id>/rechazar-intervalos/', views.rechazar_intervalos, name='rechazar_intervalos'),
+    path('comprobacion/<int:comprobacion_id>/aprobar/', views.aprobar_comprobacion, name='aprobar_comprobacion'),
+    path('comprobacion/<int:comprobacion_id>/rechazar/', views.rechazar_comprobacion, name='rechazar_comprobacion'),
+
     # Comprobación Metrológica
     path('equipos/<int:equipo_id>/comprobacion-metrologica/', views.comprobacion_metrologica_view, name='comprobacion_metrologica'),
     path('equipos/<int:equipo_id>/comprobacion-metrologica/guardar/', views.guardar_comprobacion_json, name='guardar_comprobacion_json'),

@@ -712,7 +712,7 @@ def _add_template_headers_row(sheet):
     # Headers técnicos
     headers = [
         "codigo_interno", "nombre", "empresa_nombre", "tipo_equipo", "marca", "modelo",
-        "numero_serie", "ubicacion_nombre", "responsable", "estado", "fecha_adquisicion",
+        "numero_serie", "ubicacion_nombre", "responsable", "estado", "fecha_adquisicion", "proveedor",
         "fecha_ultima_calibracion", "fecha_ultimo_mantenimiento", "fecha_ultima_comprobacion",
         "rango_medida", "resolucion", "error_maximo_permisible", "puntos_calibracion", "observaciones",
         "version_formato", "fecha_version_formato", "codificacion_formato",
@@ -722,7 +722,7 @@ def _add_template_headers_row(sheet):
     # Headers legibles
     headers_legibles = [
         "Código Interno*", "Nombre del Equipo*", "Empresa*", "Tipo de Equipo*", "Marca", "Modelo",
-        "Número de Serie", "Ubicación", "Responsable", "Estado*", "Fecha Adquisición",
+        "Número de Serie", "Ubicación", "Responsable", "Estado*", "Fecha Adquisición", "Proveedor",
         "Última Calibración", "Último Mantenimiento", "Última Comprobación",
         "Rango de Medida", "Resolución", "Error Máx. Permisible", "Puntos de Calibración", "Observaciones",
         "Versión Formato", "Fecha Versión", "Codificación Formato",
@@ -819,7 +819,7 @@ def _add_template_example_row(sheet):
         tipos_equipo[0] if tipos_equipo else "Equipo de Medición",
         "Mettler Toledo", "XPE205", "B123456789", "Laboratorio Principal",
         "Técnico Responsable", estados_equipo[0] if estados_equipo else "Activo",
-        "15/01/2023", "20/11/2024", "15/10/2024", "10/12/2024",
+        "15/01/2023", "Multiples", "20/11/2024", "15/10/2024", "10/12/2024",
         "0-220g", "0.1mg", "±0.1mg", "Equipo nuevo para laboratorio",
         "V1.0", "01/01/2023", "CAL-001", "12", "6", "3"
     ]
@@ -843,7 +843,7 @@ def _apply_template_formatting(sheet):
     from openpyxl.utils import get_column_letter
 
     # Ajustar anchos de columna
-    anchos = [15, 25, 20, 18, 15, 15, 15, 20, 20, 15, 15, 18, 18, 18, 15, 15, 15, 25, 15, 15, 15, 10, 10, 10]
+    anchos = [15, 25, 20, 18, 15, 15, 15, 20, 20, 15, 15, 18, 18, 18, 18, 15, 15, 15, 25, 15, 15, 15, 10, 10, 10]
     for i, ancho in enumerate(anchos, 1):
         column_letter = get_column_letter(i)
         sheet.column_dimensions[column_letter].width = ancho
@@ -2218,12 +2218,85 @@ def _add_dashboard_sheet(workbook, equipos_queryset, generation_date):
     return sheet
 
 
-def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset):
+def _add_prestamos_sheet(workbook, prestamos_queryset, generation_date):
     """
-    Genera un Excel consolidado con 4 hojas: Equipos, Proveedores, Procedimientos y Reporte Dashboard.
+    Helper: Crea y llena la hoja de Préstamos de Equipos.
+
+    Args:
+        workbook: Workbook de Excel
+        prestamos_queryset: QuerySet de préstamos
+        generation_date: Fecha de generación
+
+    Returns:
+        sheet: Hoja de préstamos creada
+    """
+    sheet = workbook.create_sheet(title="Préstamos")
+
+    # Header profesional
+    _add_professional_sheet_header(
+        sheet,
+        "INFORMES GENERADOS POR SAM METROLOGÍA SAS",
+        'A1:L2',
+        generation_date
+    )
+
+    # Headers de columnas
+    headers = [
+        "Código Equipo", "Nombre Equipo", "Prestatario", "Cédula", "Cargo",
+        "Teléfono", "Email", "Fecha Préstamo", "Devolución Programada",
+        "Devolución Real", "Estado", "Observaciones"
+    ]
+    _add_sheet_headers(sheet, headers, row_num=5)
+
+    # Datos de préstamos
+    current_row = 6
+    for prestamo in prestamos_queryset:
+        # Formatear fechas
+        fecha_prestamo = prestamo.fecha_prestamo.strftime('%Y-%m-%d %H:%M') if prestamo.fecha_prestamo else ''
+        fecha_dev_prog = prestamo.fecha_devolucion_programada.strftime('%Y-%m-%d') if prestamo.fecha_devolucion_programada else ''
+        fecha_dev_real = prestamo.fecha_devolucion_real.strftime('%Y-%m-%d %H:%M') if prestamo.fecha_devolucion_real else ''
+
+        # Determinar estado en español
+        estado_map = {
+            'activo': 'Activo',
+            'devuelto': 'Devuelto',
+            'vencido': 'Vencido'
+        }
+        estado = estado_map.get(prestamo.estado_prestamo, prestamo.estado_prestamo)
+
+        row_data = [
+            prestamo.equipo.codigo_interno,
+            prestamo.equipo.nombre,
+            prestamo.nombre_prestatario,
+            prestamo.cedula_prestatario or '',
+            prestamo.cargo_prestatario or '',
+            prestamo.telefono_prestatario or '',
+            prestamo.email_prestatario or '',
+            fecha_prestamo,
+            fecha_dev_prog,
+            fecha_dev_real,
+            estado,
+            prestamo.observaciones_prestamo or ''
+        ]
+        for col_num, value in enumerate(row_data, 1):
+            sheet.cell(row=current_row, column=col_num, value=value)
+        current_row += 1
+
+    # Ajustar anchos de columna
+    column_widths = [15, 25, 25, 15, 20, 15, 30, 20, 18, 18, 12, 40]
+    for col_num, width in enumerate(column_widths, 1):
+        from openpyxl.utils import get_column_letter
+        sheet.column_dimensions[get_column_letter(col_num)].width = width
+
+    return sheet
+
+
+def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset, prestamos_queryset=None):
+    """
+    Genera un Excel consolidado con 5 hojas: Equipos, Proveedores, Procedimientos, Préstamos y Reporte Dashboard.
     Usado para el ZIP completo con todas las funcionalidades.
 
-    Refactorizada: 201 líneas → 25 líneas (usa 6 helpers)
+    Refactorizada: 201 líneas → 25 líneas (usa 7 helpers)
     """
     from django.utils import timezone
     import io
@@ -2231,10 +2304,15 @@ def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset,
     workbook = Workbook()
     generation_date = timezone.now()
 
-    # Crear las 4 hojas usando helpers
+    # Crear las 5 hojas usando helpers
     _add_equipos_sheet(workbook, equipos_queryset, generation_date)
     _add_proveedores_sheet(workbook, proveedores_queryset, generation_date)
     _add_procedimientos_sheet(workbook, procedimientos_queryset, generation_date)
+
+    # Agregar hoja de préstamos si se proporciona el queryset
+    if prestamos_queryset is not None:
+        _add_prestamos_sheet(workbook, prestamos_queryset, generation_date)
+
     _add_dashboard_sheet(workbook, equipos_queryset, generation_date)
 
     # Retornar bytes del Excel
@@ -2728,13 +2806,17 @@ def _generate_general_equipment_list_excel_content_local(equipos_queryset):
     sheet['A3'] = f'LISTADO GENERAL DE EQUIPOS - Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
     sheet['A3'].font = Font(bold=True, size=12, color="1f4e79")
 
-    # INFORMACIÓN DEL FORMATO (común para todos los equipos) - Fila 4 y 5
+    # INFORMACIÓN DEL FORMATO (desde la empresa - campos de Listado de Equipos) - Fila 4 y 5
     primer_equipo = equipos_queryset.first()
-    if primer_equipo:
+    if primer_equipo and primer_equipo.empresa:
+        empresa = primer_equipo.empresa
+        codigo_fmt = empresa.listado_codigo or "N/A"
+        version_fmt = empresa.listado_version or "N/A"
+        fecha_fmt = empresa.listado_fecha_formato_display or (
+            empresa.listado_fecha_formato.strftime("%Y-%m-%d") if empresa.listado_fecha_formato else "N/A"
+        )
         sheet.merge_cells('A4:AB4')
-        formato_info = f'FORMATO: Código: {primer_equipo.codificacion_formato or "N/A"} | Versión: {primer_equipo.version_formato or "N/A"}'
-        if primer_equipo.fecha_version_formato:
-            formato_info += f' | Fecha Versión: {primer_equipo.fecha_version_formato.strftime("%Y-%m-%d")}'
+        formato_info = f'FORMATO: Código: {codigo_fmt} | Versión: {version_fmt} | Fecha: {fecha_fmt}'
         sheet['A4'] = formato_info
         sheet['A4'].font = Font(bold=True, size=10, color="FFFFFF")
         sheet['A4'].fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
@@ -2913,20 +2995,21 @@ def _validate_and_load_excel(excel_file):
             'I': 'responsable',
             'J': 'estado',
             'K': 'fecha_adquisicion',
-            'L': 'fecha_ultima_calibracion',
-            'M': 'fecha_ultimo_mantenimiento',
-            'N': 'fecha_ultima_comprobacion',
-            'O': 'rango_medida',
-            'P': 'resolucion',
-            'Q': 'error_maximo_permisible',
-            'R': 'puntos_calibracion',
-            'S': 'observaciones',
-            'T': 'version_formato',
-            'U': 'fecha_version_formato',
-            'V': 'codificacion_formato',
-            'W': 'frecuencia_calibracion_meses',
-            'X': 'frecuencia_mantenimiento_meses',
-            'Y': 'frecuencia_comprobacion_meses'
+            'L': 'proveedor',
+            'M': 'fecha_ultima_calibracion',
+            'N': 'fecha_ultimo_mantenimiento',
+            'O': 'fecha_ultima_comprobacion',
+            'P': 'rango_medida',
+            'Q': 'resolucion',
+            'R': 'error_maximo_permisible',
+            'S': 'puntos_calibracion',
+            'T': 'observaciones',
+            'U': 'version_formato',
+            'V': 'fecha_version_formato',
+            'W': 'codificacion_formato',
+            'X': 'frecuencia_calibracion_meses',
+            'Y': 'frecuencia_mantenimiento_meses',
+            'Z': 'frecuencia_comprobacion_meses'
         }
 
         result['workbook'] = workbook
@@ -3064,6 +3147,10 @@ def _update_existing_equipment(equipo_existente, row_data, dates_dict):
         equipo_existente.fecha_adquisicion = dates_dict['fecha_adquisicion']
         campos_actualizados.append('fecha_adquisicion')
 
+    if row_data.get('proveedor'):
+        equipo_existente.proveedor = row_data['proveedor']
+        campos_actualizados.append('proveedor')
+
     if row_data.get('rango_medida'):
         equipo_existente.rango_medida = row_data['rango_medida']
         campos_actualizados.append('rango_medida')
@@ -3156,6 +3243,7 @@ def _create_new_equipment(row_data, empresa, dates_dict):
         responsable=row_data.get('responsable', ''),
         estado=row_data.get('estado', ESTADO_ACTIVO),
         fecha_adquisicion=dates_dict.get('fecha_adquisicion'),
+        proveedor=row_data.get('proveedor', ''),
         rango_medida=row_data.get('rango_medida', ''),
         resolucion=row_data.get('resolucion', ''),
         error_maximo_permisible=row_data.get('error_maximo_permisible', ''),

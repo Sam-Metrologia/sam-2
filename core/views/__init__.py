@@ -72,5 +72,16 @@ from .mantenimiento import (
     generar_pdf_mantenimiento
 )
 
+# Sistema de Aprobaciones
+from .aprobaciones import (
+    pagina_aprobaciones,
+    aprobar_confirmacion,
+    rechazar_confirmacion,
+    aprobar_intervalos,
+    rechazar_intervalos,
+    aprobar_comprobacion,
+    rechazar_comprobacion
+)
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

@@ -249,12 +249,22 @@
                 <p><strong>Versión:</strong> {{ datos_mantenimiento.formato_version|default:empresa.mantenimiento_version|default:"01" }}</p>
                 {% if formato_fecha_formateada %}
                     <p><strong>Fecha:</strong> {{ formato_fecha_formateada }}</p>
-                {% elif empresa.mantenimiento_fecha_formato %}
-                    <p><strong>Fecha:</strong> {{ empresa.mantenimiento_fecha_formato|date:"Y-m-d" }}</p>
+                {% elif empresa.mantenimiento_fecha_formato_display or empresa.mantenimiento_fecha_formato %}
+                    <p><strong>Fecha:</strong> {% if empresa.mantenimiento_fecha_formato_display %}{{ empresa.mantenimiento_fecha_formato_display }}{% elif empresa.mantenimiento_fecha_formato %}{{ empresa.mantenimiento_fecha_formato|date:"Y-m-d" }}{% endif %}</p>
                 {% endif %}
             </td>
         </tr>
     </table>
+
+    <!-- ==================== FECHA DE REALIZACIÓN ==================== -->
+    {% if mantenimiento.fecha_realizacion %}
+    <div style="background: #EBF5FB; border: 1px solid #3498DB; padding: 6px 12px; margin-bottom: 10px; border-radius: 3px; font-size: 9pt;">
+        <strong>FECHA DE REALIZACIÓN:</strong> {{ mantenimiento.fecha_realizacion|date:"Y-m-d" }}
+        {% if mantenimiento.fecha_emision %}
+        &nbsp;&nbsp;|&nbsp;&nbsp;<strong>FECHA DE EMISIÓN:</strong> {{ mantenimiento.fecha_emision|date:"Y-m-d" }}
+        {% endif %}
+    </div>
+    {% endif %}
 
     <!-- SECCIÓN 1: INFORMACIÓN DEL EQUIPO -->
     <div class="section">

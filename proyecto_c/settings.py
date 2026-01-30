@@ -76,7 +76,6 @@ INSTALLED_APPS = [
     'storages',
     'crispy_forms',
     'crispy_bootstrap5',
-    'weasyprint',
     # Mis aplicaciones
     'core',
 ]
@@ -568,7 +567,7 @@ RATE_LIMIT_CONFIG = {
 # CONFIGURACIÓN DE TAREAS PROGRAMADAS (GitHub Actions)
 # ==============================================================================
 # Token de seguridad para autenticar llamadas de GitHub Actions
-SCHEDULED_TASKS_TOKEN = os.environ.get('SCHEDULED_TASKS_TOKEN', 'change-this-secret-token-in-production')
+SCHEDULED_TASKS_TOKEN = os.environ.get('SCHEDULED_TASKS_TOKEN', '')
 
 # ==============================================================================
 # CONFIGURACIÓN DE MONITOREO Y MÉTRICAS (OPCIONAL)
