@@ -515,7 +515,7 @@ def generar_hoja_vida_pdf(request, pk):
     Incluye toda la información del equipo y su historial.
     """
     try:
-        equipo = get_object_or_404(Equipo, pk=pk)
+        equipo = get_object_or_404(Equipo.objects.select_related('empresa'), pk=pk)
 
         # Verificar permisos
         if not request.user.is_superuser and request.user.empresa != equipo.empresa:
@@ -1413,6 +1413,15 @@ def _generate_hoja_vida_cache_key(equipo):
     """
     import hashlib
 
+    # Obtener datos de formato de la empresa para incluir en la clave de caché
+    empresa = equipo.empresa
+    empresa_formato_data = {
+        'empresa_formato_codificacion': empresa.formato_codificacion_empresa or '',
+        'empresa_formato_version': empresa.formato_version_empresa or '',
+        'empresa_formato_fecha_display': empresa.formato_fecha_version_empresa_display or '',
+        'empresa_formato_fecha': empresa.formato_fecha_version_empresa.isoformat() if empresa.formato_fecha_version_empresa else '',
+    }
+
     cache_data = {
         'equipo_id': equipo.id,
         'equipo_updated': equipo.fecha_actualizacion.isoformat() if hasattr(equipo, 'fecha_actualizacion') else '',
@@ -1425,6 +1434,8 @@ def _generate_hoja_vida_cache_key(equipo):
         'codificacion_formato': equipo.codificacion_formato or '',
         'version_formato': equipo.version_formato or '',
         'fecha_version_formato': equipo.fecha_version_formato.isoformat() if equipo.fecha_version_formato else '',
+        # Incluir datos de formato de la empresa para invalidar caché cuando cambien
+        **empresa_formato_data,
     }
 
     cache_key_data = str(cache_data).encode('utf-8')
