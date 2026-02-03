@@ -383,6 +383,12 @@ class Empresa(models.Model):
         verbose_name="Fecha Formato Display - Comprobación",
         help_text="Formato de fecha para mostrar (YYYY-MM o YYYY-MM-DD)"
     )
+    comprobacion_observaciones_formato = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Observaciones del Formato - Comprobación",
+        help_text="Observaciones o notas que aparecerán en todos los PDFs de comprobación metrológica"
+    )
 
     # Campos específicos para LISTADO DE EQUIPOS
     listado_codigo = models.CharField(

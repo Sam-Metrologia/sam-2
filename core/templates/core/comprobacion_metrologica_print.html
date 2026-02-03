@@ -479,11 +479,21 @@
     </div>
 
     <!-- SECCIÓN 6: OBSERVACIONES -->
-    {% if comprobacion.observaciones %}
+    {% if comprobacion.observaciones or equipo.empresa.comprobacion_observaciones_formato %}
     <div class="section">
         <div class="section-title">{% if comprobacion.equipo_referencia_nombre or datos_comprobacion.equipo_ref_nombre %}6{% else %}5{% endif %}. OBSERVACIONES</div>
         <div class="observation-box">
+            {% if equipo.empresa.comprobacion_observaciones_formato %}
+            <p><strong>Observaciones del formato:</strong></p>
+            <p>{{ equipo.empresa.comprobacion_observaciones_formato }}</p>
+            {% endif %}
+            {% if comprobacion.observaciones and equipo.empresa.comprobacion_observaciones_formato %}
+            <hr style="margin: 10px 0; border: none; border-top: 1px solid #ddd;">
+            {% endif %}
+            {% if comprobacion.observaciones %}
+            <p><strong>Observaciones de la comprobación:</strong></p>
             <p>{{ comprobacion.observaciones }}</p>
+            {% endif %}
         </div>
     </div>
     {% endif %}

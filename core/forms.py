@@ -1035,7 +1035,7 @@ class EmpresaFormatoForm(forms.ModelForm):
         fields = ['formato_version_empresa', 'formato_codificacion_empresa',
                   'confirmacion_codigo', 'confirmacion_version',
                   'intervalos_codigo', 'intervalos_version',
-                  'comprobacion_codigo', 'comprobacion_version',
+                  'comprobacion_codigo', 'comprobacion_version', 'comprobacion_observaciones_formato',
                   'mantenimiento_codigo', 'mantenimiento_version',
                   'listado_codigo', 'listado_version']
         widgets = {
@@ -1047,6 +1047,7 @@ class EmpresaFormatoForm(forms.ModelForm):
             'intervalos_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
             'comprobacion_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
             'comprobacion_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
+            'comprobacion_observaciones_formato': forms.Textarea(attrs={'class': 'form-input', 'rows': '3', 'placeholder': 'Observaciones que aparecerán en todos los PDFs de comprobación...'}),
             'mantenimiento_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
             'mantenimiento_version': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '20'}),
             'listado_codigo': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '50'}),
@@ -1061,6 +1062,7 @@ class EmpresaFormatoForm(forms.ModelForm):
             'intervalos_version': "Versión Intervalos",
             'comprobacion_codigo': "Código Comprobación",
             'comprobacion_version': "Versión Comprobación",
+            'comprobacion_observaciones_formato': "Observaciones del Formato",
             'mantenimiento_codigo': "Código Mantenimiento",
             'mantenimiento_version': "Versión Mantenimiento",
             'listado_codigo': "Código Listado de Equipos",

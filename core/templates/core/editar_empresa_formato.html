@@ -183,6 +183,17 @@
                         {% endfor %}
                     </div>
                 </div>
+                {# Campo de observaciones del formato - ancho completo #}
+                <div class="mt-4">
+                    <label for="{{ form.comprobacion_observaciones_formato.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
+                        {{ form.comprobacion_observaciones_formato.label }}
+                    </label>
+                    {{ form.comprobacion_observaciones_formato }}
+                    <p class="text-gray-600 text-xs italic mt-1">Estas observaciones aparecerán en todos los PDFs de comprobación metrológica.</p>
+                    {% for error in form.comprobacion_observaciones_formato.errors %}
+                        <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                    {% endfor %}
+                </div>
             </div>
 
             {# SECCIÓN: Mantenimiento #}
