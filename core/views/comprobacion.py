@@ -248,6 +248,11 @@ def guardar_comprobacion_json(request, equipo_id):
             comprobacion.empresa_cliente_nit = ''
             comprobacion.empresa_cliente_direccion = ''
 
+        # Guardar observaciones
+        observaciones = datos.get('observaciones', '').strip()
+        if observaciones:
+            comprobacion.observaciones = observaciones
+
         # Determinar resultado basado en conformidad
         puntos = datos.get('puntos_medicion', [])
         no_conforme = any(p.get('conformidad') == 'NO CONFORME' for p in puntos)
