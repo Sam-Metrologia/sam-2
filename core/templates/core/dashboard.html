@@ -441,6 +441,24 @@
             border-bottom: none;
         }
 
+        /* ===== MODO OSCURO: Summary Table ===== */
+        [data-theme="dark"] .summary-table {
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        [data-theme="dark"] .summary-table th {
+            background: linear-gradient(to bottom, #374151, #1f2937) !important;
+            color: #d1d5db !important;
+            border-bottom-color: #4b5563 !important;
+        }
+        [data-theme="dark"] .summary-table td {
+            background-color: var(--bg-card) !important;
+            color: var(--text-primary) !important;
+            border-bottom-color: var(--border-color) !important;
+        }
+        [data-theme="dark"] .summary-table tbody tr:hover td {
+            background-color: var(--bg-tertiary) !important;
+        }
+
         /* Estilos mejorados para las tarjetas de gráficas de torta */
         .pie-chart-card {
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
@@ -478,6 +496,22 @@
             margin-bottom: 1rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }
+
+        /* ===== MODO OSCURO: Pie Chart Cards ===== */
+        [data-theme="dark"] .pie-chart-card {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+            border-color: #374151 !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+        }
+        [data-theme="dark"] .pie-chart-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3) !important;
+        }
+        [data-theme="dark"] .pie-chart-card-title {
+            border-bottom-color: #374151 !important;
+        }
+        [data-theme="dark"] .pie-chart-section-title {
+            color: #d1d5db !important;
         }
 
         .detail-button {
@@ -595,6 +629,70 @@
         /* Cursor pointer para gráficas clickeables */
         canvas {
             cursor: pointer !important;
+        }
+
+        /* ===== MODO OSCURO: Elementos con bg-white ===== */
+        [data-theme="dark"] .bg-white {
+            background-color: var(--bg-card) !important;
+            color: var(--text-primary) !important;
+        }
+
+        [data-theme="dark"] .bg-white h2,
+        [data-theme="dark"] .bg-white h3 {
+            color: var(--text-primary) !important;
+        }
+
+        [data-theme="dark"] .bg-white .text-gray-800,
+        [data-theme="dark"] .bg-white .text-gray-700,
+        [data-theme="dark"] .bg-white .text-gray-600 {
+            color: var(--text-secondary) !important;
+        }
+
+        /* Fondo de items de alerta */
+        .alerta-item-bg {
+            background-color: white;
+        }
+
+        /* Alertas vencidas en modo oscuro */
+        [data-theme="dark"] .alerta-vencidas {
+            background-color: rgba(239, 68, 68, 0.15) !important;
+            border-color: #ef4444 !important;
+        }
+
+        [data-theme="dark"] .alerta-vencidas .alerta-item,
+        [data-theme="dark"] .alerta-vencidas .alerta-item-bg {
+            background-color: rgba(239, 68, 68, 0.1) !important;
+            border-color: rgba(239, 68, 68, 0.3) !important;
+        }
+
+        [data-theme="dark"] .alerta-titulo {
+            color: #f87171 !important;
+        }
+
+        /* Alertas próximas (amarillo) en modo oscuro */
+        [data-theme="dark"] .bg-yellow-50,
+        [data-theme="dark"] .dashboard-actividades-proximas {
+            background-color: rgba(251, 191, 36, 0.1) !important;
+        }
+
+        [data-theme="dark"] .dashboard-actividades-proximas .bg-white {
+            background-color: rgba(251, 191, 36, 0.15) !important;
+            border-color: rgba(251, 191, 36, 0.3) !important;
+        }
+
+        /* Lista de mantenimientos correctivos en modo oscuro */
+        [data-theme="dark"] .corrective-maintenance-list li {
+            border-color: var(--border-color) !important;
+        }
+
+        [data-theme="dark"] .corrective-maintenance-list a {
+            color: #60a5fa !important;
+        }
+
+        /* Sombras en modo oscuro */
+        [data-theme="dark"] .shadow-md,
+        [data-theme="dark"] .shadow-lg {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
         }
     </style>
 {% endblock extra_head %}
@@ -719,7 +817,7 @@
                 <h3 class="text-lg font-bold alerta-titulo mb-2">ACTIVIDADES VENCIDAS - ACCIÓN REQUERIDA</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {% if calibraciones_vencidas > 0 %}
-                    <div class="alerta-item p-3 rounded border border-red-200" style="background-color: white;">
+                    <div class="alerta-item p-3 rounded border border-red-200" class="alerta-item-bg">
                         <div class="text-red-700 font-bold">🔬 Calibraciones</div>
                         <div class="text-red-600">{{ calibraciones_vencidas }} vencida{{ calibraciones_vencidas|pluralize }}</div>
                         {% if vencidos_calibracion_codigos %}
@@ -728,7 +826,7 @@
                     </div>
                     {% endif %}
                     {% if mantenimientos_vencidos > 0 %}
-                    <div class="alerta-item p-3 rounded border border-red-200" style="background-color: white;">
+                    <div class="alerta-item p-3 rounded border border-red-200" class="alerta-item-bg">
                         <div class="text-red-700 font-bold">🔧 Mantenimientos</div>
                         <div class="text-red-600">{{ mantenimientos_vencidos }} vencido{{ mantenimientos_vencidos|pluralize }}</div>
                         {% if vencidos_mantenimiento_codigos %}
@@ -737,7 +835,7 @@
                     </div>
                     {% endif %}
                     {% if comprobaciones_vencidas > 0 %}
-                    <div class="alerta-item p-3 rounded border border-red-200" style="background-color: white;">
+                    <div class="alerta-item p-3 rounded border border-red-200" class="alerta-item-bg">
                         <div class="text-red-700 font-bold">✅ Comprobaciones</div>
                         <div class="text-red-600">{{ comprobaciones_vencidas }} vencida{{ comprobaciones_vencidas|pluralize }}</div>
                         {% if vencidos_comprobacion_codigos %}

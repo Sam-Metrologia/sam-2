@@ -3,6 +3,84 @@
 
 {% block title %}Aprobaciones{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* ===== MODO OSCURO: Aprobaciones ===== */
+
+    /* Encabezados de sección con colores de fondo */
+    [data-theme="dark"] .bg-purple-50 {
+        background-color: rgba(147, 51, 234, 0.15) !important;
+    }
+    [data-theme="dark"] .bg-blue-50 {
+        background-color: rgba(59, 130, 246, 0.15) !important;
+    }
+    [data-theme="dark"] .bg-green-50 {
+        background-color: rgba(34, 197, 94, 0.15) !important;
+    }
+    [data-theme="dark"] .bg-yellow-50 {
+        background-color: rgba(251, 191, 36, 0.15) !important;
+    }
+    [data-theme="dark"] .bg-gray-50 {
+        background-color: var(--bg-tertiary) !important;
+    }
+
+    /* Textos en encabezados de sección */
+    [data-theme="dark"] .text-gray-800 {
+        color: var(--text-primary) !important;
+    }
+    [data-theme="dark"] .text-gray-600 {
+        color: var(--text-secondary) !important;
+    }
+    [data-theme="dark"] .text-gray-500 {
+        color: var(--text-muted) !important;
+    }
+    [data-theme="dark"] .text-purple-800,
+    [data-theme="dark"] .text-yellow-800,
+    [data-theme="dark"] .text-yellow-900,
+    [data-theme="dark"] .text-green-800,
+    [data-theme="dark"] .text-green-900 {
+        color: var(--text-primary) !important;
+    }
+
+    /* Tablas con fondo blanco */
+    [data-theme="dark"] .bg-white {
+        background-color: var(--bg-card) !important;
+    }
+    [data-theme="dark"] .bg-white tbody {
+        background-color: var(--bg-card) !important;
+    }
+    [data-theme="dark"] table tbody tr {
+        background-color: var(--bg-card) !important;
+    }
+    [data-theme="dark"] table tbody tr:hover {
+        background-color: var(--bg-tertiary) !important;
+    }
+    [data-theme="dark"] .hover\:bg-purple-50:hover,
+    [data-theme="dark"] .hover\:bg-blue-50:hover,
+    [data-theme="dark"] .hover\:bg-green-50:hover {
+        background-color: var(--bg-tertiary) !important;
+    }
+
+    /* Textos dentro de tablas */
+    [data-theme="dark"] .text-gray-900 {
+        color: var(--text-primary) !important;
+    }
+    [data-theme="dark"] .text-gray-700 {
+        color: var(--text-secondary) !important;
+    }
+
+    /* Divisores */
+    [data-theme="dark"] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+        border-color: var(--border-color) !important;
+    }
+
+    /* Sombras */
+    [data-theme="dark"] .shadow {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 {% csrf_token %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

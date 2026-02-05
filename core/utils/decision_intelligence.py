@@ -424,10 +424,10 @@ def calcular_optimizacion_cronogramas(empresa, today):
     for equipo in equipos:
         ubicacion = equipo.ubicacion or 'Sin ubicación'
 
-        # Calibraciones próximas (próximos 60 días)
+        # Calibraciones próximas (próximos 15 días)
         if equipo.proxima_calibracion:
             dias_calibracion = (equipo.proxima_calibracion - today).days
-            if 0 <= dias_calibracion <= 60:
+            if 0 <= dias_calibracion <= 15:
                 optimizaciones[ubicacion].append({
                     'equipo': equipo,
                     'tipo': 'Calibración',
@@ -435,10 +435,10 @@ def calcular_optimizacion_cronogramas(empresa, today):
                     'dias_restantes': dias_calibracion
                 })
 
-        # Mantenimientos próximos (próximos 60 días)
+        # Mantenimientos próximos (próximos 15 días)
         if equipo.proximo_mantenimiento:
             dias_mantenimiento = (equipo.proximo_mantenimiento - today).days
-            if 0 <= dias_mantenimiento <= 60:
+            if 0 <= dias_mantenimiento <= 15:
                 optimizaciones[ubicacion].append({
                     'equipo': equipo,
                     'tipo': 'Mantenimiento',

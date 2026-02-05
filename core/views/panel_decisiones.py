@@ -10,7 +10,8 @@ from decimal import Decimal
 from ..utils.analisis_financiero import (
     calcular_analisis_financiero_empresa,
     calcular_proyeccion_costos_empresa,
-    calcular_metricas_financieras_sam
+    calcular_metricas_financieras_sam,
+    calcular_presupuesto_mensual_detallado
 )
 from ..utils.decision_intelligence import (
     calcular_alertas_predictivas,
@@ -497,6 +498,34 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
     # Recomendaciones específicas
     recomendaciones = _generar_recomendaciones(salud_equipo_data, cumplimiento_data, eficiencia_data, actividades_criticas)
 
+    # Listas consolidadas de vencidas y urgentes para el template simplificado
+    items_vencidos = []
+    for eq in actividades_criticas['calibraciones_vencidas']:
+        dias = (today - eq['proxima_calibracion']).days
+        items_vencidos.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Calibración', 'fecha': eq['proxima_calibracion'], 'dias_atraso': dias})
+    for eq in actividades_criticas['mantenimientos_vencidos']:
+        dias = (today - eq['proximo_mantenimiento']).days
+        items_vencidos.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Mantenimiento', 'fecha': eq['proximo_mantenimiento'], 'dias_atraso': dias})
+    for eq in actividades_criticas['comprobaciones_vencidas']:
+        dias = (today - eq['proxima_comprobacion']).days
+        items_vencidos.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Comprobación', 'fecha': eq['proxima_comprobacion'], 'dias_atraso': dias})
+    items_vencidos.sort(key=lambda x: x['dias_atraso'], reverse=True)
+
+    items_urgentes = []
+    for eq in actividades_criticas['calibraciones_urgentes']:
+        dias = (eq['proxima_calibracion'] - today).days
+        items_urgentes.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Calibración', 'fecha': eq['proxima_calibracion'], 'dias_restantes': dias})
+    for eq in actividades_criticas['mantenimientos_urgentes']:
+        dias = (eq['proximo_mantenimiento'] - today).days
+        items_urgentes.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Mantenimiento', 'fecha': eq['proximo_mantenimiento'], 'dias_restantes': dias})
+    for eq in actividades_criticas['comprobaciones_urgentes']:
+        dias = (eq['proxima_comprobacion'] - today).days
+        items_urgentes.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Comprobación', 'fecha': eq['proxima_comprobacion'], 'dias_restantes': dias})
+    items_urgentes.sort(key=lambda x: x['dias_restantes'])
+
+    total_vencidas = len(items_vencidos)
+    total_urgentes = len(items_urgentes)
+
     # 4. ANÁLISIS FINANCIERO (NUEVO) - Gasto YTD y Proyección
     analisis_financiero = calcular_analisis_financiero_empresa(empresa, current_year, today)
 
@@ -550,6 +579,85 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
     compliance_iso9001 = calcular_compliance_iso9001(empresa, today)
     optimizacion_cronogramas = calcular_optimizacion_cronogramas(empresa, today)
 
+    # 6. PRESUPUESTO VS EJECUCIÓN - Datos para nueva gráfica de Tendencias
+    presupuesto_mensual = calcular_presupuesto_mensual_detallado(empresa, current_year)
+    datos_mensuales_tendencias = tendencias_historicas.get('datos_mensuales', [])
+
+    # Generar datos para gráfica de líneas: presupuesto vs ejecutado
+    meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    presupuesto_vs_ejecutado = []
+    for i, mes_presupuesto in enumerate(presupuesto_mensual['presupuesto_por_mes']):
+        mes_num = i + 1
+        presupuesto_mes = mes_presupuesto['total_mes']
+        # Buscar ejecución real del mes
+        ejecutado_mes = 0
+        for dato in datos_mensuales_tendencias:
+            if dato.get('mes') == mes_num:
+                ejecutado_mes = float(dato.get('gasto_total', 0))
+                break
+        presupuesto_vs_ejecutado.append({
+            'mes': meses_nombres[i],
+            'mes_num': mes_num,
+            'presupuesto': float(presupuesto_mes),
+            'ejecutado': ejecutado_mes,
+            'diferencia': ejecutado_mes - float(presupuesto_mes)
+        })
+
+    # Generar datos para las 4 tarjetas de meses (mes anterior + actual + 2 siguientes)
+    mes_actual = today.month
+    meses_tarjetas = []
+    meses_nombres_full = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+    for offset in [-1, 0, 1, 2]:
+        mes_idx = mes_actual + offset - 1
+        if 0 <= mes_idx < 12:
+            mes_num = mes_idx + 1
+            mes_data = presupuesto_mensual['presupuesto_por_mes'][mes_idx]
+
+            # Buscar ejecución real
+            ejecutado = 0
+            actividades_ejecutadas = {'cal': 0, 'mant': 0, 'comp': 0}
+            for dato in datos_mensuales_tendencias:
+                if dato.get('mes') == mes_num:
+                    ejecutado = float(dato.get('gasto_total', 0))
+                    actividades_ejecutadas['cal'] = dato.get('calibraciones', 0)
+                    actividades_ejecutadas['mant'] = dato.get('mantenimientos', 0)
+                    actividades_ejecutadas['comp'] = dato.get('comprobaciones', 0)
+                    break
+
+            # Determinar estado del mes
+            if mes_num < mes_actual:
+                estado = 'completado'
+            elif mes_num == mes_actual:
+                estado = 'en_curso'
+            else:
+                estado = 'proximo'
+
+            meses_tarjetas.append({
+                'mes': mes_num,
+                'nombre': meses_nombres_full[mes_idx],
+                'año': current_year,
+                'estado': estado,
+                'presupuesto': float(mes_data['total_mes']),
+                'ejecutado': ejecutado,
+                'diferencia_porcentaje': round((ejecutado / float(mes_data['total_mes']) * 100) - 100, 1) if mes_data['total_mes'] > 0 else 0,
+                'actividades': {
+                    'calibraciones': {
+                        'programadas': len(mes_data['calibraciones']),
+                        'ejecutadas': actividades_ejecutadas['cal']
+                    },
+                    'mantenimientos': {
+                        'programadas': len(mes_data['mantenimientos']),
+                        'ejecutadas': actividades_ejecutadas['mant']
+                    },
+                    'comprobaciones': {
+                        'programadas': len(mes_data['comprobaciones']),
+                        'ejecutadas': actividades_ejecutadas['comp']
+                    }
+                }
+            })
+
     context = {
         'titulo_pagina': f'Panel de Decisiones - {empresa.nombre}',
         'perspectiva': 'empresa',
@@ -565,6 +673,10 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
         # Datos para acción inmediata
         'actividades_criticas': actividades_criticas,
         'recomendaciones': recomendaciones,
+        'total_vencidas': total_vencidas,
+        'total_urgentes': total_urgentes,
+        'items_vencidos': items_vencidos,
+        'items_urgentes': items_urgentes,
 
         # ANÁLISIS FINANCIERO (NUEVO)
         **analisis_financiero,
@@ -595,6 +707,10 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
             'gasto': float(item['gasto_total']),
             'actividades': item['actividades']
         } for item in tendencias_historicas['datos_mensuales']]),
+
+        # NUEVA GRÁFICA: Presupuesto vs Ejecución
+        'presupuesto_vs_ejecutado_chart_data': json.dumps(decimal_to_float(presupuesto_vs_ejecutado)),
+        'meses_tarjetas': meses_tarjetas,
     }
 
     return render(request, 'core/panel_decisiones.html', context)
@@ -786,6 +902,39 @@ def _panel_decisiones_sam(request, today, current_year):
         compliance_iso9001 = _calcular_compliance_iso9001_agregado(empresas_queryset, today)
         optimizacion_cronogramas = _calcular_optimizacion_cronogramas_agregado(empresas_queryset, today)
 
+    # Listas consolidadas de vencidas y urgentes para vista SAM
+    items_vencidos_sam = []
+    items_urgentes_sam = []
+    fecha_limite_urgente = today + timedelta(days=7)
+
+    for empresa in empresas_queryset:
+        equipos_emp = Equipo.objects.filter(empresa=empresa).exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
+        act_criticas_emp = _get_actividades_criticas(equipos_emp, today)
+
+        for eq in act_criticas_emp['calibraciones_vencidas']:
+            dias = (today - eq['proxima_calibracion']).days
+            items_vencidos_sam.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Calibración', 'fecha': eq['proxima_calibracion'], 'dias_atraso': dias, 'empresa': empresa.nombre})
+        for eq in act_criticas_emp['mantenimientos_vencidos']:
+            dias = (today - eq['proximo_mantenimiento']).days
+            items_vencidos_sam.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Mantenimiento', 'fecha': eq['proximo_mantenimiento'], 'dias_atraso': dias, 'empresa': empresa.nombre})
+        for eq in act_criticas_emp['comprobaciones_vencidas']:
+            dias = (today - eq['proxima_comprobacion']).days
+            items_vencidos_sam.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Comprobación', 'fecha': eq['proxima_comprobacion'], 'dias_atraso': dias, 'empresa': empresa.nombre})
+        for eq in act_criticas_emp['calibraciones_urgentes']:
+            dias = (eq['proxima_calibracion'] - today).days
+            items_urgentes_sam.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Calibración', 'fecha': eq['proxima_calibracion'], 'dias_restantes': dias, 'empresa': empresa.nombre})
+        for eq in act_criticas_emp['mantenimientos_urgentes']:
+            dias = (eq['proximo_mantenimiento'] - today).days
+            items_urgentes_sam.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Mantenimiento', 'fecha': eq['proximo_mantenimiento'], 'dias_restantes': dias, 'empresa': empresa.nombre})
+        for eq in act_criticas_emp['comprobaciones_urgentes']:
+            dias = (eq['proxima_comprobacion'] - today).days
+            items_urgentes_sam.append({'codigo': eq['codigo_interno'], 'nombre': eq['nombre'], 'tipo': 'Comprobación', 'fecha': eq['proxima_comprobacion'], 'dias_restantes': dias, 'empresa': empresa.nombre})
+
+    items_vencidos_sam.sort(key=lambda x: x['dias_atraso'], reverse=True)
+    items_urgentes_sam.sort(key=lambda x: x['dias_restantes'])
+    total_vencidas_sam = len(items_vencidos_sam)
+    total_urgentes_sam = len(items_urgentes_sam)
+
     # Recomendaciones estratégicas
     recomendaciones_sam = []
 
@@ -872,6 +1021,13 @@ def _panel_decisiones_sam(request, today, current_year):
 
         # Recomendaciones estratégicas
         'recomendaciones_sam': recomendaciones_sam,
+        'recomendaciones': recomendaciones_sam,
+
+        # Listas consolidadas vencidas/urgentes
+        'total_vencidas': total_vencidas_sam,
+        'total_urgentes': total_urgentes_sam,
+        'items_vencidos': items_vencidos_sam,
+        'items_urgentes': items_urgentes_sam,
 
         # MÉTRICAS DE INTELIGENCIA EMPRESARIAL
         'alertas_predictivas': alertas_predictivas,
@@ -884,6 +1040,11 @@ def _panel_decisiones_sam(request, today, current_year):
         'salud_consolidada_chart': json.dumps(decimal_to_float([salud_agregada['equipos_saludables'], salud_agregada['equipos_criticos']])),
         'cumplimiento_consolidado_chart': json.dumps(decimal_to_float([cumplimiento_agregado['actividades_realizadas'], cumplimiento_agregado['actividades_programadas'] - cumplimiento_agregado['actividades_realizadas']])),
         'crecimiento_ingresos_chart': json.dumps(decimal_to_float([metricas_financieras_sam['ingreso_año_anterior'], metricas_financieras_sam['ingreso_ytd_actual']])),
+        'tendencias_chart_data': json.dumps([{
+            'mes': item['nombre_mes'],
+            'gasto': float(item['gasto_total']) if item['gasto_total'] else 0,
+            'actividades': item['actividades']
+        } for item in tendencias_historicas['datos_mensuales']]),
     }
 
     return render(request, 'core/panel_decisiones.html', context)
