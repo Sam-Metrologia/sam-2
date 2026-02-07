@@ -2,7 +2,7 @@
 
 from django.db.models import Count, Q
 from django.contrib.auth.models import AnonymousUser
-from .models import Equipo, Mantenimiento, Calibracion, Comprobacion
+from .models import Equipo, Mantenimiento, Calibracion, Comprobacion, Empresa
 
 def company_data(request):
     """
@@ -122,4 +122,48 @@ def aprobaciones_pendientes_count(request):
         'aprobaciones_pendientes_count': pendientes,
         'aprobaciones_rechazadas_count': rechazados,
         'aprobaciones_total_badge': total,
+    }
+
+
+def modo_trabajo_context(request):
+    """
+    Agrega información del modo trabajo (impersonación) al contexto.
+    Solo visible para superusuarios o cuando están impersonando.
+    """
+    from .utils.impersonation import is_impersonating, get_impersonator
+
+    if isinstance(request.user, AnonymousUser) or not request.user.is_authenticated:
+        return {
+            'modo_trabajo_activo': False,
+            'superusuario_original': None,
+            'empresas_disponibles': [],
+            'puede_usar_modo_trabajo': False,
+        }
+
+    impersonating = is_impersonating(request)
+    impersonator = get_impersonator(request) if impersonating else None
+
+    # Solo superusuarios reales o impersonando pueden usar modo trabajo
+    es_superuser_real = request.user.is_superuser and not impersonating
+    puede_usar_modo_trabajo = es_superuser_real or impersonating
+
+    # Obtener empresas disponibles para el selector
+    empresas_disponibles = []
+    if puede_usar_modo_trabajo:
+        try:
+            empresas_disponibles = list(
+                Empresa.objects.filter(is_deleted=False)
+                .order_by('nombre')
+                .values('id', 'nombre')
+            )
+        except Exception:
+            pass
+
+    return {
+        'modo_trabajo_activo': impersonating,
+        'superusuario_original': impersonator,
+        'empresas_disponibles': empresas_disponibles,
+        'puede_usar_modo_trabajo': puede_usar_modo_trabajo,
+        'empresa_trabajo': request.user.empresa if impersonating else None,
+        'usuario_impersonado': request.user if impersonating else None,
     }

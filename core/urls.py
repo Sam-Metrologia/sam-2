@@ -6,6 +6,7 @@ from . import admin_views
 from . import zip_functions  # Import for ZIP system
 from .views import confirmacion  # Import confirmacion module
 from .views import prestamos  # Import prestamos module
+from .views import impersonation  # Import impersonation module for Modo Trabajo
 # Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
 
@@ -242,4 +243,12 @@ urlpatterns = [
     path('prestamos/historial/<int:equipo_id>/', prestamos.historial_equipo, name='historial_equipo'),
     path('prestamos/equipos-disponibles/', prestamos.equipos_disponibles, name='equipos_disponibles'),
     path('prestamos/equipos-prestados/', prestamos.equipos_prestados, name='equipos_prestados'),
+
+    # ==============================================================================
+    # MODO TRABAJO (Impersonación para Superusuarios)
+    # ==============================================================================
+    path('modo-trabajo/iniciar/', impersonation.iniciar_modo_trabajo, name='iniciar_modo_trabajo'),
+    path('modo-trabajo/salir/', impersonation.salir_modo_trabajo, name='salir_modo_trabajo'),
+    path('modo-trabajo/usuarios/<int:empresa_id>/', impersonation.obtener_usuarios_empresa, name='obtener_usuarios_empresa'),
+    path('modo-trabajo/estado/', impersonation.estado_modo_trabajo, name='estado_modo_trabajo'),
 ]

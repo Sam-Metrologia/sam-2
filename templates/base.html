@@ -159,6 +159,104 @@
             50% { transform: scale(1.1); }
         }
 
+        /* Estilos para Modo Trabajo */
+        .modo-trabajo-selector {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(59, 130, 246, 0.15);
+            margin: 0 10px 15px 10px;
+            border-radius: 8px;
+        }
+        .modo-trabajo-selector label {
+            display: block;
+            color: #9ca3af;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .modo-trabajo-selector select {
+            width: 100%;
+            padding: 8px 10px;
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            color: white;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .modo-trabajo-selector select:hover {
+            border-color: #3b82f6;
+        }
+        .modo-trabajo-selector select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Banner de modo trabajo activo */
+        .modo-trabajo-banner {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .modo-trabajo-banner i {
+            font-size: 1.1rem;
+        }
+        .modo-trabajo-banner .info {
+            flex: 1;
+        }
+        .modo-trabajo-banner .info strong {
+            font-weight: 600;
+        }
+        .modo-trabajo-banner .info small {
+            opacity: 0.85;
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+        .modo-trabajo-banner .btn-salir {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .modo-trabajo-banner .btn-salir:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .modo-trabajo-banner .user-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modo-trabajo-banner .user-selector select {
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .modo-trabajo-banner .user-selector select option {
+            background: #1e40af;
+            color: white;
+        }
+
         /* Main Content */
         .main-content {
             margin-left: 250px;
@@ -366,11 +464,28 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body> {# Body como contenedor flex con altura mínima #}
+    {% load static %}
+    {% csrf_token %}
+
     <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
         <div class="sidebar-header">
             <h2>SAM</h2>
         </div>
+
+        {% if puede_usar_modo_trabajo and not modo_trabajo_activo %}
+        <!-- Selector de Modo Trabajo (Solo Superusers) -->
+        <div class="modo-trabajo-selector">
+            <label><i class="fas fa-building"></i> Trabajar como empresa:</label>
+            <select id="empresa-trabajo-select">
+                <option value="">-- Todas las empresas (SAM) --</option>
+                {% for empresa in empresas_disponibles %}
+                <option value="{{ empresa.id }}">{{ empresa.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
         <nav>
             <ul>
                 <li><a href="{% url 'core:dashboard' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
@@ -464,6 +579,24 @@
                 </div>
             </div>
         </div>
+
+        {% if modo_trabajo_activo %}
+        <!-- Banner de Modo Trabajo Activo -->
+        <div class="modo-trabajo-banner" id="modo-trabajo-banner">
+            <i class="fas fa-user-shield"></i>
+            <div class="info">
+                <span>Modo Trabajo:</span>
+                <strong>{{ usuario_impersonado.get_full_name|default:usuario_impersonado.username }}</strong>
+                <small>({{ empresa_trabajo.nombre }})</small>
+            </div>
+            <div class="user-selector" id="user-selector-container">
+                <!-- Selector de usuario se carga dinámicamente -->
+            </div>
+            <button class="btn-salir" id="btn-salir-modo-trabajo" title="Volver a modo superusuario">
+                <i class="fas fa-sign-out-alt"></i> Salir
+            </button>
+        </div>
+        {% endif %}
 
         <!-- Notificación global para ZIP requests -->
         <div id="zipNotificationContainer" class="hidden fixed top-20 right-4 z-50 max-w-sm">
@@ -969,6 +1102,135 @@
     {% if user.is_authenticated %}
     <script src="{% static 'core/js/session_keepalive.js' %}?v=1.0"></script>
     {% endif %}
+
+    <!-- Sistema de Modo Trabajo (Impersonación) -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Selector de empresa para iniciar modo trabajo
+        const empresaSelect = document.getElementById('empresa-trabajo-select');
+        if (empresaSelect) {
+            empresaSelect.addEventListener('change', function() {
+                const empresaId = this.value;
+                if (!empresaId) return;
+
+                if (!confirm('¿Deseas trabajar como usuario de esta empresa? Podrás ver sus datos como si fueras un usuario de esa empresa.')) {
+                    this.value = '';
+                    return;
+                }
+
+                iniciarModoTrabajo(empresaId);
+            });
+        }
+
+        // Botón para salir del modo trabajo
+        const btnSalir = document.getElementById('btn-salir-modo-trabajo');
+        if (btnSalir) {
+            btnSalir.addEventListener('click', function() {
+                salirModoTrabajo();
+            });
+        }
+
+        // Cargar usuarios de la empresa actual si estamos en modo trabajo
+        {% if modo_trabajo_activo and empresa_trabajo %}
+        cargarUsuariosEmpresa({{ empresa_trabajo.id }});
+        {% endif %}
+    });
+
+    function iniciarModoTrabajo(empresaId, userId = null) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                          document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+
+        const formData = new FormData();
+        formData.append('empresa_id', empresaId);
+        if (userId) {
+            formData.append('user_id', userId);
+        }
+
+        fetch('/core/modo-trabajo/iniciar/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                // Recargar página para aplicar nuevo contexto
+                setTimeout(() => {
+                    window.location.href = data.redirect || '/core/dashboard/';
+                }, 500);
+            } else {
+                showToast(data.error || 'Error al iniciar modo trabajo', 'error');
+                const empresaSelect = document.getElementById('empresa-trabajo-select');
+                if (empresaSelect) empresaSelect.value = '';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error de conexión', 'error');
+        });
+    }
+
+    function salirModoTrabajo() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                          document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+
+        fetch('/core/modo-trabajo/salir/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'info');
+                setTimeout(() => {
+                    window.location.href = data.redirect || '/core/dashboard/';
+                }, 500);
+            } else {
+                showToast(data.error || 'Error al salir del modo trabajo', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error de conexión', 'error');
+        });
+    }
+
+    function cargarUsuariosEmpresa(empresaId) {
+        const container = document.getElementById('user-selector-container');
+        if (!container) return;
+
+        fetch(`/core/modo-trabajo/usuarios/${empresaId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.usuarios.length > 1) {
+                // Solo mostrar selector si hay más de un usuario
+                const currentUserId = {{ usuario_impersonado.id|default:'null' }};
+                let html = '<select id="cambiar-usuario-empresa" title="Cambiar usuario">';
+                data.usuarios.forEach(u => {
+                    const selected = u.id === currentUserId ? 'selected' : '';
+                    html += `<option value="${u.id}" ${selected}>${u.nombre} (${u.rol})</option>`;
+                });
+                html += '</select>';
+                container.innerHTML = html;
+
+                // Event listener para cambiar usuario
+                document.getElementById('cambiar-usuario-empresa').addEventListener('change', function() {
+                    const newUserId = this.value;
+                    iniciarModoTrabajo(empresaId, newUserId);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error cargando usuarios:', error);
+        });
+    }
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>
