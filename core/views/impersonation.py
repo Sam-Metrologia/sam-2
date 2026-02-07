@@ -28,16 +28,29 @@ logger = logging.getLogger(__name__)
 def iniciar_modo_trabajo(request):
     """
     Inicia el modo trabajo impersonando a un usuario de una empresa.
+    También permite cambiar de usuario cuando ya está impersonando.
 
     POST params:
         empresa_id: ID de la empresa
         user_id (opcional): ID del usuario específico a impersonar
     """
-    if not request.user.is_superuser:
+    # Verificar permisos: debe ser superusuario O estar ya impersonando
+    already_impersonating = is_impersonating(request)
+
+    if not request.user.is_superuser and not already_impersonating:
         return JsonResponse({
             'success': False,
             'error': 'Solo superusuarios pueden usar el modo trabajo'
         }, status=403)
+
+    # Si está impersonando, verificar que el superusuario original es válido
+    if already_impersonating:
+        impersonator = get_impersonator(request)
+        if not impersonator or not impersonator.is_superuser:
+            return JsonResponse({
+                'success': False,
+                'error': 'Sesión de impersonación inválida'
+            }, status=403)
 
     empresa_id = request.POST.get('empresa_id')
     user_id = request.POST.get('user_id')

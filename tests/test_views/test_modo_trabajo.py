@@ -197,6 +197,44 @@ class TestModoTrabajoUsuarios:
         # El usuario actual debería ser el gerente
         assert estado_data['usuario_actual']['id'] == gerente_empresa.id
 
+    def test_cambiar_usuario_mientras_impersona(self, client, superuser, empresa_test, gerente_empresa, usuario_empresa):
+        """Verifica que se puede cambiar de usuario mientras ya se está impersonando."""
+        client.login(username='superadmin', password='super123')
+
+        # Iniciar como gerente
+        response = client.post(
+            reverse('core:iniciar_modo_trabajo'),
+            {'empresa_id': empresa_test.id}
+        )
+        assert response.status_code == 200
+
+        # Verificar que estamos como gerente
+        estado_response = client.get(reverse('core:estado_modo_trabajo'))
+        estado_data = estado_response.json()
+        assert estado_data['activo'] is True
+        assert estado_data['usuario_actual']['id'] == gerente_empresa.id
+
+        # Ahora cambiar a usuario (técnico) mientras ya estamos impersonando
+        response = client.post(
+            reverse('core:iniciar_modo_trabajo'),
+            {
+                'empresa_id': empresa_test.id,
+                'user_id': usuario_empresa.id
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data['success'] is True
+
+        # Verificar que ahora estamos como el usuario técnico
+        estado_response = client.get(reverse('core:estado_modo_trabajo'))
+        estado_data = estado_response.json()
+        assert estado_data['activo'] is True
+        assert estado_data['usuario_actual']['id'] == usuario_empresa.id
+
+        # Verificar que el superusuario original sigue siendo el mismo
+        assert estado_data['superusuario_original']['id'] == superuser.id
+
 
 class TestModoTrabajoContextProcessor:
     """Tests del context processor para modo trabajo."""

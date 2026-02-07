@@ -43,6 +43,7 @@ def start_impersonation(request, target_user):
     """
     Inicia la impersonación de un usuario.
     Solo superusuarios pueden impersonar.
+    Si ya está impersonando, cambia al nuevo usuario manteniendo el superusuario original.
 
     Args:
         request: HttpRequest
@@ -51,21 +52,32 @@ def start_impersonation(request, target_user):
     Returns:
         bool: True si se inició correctamente, False si no
     """
-    # Solo superusuarios pueden impersonar
-    if not request.user.is_superuser:
-        return False
-
     # No puede impersonar a otro superusuario
     if target_user.is_superuser:
         return False
 
-    # Guardar el ID del superusuario original
-    request.session[IMPERSONATOR_SESSION_KEY] = request.user.id
+    # Verificar permisos: debe ser superusuario O estar ya impersonando
+    already_impersonating = is_impersonating(request)
+
+    if already_impersonating:
+        # Ya está impersonando, verificar que el superusuario original existe
+        impersonator = get_impersonator(request)
+        if not impersonator or not impersonator.is_superuser:
+            return False
+        # Mantener el ID del superusuario original (no sobrescribir)
+        original_superuser_id = request.session.get(IMPERSONATOR_SESSION_KEY)
+    else:
+        # No está impersonando, verificar que el usuario actual es superusuario
+        if not request.user.is_superuser:
+            return False
+        # Guardar el ID del superusuario original
+        original_superuser_id = request.user.id
+
+    # Guardar/mantener el ID del superusuario original
+    request.session[IMPERSONATOR_SESSION_KEY] = original_superuser_id
 
     # Cambiar la sesión al usuario objetivo
-    # Usamos la misma clave que Django usa para autenticación
     from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY
-    from django.contrib.auth import get_backends
 
     # Guardar datos del usuario objetivo en la sesión
     request.session[SESSION_KEY] = target_user.pk
