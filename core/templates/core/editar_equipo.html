@@ -177,7 +177,7 @@
                 <h3 class="text-sm font-semibold text-indigo-700 uppercase tracking-wide mb-3">Documentos e Imagen</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
                     {% for field in form %}
-                        {% if field.name == 'archivo_compra_pdf' or field.name == 'manual_pdf' or field.name == 'otros_documentos_pdf' or field.name == 'imagen_equipo' %}
+                        {% if field.name == 'archivo_compra_pdf' or field.name == 'ficha_tecnica_pdf' or field.name == 'manual_pdf' or field.name == 'otros_documentos_pdf' or field.name == 'imagen_equipo' %}
                             <div>
                                 <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-1">{{ field.label }}:</label>
                                 {{ field }}

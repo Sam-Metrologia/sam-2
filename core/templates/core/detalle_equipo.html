@@ -156,13 +156,6 @@
             </div>
 
             <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
-                <h2 class="text-xl font-semibold text-gray-800 mb-3">Información de Formato</h2>
-                <p><strong>Versión del Formato:</strong> {{ equipo.version_formato|default:"N/A" }}</p>
-                <p><strong>Fecha de Versión:</strong> {{ equipo.fecha_version_formato|date:"Y-m-d"|default:"N/A" }}</p>
-                <p><strong>Codificación del Formato:</strong> {{ equipo.codificacion_formato|default:"N/A" }}</p>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
                 <h2 class="text-xl font-semibold text-gray-800 mb-3">Próximas Actividades</h2>
                 <p><strong>Próxima Calibración:</strong> <span class="{{ equipo.proxima_calibracion_status }}">{{ equipo.proxima_calibracion|date:"Y-m-d"|default:"N/A" }}</span></p>
                 <p><strong>Frecuencia Calibración:</strong> {{ equipo.frecuencia_calibracion_meses|default:"N/A" }} meses</p>
@@ -189,23 +182,23 @@
             <div class="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
                 <h2 class="text-xl font-semibold text-gray-800 mb-3">Documentos del Equipo</h2>
                 <ul class="list-disc list-inside space-y-1">
-                    {% if archivo_compra_pdf_url %}
-                        <li><a href="{{ archivo_compra_pdf_url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Archivo de Compra</a></li>
+                    {% if archivo_compra_url %}
+                        <li><a href="{{ archivo_compra_url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Archivo de Compra</a></li>
                     {% else %}
                         <li>Archivo de Compra: N/A</li>
                     {% endif %}
-                    {% if equipo.ficha_tecnica_pdf %}
-                        <li><a href="{{ equipo.ficha_tecnica_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Ficha Técnica</a></li>
+                    {% if ficha_tecnica_url %}
+                        <li><a href="{{ ficha_tecnica_url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Ficha Técnica</a></li>
                     {% else %}
                         <li>Ficha Técnica: N/A</li>
                     {% endif %}
-                    {% if equipo.manual_pdf %}
-                        <li><a href="{{ equipo.manual_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Manual</a></li>
+                    {% if manual_url %}
+                        <li><a href="{{ manual_url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Manual</a></li>
                     {% else %}
                         <li>Manual: N/A</li>
                     {% endif %}
-                    {% if equipo.otros_documentos_pdf %}
-                        <li><a href="{{ equipo.otros_documentos_pdf.url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Otros Documentos</a></li>
+                    {% if otros_documentos_url %}
+                        <li><a href="{{ otros_documentos_url }}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-file-pdf mr-2"></i> Otros Documentos</a></li>
                     {% else %}
                         <li>Otros Documentos: N/A</li>
                     {% endif %}
