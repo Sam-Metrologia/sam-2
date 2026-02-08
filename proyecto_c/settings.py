@@ -348,40 +348,60 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / 'staticfiles' 
 
 # ==============================================================================
-# CONFIGURACIÓN DE ALMACENAMIENTO DE ARCHIVOS EN AWS S3 (MEJORADA Y SEGURA)
+# CONFIGURACIÓN DE ALMACENAMIENTO S3-COMPATIBLE (AWS S3 / Cloudflare R2)
 # ==============================================================================
 
-# Obtiene las credenciales de AWS desde las variables de entorno
+# Obtiene las credenciales desde las variables de entorno
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '').strip()
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '').strip()
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '').strip()
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-2').strip()
 
-# AWS configuration logging (via proper logging system)
+# Endpoint personalizado para proveedores S3-compatibles (Cloudflare R2, Backblaze B2, etc.)
+# Si está definido, usa ese endpoint; si no, usa AWS S3 por defecto
+AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL', '').strip()
+
+# Detectar si estamos usando Cloudflare R2 u otro proveedor S3-compatible
+IS_CLOUDFLARE_R2 = 'r2.cloudflarestorage.com' in AWS_S3_ENDPOINT_URL
+
+# Logging de configuración
 import logging
 logger = logging.getLogger(__name__)
 if DEBUG:
-    logger.info(f"AWS Config - Bucket: {AWS_STORAGE_BUCKET_NAME}, Region: {AWS_S3_REGION_NAME}")
+    storage_provider = "Cloudflare R2" if IS_CLOUDFLARE_R2 else "AWS S3"
+    logger.info(f"Storage Config - Provider: {storage_provider}, Bucket: {AWS_STORAGE_BUCKET_NAME}")
 
-# Configuración S3 mejorada con seguridad
+# Configuración S3/R2 mejorada con seguridad
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
     AWS_S3_SIGNATURE_VERSION = "s3v4"
-    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     AWS_DEFAULT_ACL = None
     AWS_S3_USE_SSL = True
-    AWS_QUERYSTRING_AUTH = False
+    AWS_QUERYSTRING_AUTH = True  # Necesario para R2 y URLs firmadas
     AWS_S3_FILE_OVERWRITE = False
-    AWS_S3_ENDPOINT_URL = f'https://s3.{AWS_S3_REGION_NAME}.amazonaws.com'
-    
-    # Configuraciones de seguridad adicionales
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-        'ServerSideEncryption': 'AES256',  # Encripción en servidor
-    }
-    
-    # Configuración para diferentes tipos de archivos
-    AWS_LOCATION = 'media'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+
+    # Configurar endpoint y dominio según el proveedor
+    if IS_CLOUDFLARE_R2:
+        # Cloudflare R2: usar endpoint personalizado, sin custom domain público
+        # Las URLs se generan con querystring auth
+        AWS_S3_CUSTOM_DOMAIN = None  # R2 no tiene custom domain por defecto
+        AWS_S3_OBJECT_PARAMETERS = {
+            'CacheControl': 'max-age=86400',
+            # R2 no soporta ServerSideEncryption de la misma forma
+        }
+        AWS_LOCATION = 'media'
+        # Para R2, las URLs serán firmadas (querystring auth)
+        MEDIA_URL = '/media/'  # Fallback, las URLs reales son firmadas
+    else:
+        # AWS S3: configuración tradicional
+        if not AWS_S3_ENDPOINT_URL:
+            AWS_S3_ENDPOINT_URL = f'https://s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+        AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+        AWS_S3_OBJECT_PARAMETERS = {
+            'CacheControl': 'max-age=86400',
+            'ServerSideEncryption': 'AES256',
+        }
+        AWS_LOCATION = 'media'
+        MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
 
     # Usar storage personalizado para archivos media (Django 5.2+ style)
     # IMPORTANTE: WhiteNoise para static files sin compresión (evita problemas de manifest)
