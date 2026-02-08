@@ -1312,15 +1312,9 @@ def _get_pdf_file_url(request, file_field):
         storage_name = default_storage.__class__.__name__
 
         if 'S3' in storage_name or hasattr(default_storage, 'bucket'):
-            # Para S3, verificar que el archivo existe antes de generar URL
-            try:
-                if not default_storage.exists(file_field.name):
-                    logger.warning(f"Archivo no existe en S3: {file_field.name}")
-                    return None
-            except Exception:
-                pass  # Si falla la verificación, intentar generar URL anyway
-
-            # Para S3, usar URL con mayor tiempo de expiración para PDFs
+            # Para S3/R2, generar URL directamente sin verificar existencia
+            # La verificación exists() puede fallar con Cloudflare R2
+            # Si el campo tiene nombre, asumimos que el archivo existe
             try:
                 url = default_storage.url(file_field.name, expire=7200)  # 2 horas
             except TypeError:
