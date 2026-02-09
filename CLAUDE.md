@@ -287,19 +287,26 @@ ADMIN_EMAIL=admin@yourcompany.com
 - Monitor logs for S3-related errors in `logs/sam_errors.log`
 - Test with local storage first by clearing AWS environment variables
 
-## Backups Automáticos y Retención de Datos
+## Backups Automaticos y Retencion de Datos
 
-### Sistema de Backups (PostgreSQL → AWS S3)
+### Sistema de Backups (PostgreSQL → Cloudflare R2)
 - **Frecuencia:** Diario a las 3:00 AM (hora Colombia)
-- **Ubicación:** Bucket S3 `sam-metrologia-backups1`
-- **Retención:** 180 días (6 meses) con transición automática a Glacier después de 30 días
+- **Almacenamiento:** Cloudflare R2 (S3-compatible)
+- **Bucket:** Configurado en secret `AWS_BACKUP_BUCKET`
+- **Retencion:** 180 dias (6 meses) - Clausula 5.2 del contrato
 - **Workflow:** `.github/workflows/daily-backup.yml`
-- **Script:** `backup_to_s3.py`
-- **Costo:** ~$0.15 USD/mes
+- **Script:** `backup_to_s3.py` (compatible con R2 y AWS S3)
+- **Deteccion automatica:** El script detecta R2 via `AWS_S3_ENDPOINT_URL`
 
 **Restaurar backup manualmente:**
 ```bash
-aws s3 cp s3://sam-metrologia-backups1/backups/database/YYYY/MM/backup.sql.gz ./
+# Usando boto3 (recomendado)
+python -c "
+from backup_to_s3 import DatabaseBackupManager
+mgr = DatabaseBackupManager()
+mgr.list_backups()  # Ver backups disponibles
+mgr.restore_backup('backups/database/YYYY/MM/sam_backup_YYYYMMDD_HHMMSS.sql.gz')
+"
 ```
 
 ### Sistema de Soft Delete de Empresas
@@ -329,10 +336,11 @@ python manage.py cleanup_deleted_companies --execute
 
 **Secrets requeridos en GitHub Actions:**
 - `DATABASE_URL` (External PostgreSQL URL)
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_BACKUP_BUCKET` (sam-metrologia-backups1)
-- `AWS_S3_REGION_NAME` (us-east-2)
+- `AWS_ACCESS_KEY_ID` (R2 Access Key ID)
+- `AWS_SECRET_ACCESS_KEY` (R2 Secret Access Key)
+- `AWS_BACKUP_BUCKET` (nombre del bucket en R2)
+- `AWS_S3_ENDPOINT_URL` (https://<account_id>.r2.cloudflarestorage.com)
+- `AWS_S3_REGION_NAME` (auto para R2)
 - `SECRET_KEY`
 - `SCHEDULED_TASKS_TOKEN` (para endpoints API)
 - `APP_URL` (https://sam-9o6o.onrender.com)

@@ -1,14 +1,15 @@
-name: Backup Diario Automático de Base de Datos
+name: Backup Diario Automatico de Base de Datos
 
-# Ejecuta backup automático diario a las 3:00 AM (hora Colombia)
-# Cumple con Cláusula 5.2 del contrato: "Copias de seguridad automáticas diarias"
+# Ejecuta backup automatico diario a las 3:00 AM (hora Colombia)
+# Cumple con Clausula 5.2 del contrato: "Copias de seguridad automaticas diarias"
+# Almacenamiento: Cloudflare R2 (S3-compatible)
 
 on:
   schedule:
     # Cron: 3:00 AM hora Colombia = 8:00 AM UTC
     - cron: '0 8 * * *'
 
-  # Permitir ejecución manual desde GitHub Actions
+  # Permitir ejecucion manual desde GitHub Actions
   workflow_dispatch:
 
 jobs:
@@ -16,11 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v3
+      - name: Checkout codigo
+        uses: actions/checkout@v4
 
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -34,35 +35,30 @@ jobs:
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
-          # Instalar PostgreSQL 17 client específicamente
+          # Instalar PostgreSQL 17 client especificamente
           sudo apt-get install -y postgresql-client-17
-          # Agregar al PATH para que use versión 17 por defecto
+          # Agregar al PATH para que use version 17 por defecto
           echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
-          # Verificar versión instalada
+          # Verificar version instalada
           /usr/lib/postgresql/17/bin/pg_dump --version
-          ls -la /usr/lib/postgresql/17/bin/pg_dump
 
-      - name: Ejecutar backup automático
+      - name: Ejecutar backup automatico
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_BACKUP_BUCKET: ${{ secrets.AWS_BACKUP_BUCKET }}
           AWS_S3_REGION_NAME: ${{ secrets.AWS_S3_REGION_NAME }}
+          AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
         run: |
           python backup_to_s3.py
 
       - name: Notificar resultado
-        if: always()
+        if: success()
         run: |
-          if [ $? -eq 0 ]; then
-            echo "✅ Backup completado exitosamente"
-          else
-            echo "❌ Error en backup - revisar logs"
-            exit 1
-          fi
+          echo "Backup completado exitosamente a Cloudflare R2"
 
-      # Opcional: Enviar notificación por email en caso de fallo
+      # Enviar notificacion por email en caso de fallo
       - name: Notificar fallo por email
         if: failure()
         uses: dawidd6/action-send-mail@v3
@@ -71,14 +67,15 @@ jobs:
           server_port: 587
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: '⚠️ Fallo en Backup Automático SAM Metrología'
+          subject: 'FALLO en Backup Automatico SAM Metrologia'
           body: |
-            El backup automático programado falló.
+            El backup automatico programado fallo.
 
             Fecha: ${{ github.event.repository.updated_at }}
             Workflow: ${{ github.workflow }}
+            Proveedor: Cloudflare R2
 
             Por favor revisar los logs en:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           to: ${{ secrets.ADMIN_EMAIL }}
-          from: SAM Metrología Backups
+          from: SAM Metrologia Backups

@@ -1,8 +1,8 @@
-# Guía de Recuperación de Backups desde S3
+# Guia de Recuperacion de Backups desde Cloudflare R2
 
-## Descripción del Sistema de Backups
+## Descripcion del Sistema de Backups
 
-El sistema SAM Metrología crea backups automáticos mensuales de todas las empresas y los almacena en Amazon S3 para seguridad.
+El sistema SAM Metrologia crea backups automaticos diarios de la base de datos PostgreSQL y los almacena en Cloudflare R2 (S3-compatible) para seguridad. Cumple con la Clausula 5.2 del contrato.
 
 ### ¿Qué se respalda?
 
@@ -21,28 +21,29 @@ El sistema SAM Metrología crea backups automáticos mensuales de todas las empr
 
 ## 🔍 Cómo Saber si los Backups se están Guardando
 
-### Opción 1: Verificar en AWS S3 Console
+### Opcion 1: Verificar en Cloudflare Dashboard
 
-1. Ir a [AWS S3 Console](https://s3.console.aws.amazon.com/)
-2. Buscar el bucket configurado (nombre en variable `AWS_STORAGE_BUCKET_NAME`)
-3. Navegar a la carpeta `backups/`
-4. Verificar que existan archivos con formato: `backup_NombreEmpresa_YYYYMMDD_HHMMSS.zip`
+1. Ir a [Cloudflare Dashboard](https://dash.cloudflare.com/) → R2
+2. Seleccionar el bucket de backups
+3. Navegar a la carpeta `backups/database/`
+4. Verificar que existan archivos con formato: `sam_backup_YYYYMMDD_HHMMSS.sql.gz`
 
-### Opción 2: Usar AWS CLI
+### Opcion 2: Usar el script de backup
 
 ```bash
-# Listar todos los backups en S3
-aws s3 ls s3://tu-bucket-name/backups/
-
-# Listar backups de una empresa específica
-aws s3 ls s3://tu-bucket-name/backups/ | grep "NombreEmpresa"
+# Listar los ultimos 10 backups
+python -c "
+from backup_to_s3 import DatabaseBackupManager
+mgr = DatabaseBackupManager()
+mgr.list_backups()
+"
 ```
 
-### Opción 3: Verificar logs del sistema
+### Opcion 3: Verificar logs del sistema
 
 ```bash
-# Revisar logs de backup
-cat logs/sam_info.log | grep "Backup uploaded to S3"
+# Revisar logs de backup en GitHub Actions
+# Ir a: GitHub repo → Actions → "Backup Diario Automatico" → ver ultimo run
 ```
 
 ---
@@ -186,16 +187,20 @@ python manage.py shell
 
 ---
 
-## ⚙️ Configuración de Backups Automáticos
+## Configuracion de Backups Automaticos
 
-### Variables de Entorno Requeridas
+### Variables de Entorno / Secrets de GitHub Requeridos
 
 ```bash
-# En tu archivo .env o configuración de producción
-AWS_ACCESS_KEY_ID=tu_access_key
-AWS_SECRET_ACCESS_KEY=tu_secret_key
-AWS_STORAGE_BUCKET_NAME=nombre-tu-bucket
-AWS_S3_REGION_NAME=us-east-2  # o tu región
+# Credenciales de Cloudflare R2
+AWS_ACCESS_KEY_ID=tu_r2_access_key_id
+AWS_SECRET_ACCESS_KEY=tu_r2_secret_access_key
+AWS_BACKUP_BUCKET=nombre-del-bucket-en-r2
+AWS_S3_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
+AWS_S3_REGION_NAME=auto
+
+# Base de datos
+DATABASE_URL=postgresql://...
 ```
 
 ### Crear Backup Manual
@@ -307,4 +312,4 @@ También disponible desde el panel de **Admin/Sistema → Mantenimiento** con la
 
 ---
 
-**Última actualización**: Octubre 2025
+**Ultima actualizacion**: Febrero 2026 - Migrado de AWS S3 a Cloudflare R2
