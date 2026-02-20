@@ -109,3 +109,22 @@ GUION_*.md
 
 # Report files
 ARCHIVOS_A_ELIMINAR.txt
+
+# Coverage files
+.coverage
+coverage.json
+coverage.xml
+htmlcov/
+
+# Git artifacts
+FETCH_HEAD
+main
+migrations_before.txt
+temp_*.html
+
+# Test result files
+test_results_*.txt
+
+# Model backups
+*.py.backup_*
+core/models_BACKUP_*/

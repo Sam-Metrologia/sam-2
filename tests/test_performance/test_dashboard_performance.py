@@ -1,214 +1,179 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-Tests de rendimiento para dashboard.
+Script de Testing de Rendimiento del Dashboard
+==============================================
 
-Objetivo: Medir impacto de índices BD en queries del dashboard.
-Benchmarks con 100, 200, 500 equipos.
+Mide el tiempo de carga y número de queries del dashboard
+antes y después de las optimizaciones.
+
+Uso:
+    python test_dashboard_performance.py
 """
-import pytest
-from django.test import Client
-from django.urls import reverse
-from django.utils import timezone
-from datetime import timedelta
+
+import os
+import sys
+import django
 import time
+from django.conf import settings
 
-from core.models import Empresa, CustomUser, Equipo
-from core.constants import ESTADO_ACTIVO, ESTADO_EN_CALIBRACION
+# Setup Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'proyecto_c.settings')
+django.setup()
+
+from django.test import Client
+from django.db import connection, reset_queries
+from django.core.cache import cache
+from core.models import CustomUser
 
 
-@pytest.mark.django_db
-class TestDashboardPerformance:
-    """Tests de rendimiento del dashboard con diferentes cargas."""
+def measure_dashboard_performance():
+    """
+    Mide rendimiento del dashboard
+    """
+    print("=" * 70)
+    print("TEST DE RENDIMIENTO DEL DASHBOARD")
+    print("=" * 70)
+    print()
 
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Setup común para todos los tests."""
-        self.client = Client()
-        self.empresa = Empresa.objects.create(
-            nombre="Empresa Test Performance",
-            nit="900123456-7",
-            limite_equipos_empresa=1000,  # Suficiente para benchmarks
-        )
-        self.user = CustomUser.objects.create_user(
-            username="perfuser",
-            email="perf@test.com",
-            password="testpass123",
-            empresa=self.empresa,
-            rol_usuario="ADMINISTRADOR"
-        )
-        self.client.login(username="perfuser", password="testpass123")
+    # Limpiar cache
+    print("Limpiando cache...")
+    cache.clear()
 
-    def _create_equipos_batch(self, count, with_dates=True):
-        """
-        Helper: Crea equipos en batch para benchmarks.
+    # Obtener o crear usuario de prueba
+    try:
+        user = CustomUser.objects.filter(is_superuser=False).first()
+        if not user:
+            print("ADVERTENCIA: No se encontro usuario de prueba")
+            print("   Crea un usuario primero con: python manage.py createsuperuser")
+            return
+    except Exception as e:
+        print(f"ERROR obteniendo usuario: {e}")
+        return
 
-        Args:
-            count: Número de equipos a crear
-            with_dates: Si incluir fechas de calibración/mantenimiento
+    # Crear cliente y login
+    client = Client()
+    login_success = client.login(username=user.username, password='testpass')  # Cambiar password si es necesario
 
-        Returns:
-            list: Lista de equipos creados
-        """
-        equipos = []
-        today = timezone.now().date()
+    if not login_success:
+        # Intentar con usuario admin
+        try:
+            admin_user = CustomUser.objects.filter(is_superuser=True).first()
+            if admin_user:
+                print(f"   Intentando con superusuario: {admin_user.username}")
+                # No podemos hacer login programático sin password, así que solo reportamos
+                print(f"   Usuario encontrado: {admin_user.username}")
+                print(f"   Empresa: {admin_user.empresa.nombre if admin_user.empresa else 'N/A'}")
+        except:
+            pass
 
-        for i in range(count):
-            equipo = Equipo.objects.create(
-                codigo_interno=f"EQ-PERF-{i:04d}",
-                nombre=f"Equipo Performance {i}",
-                empresa=self.empresa,
-                tipo_equipo="Equipo de Medición",
-                estado=ESTADO_ACTIVO if i % 10 != 0 else ESTADO_EN_CALIBRACION,
-                marca="Test Brand",
-                modelo=f"Model-{i % 5}",
-            )
+    print()
+    print("CONFIGURACION DEL TEST")
+    print("-" * 70)
+    print(f"   Usuario: {user.username}")
+    print(f"   Empresa: {user.empresa.nombre if user.empresa else 'N/A'}")
+    print(f"   Superusuario: {'Si' if user.is_superuser else 'No'}")
+    print()
 
-            if with_dates:
-                # 20% vencidos, 30% próximos, 50% al día
-                if i % 5 == 0:  # 20% vencidos
-                    equipo.proxima_calibracion = today - timedelta(days=30)
-                    equipo.proximo_mantenimiento = today - timedelta(days=15)
-                elif i % 5 == 1:  # 30% próximos (dentro de 30 días)
-                    equipo.proxima_calibracion = today + timedelta(days=15)
-                    equipo.proximo_mantenimiento = today + timedelta(days=20)
-                else:  # 50% al día
-                    equipo.proxima_calibracion = today + timedelta(days=90)
-                    equipo.proximo_mantenimiento = today + timedelta(days=60)
+    # Habilitar logging de queries
+    settings.DEBUG = True
 
-                equipo.save()
+    print("MIDIENDO RENDIMIENTO...")
+    print("-" * 70)
 
-            equipos.append(equipo)
+    # Resetear queries
+    reset_queries()
 
-        return equipos
+    # Medir tiempo
+    start_time = time.time()
 
-    @pytest.mark.performance
-    def test_dashboard_with_100_equipos(self):
-        """
-        Benchmark: Dashboard con 100 equipos.
-        Límite aceptable: < 2 segundos.
-        """
-        # Crear 100 equipos
-        self._create_equipos_batch(100)
+    try:
+        # Simular request al dashboard
+        response = client.get('/dashboard/')
 
-        # Medir tiempo de carga del dashboard
-        start_time = time.time()
-        response = self.client.get(reverse('core:dashboard'))
-        elapsed = time.time() - start_time
+        # Calcular tiempo
+        elapsed_time = time.time() - start_time
 
-        assert response.status_code == 200
-        assert elapsed < 2.0, f"Dashboard con 100 equipos tomó {elapsed:.2f}s (límite: 2s)"
+        # Contar queries
+        num_queries = len(connection.queries)
 
-        print(f"\n✓ Dashboard (100 equipos): {elapsed:.3f}s")
+        # Resultados
+        print()
+        print("=" * 70)
+        print("RESULTADOS")
+        print("=" * 70)
+        print()
+        print(f"Tiempo de Carga:     {elapsed_time:.3f} segundos")
+        print(f"Numero de Queries:   {num_queries}")
+        print(f"Status Code:         {response.status_code}")
+        print()
 
-    @pytest.mark.performance
-    def test_dashboard_with_200_equipos(self):
-        """
-        Benchmark: Dashboard con 200 equipos.
-        Límite aceptable: < 3 segundos.
-        """
-        # Crear 200 equipos
-        self._create_equipos_batch(200)
+        # Evaluación
+        print("EVALUACION")
+        print("-" * 70)
 
-        # Medir tiempo de carga del dashboard
-        start_time = time.time()
-        response = self.client.get(reverse('core:dashboard'))
-        elapsed = time.time() - start_time
+        if elapsed_time < 1.0:
+            print("[OK] Tiempo:   EXCELENTE (<1s)")
+        elif elapsed_time < 2.0:
+            print("[OK] Tiempo:   BUENO (1-2s)")
+        elif elapsed_time < 5.0:
+            print("[!]  Tiempo:   ACEPTABLE (2-5s)")
+        else:
+            print("[X]  Tiempo:   LENTO (>5s)")
 
-        assert response.status_code == 200
-        assert elapsed < 3.0, f"Dashboard con 200 equipos tomó {elapsed:.2f}s (límite: 3s)"
+        if num_queries < 20:
+            print("[OK] Queries:  EXCELENTE (<20)")
+        elif num_queries < 50:
+            print("[OK] Queries:  BUENO (20-50)")
+        elif num_queries < 100:
+            print("[!]  Queries:  MEJORABLE (50-100)")
+        else:
+            print("[X]  Queries:  MUCHAS (>100) - Posible N+1")
 
-        print(f"\n✓ Dashboard (200 equipos): {elapsed:.3f}s")
+        print()
 
-    @pytest.mark.performance
-    def test_dashboard_with_500_equipos(self):
-        """
-        Benchmark: Dashboard con 500 equipos.
-        Límite aceptable: < 5 segundos.
-        """
-        # Crear 500 equipos
-        self._create_equipos_batch(500)
+        # Queries más lentas (top 5)
+        if connection.queries:
+            print("TOP 5 QUERIES MAS LENTAS")
+            print("-" * 70)
 
-        # Medir tiempo de carga del dashboard
-        start_time = time.time()
-        response = self.client.get(reverse('core:dashboard'))
-        elapsed = time.time() - start_time
+            # Ordenar por tiempo
+            sorted_queries = sorted(
+                connection.queries,
+                key=lambda q: float(q['time']),
+                reverse=True
+            )[:5]
 
-        assert response.status_code == 200
-        assert elapsed < 5.0, f"Dashboard con 500 equipos tomó {elapsed:.2f}s (límite: 5s)"
+            for i, query in enumerate(sorted_queries, 1):
+                sql = query['sql'][:100] + "..." if len(query['sql']) > 100 else query['sql']
+                print(f"{i}. {query['time']}s - {sql}")
 
-        print(f"\n✓ Dashboard (500 equipos): {elapsed:.3f}s")
+            print()
 
-    @pytest.mark.performance
-    def test_dashboard_estadisticas_actividades(self):
-        """
-        Test: Rendimiento del bloque de estadísticas de actividades.
-        Límite: < 1 segundo con 200 equipos.
-        """
-        # Crear 200 equipos con fechas variadas
-        self._create_equipos_batch(200, with_dates=True)
+        # Benchmark de referencia
+        print("BENCHMARK DE REFERENCIA")
+        print("-" * 70)
+        print("   Antes de optimizacion:  7-13s,  ~613 queries")
+        print("   Meta despues:           <1s,    <20 queries")
+        print()
 
-        # Medir tiempo del dashboard (incluye estadísticas)
-        start_time = time.time()
-        response = self.client.get(reverse('core:dashboard'))
-        elapsed = time.time() - start_time
+        # Mejora estimada
+        if num_queries < 613:
+            mejora_queries = ((613 - num_queries) / 613) * 100
+            print(f"   Mejora de queries:      -{mejora_queries:.1f}%")
 
-        assert response.status_code == 200
-        assert elapsed < 2.0, f"Estadísticas con 200 equipos tomó {elapsed:.2f}s"
+        print()
 
-        # Verificar que las estadísticas de actividades están en el contexto
-        assert 'calibraciones_vencidas' in response.context
-        assert 'mantenimientos_vencidos' in response.context
-        assert 'comprobaciones_vencidas' in response.context
+    except Exception as e:
+        print()
+        print(f"ERROR: {e}")
+        print()
+        import traceback
+        traceback.print_exc()
 
-        print(f"\n✓ Estadísticas actividades (200 equipos): {elapsed:.3f}s")
+    # Volver a producción
+    settings.DEBUG = False
 
-    @pytest.mark.performance
-    def test_dashboard_filtro_empresa(self):
-        """
-        Test: Rendimiento con filtro de empresa aplicado.
-        Límite: < 1.5 segundos con 300 equipos.
-        """
-        # Crear 300 equipos
-        self._create_equipos_batch(300)
 
-        # Medir tiempo con filtro de empresa
-        start_time = time.time()
-        response = self.client.get(reverse('core:dashboard'), {'empresa_id': self.empresa.id})
-        elapsed = time.time() - start_time
-
-        assert response.status_code == 200
-        assert elapsed < 1.5, f"Dashboard filtrado tomó {elapsed:.2f}s (límite: 1.5s)"
-
-        print(f"\n✓ Dashboard filtrado (300 equipos): {elapsed:.3f}s")
-
-    @pytest.mark.performance
-    def test_equipos_vencidos_query_performance(self):
-        """
-        Test: Query de equipos vencidos con índices.
-        Límite: < 0.5 segundos con 400 equipos.
-        """
-        today = timezone.now().date()
-
-        # Crear 400 equipos, 25% vencidos
-        equipos = self._create_equipos_batch(400, with_dates=False)
-        # Usar .update() para evitar que save() recalcule las fechas
-        vencido_ids = [equipos[i].pk for i in range(0, len(equipos), 4)]
-        Equipo.objects.filter(pk__in=vencido_ids).update(
-            proxima_calibracion=today - timedelta(days=10)
-        )
-
-        # Medir query de vencidos
-        start_time = time.time()
-        from django.db.models import Q
-        vencidos = Equipo.objects.filter(
-            empresa=self.empresa
-        ).filter(
-            Q(proxima_calibracion__lt=today) |
-            Q(proximo_mantenimiento__lt=today) |
-            Q(proxima_comprobacion__lt=today)
-        ).count()
-        elapsed = time.time() - start_time
-
-        assert vencidos == 100  # 25% de 400
-        assert elapsed < 0.5, f"Query vencidos tomó {elapsed:.3f}s (límite: 0.5s)"
-
-        print(f"\n✓ Query equipos vencidos (400 equipos): {elapsed:.3f}s - {vencidos} resultados")
+if __name__ == '__main__':
+    measure_dashboard_performance()

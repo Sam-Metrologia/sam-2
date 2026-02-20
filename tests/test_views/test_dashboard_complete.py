@@ -354,7 +354,7 @@ class TestDashboardHelpers:
 
         assert maintenances is not None
         # Debe haber mantenimientos correctivos
-        assert maintenances.count() > 0
+        assert len(maintenances) > 0
 
     def test_get_latest_corrective_maintenances_superuser(self, setup_dashboard_completo):
         """_get_latest_corrective_maintenances para superuser"""

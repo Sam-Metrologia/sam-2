@@ -10,6 +10,19 @@ import os
 
 
 # ============================================================================
+# FIXTURES: Cache Cleanup
+# ============================================================================
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Limpia el cache entre tests para evitar interferencia."""
+    from django.core.cache import cache
+    cache.clear()
+    yield
+    cache.clear()
+
+
+# ============================================================================
 # FIXTURES: Test Clients
 # ============================================================================
 

@@ -4,22 +4,114 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SAM Metrología is a Django-based metrology management system that handles equipment tracking, maintenance scheduling, and company management for metrology businesses. The system supports multi-tenant companies with equipment limits and subscription plans.
+SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2012 compliance. It handles equipment tracking, calibration scheduling, maintenance management, intermediate verifications (comprobaciones), and company management for metrology businesses. The system supports multi-tenant companies with equipment limits and subscription plans.
 
-## Recent Code Cleanup (Dec 5, 2025)
+**Norm:** ISO/IEC 17020:2012 (Inspection Bodies)
+**Language:** Spanish (Colombia)
+**Version:** 2.0.0
 
-**Completed:** Phase 1 code cleanup removing 1,149 lines of obsolete/debug code
+## Current Status (Feb 19, 2026)
 
-### Files Removed
-- `core/views/dashboard_gerencia.py` (1,134 lines) - Replaced by dashboard_gerencia_simple.py
+- **Tests:** 1,023 passing, 0 failing, 1 skipped
+- **Coverage:** 57.91% (Goal: 70%)
+- **Score:** 7.6/10 (audited)
+- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-02-19.md`
+- **Dashboard Cache:** Habilitado (5 min, invalidado por signals)
+- **Dependencies:** Actualizadas 2026-02-19 (32 CVEs corregidos)
+- **Next:** Trial autoservicio + Onboarding + Pagos (`docs/PLAN_TRIAL_ONBOARDING_PAGOS.md`)
 
-### Code Improvements
-- Removed DEBUG prints from `core/models.py` (Equipo.save method)
-- Removed unreachable code in `core/models.py` (Empresa.esta_al_dia_con_pagos method)
-- Moved matplotlib/numpy imports to module level in `core/views/confirmacion.py`
-- Cleaned all `__pycache__/` directories
+## Project Structure
 
-**Details:** See `auditorias/LIMPIEZA_COMPLETADA_2025-12-05.md` for full report
+```
+sam-2/
+  manage.py                  # Django management
+  pyproject.toml             # pytest + coverage config
+  requirements.txt           # Production dependencies
+  requirements_test.txt      # Test dependencies
+  Dockerfile / Procfile       # Deploy config
+  render.yaml                # Render.com deploy
+  start.sh / build.sh        # Deploy scripts
+  run_tests.sh / .bat        # Test runners
+  terminos_condiciones_v1.0.html  # Legal terms (loaded by management command)
+
+  core/                      # Main Django app (all business logic)
+    models.py                # All models (4,148 lines - needs refactoring)
+    constants.py             # Centralized constants (327 lines)
+    forms.py                 # All forms (1,742 lines)
+    signals.py               # Cache invalidation signals
+    urls.py                  # URL routing
+    views/                   # Views organized by domain
+      dashboard.py           # Main dashboard (optimized, cached)
+      equipment.py           # Equipment CRUD
+      reports.py             # PDF/Excel generation (3,699 lines)
+      confirmacion.py        # Metrological confirmation
+      comprobacion.py        # Intermediate verifications
+      prestamos.py           # Equipment loans
+      panel_decisiones.py    # Decision panel / analytics
+      calendario.py          # Activity calendar
+      aprobaciones.py        # Document approvals
+      companies.py           # Company management
+      activities.py          # Activity views
+      maintenance.py         # Maintenance views
+      admin.py               # Admin views
+      scheduled_tasks_api.py # API for scheduled tasks
+      terminos.py            # Terms & conditions
+    services.py              # Business logic services
+    services_new.py          # Optimized services (cache, file upload)
+    monitoring.py            # System health monitoring
+    notifications.py         # Notification system
+    file_validators.py       # File upload validation
+    storage_validators.py    # Storage limit validation
+    zip_functions.py         # ZIP generation for equipment docs
+    middleware.py            # Company middleware, security
+    optimizations.py         # Query optimizations
+    security.py              # Security utilities
+    admin_services.py        # Admin business logic
+    admin_views.py           # Admin extra views
+    utils/                   # Utility modules
+      analisis_financiero.py # Financial analysis
+      decision_intelligence.py # Decision intelligence
+      impersonation.py       # User impersonation
+    static/                  # CSS, JS, images
+    templates/               # App-specific templates
+    templatetags/            # Custom template filters
+    management/commands/     # Django management commands
+    migrations/              # Database migrations
+
+  proyecto_c/                # Django project settings
+    settings.py              # Environment-based settings
+    urls.py                  # Root URL config
+    wsgi.py                  # WSGI entry point
+
+  templates/                 # Global templates (base.html, etc.)
+
+  tests/                     # All tests (pytest)
+    conftest.py              # Shared fixtures
+    factories.py             # Factory Boy factories
+    test_critical/           # Critical flow tests
+    test_integration/        # Integration tests
+    test_models/             # Model tests
+    test_monitoring/         # Monitoring tests
+    test_notifications/      # Notification tests
+    test_performance/        # Performance benchmarks
+    test_security/           # Security tests
+    test_services/           # Service layer tests
+    test_views/              # View/endpoint tests
+    test_zip/                # ZIP generation tests
+
+  scripts/                   # Utility/diagnostic scripts (not auto-run)
+  auditorias/                # Audit reports and plans
+  docs/                      # Technical documentation
+    PLAN_TRIAL_ONBOARDING_PAGOS.md  # Plan: trial + onboarding + pagos
+    DEPENDENCY_MANAGEMENT.md         # Procedimiento actualizacion dependencias
+    AUTO_UPDATE_DOCS.md              # Sistema auto-actualizacion docs
+    BACKUP_RECOVERY.md               # Procedimiento backup/recovery
+  backups/                   # Local backup files
+  logs/                      # Application logs
+  media/                     # Dev file uploads
+  staticfiles/               # Collected static files
+  htmlcov/                   # Coverage HTML report
+```
 
 ## Development Commands
 
@@ -31,331 +123,138 @@ python manage.py runserver
 # Apply database migrations
 python manage.py migrate
 
-# Create database migrations after model changes
+# Create migrations after model changes
 python manage.py makemigrations
 
-# Create superuser for admin access
+# Create superuser
 python manage.py createsuperuser
 
-# Collect static files (required for production)
+# Collect static files
 python manage.py collectstatic
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Start with virtual environment
+# Virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
-### Testing and Quality
+### Testing
 ```bash
-# Run all tests with pytest (RECOMMENDED - 746 tests)
-pytest
+# Run all tests (recommended)
+python -m pytest
 
-# Run tests with coverage report
-pytest --cov=core --cov-report=html --cov-report=term-missing
+# Run with coverage
+python -m pytest --cov=core --cov-report=html --cov-report=term-missing
 
 # Run specific test file
-pytest tests/test_monitoring/test_monitoring_core.py -v
+python -m pytest tests/test_views/test_dashboard.py -v
 
-# Run tests by marker
-pytest -m integration
+# Run by marker
+python -m pytest -m integration
 
-# Run Django tests (legacy - use pytest instead)
-python manage.py test
-
-# Check for code issues
+# Check for issues
 python manage.py check
-
-# Create cache table (if using database cache)
-python manage.py createcachetable sam_cache_table
 ```
 
 ### Test Organization
 
-**Current Status (Jan 10, 2026):**
-- **Total Tests:** 738 tests passing, 0 failing
-- **Coverage:** 54.66% (Goal: 80%)
-- **Organization:** Tests organized by functionality in 9 directories
+Tests are in `tests/` (configured in pyproject.toml `testpaths`). Structure:
 
-**Test Structure:**
-```
-tests/
-├── test_critical/      # Critical flow tests
-├── test_integration/   # Integration tests
-├── test_models/        # Model tests (Empresa, Equipo, Usuario)
-├── test_monitoring/    # System monitoring tests (30 tests, 81.50% coverage)
-├── test_notifications/ # Notification system tests (18 tests, 43.07% coverage)
-├── test_security/      # Security and file validation tests
-├── test_services/      # Service layer tests (25 tests for services_new.py)
-├── test_views/         # View and endpoint tests
-└── test_zip/           # ZIP generation tests (39 tests, 50% coverage)
-```
+| Directory | Purpose | Key modules covered |
+|-----------|---------|-------------------|
+| test_critical/ | Critical business flows | Multi-tenant, core workflows |
+| test_integration/ | End-to-end workflows | Auth, equipment, company flows |
+| test_models/ | Model unit tests | Empresa, Equipo, Usuario |
+| test_monitoring/ | System health | monitoring.py (81.58%) |
+| test_notifications/ | Notifications | notifications.py (56.72%) |
+| test_performance/ | Benchmarks, cache | Dashboard perf, cache invalidation |
+| test_security/ | File security | file_validators.py |
+| test_services/ | Service layer | services_new.py (72.73%) |
+| test_views/ | Views & endpoints | All view modules |
+| test_zip/ | ZIP generation | zip_functions.py (49.22%) |
 
-**Recent Improvements (Jan 2026):**
-- ✅ Added 112 new critical tests
-- ✅ Increased coverage from 35.84% to 54.66% (+18.82%)
-- ✅ All tests passing (0 failures)
-- ✅ Tests organized by functionality
-- ✅ monitoring.py: 81.50% coverage (EXCEEDED 70% goal)
-- ✅ services_new.py: 59.24% coverage
-- ✅ zip_functions.py: 50% coverage
+**Testing best practices:**
+1. Use mocks only for external I/O (storage, email, cache)
+2. Test error handling and edge cases
+3. Run full suite before commits: `python -m pytest`
+4. Keep coverage above 57%
 
-**Testing Best Practices:**
-1. Write REAL tests without evasion
-2. Use mocks only for external I/O (storage, email, cache)
-3. Test error handling and edge cases
-4. Organize tests by functionality
-5. Run full test suite before commits
-6. Maintain coverage above 50%
-
-### Deployment Commands
+### Deployment
 ```bash
-# Production deployment (from start.sh)
+# Production (from start.sh)
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 gunicorn proyecto_c.wsgi:application
 
-# Sistema de Cola ZIP (NUEVO - Optimización de Memoria)
-./start_zip_processor.sh     # Iniciar procesador de cola
-./stop_zip_processor.sh      # Detener procesador de cola
-./monitor_zip_system.sh      # Monitorear sistema de cola
-
-# Limpieza de archivos ZIP
-python manage.py cleanup_zip_files --dry-run          # Simular limpieza
-python manage.py cleanup_zip_files --older-than-hours 6  # Limpiar archivos antiguos
-python manage.py cleanup_zip_files --force-all        # Eliminar TODOS (cuidado!)
+# ZIP processor
+./start_zip_processor.sh
+./stop_zip_processor.sh
+./monitor_zip_system.sh
 ```
 
-## Architecture Overview
+## Architecture
 
-### Project Structure
-- **core/**: Main business logic app containing models, views, and business logic
-- **proyecto_c/**: Django project settings and main configuration
-- **templates/**: Global templates directory
-- **media/**: Local file uploads (development only)
-- **logs/**: Application logs with rotation
+### Settings
+Environment-based with automatic switching:
+- **Dev**: SQLite, local storage, debug logging
+- **Prod**: PostgreSQL (DATABASE_URL), AWS S3, JSON logging
+- **Detection**: `RENDER_EXTERNAL_HOSTNAME` env var
 
-### Key Models and Domain
-- **Empresa**: Company/client management with logo, contact info, and equipment limits
-- **CustomUser**: Extended user model with company associations and role management
-- **Equipment Management**: Equipment tracking, maintenance scheduling, and documentation
-- **Subscription System**: Company-based equipment limits and plan management
+### Multi-tenancy
+All data is filtered by `empresa` (company). Key patterns:
+- QuerySets: `Equipo.objects.filter(empresa=request.user.empresa)`
+- Cache keys: `f"dashboard_{user.id}_{empresa_id}"`
+- Middleware validates empresa on each request
 
-### Settings Architecture
-Environment-based configuration with automatic switching:
-- **Development**: SQLite database, local file storage, debug logging
-- **Production**: PostgreSQL database, AWS S3 storage, structured JSON logging
-- **Environment Detection**: Uses `RENDER_EXTERNAL_HOSTNAME` to detect production
+### Caching
+- **Dev**: Local memory cache
+- **Prod + Redis**: Redis with connection pooling
+- **Prod fallback**: Database cache (`sam_cache_table`)
+- Dashboard cached for 5 min, auto-invalidated via signals
 
-### Database Configuration
-- **Development**: SQLite (`db.sqlite3`)
-- **Production**: PostgreSQL via `DATABASE_URL` environment variable
-- **Migrations**: Located in `core/migrations/`
-
-### File Storage Strategy
-- **Development**: Local filesystem storage in `media/` directory
-- **Production**: AWS S3 with server-side encryption and optimized settings
-- **Static Files**: WhiteNoise for development, S3 for production
-
-### Caching System
-Three-tier caching based on environment:
-- **Development**: Local memory cache
-- **Production with Redis**: Redis cache with connection pooling
-- **Production fallback**: Database cache with table `sam_cache_table`
-
-### Logging Configuration
-Structured logging with multiple handlers:
-- **Development**: Console output with verbose formatting
-- **Production**: JSON-formatted logs with file rotation
-- **Log Files**:
-  - `logs/sam_info.log`: General application logs
-  - `logs/sam_errors.log`: Error logs with extended retention
-  - `logs/sam_security.log`: Security-related events
-  - `logs/zip_processor.log`: Procesador de cola ZIP (NUEVO)
-
-### Sistema de Cola ZIP (Optimización de Memoria)
-Sistema implementado para optimizar el uso de memoria en generación de ZIPs:
-- **Procesamiento en Cola**: Las solicitudes ZIP se procesan una por una en orden FIFO
-- **Optimización de RAM**: Máximo 35 equipos por ZIP para mantener <50% uso de RAM
-- **Persistencia entre Páginas**: Notificaciones globales que persisten al navegar
-- **Limpieza Automática**: Archivos ZIP expiran automáticamente en 6 horas
-- **Monitoreo**: Scripts incluidos para monitorear estado y uso de recursos
+### Key Constants
+All in `core/constants.py` - equipment states, loan states, service types, limits, messages, etc.
 
 ## Environment Variables
 
-### Required for Production
-```bash
-SECRET_KEY=your_secret_key
-DATABASE_URL=postgresql://...
-AWS_ACCESS_KEY_ID=your_aws_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret
-AWS_STORAGE_BUCKET_NAME=your_bucket_name
-AWS_S3_REGION_NAME=us-east-2
-RENDER_EXTERNAL_HOSTNAME=your-domain.com
+### Required (Production)
+```
+SECRET_KEY, DATABASE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+AWS_STORAGE_BUCKET_NAME, AWS_S3_REGION_NAME, RENDER_EXTERNAL_HOSTNAME
 ```
 
-### Optional Configuration
-```bash
-DEBUG_VALUE=False
-REDIS_URL=redis://...
-EMAIL_HOST=smtp.gmail.com
-EMAIL_HOST_USER=your_email
-EMAIL_HOST_PASSWORD=your_password
-ADMIN_EMAIL=admin@yourcompany.com
+### Optional
+```
+DEBUG_VALUE, REDIS_URL, EMAIL_HOST, EMAIL_HOST_USER,
+EMAIL_HOST_PASSWORD, ADMIN_EMAIL
 ```
 
-## Security Configuration
+## Known Technical Debt
 
-### Production Security Features
-- HTTPS enforcement with HSTS
-- Content Security Policy (CSP) headers
-- XSS and content type protection
-- Secure cookie settings
-- AWS S3 server-side encryption
-- Rate limiting configuration in `RATE_LIMIT_CONFIG`
+- `core/models.py`: 4,148 lines (should be split into modules)
+- `core/views/reports.py`: 3,699 lines (has helpers but still large)
+- `core/forms.py`: 1,742 lines (should split by domain)
+- Coverage gaps: comprobacion.py (32%), maintenance.py (32%), confirmacion.py (38%)
+- ISO 17020 modules missing: complaints, non-conformities, impartiality
+- `core/views_optimized.py`, `core/zip_optimizer.py`, `core/async_zip_improved.py`: Evaluate if still needed
 
-### Authentication System
-- Custom user model (`AUTH_USER_MODEL = 'core.CustomUser'`)
-- Company-based user associations
-- Login redirects to dashboard (`core:dashboard`)
-- Session-based authentication with security cookies
+## Backups
 
-## Application-Specific Configuration
+### PostgreSQL to Cloudflare R2
+- Daily at 3:00 AM (Colombia) via GitHub Actions
+- Script: `scripts/backup_to_s3.py`
+- Retention: 180 days
 
-### SAM Configuration (`SAM_CONFIG`)
-- `DEFAULT_EQUIPMENT_LIMIT`: 5 equipments per company default
-- `MAX_EQUIPMENT_LIMIT`: 1000 equipments maximum
-- `MAX_FILE_SIZE_MB`: 10MB file upload limit
-- `ALLOWED_IMAGE_FORMATS`: jpg, jpeg, png
-- `ALLOWED_DOCUMENT_FORMATS`: pdf, xlsx, docx
-- `PAGINATION_SIZE`: 25 items per page
+### Soft Delete
+- Companies: 180-day retention before permanent deletion
+- Command: `python manage.py cleanup_deleted_companies`
 
-### Localization
-- **Language**: Spanish Colombia (`es-co`)
-- **Timezone**: America/Bogota
-- **Date Format**: dd/mm/yyyy
-- **Time Format**: 24-hour format
-
-## Development Guidelines
-
-### Model Changes
-1. Make model changes in `core/models.py`
-2. Run `python manage.py makemigrations`
-3. Apply with `python manage.py migrate`
-4. Update admin registration in `core/admin.py` if needed
-
-### File Uploads
-- Use configured storage backends (auto-switches based on environment)
-- Files are validated for type and size in `core/forms.py`
-- Images and documents handled separately with different validation rules
-
-### Performance Considerations
-- Database connection pooling enabled in production (`CONN_MAX_AGE = 600`)
-- Cache configuration with timeout settings
-- AWS S3 optimized with connection pooling and retry logic
-- Static file compression with WhiteNoise
-
-### Error Handling
-- Structured logging captures errors with context
-- Email notifications for critical errors in production
-- Security events logged separately for monitoring
-
-## Common Development Tasks
-
-### Adding New Equipment Types
-1. Update models in `core/models.py`
-2. Create and apply migrations
-3. Update forms in `core/forms.py`
-4. Add validation logic in `core/services.py`
-
-### Template Development
-- Global templates in `templates/`
-- App-specific templates in `core/templates/`
-- Bootstrap 5 with Crispy Forms integration
-- Base template inheritance pattern
-
-### PDF Generation
-- Uses WeasyPrint for PDF generation
-- Templates in `core/templates/` with PDF-specific styling
-- Configured for handling Spanish characters and formatting
-
-### AWS S3 Troubleshooting
-- Check environment variables are set correctly
-- Verify AWS credentials have S3 permissions
-- Monitor logs for S3-related errors in `logs/sam_errors.log`
-- Test with local storage first by clearing AWS environment variables
-
-## Backups Automaticos y Retencion de Datos
-
-### Sistema de Backups (PostgreSQL → Cloudflare R2)
-- **Frecuencia:** Diario a las 3:00 AM (hora Colombia)
-- **Almacenamiento:** Cloudflare R2 (S3-compatible)
-- **Bucket:** Configurado en secret `AWS_BACKUP_BUCKET`
-- **Retencion:** 180 dias (6 meses) - Clausula 5.2 del contrato
-- **Workflow:** `.github/workflows/daily-backup.yml`
-- **Script:** `backup_to_s3.py` (compatible con R2 y AWS S3)
-- **Deteccion automatica:** El script detecta R2 via `AWS_S3_ENDPOINT_URL`
-
-**Restaurar backup manualmente:**
-```bash
-# Usando boto3 (recomendado)
-python -c "
-from backup_to_s3 import DatabaseBackupManager
-mgr = DatabaseBackupManager()
-mgr.list_backups()  # Ver backups disponibles
-mgr.restore_backup('backups/database/YYYY/MM/sam_backup_YYYYMMDD_HHMMSS.sql.gz')
-"
-```
-
-### Sistema de Soft Delete de Empresas
-- **Retención:** 180 días (6 meses) antes de eliminación permanente
-- **Campos:** `is_deleted`, `deleted_at`, `deleted_by`, `delete_reason`
-- **Restauración:** `empresa.restore(user)` o desde Django Admin
-- **Verificación mensual:** Primer día del mes a las 2:00 AM
-- **Comando:** `python manage.py cleanup_deleted_companies --days=180`
-
-**Eliminar permanentemente (requiere confirmación manual):**
-```bash
-# Verificar qué se eliminaría (dry-run)
-python manage.py cleanup_deleted_companies
-
-# Ejecutar eliminación real
-python manage.py cleanup_deleted_companies --execute
-```
-
-### Tareas Programadas (GitHub Actions)
-
-| Tarea | Workflow | Frecuencia | Descripción |
-|-------|----------|------------|-------------|
-| Backup BD | `daily-backup.yml` | Diario 3:00 AM | Backup PostgreSQL a S3 |
-| Limpieza Notificaciones | `cleanup-notifications.yml` | Domingos 4:00 AM | Elimina notificaciones antiguas |
-| Verificación Empresas | `monthly-cleanup-check.yml` | Mensual (día 1, 2:00 AM) | Reporte de empresas para eliminar |
-| Eliminación Empresas | `cleanup-execute.yml` | Manual con confirmación | Elimina empresas confirmadas |
-
-**Secrets requeridos en GitHub Actions:**
-- `DATABASE_URL` (External PostgreSQL URL)
-- `AWS_ACCESS_KEY_ID` (R2 Access Key ID)
-- `AWS_SECRET_ACCESS_KEY` (R2 Secret Access Key)
-- `AWS_BACKUP_BUCKET` (nombre del bucket en R2)
-- `AWS_S3_ENDPOINT_URL` (https://<account_id>.r2.cloudflarestorage.com)
-- `AWS_S3_REGION_NAME` (auto para R2)
-- `SECRET_KEY`
-- `SCHEDULED_TASKS_TOKEN` (para endpoints API)
-- `APP_URL` (https://sam-9o6o.onrender.com)
-
-### Contrato de Términos y Condiciones
-- **Versión actual:** 1.0 (180 días de período de gracia)
-- **Ubicación:** `terminos_condiciones_v1.0.html`
-- **Comando de carga:** `python manage.py cargar_contrato_completo`
-- **Auto-carga:** En `start.sh` durante cada deploy
-- **Vista:** `/core/mi-aceptacion-terminos/`
-
-## Seguridad y Sesiones
-
-### CSRF y Sesiones
-- **Duración de sesión:** 8 horas (configurado para reducir errores 403)
-- **Cookie persistente:** No expira al cerrar navegador
-- **CSRF cookie:** 8 horas, HttpOnly=False para compatibilidad
-- **Rate limiting:** Configurado en `RATE_LIMIT_CONFIG`
+## Security
+- HTTPS + HSTS in production
+- CSP headers, XSS protection
+- Session: 8 hours, CSRF: 8 hours
+- Custom user model: `core.CustomUser`
+- File validation on all uploads
+- Rate limiting configured

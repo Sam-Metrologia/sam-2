@@ -153,8 +153,14 @@ def puede_aprobar(usuario, documento):
     Reglas:
     - Técnicos NO pueden aprobar nada
     - Nadie puede aprobar su propio documento
-    - Admin y Gerente pueden aprobar (si no es suyo)
+    - El documento debe pertenecer a la empresa del usuario (aislamiento multi-tenant)
+    - Admin y Gerente pueden aprobar (si no es suyo y es de su empresa)
+    - Superusuarios pueden aprobar cualquier documento
     """
+    # Superusuarios pueden aprobar cualquier documento
+    if usuario.is_superuser:
+        return True
+
     # Técnicos NO pueden aprobar
     if usuario.rol_usuario == 'TECNICO':
         return False
@@ -163,7 +169,16 @@ def puede_aprobar(usuario, documento):
     if documento.creado_por == usuario:
         return False
 
-    # Admin y Gerente pueden aprobar (si no es suyo)
+    # Validar que el documento pertenezca a la empresa del usuario (multi-tenant)
+    if not usuario.empresa:
+        return False
+
+    documento_empresa = getattr(documento, 'equipo', None)
+    if documento_empresa and hasattr(documento_empresa, 'empresa'):
+        if documento_empresa.empresa != usuario.empresa:
+            return False
+
+    # Admin y Gerente pueden aprobar (si no es suyo y es de su empresa)
     if usuario.rol_usuario in ['ADMINISTRADOR', 'GERENCIA']:
         return True
 
@@ -178,7 +193,14 @@ def aprobar_confirmacion(request, calibracion_id):
     Solo Admin o Gerente pueden aprobar (y no su propio documento).
     """
     try:
-        calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        # Filtrar por empresa del usuario para aislamiento multi-tenant
+        if request.user.is_superuser:
+            calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        else:
+            calibracion = get_object_or_404(
+                Calibracion, id=calibracion_id,
+                equipo__empresa=request.user.empresa
+            )
 
         # Verificar permisos
         if not puede_aprobar(request.user, calibracion):
@@ -303,7 +325,14 @@ def rechazar_confirmacion(request, calibracion_id):
     Rechaza una confirmación metrológica con observaciones.
     """
     try:
-        calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        # Filtrar por empresa del usuario para aislamiento multi-tenant
+        if request.user.is_superuser:
+            calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        else:
+            calibracion = get_object_or_404(
+                Calibracion, id=calibracion_id,
+                equipo__empresa=request.user.empresa
+            )
 
         # Verificar permisos
         if not puede_aprobar(request.user, calibracion):
@@ -356,7 +385,14 @@ def aprobar_intervalos(request, calibracion_id):
     Aprueba intervalos de calibración.
     """
     try:
-        calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        # Filtrar por empresa del usuario para aislamiento multi-tenant
+        if request.user.is_superuser:
+            calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        else:
+            calibracion = get_object_or_404(
+                Calibracion, id=calibracion_id,
+                equipo__empresa=request.user.empresa
+            )
 
         # Verificar permisos
         if not puede_aprobar(request.user, calibracion):
@@ -510,7 +546,14 @@ def rechazar_intervalos(request, calibracion_id):
     Rechaza intervalos de calibración con observaciones.
     """
     try:
-        calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        # Filtrar por empresa del usuario para aislamiento multi-tenant
+        if request.user.is_superuser:
+            calibracion = get_object_or_404(Calibracion, id=calibracion_id)
+        else:
+            calibracion = get_object_or_404(
+                Calibracion, id=calibracion_id,
+                equipo__empresa=request.user.empresa
+            )
 
         # Verificar permisos
         if not puede_aprobar(request.user, calibracion):
@@ -562,7 +605,14 @@ def aprobar_comprobacion(request, comprobacion_id):
     Aprueba una comprobación metrológica.
     """
     try:
-        comprobacion = get_object_or_404(Comprobacion, id=comprobacion_id)
+        # Filtrar por empresa del usuario para aislamiento multi-tenant
+        if request.user.is_superuser:
+            comprobacion = get_object_or_404(Comprobacion, id=comprobacion_id)
+        else:
+            comprobacion = get_object_or_404(
+                Comprobacion, id=comprobacion_id,
+                equipo__empresa=request.user.empresa
+            )
 
         # Verificar permisos
         if not puede_aprobar(request.user, comprobacion):
@@ -703,7 +753,14 @@ def rechazar_comprobacion(request, comprobacion_id):
     Rechaza una comprobación metrológica con observaciones.
     """
     try:
-        comprobacion = get_object_or_404(Comprobacion, id=comprobacion_id)
+        # Filtrar por empresa del usuario para aislamiento multi-tenant
+        if request.user.is_superuser:
+            comprobacion = get_object_or_404(Comprobacion, id=comprobacion_id)
+        else:
+            comprobacion = get_object_or_404(
+                Comprobacion, id=comprobacion_id,
+                equipo__empresa=request.user.empresa
+            )
 
         # Verificar permisos
         if not puede_aprobar(request.user, comprobacion):

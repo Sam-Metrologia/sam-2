@@ -214,14 +214,14 @@ def dashboard(request):
     # Filtrado por empresa para superusuarios (solo empresas activas)
     selected_company_id = request.GET.get('empresa_id')
 
-    # CACHE DESHABILITADO TEMPORALMENTE (issue con serialización de QuerySets)
-    # TODO: Implementar cache con serialización correcta de QuerySets
-    # cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}"
-    # cached_context = cache.get(cache_key)
-    # if cached_context:
-    #     return render(request, 'core/dashboard.html', cached_context)
+    # Cache del dashboard (5 min, invalidado por signals en core/signals.py)
+    cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}"
+    cached_context = cache.get(cache_key)
+    if cached_context:
+        return render(request, 'core/dashboard.html', cached_context)
 
-    empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
+    # list() fuerza evaluación del QuerySet para que sea serializable en cache
+    empresas_disponibles = list(Empresa.objects.filter(is_deleted=False).order_by('nombre'))
 
     # Obtener queryset de equipos según permisos
     equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
@@ -280,9 +280,8 @@ def dashboard(request):
         **prestamos_data  # AGREGAR ESTA LÍNEA
     }
 
-    # CACHE DESHABILITADO TEMPORALMENTE (issue con serialización de QuerySets)
-    # TODO: Implementar cache con serialización correcta
-    # cache.set(cache_key, context, 300)
+    # Cache por 5 minutos (invalidado automáticamente por signals)
+    cache.set(cache_key, context, 300)
 
     return render(request, 'core/dashboard.html', context)
 
@@ -938,7 +937,7 @@ def _get_latest_corrective_maintenances(user, selected_company_id):
     elif selected_company_id:
         query = query.filter(equipo__empresa_id=selected_company_id)
 
-    return query[:5]  # Últimos 5
+    return list(query[:5])  # Últimos 5 (list() para serialización en cache)
 
 
 def _get_plan_info(user, selected_company_id):
