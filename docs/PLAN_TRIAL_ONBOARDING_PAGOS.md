@@ -11,6 +11,54 @@ Orden de implementacion: A -> B -> C (cada uno funciona independiente)
 
 ---
 
+## Checklist de Avance
+
+### MODULO A: Auto-registro de Trial
+- [ ] A1. Crear formulario RegistroTrialForm (`core/forms/registro.py`)
+- [ ] A2. Crear vista solicitar_trial (`core/views/registro.py`)
+- [ ] A3. Crear template solicitar_trial.html
+- [ ] A4. Crear template trial_exitoso.html
+- [ ] A5. Agregar URLs en core/urls.py
+- [ ] A6. Agregar boton "Solicitar Trial" en login.html
+- [ ] A7. Configurar CAPTCHA (reCAPTCHA)
+- [ ] A8. Tests de registro (15-18 tests)
+- [ ] A9. Verificar 1,023+ tests pasan
+
+### MODULO B: Onboarding Guiado
+- [ ] B1. Crear modelo OnboardingProgress en models.py
+- [ ] B2. Crear migracion y migrar
+- [ ] B3. Crear signal auto-crear progreso al crear usuario trial
+- [ ] B4. Integrar Shepherd.js (tour guiado)
+- [ ] B5. Crear widget checklist en dashboard (partial template)
+- [ ] B6. Crear vista API progreso onboarding (`core/views/onboarding.py`)
+- [ ] B7. Marcar pasos en vistas existentes (4 vistas)
+- [ ] B8. Incluir checklist en template dashboard.html
+- [ ] B9. Tests de onboarding (12-15 tests)
+- [ ] B10. Verificar 1,038+ tests pasan
+
+### MODULO C: Pagos (PSE / Tarjeta)
+- [ ] C1. Elegir pasarela y crear cuenta (Wompi/ePayco)
+- [ ] C2. Crear modelo TransaccionPago en models.py
+- [ ] C3. Crear migracion y migrar
+- [ ] C4. Crear pagina de planes (`core/views/pagos.py` + template)
+- [ ] C5. Crear endpoint inicio de pago
+- [ ] C6. Crear webhook de confirmacion
+- [ ] C7. Crear pagina de resultado de pago
+- [ ] C8. Agregar banner vencimiento trial en dashboard
+- [ ] C9. Configurar settings (claves pasarela)
+- [ ] C10. Tests de pagos (18-22 tests)
+- [ ] C11. Verificar 1,056+ tests pasan
+
+### DEPLOY FINAL
+- [ ] D1. Correr suite completo de tests
+- [ ] D2. Actualizar este documento (marcar todo como completado)
+- [ ] D3. Commit final y push a main
+- [ ] D4. Desplegar en Render
+
+**Progreso general: 0/33 tareas completadas**
+
+---
+
 ## Estructura de Carpetas (donde va cada archivo nuevo)
 
 ```

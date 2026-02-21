@@ -13,6 +13,10 @@ from django.contrib.auth import views as auth_views # Importar las vistas de aut
 app_name = 'core'
 
 urlpatterns = [
+    # Auto-registro de Trial (público)
+    path('solicitar-trial/', views.solicitar_trial, name='solicitar_trial'),
+    path('trial-exitoso/', views.trial_exitoso, name='trial_exitoso'),
+
     # Autenticación
     path('login/', views.user_login, name='login'),
     path('logout/', views.user_logout, name='logout'),

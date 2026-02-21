@@ -1741,3 +1741,183 @@ class DevolucionEquipoForm(forms.Form):
             'resultado_general': 'Aprobado' if data.get('verificacion_funcional_ok') == 'Conforme' else 'No Aprobado',
             'punto_medicion': punto_medicion_data
         }
+
+
+# ==============================================================================
+# FORMULARIO DE AUTO-REGISTRO DE TRIAL
+# ==============================================================================
+
+class RegistroTrialForm(forms.Form):
+    """
+    Formulario público para auto-registro de Trial.
+    Crea 1 Empresa + 1 Usuario Administrador.
+    Los usuarios de Gerencia y Técnico se generan automáticamente en la vista.
+    Incluye: honeypot anti-bot, campo logo opcional, validación NIT contra eliminadas.
+    """
+
+    # --- Honeypot anti-bot (campo oculto, si se llena = bot) ---
+    website = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={'tabindex': '-1', 'autocomplete': 'off'}),
+    )
+
+    # --- Datos de la Empresa ---
+    nombre_empresa = forms.CharField(
+        max_length=200,
+        label='Nombre de la Empresa',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Ej: Metrología ABC S.A.S.'
+        })
+    )
+    nit = forms.CharField(
+        max_length=50,
+        label='NIT',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Ej: 900123456-7'
+        })
+    )
+    email_empresa = forms.EmailField(
+        label='Email de la Empresa',
+        widget=forms.EmailInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'contacto@empresa.com'
+        }),
+        help_text='Este correo se usará para el envío de facturas y comunicaciones comerciales.'
+    )
+    telefono = forms.CharField(
+        max_length=20,
+        required=False,
+        label='Teléfono',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': '+57 300 123 4567'
+        })
+    )
+    logo_empresa = forms.ImageField(
+        required=False,
+        label='Logo de la Empresa (opcional)',
+        widget=forms.FileInput(attrs={
+            'class': 'form-input-file',
+            'accept': 'image/png,image/jpeg,image/jpg'
+        }),
+        help_text='PNG o JPG, máximo 2 MB. Este logo aparecerá en el encabezado de los formatos e informes generados.'
+    )
+
+    # --- Datos del Administrador ---
+    nombre_completo = forms.CharField(
+        max_length=150,
+        label='Nombre Completo del Administrador',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Ej: Juan Pérez García'
+        })
+    )
+    username = forms.CharField(
+        max_length=30,
+        min_length=3,
+        label='Nombre de Usuario',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Ej: juan.perez'
+        }),
+        help_text='3-30 caracteres: letras, números, guiones y guiones bajos'
+    )
+    email_usuario = forms.EmailField(
+        label='Email del Administrador',
+        widget=forms.EmailInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'admin@empresa.com'
+        })
+    )
+    password1 = forms.CharField(
+        label='Contraseña',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Mínimo 8 caracteres'
+        }),
+        help_text='Mínimo 8 caracteres, no puede ser solo numérica'
+    )
+    password2 = forms.CharField(
+        label='Confirmar Contraseña',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Repite la contraseña'
+        })
+    )
+
+    def clean_nombre_empresa(self):
+        nombre = self.cleaned_data.get('nombre_empresa')
+        if nombre and Empresa.objects.filter(nombre=nombre).exists():
+            raise ValidationError("Ya existe una empresa con este nombre.")
+        return nombre
+
+    def clean_nit(self):
+        nit = self.cleaned_data.get('nit')
+        if nit:
+            nit_clean = re.sub(r'[^0-9]', '', nit)
+            if len(nit_clean) < 9:
+                raise ValidationError("El NIT debe tener al menos 9 dígitos.")
+            # Verificar contra empresas activas Y eliminadas (soft-deleted)
+            if Empresa.objects.filter(nit=nit, is_deleted=True).exists():
+                raise ValidationError(
+                    "Este NIT ya fue usado en un trial anterior. "
+                    "Contacta soporte si necesitas reactivar tu cuenta."
+                )
+            if Empresa.objects.filter(nit=nit, is_deleted=False).exists():
+                raise ValidationError("Ya existe una empresa con este NIT.")
+        return nit
+
+    def clean_email_empresa(self):
+        email = self.cleaned_data.get('email_empresa')
+        if email and Empresa.objects.filter(email=email, is_deleted=False).exists():
+            raise ValidationError("Ya existe una empresa con este correo electrónico.")
+        return email
+
+    def clean_logo_empresa(self):
+        logo = self.cleaned_data.get('logo_empresa')
+        if logo:
+            # Validar tamaño (max 2 MB)
+            if logo.size > 2 * 1024 * 1024:
+                raise ValidationError("El logo no puede superar 2 MB.")
+            # Validar formato
+            allowed = ['image/jpeg', 'image/png', 'image/jpg']
+            if hasattr(logo, 'content_type') and logo.content_type not in allowed:
+                raise ValidationError("Solo se permiten imágenes PNG o JPG.")
+        return logo
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if username:
+            if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', username):
+                raise ValidationError(
+                    "El nombre de usuario debe tener entre 3-30 caracteres y solo contener "
+                    "letras, números, guiones y guiones bajos."
+                )
+            if CustomUser.objects.filter(username=username).exists():
+                raise ValidationError("Este nombre de usuario ya está en uso.")
+        return username
+
+    def clean_email_usuario(self):
+        email = self.cleaned_data.get('email_usuario')
+        if email and CustomUser.objects.filter(email=email).exists():
+            raise ValidationError("Ya existe un usuario con este correo electrónico.")
+        return email
+
+    def clean_password1(self):
+        password = self.cleaned_data.get('password1')
+        if password:
+            if len(password) < 8:
+                raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
+            if password.isdigit():
+                raise ValidationError("La contraseña no puede ser completamente numérica.")
+        return password
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get('password1')
+        password2 = cleaned_data.get('password2')
+        if password1 and password2 and password1 != password2:
+            self.add_error('password2', "Las contraseñas no coinciden.")
+        return cleaned_data

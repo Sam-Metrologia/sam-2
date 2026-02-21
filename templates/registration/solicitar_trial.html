@@ -1,0 +1,153 @@
+{% extends 'base_login.html' %}
+{% load static %}
+
+{% block title %}Solicitar Trial Gratuito - SAM Metrología{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-100 py-8">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-2">Solicitar Trial Gratuito</h2>
+        <p class="text-center text-gray-500 mb-6">30 días gratis &middot; 50 equipos &middot; 500 MB de almacenamiento</p>
+
+        {% if form.non_field_errors %}
+            <div class="mb-4">
+                {% for error in form.non_field_errors %}
+                    <div class="alert alert-error px-4 py-3 rounded-md" role="alert">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'core:solicitar_trial' %}" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+
+            <!-- Honeypot anti-bot (oculto) -->
+            <div style="position:absolute;left:-9999px;" aria-hidden="true">
+                {{ form.website }}
+            </div>
+
+            <!-- Datos de la Empresa -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">
+                    <i class="fas fa-building mr-2 text-blue-600"></i>Datos de la Empresa
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="id_nombre_empresa" class="block text-gray-700 text-sm font-bold mb-1">{{ form.nombre_empresa.label }} *</label>
+                        {{ form.nombre_empresa }}
+                        {% if form.nombre_empresa.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.nombre_empresa.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_nit" class="block text-gray-700 text-sm font-bold mb-1">{{ form.nit.label }} *</label>
+                        {{ form.nit }}
+                        {% if form.nit.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.nit.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_email_empresa" class="block text-gray-700 text-sm font-bold mb-1">{{ form.email_empresa.label }} *</label>
+                        {{ form.email_empresa }}
+                        {% if form.email_empresa.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.email_empresa.help_text }}</p>
+                        {% endif %}
+                        {% if form.email_empresa.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.email_empresa.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_telefono" class="block text-gray-700 text-sm font-bold mb-1">{{ form.telefono.label }}</label>
+                        {{ form.telefono }}
+                        {% if form.telefono.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.telefono.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="id_logo_empresa" class="block text-gray-700 text-sm font-bold mb-1">{{ form.logo_empresa.label }}</label>
+                        {{ form.logo_empresa }}
+                        {% if form.logo_empresa.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.logo_empresa.help_text }}</p>
+                        {% endif %}
+                        {% if form.logo_empresa.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.logo_empresa.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Datos del Administrador -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">
+                    <i class="fas fa-user-shield mr-2 text-blue-600"></i>Datos del Administrador
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="id_nombre_completo" class="block text-gray-700 text-sm font-bold mb-1">{{ form.nombre_completo.label }} *</label>
+                        {{ form.nombre_completo }}
+                        {% if form.nombre_completo.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.nombre_completo.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_username" class="block text-gray-700 text-sm font-bold mb-1">{{ form.username.label }} *</label>
+                        {{ form.username }}
+                        {% if form.username.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.username.help_text }}</p>
+                        {% endif %}
+                        {% if form.username.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.username.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_email_usuario" class="block text-gray-700 text-sm font-bold mb-1">{{ form.email_usuario.label }} *</label>
+                        {{ form.email_usuario }}
+                        {% if form.email_usuario.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.email_usuario.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_password1" class="block text-gray-700 text-sm font-bold mb-1">{{ form.password1.label }} *</label>
+                        {{ form.password1 }}
+                        {% if form.password1.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.password1.help_text }}</p>
+                        {% endif %}
+                        {% if form.password1.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.password1.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_password2" class="block text-gray-700 text-sm font-bold mb-1">{{ form.password2.label }} *</label>
+                        {{ form.password2 }}
+                        {% if form.password2.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.password2.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info: 3 usuarios + retención -->
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4 text-sm text-blue-800">
+                <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i> Se crearán 3 usuarios automáticamente:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2">
+                    <li><strong>Administrador</strong> &mdash; Gestión completa de empresa, descargar informes, eliminar equipos</li>
+                    <li><strong>Gerencia</strong> &mdash; Todo lo del admin + panel de decisiones (métricas financieras)</li>
+                    <li><strong>Técnico</strong> &mdash; Operaciones básicas (registrar calibraciones, comprobaciones)</li>
+                </ul>
+            </div>
+
+            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6 text-sm text-yellow-800">
+                <p class="font-semibold"><i class="fas fa-exclamation-triangle mr-1"></i> Política de datos del Trial</p>
+                <p>Si el trial expira y no se contrata un plan, los datos se conservarán solo <strong>15 días</strong> después de la fecha de expiración y luego se eliminarán permanentemente.</p>
+            </div>
+
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md focus:outline-none focus:shadow-outline w-full transition duration-300 ease-in-out text-lg">
+                Crear mi cuenta Trial
+            </button>
+
+            <div class="text-center mt-4 text-gray-600 text-sm">
+                <p>¿Ya tienes cuenta? <a href="{% url 'core:login' %}" class="text-blue-600 hover:text-blue-700 font-semibold underline">Iniciar sesión</a></p>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

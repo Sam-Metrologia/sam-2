@@ -90,5 +90,8 @@ from .aprobaciones import (
     rechazar_comprobacion
 )
 
+# Auto-registro de Trial (público)
+from .registro import solicitar_trial, trial_exitoso
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

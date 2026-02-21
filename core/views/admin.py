@@ -116,6 +116,33 @@ def user_login(request):
             user = authenticate(username=username, password=password)
 
             if user is not None:
+                # Advertencia si el trial expiró (retención 15 días)
+                if (user.empresa
+                        and user.empresa.es_periodo_prueba
+                        and user.empresa.fecha_inicio_plan):
+                    from datetime import timedelta
+                    from django.utils import timezone
+                    fecha_fin_trial = (
+                        user.empresa.fecha_inicio_plan
+                        + timedelta(days=user.empresa.duracion_prueba_dias)
+                    )
+                    hoy = timezone.localdate()
+                    if hoy > fecha_fin_trial:
+                        dias_desde_expiracion = (hoy - fecha_fin_trial).days
+                        dias_restantes = max(0, 15 - dias_desde_expiracion)
+                        if dias_restantes > 0:
+                            messages.warning(
+                                request,
+                                f'Tu trial ha expirado. Tus datos se eliminarán en '
+                                f'{dias_restantes} día(s). Contacta ventas para continuar.'
+                            )
+                        else:
+                            messages.error(
+                                request,
+                                'Tu trial ha expirado y tus datos están siendo eliminados. '
+                                'Contacta soporte para más información.'
+                            )
+
                 login(request, user)
                 logger.info(f"Usuario {username} inició sesión exitosamente")
                 return redirect('core:dashboard')
