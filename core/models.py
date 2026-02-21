@@ -4146,3 +4146,59 @@ class PrestamoEquipo(models.Model):
             if motivo:
                 self.observaciones_devolucion = f"CANCELADO: {motivo}"
             self.save()
+
+
+class OnboardingProgress(models.Model):
+    """Progreso del onboarding para usuarios de empresas trial."""
+    usuario = models.OneToOneField(
+        'CustomUser', on_delete=models.CASCADE,
+        related_name='onboarding_progress'
+    )
+    # Tour guiado (Shepherd.js)
+    tour_completado = models.BooleanField(default=False)
+    # Pasos del checklist
+    paso_crear_equipo = models.BooleanField(default=False)
+    paso_registrar_calibracion = models.BooleanField(default=False)
+    paso_generar_reporte = models.BooleanField(default=False)
+    # Timestamps
+    fecha_inicio = models.DateTimeField(auto_now_add=True)
+    fecha_completado = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Progreso de Onboarding'
+        verbose_name_plural = 'Progresos de Onboarding'
+
+    def __str__(self):
+        pasos = self.pasos_completados
+        return f"Onboarding {self.usuario.username}: {pasos}/3"
+
+    @property
+    def pasos_completados(self):
+        return sum([
+            self.paso_crear_equipo,
+            self.paso_registrar_calibracion,
+            self.paso_generar_reporte,
+        ])
+
+    @property
+    def total_pasos(self):
+        return 3
+
+    @property
+    def porcentaje(self):
+        return int((self.pasos_completados / self.total_pasos) * 100)
+
+    @property
+    def completado(self):
+        return self.pasos_completados == self.total_pasos
+
+    def marcar_paso(self, nombre_paso):
+        """Marca un paso como completado si existe y no estaba marcado."""
+        campo = f'paso_{nombre_paso}'
+        if hasattr(self, campo) and not getattr(self, campo):
+            setattr(self, campo, True)
+            if self.completado and not self.fecha_completado:
+                self.fecha_completado = timezone.now()
+            self.save(update_fields=[campo, 'fecha_completado'])
+            return True
+        return False

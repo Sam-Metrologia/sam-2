@@ -17,6 +17,10 @@ urlpatterns = [
     path('solicitar-trial/', views.solicitar_trial, name='solicitar_trial'),
     path('trial-exitoso/', views.trial_exitoso, name='trial_exitoso'),
 
+    # Onboarding (API interna)
+    path('onboarding/progreso/', views.onboarding_progreso, name='onboarding_progreso'),
+    path('onboarding/completar-tour/', views.onboarding_completar_tour, name='onboarding_completar_tour'),
+
     # Autenticación
     path('login/', views.user_login, name='login'),
     path('logout/', views.user_logout, name='logout'),

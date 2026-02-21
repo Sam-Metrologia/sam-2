@@ -93,5 +93,8 @@ from .aprobaciones import (
 # Auto-registro de Trial (público)
 from .registro import solicitar_trial, trial_exitoso
 
+# Onboarding guiado para Trial
+from .onboarding import onboarding_progreso, onboarding_completar_tour
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

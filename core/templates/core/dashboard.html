@@ -695,6 +695,10 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
         }
     </style>
+    {% if onboarding_progress and not onboarding_progress.completado %}
+    <!-- Shepherd.js Tour -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@13/dist/css/shepherd.css"/>
+    {% endif %}
 {% endblock extra_head %}
 
 {% block content %}
@@ -886,6 +890,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
+
+    {% if onboarding_progress and not onboarding_progress.completado %}
+        {% include 'core/partials/onboarding_checklist.html' %}
     {% endif %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -2578,4 +2586,11 @@
 
     });
 </script>
+{% if onboarding_progress and not onboarding_progress.completado %}
+<script>
+    var samOnboardingTourCompletado = {{ onboarding_progress.tour_completado|yesno:"true,false" }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/shepherd.js@13/dist/js/shepherd.min.js"></script>
+<script src="{% static 'core/js/onboarding_tour.js' %}"></script>
+{% endif %}
 {% endblock content %}

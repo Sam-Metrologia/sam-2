@@ -283,6 +283,16 @@ def dashboard(request):
     # Cache por 5 minutos (invalidado automáticamente por signals)
     cache.set(cache_key, context, 300)
 
+    # Onboarding (NO se cachea - es específico por usuario y cambia frecuentemente)
+    onboarding_progress = None
+    if (user.empresa
+            and getattr(user.empresa, 'es_periodo_prueba', False)):
+        try:
+            onboarding_progress = user.onboarding_progress
+        except Exception:
+            pass
+    context['onboarding_progress'] = onboarding_progress
+
     return render(request, 'core/dashboard.html', context)
 
 

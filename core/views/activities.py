@@ -61,6 +61,8 @@ def añadir_calibracion(request, equipo_pk):
 
                 messages.success(request, 'Calibración añadida exitosamente.')
                 logger.info(f"[SUCCESS] ÉXITO: Calibración creada ID: {calibracion.pk} para equipo {equipo.nombre}")
+                from .onboarding import _marcar_paso_onboarding
+                _marcar_paso_onboarding(request.user, 'registrar_calibracion')
                 return redirect('core:detalle_equipo', pk=equipo.pk)
 
             except ValidationError as e:

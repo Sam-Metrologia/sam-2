@@ -1089,6 +1089,8 @@ def _process_add_equipment_form(request, empresa_actual, limite_alcanzado):
                 })
 
             equipo.save()
+            from .onboarding import _marcar_paso_onboarding
+            _marcar_paso_onboarding(request.user, 'crear_equipo')
             messages.success(request, 'Equipo añadido exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
 

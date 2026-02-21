@@ -531,6 +531,8 @@ def generar_hoja_vida_pdf(request, pk):
         response['Content-Disposition'] = f'attachment; filename="{filename_safe}"'
 
         logger.info(f"Hoja de vida PDF generada para equipo {equipo.codigo_interno}")
+        from .onboarding import _marcar_paso_onboarding
+        _marcar_paso_onboarding(request.user, 'generar_reporte')
         return response
 
     except Exception as e:

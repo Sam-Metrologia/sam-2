@@ -4,7 +4,7 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
-from .models import Equipo, Calibracion, Mantenimiento, Comprobacion
+from .models import Equipo, Calibracion, Mantenimiento, Comprobacion, CustomUser, OnboardingProgress
 
 
 def invalidate_dashboard_cache(empresa_id=None):
@@ -88,3 +88,12 @@ def invalidate_cache_on_comprobacion_change(sender, instance, **kwargs):
         invalidate_dashboard_cache(instance.equipo.empresa.id)
     else:
         invalidate_dashboard_cache()
+
+
+@receiver(post_save, sender=CustomUser)
+def crear_onboarding_para_trial(sender, instance, created, **kwargs):
+    """Crea OnboardingProgress automáticamente para usuarios de empresas trial."""
+    if (created
+            and instance.empresa
+            and getattr(instance.empresa, 'es_periodo_prueba', False)):
+        OnboardingProgress.objects.get_or_create(usuario=instance)

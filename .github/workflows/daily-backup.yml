@@ -51,7 +51,7 @@ jobs:
           AWS_S3_REGION_NAME: ${{ secrets.AWS_S3_REGION_NAME }}
           AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
         run: |
-          python backup_to_s3.py
+          python scripts/backup_to_s3.py
 
       - name: Notificar resultado
         if: success()
