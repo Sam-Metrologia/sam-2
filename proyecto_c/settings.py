@@ -115,6 +115,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.aprobaciones_pendientes_count',
                 'core.context_processors.modo_trabajo_context',
+                'core.context_processors.onboarding_context',
             ],
         },
     },

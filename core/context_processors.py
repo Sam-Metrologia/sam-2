@@ -167,3 +167,19 @@ def modo_trabajo_context(request):
         'empresa_trabajo': request.user.empresa if impersonating else None,
         'usuario_impersonado': request.user if impersonating else None,
     }
+
+
+def onboarding_context(request):
+    """Inyecta estado de onboarding en todas las páginas para el tour multi-página."""
+    if isinstance(request.user, AnonymousUser) or not request.user.is_authenticated:
+        return {'has_active_onboarding': False}
+    try:
+        progress = request.user.onboarding_progress
+        if not progress.completado:
+            return {
+                'has_active_onboarding': True,
+                'onboarding_tour_completado': progress.tour_completado,
+            }
+    except Exception:
+        pass
+    return {'has_active_onboarding': False}

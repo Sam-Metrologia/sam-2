@@ -35,12 +35,12 @@ VALID_TRIAL_DATA = {
     'nit': '900123456-7',
     'email_empresa': 'contacto@metrologiatest.com',
     'telefono': '+57 300 123 4567',
-    'nombre_completo': 'Juan Pérez García',
-    'username': 'juan_perez',
-    'email_usuario': 'juan@metrologiatest.com',
-    'password1': 'SecurePass123!',
-    'password2': 'SecurePass123!',
 }
+
+# Usernames auto-generados: "Metrología Test S.A.S." → letras "metro" + NIT últimos 4: "4567"
+ADMIN_USERNAME = 'dirmetro4567'
+GERENTE_USERNAME = 'germetro4567'
+TECNICO_USERNAME = 'tecmetro4567'
 
 
 def get_trial_url():
@@ -111,20 +111,18 @@ class TestSolicitarTrialPOSTValido:
         usuarios = CustomUser.objects.filter(empresa=empresa)
         assert usuarios.count() == 3
 
-    def test_usuario_admin_con_datos_formulario(self, client):
-        """El usuario ADMINISTRADOR tiene los datos del formulario."""
+    def test_usuario_admin_generado(self, client):
+        """El usuario ADMINISTRADOR se genera con username basado en nombre empresa."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        admin = CustomUser.objects.get(username='juan_perez')
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME)
         assert admin.rol_usuario == 'ADMINISTRADOR'
-        assert admin.email == 'juan@metrologiatest.com'
-        assert admin.first_name == 'Juan'
-        assert admin.last_name == 'Pérez García'
+        assert admin.email == 'contacto@metrologiatest.com'
         assert admin.is_active is True
 
     def test_usuario_gerencia_generado(self, client):
         """El usuario GERENCIA se genera con username basado en NIT."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        gerente = CustomUser.objects.get(username='9001234567_gerente')
+        gerente = CustomUser.objects.get(username=GERENTE_USERNAME)
         assert gerente.rol_usuario == 'GERENCIA'
         assert gerente.is_management_user is True
         assert gerente.can_access_dashboard_decisiones is True
@@ -133,7 +131,7 @@ class TestSolicitarTrialPOSTValido:
     def test_usuario_tecnico_generado(self, client):
         """El usuario TECNICO se genera con username basado en NIT."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         assert tecnico.rol_usuario == 'TECNICO'
         assert tecnico.is_active is True
 
@@ -150,12 +148,13 @@ class TestSolicitarTrialPOSTValido:
         creds = session.get('trial_credenciales')
         assert creds is not None
         assert creds['empresa_nombre'] == 'Metrología Test S.A.S.'
-        assert creds['admin']['username'] == 'juan_perez'
-        assert creds['gerente']['username'] == '9001234567_gerente'
-        assert creds['tecnico']['username'] == '9001234567_tecnico'
-        # Las contraseñas temporales deben estar presentes
-        assert len(creds['gerente']['password']) > 0
-        assert len(creds['tecnico']['password']) > 0
+        assert creds['admin']['username'] == ADMIN_USERNAME
+        assert creds['gerente']['username'] == GERENTE_USERNAME
+        assert creds['tecnico']['username'] == TECNICO_USERNAME
+        # Las contraseñas siguen formato Rol.NIT
+        assert creds['admin']['password'] == 'Dir.900123456-7'
+        assert creds['gerente']['password'] == 'Ger.900123456-7'
+        assert creds['tecnico']['password'] == 'Tec.900123456-7'
 
 
 # ============================================================================
@@ -168,7 +167,7 @@ class TestPermisosAutomaticos:
     def test_admin_tiene_permisos_administrador(self, client):
         """El usuario ADMINISTRADOR recibe todos los permisos de admin."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        admin = CustomUser.objects.get(username='juan_perez')
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME)
         permisos_user = set(admin.user_permissions.values_list('codename', flat=True))
         for codename in PERMISOS_ADMINISTRADOR:
             assert codename in permisos_user, f"Falta permiso '{codename}' en ADMINISTRADOR"
@@ -176,7 +175,7 @@ class TestPermisosAutomaticos:
     def test_gerencia_tiene_permisos_gerencia(self, client):
         """El usuario GERENCIA recibe los permisos de gerencia."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        gerente = CustomUser.objects.get(username='9001234567_gerente')
+        gerente = CustomUser.objects.get(username=GERENTE_USERNAME)
         permisos_user = set(gerente.user_permissions.values_list('codename', flat=True))
         for codename in PERMISOS_GERENCIA:
             assert codename in permisos_user, f"Falta permiso '{codename}' en GERENCIA"
@@ -184,7 +183,7 @@ class TestPermisosAutomaticos:
     def test_tecnico_tiene_permisos_tecnico(self, client):
         """El usuario TECNICO recibe solo los permisos de técnico."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         permisos_user = set(tecnico.user_permissions.values_list('codename', flat=True))
         for codename in PERMISOS_TECNICO:
             assert codename in permisos_user, f"Falta permiso '{codename}' en TECNICO"
@@ -192,7 +191,7 @@ class TestPermisosAutomaticos:
     def test_tecnico_no_tiene_permisos_extra(self, client):
         """El TECNICO no tiene permisos de admin como delete_equipo."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         permisos_user = set(tecnico.user_permissions.values_list('codename', flat=True))
         permisos_solo_admin = set(PERMISOS_ADMINISTRADOR) - set(PERMISOS_TECNICO)
         for codename in permisos_solo_admin:
@@ -201,66 +200,98 @@ class TestPermisosAutomaticos:
     def test_admin_puede_ver_equipos(self, client):
         """El ADMINISTRADOR tiene permiso view_equipo."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        admin = CustomUser.objects.get(username='juan_perez')
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME)
         assert admin.has_perm('core.view_equipo')
 
     def test_tecnico_puede_agregar_calibracion(self, client):
         """El TECNICO tiene permiso add_calibracion."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         assert tecnico.has_perm('core.add_calibracion')
 
     def test_tecnico_puede_ver_proveedores(self, client):
         """El TECNICO tiene permiso view_proveedor (consulta al registrar calibraciones)."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         assert tecnico.has_perm('core.view_proveedor')
 
     def test_tecnico_puede_ver_procedimientos(self, client):
         """El TECNICO tiene permiso view_procedimiento."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         assert tecnico.has_perm('core.view_procedimiento')
 
     def test_tecnico_no_puede_eliminar_proveedor(self, client):
         """El TECNICO NO tiene permiso delete_proveedor."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         assert not tecnico.has_perm('core.delete_proveedor')
 
     def test_tecnico_no_puede_eliminar_procedimiento(self, client):
         """El TECNICO NO tiene permiso delete_procedimiento."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        tecnico = CustomUser.objects.get(username='9001234567_tecnico')
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         assert not tecnico.has_perm('core.delete_procedimiento')
 
     def test_admin_tiene_crud_proveedores(self, client):
         """El ADMINISTRADOR tiene CRUD completo de proveedores."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        admin = CustomUser.objects.get(username='juan_perez')
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME)
         for perm in ['add_proveedor', 'change_proveedor', 'delete_proveedor', 'view_proveedor']:
             assert admin.has_perm(f'core.{perm}'), f"Falta permiso '{perm}' en ADMINISTRADOR"
 
     def test_admin_tiene_crud_procedimientos(self, client):
         """El ADMINISTRADOR tiene CRUD completo de procedimientos."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        admin = CustomUser.objects.get(username='juan_perez')
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME)
         for perm in ['add_procedimiento', 'change_procedimiento', 'delete_procedimiento', 'view_procedimiento']:
             assert admin.has_perm(f'core.{perm}'), f"Falta permiso '{perm}' en ADMINISTRADOR"
 
     def test_gerencia_tiene_crud_proveedores(self, client):
         """El GERENCIA tiene CRUD completo de proveedores."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        gerente = CustomUser.objects.get(username='9001234567_gerente')
+        gerente = CustomUser.objects.get(username=GERENTE_USERNAME)
         for perm in ['add_proveedor', 'change_proveedor', 'delete_proveedor', 'view_proveedor']:
             assert gerente.has_perm(f'core.{perm}'), f"Falta permiso '{perm}' en GERENCIA"
 
     def test_gerencia_tiene_crud_procedimientos(self, client):
         """El GERENCIA tiene CRUD completo de procedimientos."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        gerente = CustomUser.objects.get(username='9001234567_gerente')
+        gerente = CustomUser.objects.get(username=GERENTE_USERNAME)
         for perm in ['add_procedimiento', 'change_procedimiento', 'delete_procedimiento', 'view_procedimiento']:
             assert gerente.has_perm(f'core.{perm}'), f"Falta permiso '{perm}' en GERENCIA"
+
+    def test_permisos_prestamos_admin(self, client):
+        """Admin creado por trial tiene permisos de préstamos."""
+        client.post(get_trial_url(), data=VALID_TRIAL_DATA)
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME)
+        permisos_user = set(admin.user_permissions.values_list('codename', flat=True))
+        assert 'can_view_prestamo' in permisos_user, "Admin debería tener can_view_prestamo"
+        assert 'can_add_prestamo' in permisos_user, "Admin debería tener can_add_prestamo"
+        assert 'can_change_prestamo' in permisos_user, "Admin debería tener can_change_prestamo"
+
+    def test_permisos_prestamos_tecnico(self, client):
+        """Técnico creado por trial tiene permiso can_view_prestamo."""
+        client.post(get_trial_url(), data=VALID_TRIAL_DATA)
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
+        permisos_user = set(tecnico.user_permissions.values_list('codename', flat=True))
+        assert 'can_view_prestamo' in permisos_user, "Técnico debería tener can_view_prestamo"
+
+    def test_tecnico_no_puede_crear_prestamo(self, client):
+        """El TECNICO NO tiene permiso can_add_prestamo."""
+        client.post(get_trial_url(), data=VALID_TRIAL_DATA)
+        tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
+        permisos_user = set(tecnico.user_permissions.values_list('codename', flat=True))
+        assert 'can_add_prestamo' not in permisos_user, "Técnico NO debería tener can_add_prestamo"
+
+    def test_gerencia_tiene_permisos_prestamos(self, client):
+        """Gerencia creado por trial tiene permisos de préstamos (hereda de admin)."""
+        client.post(get_trial_url(), data=VALID_TRIAL_DATA)
+        gerente = CustomUser.objects.get(username=GERENTE_USERNAME)
+        permisos_user = set(gerente.user_permissions.values_list('codename', flat=True))
+        assert 'can_view_prestamo' in permisos_user
+        assert 'can_add_prestamo' in permisos_user
+        assert 'can_change_prestamo' in permisos_user
 
 
 # ============================================================================
@@ -437,53 +468,13 @@ class TestRegistroTrialValidaciones:
         form = response.context['form']
         assert 'nombre_empresa' in form.errors
 
-    def test_username_duplicado(self, client, user_factory):
-        """No permite registrar con un username que ya existe."""
-        user_factory(username='juan_perez')
+    def test_email_empresa_duplicado(self, client, empresa_factory):
+        """No permite registrar con un email de empresa que ya existe."""
+        empresa_factory(email='contacto@metrologiatest.com')
         response = client.post(get_trial_url(), data=VALID_TRIAL_DATA)
         assert response.status_code == 200
         form = response.context['form']
-        assert 'username' in form.errors
-
-    def test_email_usuario_duplicado(self, client, user_factory):
-        """No permite registrar con un email de usuario que ya existe."""
-        user_factory(email='juan@metrologiatest.com')
-        response = client.post(get_trial_url(), data=VALID_TRIAL_DATA)
-        assert response.status_code == 200
-        form = response.context['form']
-        assert 'email_usuario' in form.errors
-
-    def test_passwords_no_coinciden(self, client):
-        """Contraseñas diferentes son rechazadas."""
-        data = {**VALID_TRIAL_DATA, 'password2': 'OtraPassword456'}
-        response = client.post(get_trial_url(), data=data)
-        assert response.status_code == 200
-        form = response.context['form']
-        assert 'password2' in form.errors
-
-    def test_password_muy_corta(self, client):
-        """Contraseña de menos de 8 caracteres es rechazada."""
-        data = {**VALID_TRIAL_DATA, 'password1': 'Short1', 'password2': 'Short1'}
-        response = client.post(get_trial_url(), data=data)
-        assert response.status_code == 200
-        form = response.context['form']
-        assert 'password1' in form.errors
-
-    def test_password_solo_numeros(self, client):
-        """Contraseña solo numérica es rechazada."""
-        data = {**VALID_TRIAL_DATA, 'password1': '12345678', 'password2': '12345678'}
-        response = client.post(get_trial_url(), data=data)
-        assert response.status_code == 200
-        form = response.context['form']
-        assert 'password1' in form.errors
-
-    def test_username_formato_invalido(self, client):
-        """Username con caracteres inválidos es rechazado."""
-        data = {**VALID_TRIAL_DATA, 'username': 'user name!'}
-        response = client.post(get_trial_url(), data=data)
-        assert response.status_code == 200
-        form = response.context['form']
-        assert 'username' in form.errors
+        assert 'email_empresa' in form.errors
 
 
 # ============================================================================

@@ -1,15 +1,17 @@
 """
 Tests para el módulo de Onboarding Guiado (Módulo B).
 Cubre: modelo OnboardingProgress, signal auto-crear, API endpoints,
-marcado de pasos en vistas existentes, e integración con dashboard.
+marcado de pasos en vistas existentes, integración con dashboard,
+y creación de equipo demo en registro trial.
 """
 import pytest
+from datetime import date, timedelta
 
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Empresa, CustomUser, OnboardingProgress
+from core.models import Empresa, CustomUser, Equipo, OnboardingProgress
 from tests.factories import EmpresaFactory, UserFactory
 
 
@@ -282,3 +284,152 @@ class TestOnboardingEnDashboard:
         assert progress.porcentaje == 33
         assert progress.pasos_completados == 1
         assert progress.total_pasos == 3
+
+
+# ============================================================================
+# TestEquipoDemoEnRegistro - Tests de creación de equipo demo
+# ============================================================================
+
+# Datos válidos para registro trial (solo empresa, usuarios se auto-generan)
+VALID_TRIAL_DATA = {
+    'nombre_empresa': 'Metrología Onboarding S.A.S.',
+    'nit': '900777888-1',
+    'email_empresa': 'contacto@metrologiaonb.com',
+    'telefono': '+57 300 777 8888',
+}
+# Username auto-generado del admin: dir + "metro" + últimos 4 dígitos NIT "9007778881" → "8881"
+ADMIN_USERNAME_ONB = 'dirmetro8881'
+
+
+def _get_trial_url():
+    return reverse('core:solicitar_trial')
+
+
+@pytest.mark.django_db
+class TestEquipoDemoEnRegistro:
+
+    def test_registro_trial_crea_equipo_demo(self, client):
+        """Al registrar trial, se crea equipo EQ-DEMO-001."""
+        client.post(_get_trial_url(), data=VALID_TRIAL_DATA)
+        empresa = Empresa.objects.get(nombre='Metrología Onboarding S.A.S.')
+        assert Equipo.objects.filter(
+            codigo_interno='EQ-DEMO-001',
+            empresa=empresa,
+        ).exists()
+
+    def test_equipo_demo_tiene_datos_completos(self, client):
+        """El equipo demo tiene marca, modelo, rango y resolución."""
+        client.post(_get_trial_url(), data=VALID_TRIAL_DATA)
+        empresa = Empresa.objects.get(nombre='Metrología Onboarding S.A.S.')
+        equipo = Equipo.objects.get(codigo_interno='EQ-DEMO-001', empresa=empresa)
+        assert equipo.nombre == 'Balanza Analítica (Demo)'
+        assert equipo.marca == 'Ohaus'
+        assert equipo.modelo == 'Pioneer PX224'
+        assert equipo.rango_medida == '0 - 220 g'
+        assert equipo.resolucion == '0.0001 g (0.1 mg)'
+        assert equipo.estado == 'Activo'
+        assert equipo.ubicacion == 'Laboratorio Principal'
+
+    def test_equipo_demo_tiene_calibracion_proxima(self, client):
+        """El equipo demo tiene proxima_calibracion configurada."""
+        client.post(_get_trial_url(), data=VALID_TRIAL_DATA)
+        empresa = Empresa.objects.get(nombre='Metrología Onboarding S.A.S.')
+        equipo = Equipo.objects.get(codigo_interno='EQ-DEMO-001', empresa=empresa)
+        assert equipo.proxima_calibracion is not None
+        assert equipo.fecha_ultima_calibracion is not None
+        assert equipo.frecuencia_calibracion_meses is not None
+
+    def test_dashboard_trial_muestra_metricas(self, client):
+        """Dashboard de empresa trial con equipo demo muestra total_equipos >= 1."""
+        client.post(_get_trial_url(), data=VALID_TRIAL_DATA)
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME_ONB)
+        client.force_login(admin)
+        response = client.get(reverse('core:dashboard'))
+        assert response.status_code == 200
+        assert response.context['total_equipos'] >= 1
+
+
+# ============================================================================
+# TestOnboardingPermisosPrestamos - Permisos de préstamos en trial
+# ============================================================================
+
+@pytest.mark.django_db
+class TestOnboardingPermisosPrestamos:
+
+    def test_prestamos_permisos_asignados_admin(self, client):
+        """Admin trial tiene permiso can_add_prestamo y can_change_prestamo."""
+        from django.contrib.auth.models import Permission
+        client.post(_get_trial_url(), data=VALID_TRIAL_DATA)
+        admin = CustomUser.objects.get(username=ADMIN_USERNAME_ONB)
+        permisos = set(admin.user_permissions.values_list('codename', flat=True))
+        assert 'can_add_prestamo' in permisos
+        assert 'can_change_prestamo' in permisos
+        assert 'can_view_prestamo' in permisos
+
+    def test_prestamos_permisos_asignados_tecnico(self, client):
+        """Técnico trial tiene permiso can_view_prestamo."""
+        client.post(_get_trial_url(), data=VALID_TRIAL_DATA)
+        # El técnico se genera con username 'tecmetro' + últimos 4 dígitos del NIT
+        tecnico = CustomUser.objects.filter(
+            empresa__nombre='Metrología Onboarding S.A.S.',
+            rol_usuario='TECNICO'
+        ).first()
+        assert tecnico is not None
+        permisos = set(tecnico.user_permissions.values_list('codename', flat=True))
+        assert 'can_view_prestamo' in permisos
+
+
+# ============================================================================
+# TestTourMultiPaginaScripts - Scripts Shepherd.js en base.html
+# ============================================================================
+
+@pytest.mark.django_db
+class TestTourMultiPaginaScripts:
+
+    def test_shepherd_cargado_en_dashboard(self):
+        """Shepherd.js se carga en dashboard cuando hay onboarding activo."""
+        client = _crear_cliente_autenticado_trial()
+        response = client.get(reverse('core:dashboard'))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'shepherd.min.js' in content
+        assert 'onboarding_tour.js' in content
+
+    def test_shepherd_cargado_en_equipos(self):
+        """Shepherd.js se carga en lista de equipos cuando hay onboarding activo."""
+        from django.contrib.auth.models import Permission
+        client = _crear_cliente_autenticado_trial()
+        # El usuario necesita permiso view_equipo para acceder a la lista
+        perm = Permission.objects.filter(codename='view_equipo').first()
+        if perm:
+            client.user.user_permissions.add(perm)
+        response = client.get(reverse('core:home'))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'shepherd.min.js' in content
+
+    def test_shepherd_no_cargado_sin_onboarding(self):
+        """Shepherd.js NO se carga para usuarios sin onboarding activo."""
+        empresa = _crear_empresa_no_trial()
+        user = UserFactory(empresa=empresa)
+        client = Client()
+        client.force_login(user)
+        response = client.get(reverse('core:dashboard'))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'shepherd.min.js' not in content
+
+    def test_shepherd_no_cargado_onboarding_completado(self):
+        """Shepherd.js NO se carga cuando onboarding está completado."""
+        client = _crear_cliente_autenticado_trial()
+        progress = client.user.onboarding_progress
+        progress.paso_crear_equipo = True
+        progress.paso_registrar_calibracion = True
+        progress.paso_generar_reporte = True
+        progress.fecha_completado = timezone.now()
+        progress.save()
+
+        response = client.get(reverse('core:dashboard'))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'shepherd.min.js' not in content

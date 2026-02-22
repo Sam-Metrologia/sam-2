@@ -4,6 +4,9 @@
 
 import re
 import logging
+from datetime import date, timedelta
+from decimal import Decimal
+
 from django.shortcuts import render, redirect
 from django.db import transaction
 from django.utils.crypto import get_random_string
@@ -11,7 +14,7 @@ from django.contrib.auth.models import Permission
 from django.core.cache import cache
 
 from ..forms import RegistroTrialForm
-from ..models import Empresa, CustomUser
+from ..models import Empresa, CustomUser, Equipo
 
 logger = logging.getLogger('core')
 
@@ -32,6 +35,7 @@ PERMISOS_TECNICO = [
     'add_comprobacion', 'change_comprobacion', 'view_comprobacion',
     'view_proveedor',
     'view_procedimiento',
+    'can_view_prestamo',
 ]
 
 PERMISOS_ADMINISTRADOR = PERMISOS_TECNICO + [
@@ -41,6 +45,7 @@ PERMISOS_ADMINISTRADOR = PERMISOS_TECNICO + [
     'view_empresa', 'change_empresa',
     'add_proveedor', 'change_proveedor', 'delete_proveedor',
     'add_procedimiento', 'change_procedimiento', 'delete_procedimiento',
+    'can_add_prestamo', 'can_change_prestamo',
 ]
 
 # Gerencia tiene los mismos permisos que admin; el acceso extra se maneja con flags
@@ -159,34 +164,32 @@ def solicitar_trial(request):
                         empresa.logo_empresa = logo
                         empresa.save(update_fields=['logo_empresa'])
 
-                    # 4. Parsear nombre completo
-                    nombre_parts = data['nombre_completo'].strip().split()
-                    first_name = nombre_parts[0] if nombre_parts else ''
-                    last_name = ' '.join(nombre_parts[1:]) if len(nombre_parts) > 1 else ''
+                    # 4. Generar credenciales automáticas para los 3 usuarios
+                    #    Formato: prefijo + primeras 5 letras + últimos 4 dígitos NIT
+                    nit_clean = re.sub(r'[^0-9]', '', data['nit'])
+                    letras = re.sub(r'[^a-zA-Z]', '', data['nombre_empresa']).lower()[:5]
+                    nit_sufijo = nit_clean[-4:]
+                    admin_username = f"dir{letras}{nit_sufijo}"
+                    gerente_username = f"ger{letras}{nit_sufijo}"
+                    tecnico_username = f"tec{letras}{nit_sufijo}"
+                    admin_password = f"Dir.{data['nit']}"
+                    gerente_password = f"Ger.{data['nit']}"
+                    tecnico_password = f"Tec.{data['nit']}"
 
                     # 5. Crear usuario ADMINISTRADOR
                     admin_user = CustomUser.objects.create_user(
-                        username=data['username'],
-                        email=data['email_usuario'],
-                        password=data['password1'],
-                        first_name=first_name,
-                        last_name=last_name,
+                        username=admin_username,
+                        email=data['email_empresa'],
+                        password=admin_password,
+                        first_name='Usuario',
+                        last_name='Director',
                         empresa=empresa,
                         rol_usuario='ADMINISTRADOR',
                         is_active=True,
                     )
                     asignar_permisos_por_rol(admin_user)
 
-                    # 6. Generar usernames para gerente y técnico
-                    nit_clean = re.sub(r'[^0-9]', '', data['nit'])
-                    gerente_username = f"{nit_clean}_gerente"
-                    tecnico_username = f"{nit_clean}_tecnico"
-
-                    # 7. Generar passwords temporales
-                    gerente_password = get_random_string(length=10)
-                    tecnico_password = get_random_string(length=10)
-
-                    # 8. Crear usuario GERENCIA
+                    # 6. Crear usuario GERENCIA
                     gerente_user = CustomUser.objects.create_user(
                         username=gerente_username,
                         email=f"gerencia@{nit_clean}.trial.sam",
@@ -201,7 +204,7 @@ def solicitar_trial(request):
                     )
                     asignar_permisos_por_rol(gerente_user)
 
-                    # 9. Crear usuario TECNICO
+                    # 7. Crear usuario TECNICO
                     tecnico_user = CustomUser.objects.create_user(
                         username=tecnico_username,
                         email=f"tecnico@{nit_clean}.trial.sam",
@@ -214,15 +217,39 @@ def solicitar_trial(request):
                     )
                     asignar_permisos_por_rol(tecnico_user)
 
-                    # 10. Guardar credenciales en sesión
+                    # 8. Crear equipo demo para el tour
+                    fecha_hoy = date.today()
+                    Equipo.objects.create(
+                        codigo_interno='EQ-DEMO-001',
+                        nombre='Balanza Analítica (Demo)',
+                        empresa=empresa,
+                        tipo_equipo='Equipo de Medición',
+                        marca='Ohaus',
+                        modelo='Pioneer PX224',
+                        numero_serie='DEMO-SN-2024',
+                        ubicacion='Laboratorio Principal',
+                        responsable=admin_user.get_full_name() or admin_user.username,
+                        estado='Activo',
+                        fecha_adquisicion=fecha_hoy - timedelta(days=365),
+                        rango_medida='0 - 220 g',
+                        resolucion='0.0001 g (0.1 mg)',
+                        error_maximo_permisible='±0.0002 g',
+                        frecuencia_calibracion_meses=Decimal('12'),
+                        fecha_ultima_calibracion=fecha_hoy - timedelta(days=335),
+                        proxima_calibracion=fecha_hoy + timedelta(days=30),
+                        observaciones='Equipo de demostración creado automáticamente. '
+                                      'Puedes editarlo o eliminarlo cuando quieras.',
+                    )
+
+                    # 9. Guardar credenciales en sesión
                     request.session['trial_credenciales'] = {
                         'empresa_nombre': empresa.nombre,
                         'admin': {
                             'username': admin_user.username,
-                            'password': data['password1'],
+                            'password': admin_password,
                             'rol': 'ADMINISTRADOR',
                             'email': admin_user.email,
-                            'nombre': data['nombre_completo'],
+                            'nombre': 'Usuario Director',
                         },
                         'gerente': {
                             'username': gerente_user.username,
