@@ -6,7 +6,7 @@ services:
   - type: web
     name: sam-metrologia
     runtime: python
-    plan: free  # Puedes cambiar a: starter, standard, pro
+    plan: standard
     region: oregon  # Región más cercana: ohio, oregon, frankfurt, singapore
 
     buildCommand: "./build.sh"

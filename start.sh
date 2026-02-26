@@ -26,4 +26,7 @@ gunicorn proyecto_c.wsgi:application \
     --workers 2 \
     --bind 0.0.0.0:$PORT \
     --timeout 120 \
-    --log-level info 
+    --keep-alive 5 \
+    --max-requests 500 \
+    --max-requests-jitter 50 \
+    --log-level info

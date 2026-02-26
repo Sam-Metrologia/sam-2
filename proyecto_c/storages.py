@@ -1,21 +1,35 @@
 # proyecto_c/storages.py
-# Configuración personalizada de almacenamiento para AWS S3
+# Configuración personalizada de almacenamiento para AWS S3 / Cloudflare R2
 
+from botocore.config import Config as BotoCoreConfig
 from storages.backends.s3boto3 import S3Boto3Storage
 from django.conf import settings
 import logging
 
 logger = logging.getLogger('core')
 
+# Configuración compartida de boto3: timeouts y reintentos
+# connect_timeout: max espera para establecer conexión con R2
+# read_timeout:    max espera para recibir respuesta (subidas grandes pueden tardar)
+# retries:         reintentos automáticos en modo adaptive
+_BOTO_CONFIG = BotoCoreConfig(
+    connect_timeout=10,
+    read_timeout=90,
+    retries={'max_attempts': 3, 'mode': 'adaptive'},
+)
+
+
 class S3MediaStorage(S3Boto3Storage):
     """
-    Storage personalizado para archivos media en S3
+    Storage personalizado para archivos media en S3 / Cloudflare R2.
+    Incluye timeouts explícitos para evitar colgadas en uploads.
     """
     bucket_name = settings.AWS_STORAGE_BUCKET_NAME
     location = settings.AWS_LOCATION if hasattr(settings, 'AWS_LOCATION') else 'media'
     default_acl = None  # No usar ACL (bucket ACL disabled)
     file_overwrite = False
     custom_domain = False  # Usar URLs firmadas en lugar del dominio personalizado
+    config = _BOTO_CONFIG    # timeouts y reintentos
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,10 +66,11 @@ class S3MediaStorage(S3Boto3Storage):
 
 class S3StaticStorage(S3Boto3Storage):
     """
-    Storage personalizado para archivos estáticos en S3
+    Storage personalizado para archivos estáticos en S3 / Cloudflare R2
     """
     bucket_name = settings.AWS_STORAGE_BUCKET_NAME
     location = settings.AWS_STATIC_LOCATION if hasattr(settings, 'AWS_STATIC_LOCATION') else 'static'
+    config = _BOTO_CONFIG
     default_acl = None  # No usar ACL (bucket ACL disabled)
     file_overwrite = True
     querystring_auth = False

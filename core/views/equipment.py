@@ -345,6 +345,11 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
     y_max = max_error_pct + padding
     y_min = min_error_pct - padding
 
+    # Guardia: evita división por cero cuando todos los errores son iguales
+    if y_max == y_min:
+        y_max += 0.001
+        y_min -= 0.001
+
     def escala_y(valor):
         return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height
 
@@ -552,6 +557,11 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
 
     y_max = max_error_pct + padding
     y_min = min_error_pct - padding
+
+    # Guardia: evita división por cero cuando todos los errores son iguales
+    if y_max == y_min:
+        y_max += 0.001
+        y_min -= 0.001
 
     def escala_y(valor):
         return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height

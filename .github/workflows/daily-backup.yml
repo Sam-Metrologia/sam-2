@@ -61,6 +61,7 @@ jobs:
       # Enviar notificacion por email en caso de fallo
       - name: Notificar fallo por email
         if: failure()
+        continue-on-error: true   # no fallar si el email no está configurado
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
