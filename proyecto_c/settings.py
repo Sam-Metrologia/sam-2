@@ -587,6 +587,19 @@ RATE_LIMIT_CONFIG = {
 }
 
 # ==============================================================================
+# CONFIGURACIÓN DE PASARELA DE PAGOS — WOMPI
+# ==============================================================================
+# Obtener credenciales desde variables de entorno (nunca hardcodear)
+# Sandbox (desarrollo): obtener en https://dashboard.wompi.co → modo prueba
+# Producción: obtener en https://dashboard.wompi.co → modo producción
+WOMPI_PUBLIC_KEY = os.environ.get('WOMPI_PUBLIC_KEY', '')
+WOMPI_PRIVATE_KEY = os.environ.get('WOMPI_PRIVATE_KEY', '')
+WOMPI_EVENTS_SECRET = os.environ.get('WOMPI_EVENTS_SECRET', '')
+WOMPI_INTEGRITY_SECRET = os.environ.get('WOMPI_INTEGRITY_SECRET', '')
+# True = sandbox (desarrollo), False = producción
+WOMPI_SANDBOX = os.environ.get('WOMPI_SANDBOX', 'True') == 'True'
+
+# ==============================================================================
 # CONFIGURACIÓN DE TAREAS PROGRAMADAS (GitHub Actions)
 # ==============================================================================
 # Token de seguridad para autenticar llamadas de GitHub Actions

@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Crear Usuario — SAM Metrología{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-lg">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Crear nuevo usuario</h1>
+        <p class="text-gray-500 text-sm mt-1">
+            Los usuarios creados aquí tendrán acceso a <strong>{{ empresa.nombre }}</strong>.
+        </p>
+    </div>
+
+    <!-- Barra de uso de usuarios -->
+    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-gray-600">Usuarios usados</span>
+            <span class="text-sm font-bold {% if total_usuarios >= limite %}text-red-600{% else %}text-gray-800{% endif %}">
+                {{ total_usuarios }} / {{ limite }}
+            </span>
+        </div>
+        <div class="w-full bg-gray-100 rounded-full h-2">
+            <div class="h-2 rounded-full {% if total_usuarios >= limite %}bg-red-500{% elif total_usuarios >= limite|add:'-1' %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                 style="width: {% widthratio total_usuarios limite 100 %}%"></div>
+        </div>
+        {% if not puede_crear %}
+            <p class="mt-2 text-xs text-red-600 font-medium">
+                Alcanzaste el límite.
+                <a href="{% url 'core:planes' %}" class="underline">Compra más usuarios en Add-ons</a>.
+            </p>
+        {% else %}
+            <p class="mt-2 text-xs text-gray-400">
+                Puedes crear {{ limite|add:"-1"|add:"-"|add:"total_usuarios" }} usuario{{ limite|add:"-1"|add:"-"|add:"total_usuarios"|pluralize }} más.
+                Quedan {{ limite }} − {{ total_usuarios }} = <strong>{{ limite|add:"-0" }}</strong> disponibles.
+            </p>
+        {% endif %}
+    </div>
+
+    {% if messages %}
+        {% for m in messages %}
+            <div class="mb-4 px-4 py-3 rounded-lg text-sm
+                {% if m.tags == 'success' %}bg-green-50 border border-green-200 text-green-700
+                {% elif m.tags == 'error' %}bg-red-50 border border-red-200 text-red-700
+                {% else %}bg-blue-50 border border-blue-200 text-blue-700{% endif %}">
+                {{ m }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if puede_crear %}
+    <form method="post" class="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
+                <input type="text" name="first_name" required maxlength="30" placeholder="Ej: Carlos"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+                <input type="text" name="last_name" maxlength="150" placeholder="Ej: Pérez"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico <span class="text-red-500">*</span></label>
+            <input type="email" name="email" required placeholder="usuario@empresa.com"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Rol del usuario <span class="text-red-500">*</span></label>
+            <div class="grid grid-cols-3 gap-3">
+
+                <label class="cursor-pointer">
+                    <input type="radio" name="rol_usuario" value="TECNICO" class="sr-only peer" checked>
+                    <div class="border-2 border-gray-200 rounded-xl p-3 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 transition">
+                        <div class="text-2xl mb-1">👷</div>
+                        <div class="text-sm font-semibold text-gray-700">Técnico</div>
+                        <div class="text-xs text-gray-400 mt-1">Opera equipos, registra calibraciones</div>
+                        <div class="text-xs font-bold text-blue-600 mt-1">$20.000/mes</div>
+                    </div>
+                </label>
+
+                <label class="cursor-pointer">
+                    <input type="radio" name="rol_usuario" value="ADMINISTRADOR" class="sr-only peer">
+                    <div class="border-2 border-gray-200 rounded-xl p-3 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 transition">
+                        <div class="text-2xl mb-1">🔧</div>
+                        <div class="text-sm font-semibold text-gray-700">Administrador</div>
+                        <div class="text-xs text-gray-400 mt-1">Gestiona equipos, usuarios y config</div>
+                        <div class="text-xs font-bold text-blue-600 mt-1">$28.000/mes</div>
+                    </div>
+                </label>
+
+                <label class="cursor-pointer">
+                    <input type="radio" name="rol_usuario" value="GERENCIA" class="sr-only peer">
+                    <div class="border-2 border-gray-200 rounded-xl p-3 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 transition">
+                        <div class="text-2xl mb-1">👔</div>
+                        <div class="text-sm font-semibold text-gray-700">Gerencia</div>
+                        <div class="text-xs text-gray-400 mt-1">Dashboard ejecutivo y reportes avanzados</div>
+                        <div class="text-xs font-bold text-blue-600 mt-1">$35.000/mes</div>
+                    </div>
+                </label>
+
+            </div>
+        </div>
+
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-700">
+            Se generará un <strong>nombre de usuario</strong> y una <strong>contraseña temporal</strong> automáticamente.
+            Entrégala al usuario para que la cambie en su primer inicio de sesión.
+        </div>
+
+        <button type="submit"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition text-sm">
+            Crear usuario
+        </button>
+    </form>
+    {% else %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <p class="text-red-700 font-semibold mb-3">Límite de usuarios alcanzado</p>
+        <p class="text-sm text-red-600 mb-4">
+            Tu empresa tiene {{ limite }} usuario{{ limite|pluralize }} permitido{{ limite|pluralize }}.
+            Para crear más, compra el add-on correspondiente.
+        </p>
+        <a href="{% url 'core:planes' %}#addons"
+           class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition text-sm">
+            Ver Add-ons
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="mt-4 text-center">
+        <a href="{% url 'core:dashboard' %}" class="text-sm text-gray-400 hover:text-gray-600">← Volver al dashboard</a>
+    </div>
+
+</div>
+{% endblock %}

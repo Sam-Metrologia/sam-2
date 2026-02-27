@@ -7,6 +7,7 @@ Incluye gestión de préstamos, devoluciones y dashboard de seguimiento.
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
+from .base import access_check
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -20,6 +21,7 @@ from ..constants import (
 )
 
 
+@access_check
 @login_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def listar_prestamos(request):
@@ -76,6 +78,7 @@ def listar_prestamos(request):
     return render(request, 'core/prestamos/listar.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_add_prestamo', raise_exception=True)
 def crear_prestamo(request):
@@ -171,6 +174,7 @@ def crear_prestamo(request):
     return render(request, 'core/prestamos/crear.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def detalle_prestamo(request, pk):
@@ -209,6 +213,7 @@ def detalle_prestamo(request, pk):
     return render(request, 'core/prestamos/detalle.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_change_prestamo', raise_exception=True)
 def devolver_equipo(request, pk):
@@ -269,6 +274,7 @@ def devolver_equipo(request, pk):
     return render(request, 'core/prestamos/devolver.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def dashboard_prestamos(request):
@@ -336,6 +342,7 @@ def dashboard_prestamos(request):
     return render(request, 'core/prestamos/dashboard.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def historial_equipo(request, equipo_id):
@@ -383,6 +390,7 @@ def historial_equipo(request, equipo_id):
     return render(request, 'core/prestamos/historial.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def equipos_disponibles(request):
@@ -409,6 +417,7 @@ def equipos_disponibles(request):
     return render(request, 'core/prestamos/equipos_estado.html', context)
 
 
+@access_check
 @login_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def equipos_prestados(request):

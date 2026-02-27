@@ -975,12 +975,19 @@ def _get_plan_info(user, selected_company_id):
     else:
         almacenamiento_display = f"{almacenamiento_mb} MB"
 
+    # Detectar si es un trial expirado (diferente de plan gratuito real)
+    es_trial_expirado = (
+        empresa.es_periodo_prueba
+        and empresa.get_estado_suscripcion_display() == "Período de Prueba Expirado"
+    )
+
     plan_info = {
         'plan_actual': plan_actual,
         'limite_equipos_actual': empresa.get_limite_equipos(),
         'limite_almacenamiento_actual': almacenamiento_mb,
         'limite_almacenamiento_display': almacenamiento_display,
-        'dias_restantes': dias_restantes if dias_restantes != float('inf') else 'inf'
+        'dias_restantes': dias_restantes if dias_restantes != float('inf') else 'inf',
+        'es_trial_expirado': es_trial_expirado,
     }
 
     return {'plan_info': plan_info}

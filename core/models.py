@@ -445,7 +445,13 @@ class Empresa(models.Model):
         verbose_name="Límite de Almacenamiento (MB)",
         help_text="Límite máximo de almacenamiento en megabytes para archivos de la empresa"
     )
-    
+
+    limite_usuarios_empresa = models.IntegerField(
+        default=3,
+        verbose_name="Límite de Usuarios",
+        help_text="Máximo de usuarios activos permitidos. Base: 3 (técnico, admin, gerente)."
+    )
+
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
         max_length=50,
@@ -859,6 +865,48 @@ class Empresa(models.Model):
         logger = logging.getLogger(__name__)
         logger.info(f"Plan pagado activado para empresa {self.nombre}: {limite_equipos} equipos, {limite_almacenamiento_mb}MB, {duracion_meses} meses")
 
+    def activar_addons(self, datos_addon):
+        """
+        Activa add-ons comprados incrementando los límites actuales.
+        No toca fechas ni estado de suscripción — solo aumenta límites.
+
+        datos_addon = {
+            'tecnicos': N,       # usuarios técnicos adicionales
+            'admins': N,         # usuarios admin adicionales
+            'gerentes': N,       # usuarios gerente adicionales
+            'bloques_equipos': N,  # cada bloque = +50 equipos
+            'bloques_storage': N,  # cada bloque = +5 GB
+        }
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        usuarios_extra = (
+            int(datos_addon.get('tecnicos', 0)) +
+            int(datos_addon.get('admins', 0)) +
+            int(datos_addon.get('gerentes', 0))
+        )
+        equipos_extra = int(datos_addon.get('bloques_equipos', 0)) * 50
+        storage_extra_mb = int(datos_addon.get('bloques_storage', 0)) * 5 * 1024
+
+        if usuarios_extra > 0:
+            self.limite_usuarios_empresa += usuarios_extra
+        if equipos_extra > 0:
+            self.limite_equipos_empresa += equipos_extra
+        if storage_extra_mb > 0:
+            self.limite_almacenamiento_mb += storage_extra_mb
+
+        self.save(update_fields=[
+            'limite_usuarios_empresa',
+            'limite_equipos_empresa',
+            'limite_almacenamiento_mb',
+        ])
+        logger.info(
+            f"Add-ons activados para empresa {self.nombre}: "
+            f"+{usuarios_extra} usuarios, +{equipos_extra} equipos, "
+            f"+{storage_extra_mb}MB almacenamiento"
+        )
+
     def activar_periodo_prueba(self, duracion_dias=7):
         """
         Activa un período de prueba usando el sistema existente.
@@ -961,106 +1009,100 @@ class Empresa(models.Model):
         return self.get_fecha_fin_plan()
 
     def get_total_storage_used_mb(self):
-        """Calcula el uso total de almacenamiento en MB para todos los archivos de la empresa."""
+        """
+        Calcula el uso total de almacenamiento en MB para la empresa.
+
+        Optimizado para evitar timeouts en R2/S3:
+        - Cache de 2 horas: la mayoría de las visitas no hacen ninguna llamada a R2.
+        - Sin llamadas exists(): cada archivo hace UNA sola llamada a R2 (head_object),
+          no dos (exists + size). Esto reduce a la mitad las llamadas.
+        - Presupuesto de tiempo de 15s: si R2 es lento, devuelve el valor parcial
+          para no matar el worker de Gunicorn.
+        """
+        import time
+        import logging
         from django.core.files.storage import default_storage
         from django.core.cache import cache
-        from django.core.cache.backends.base import InvalidCacheBackendError
-        import hashlib
-        import time
 
-        # Crear clave de cache única para esta empresa con timestamp de última modificación
-        from django.utils import timezone
-        last_modified = self.equipos.aggregate(
-            last_mod=models.Max('fecha_registro')
-        ).get('last_mod', timezone.now())
+        log = logging.getLogger(__name__)
 
-        # Cache más inteligente con timestamp para invalidación automática
-        cache_version = int(last_modified.timestamp()) if last_modified else 0
-        cache_key = f"storage_usage_empresa_{self.id}_v3_{cache_version}"
+        # Clave de cache estable (sin timestamp) — la invalidación manual
+        # se hace desde invalidate_storage_cache() al subir/borrar archivos.
+        cache_key = f"storage_usage_empresa_{self.id}_v5"
 
-        # Cache válido por 30 minutos para mejor performance
         try:
-            cached_result = cache.get(cache_key)
-            if cached_result is not None:
-                return cached_result
-        except Exception as e:
-            # Si hay error con el cache (ej. tabla no existe), continuar sin cache
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Cache no disponible para storage calculation: {e}")
-            cached_result = None
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+
+        def _size(archivo):
+            """
+            Devuelve el tamaño de un FieldFile en bytes.
+            Una sola llamada a R2 (head_object), sin exists() previo.
+            Devuelve 0 si el archivo no existe o hay error de red.
+            """
+            if not archivo or not getattr(archivo, 'name', None):
+                return 0
+            try:
+                return default_storage.size(archivo.name)
+            except Exception:
+                return 0
 
         total_size_bytes = 0
+        deadline = time.monotonic() + 15  # máximo 15 s de llamadas a R2
 
-        # Calcular storage del logo de la empresa
-        if self.logo_empresa and hasattr(self.logo_empresa, 'name') and self.logo_empresa.name:
-            try:
-                if default_storage.exists(self.logo_empresa.name):
-                    total_size_bytes += default_storage.size(self.logo_empresa.name)
-            except Exception:
-                pass
+        # Logo de la empresa
+        total_size_bytes += _size(self.logo_empresa)
 
-        # Calcular storage de equipos y sus archivos (Optimizado con prefetch)
-        equipos_con_relaciones = self.equipos.prefetch_related(
+        # Equipos y sus actividades
+        equipos = self.equipos.prefetch_related(
             'calibraciones', 'mantenimientos', 'comprobaciones'
         ).all()
 
-        for equipo in equipos_con_relaciones:
-            # Archivos principales del equipo
-            campos_archivo_equipo = ['archivo_compra_pdf', 'ficha_tecnica_pdf', 'manual_pdf', 'otros_documentos_pdf', 'imagen_equipo']
-            for campo_archivo in campos_archivo_equipo:
-                archivo = getattr(equipo, campo_archivo, None)
-                if archivo and hasattr(archivo, 'name'):
-                    try:
-                        if default_storage.exists(archivo.name):
-                            total_size_bytes += default_storage.size(archivo.name)
-                    except Exception:
-                        pass
+        CAMPOS_EQUIPO = [
+            'archivo_compra_pdf', 'ficha_tecnica_pdf',
+            'manual_pdf', 'otros_documentos_pdf', 'imagen_equipo',
+        ]
+        CAMPOS_CAL = [
+            'documento_calibracion',
+            'confirmacion_metrologica_pdf',
+            'intervalos_calibracion_pdf',
+        ]
+        CAMPOS_MANT = ['documento_mantenimiento', 'archivo_mantenimiento']
 
-            # Archivos de calibraciones
-            for calibracion in equipo.calibraciones.all():
-                # Verificar múltiples campos de archivos en calibraciones
-                for campo_archivo in ['documento_calibracion', 'confirmacion_metrologica_pdf', 'intervalos_calibracion_pdf']:
-                    archivo = getattr(calibracion, campo_archivo, None)
-                    if archivo and hasattr(archivo, 'name'):
-                        try:
-                            if default_storage.exists(archivo.name):
-                                total_size_bytes += default_storage.size(archivo.name)
-                        except Exception:
-                            pass
+        for equipo in equipos:
+            if time.monotonic() > deadline:
+                log.warning(
+                    f"get_total_storage_used_mb: presupuesto de tiempo agotado "
+                    f"para empresa {self.id}. Devolviendo resultado parcial."
+                )
+                break
 
-            # Archivos de mantenimientos
-            for mantenimiento in equipo.mantenimientos.all():
-                # Verificar múltiples campos de archivos en mantenimientos
-                for campo_archivo in ['documento_mantenimiento', 'archivo_mantenimiento']:
-                    archivo = getattr(mantenimiento, campo_archivo, None)
-                    if archivo and hasattr(archivo, 'name'):
-                        try:
-                            if default_storage.exists(archivo.name):
-                                total_size_bytes += default_storage.size(archivo.name)
-                        except Exception:
-                            pass
+            for campo in CAMPOS_EQUIPO:
+                total_size_bytes += _size(getattr(equipo, campo, None))
 
-            # Archivos de comprobaciones
-            for comprobacion in equipo.comprobaciones.all():
-                if comprobacion.documento_comprobacion and hasattr(comprobacion.documento_comprobacion, 'name'):
-                    try:
-                        if default_storage.exists(comprobacion.documento_comprobacion.name):
-                            total_size_bytes += default_storage.size(comprobacion.documento_comprobacion.name)
-                    except Exception:
-                        pass
+            for cal in equipo.calibraciones.all():
+                for campo in CAMPOS_CAL:
+                    total_size_bytes += _size(getattr(cal, campo, None))
 
-        # Convertir bytes a MB
+            for mant in equipo.mantenimientos.all():
+                for campo in CAMPOS_MANT:
+                    total_size_bytes += _size(getattr(mant, campo, None))
+
+            for comp in equipo.comprobaciones.all():
+                total_size_bytes += _size(
+                    getattr(comp, 'documento_comprobacion', None)
+                )
+
         total_size_mb = round(total_size_bytes / (1024 * 1024), 2)
 
-        # Guardar en cache por 30 minutos (1800 segundos) para mejor performance
+        # Guardar en cache 2 horas
         try:
-            cache.set(cache_key, total_size_mb, 1800)
-        except Exception as e:
-            # Si hay error con el cache, continuar sin guardarlo
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"No se pudo guardar en cache storage calculation: {e}")
+            cache.set(cache_key, total_size_mb, 7200)
+        except Exception:
+            pass
 
         return total_size_mb
 
@@ -4202,3 +4244,100 @@ class OnboardingProgress(models.Model):
             self.save(update_fields=[campo, 'fecha_completado'])
             return True
         return False
+
+
+class TransaccionPago(models.Model):
+    """
+    Registra cada intento de pago realizado por una empresa.
+    Soporta PSE y tarjeta a través de la pasarela Wompi.
+    La referencia_pago es única y se usa como identificador contra Wompi.
+    """
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('aprobado', 'Aprobado'),
+        ('rechazado', 'Rechazado'),
+        ('error', 'Error'),
+    ]
+    METODO_CHOICES = [
+        ('PSE', 'PSE'),
+        ('tarjeta', 'Tarjeta de Crédito/Débito'),
+        ('efectivo', 'Efectivo'),
+    ]
+    PLAN_CHOICES = [
+        # Estándar (200 equipos) — backward compat con transacciones existentes
+        ('MENSUAL', 'Plan Estándar Mensual'),
+        ('ANUAL', 'Plan Estándar Anual'),
+        # Básico (50 equipos)
+        ('BASICO_MENSUAL', 'Plan Básico Mensual'),
+        ('BASICO_ANUAL', 'Plan Básico Anual'),
+        # Profesional (500 equipos)
+        ('PRO_MENSUAL', 'Plan Profesional Mensual'),
+        ('PRO_ANUAL', 'Plan Profesional Anual'),
+        # Empresarial (1000 equipos)
+        ('ENTERPRISE_MENSUAL', 'Plan Empresarial Mensual'),
+        ('ENTERPRISE_ANUAL', 'Plan Empresarial Anual'),
+        # Add-ons modulares
+        ('ADDON', 'Add-ons'),
+    ]
+
+    empresa = models.ForeignKey(
+        'Empresa', on_delete=models.CASCADE,
+        related_name='transacciones_pago',
+        verbose_name='Empresa'
+    )
+    referencia_pago = models.CharField(
+        max_length=100, unique=True,
+        verbose_name='Referencia de Pago',
+        help_text='ID único de la transacción (enviado a Wompi como reference)'
+    )
+    estado = models.CharField(
+        max_length=20, choices=ESTADO_CHOICES, default='pendiente',
+        verbose_name='Estado'
+    )
+    monto = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        verbose_name='Monto',
+        help_text='Valor total incluyendo IVA, en COP'
+    )
+    moneda = models.CharField(max_length=3, default='COP', verbose_name='Moneda')
+    metodo_pago = models.CharField(
+        max_length=20, choices=METODO_CHOICES, blank=True,
+        verbose_name='Método de Pago'
+    )
+    plan_seleccionado = models.CharField(
+        max_length=20, choices=PLAN_CHOICES, blank=True,
+        verbose_name='Plan Seleccionado',
+        help_text="Vacío solo para transacciones de tipo add-on cuando se usa el campo datos_addon"
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name='Última Actualización')
+    datos_respuesta = models.JSONField(
+        null=True, blank=True,
+        verbose_name='Datos de Respuesta',
+        help_text='Respuesta completa de Wompi (para auditoría)'
+    )
+    datos_addon = models.JSONField(
+        null=True, blank=True,
+        verbose_name='Detalle de Add-ons',
+        help_text='Cantidades de add-ons comprados: {tecnicos, admins, gerentes, bloques_equipos, bloques_storage}'
+    )
+    ip_cliente = models.GenericIPAddressField(
+        null=True, blank=True,
+        verbose_name='IP del Cliente'
+    )
+
+    class Meta:
+        verbose_name = 'Transacción de Pago'
+        verbose_name_plural = 'Transacciones de Pago'
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return f"{self.empresa.nombre} | {self.referencia_pago} | {self.estado}"
+
+    @property
+    def monto_en_centavos(self):
+        """Retorna el monto en centavos (requerido por Wompi)."""
+        return int(self.monto * 100)
+
+    def esta_aprobada(self):
+        return self.estado == 'aprobado'

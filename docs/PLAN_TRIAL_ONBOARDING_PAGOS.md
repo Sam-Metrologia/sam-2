@@ -14,27 +14,32 @@ Orden de implementacion: A -> B -> C (cada uno funciona independiente)
 ## Checklist de Avance
 
 ### MODULO A: Auto-registro de Trial
-- [ ] A1. Crear formulario RegistroTrialForm (`core/forms/registro.py`)
-- [ ] A2. Crear vista solicitar_trial (`core/views/registro.py`)
-- [ ] A3. Crear template solicitar_trial.html
-- [ ] A4. Crear template trial_exitoso.html
-- [ ] A5. Agregar URLs en core/urls.py
-- [ ] A6. Agregar boton "Solicitar Trial" en login.html
-- [ ] A7. Configurar CAPTCHA (reCAPTCHA)
-- [ ] A8. Tests de registro (15-18 tests)
-- [ ] A9. Verificar 1,023+ tests pasan
+- [x] A1. Crear formulario RegistroTrialForm (`core/forms/registro.py`)
+- [x] A2. Crear vista solicitar_trial (`core/views/registro.py`)
+- [x] A3. Crear template solicitar_trial.html
+- [x] A4. Crear template trial_exitoso.html
+- [x] A5. Agregar URLs en core/urls.py
+- [x] A6. Agregar boton "Solicitar Trial" en login.html
+- [ ] A7. Configurar CAPTCHA (reCAPTCHA) - Flag existe pero no implementado
+- [x] A8. Tests de registro (39 tests)
+- [x] A9. Verificar tests pasan
 
 ### MODULO B: Onboarding Guiado
-- [ ] B1. Crear modelo OnboardingProgress en models.py
-- [ ] B2. Crear migracion y migrar
-- [ ] B3. Crear signal auto-crear progreso al crear usuario trial
-- [ ] B4. Integrar Shepherd.js (tour guiado)
-- [ ] B5. Crear widget checklist en dashboard (partial template)
-- [ ] B6. Crear vista API progreso onboarding (`core/views/onboarding.py`)
-- [ ] B7. Marcar pasos en vistas existentes (4 vistas)
-- [ ] B8. Incluir checklist en template dashboard.html
-- [ ] B9. Tests de onboarding (12-15 tests)
-- [ ] B10. Verificar 1,038+ tests pasan
+- [x] B1. Crear modelo OnboardingProgress en models.py
+- [x] B2. Crear migracion y migrar
+- [x] B3. Crear signal auto-crear progreso al crear usuario trial
+- [x] B4. Integrar Shepherd.js (tour guiado multi-pagina 21 pasos)
+- [x] B5. Crear widget checklist en dashboard (partial template)
+- [x] B6. Crear vista API progreso onboarding (`core/views/onboarding.py`)
+- [x] B7. Marcar pasos en vistas existentes (4 vistas)
+- [x] B8. Incluir checklist en template dashboard.html
+- [x] B9. Tests de onboarding (41 tests)
+- [x] B10. Verificar tests pasan
+- [x] B11. Context processor para carga global de Shepherd.js
+- [x] B12. Tour multi-pagina con persistencia localStorage
+- [x] B13. Permisos de prestamos para usuarios trial
+- [x] B14. Boton WhatsApp soporte en base.html
+- [x] B15. Banner trial expirado en dashboard
 
 ### MODULO C: Pagos (PSE / Tarjeta)
 - [ ] C1. Elegir pasarela y crear cuenta (Wompi/ePayco)
@@ -44,7 +49,7 @@ Orden de implementacion: A -> B -> C (cada uno funciona independiente)
 - [ ] C5. Crear endpoint inicio de pago
 - [ ] C6. Crear webhook de confirmacion
 - [ ] C7. Crear pagina de resultado de pago
-- [ ] C8. Agregar banner vencimiento trial en dashboard
+- [x] C8. Agregar banner vencimiento trial en dashboard (adelantado)
 - [ ] C9. Configurar settings (claves pasarela)
 - [ ] C10. Tests de pagos (18-22 tests)
 - [ ] C11. Verificar 1,056+ tests pasan
@@ -55,7 +60,11 @@ Orden de implementacion: A -> B -> C (cada uno funciona independiente)
 - [ ] D3. Commit final y push a main
 - [ ] D4. Desplegar en Render
 
-**Progreso general: 0/33 tareas completadas**
+**Progreso general: 22/34 tareas completadas (65%)**
+- Modulo A: 8/9 (89%) - falta reCAPTCHA
+- Modulo B: 13/13 (100%)
+- Modulo C: 1/11 (9%) - solo banner expirado
+- Deploy: 0/4
 
 ---
 

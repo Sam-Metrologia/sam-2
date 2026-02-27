@@ -393,7 +393,7 @@ class TestTourMultiPaginaScripts:
         assert response.status_code == 200
         content = response.content.decode()
         assert 'shepherd.min.js' in content
-        assert 'onboarding_tour.js' in content
+        assert 'onboarding_tour' in content
 
     def test_shepherd_cargado_en_equipos(self):
         """Shepherd.js se carga en lista de equipos cuando hay onboarding activo."""

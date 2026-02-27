@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Resultado del Pago — SAM Metrología{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-12 max-w-lg text-center">
+
+    {% if not transaccion %}
+        <!-- Referencia no encontrada o no pertenece al usuario -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-8">
+            <svg class="w-16 h-16 text-yellow-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            <h2 class="text-xl font-bold text-yellow-700 mb-2">Transacción no encontrada</h2>
+            <p class="text-yellow-600 text-sm mb-4">
+                No encontramos la referencia <strong>{{ referencia }}</strong> en tu cuenta.
+            </p>
+            <a href="{% url 'core:planes' %}"
+               class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition">
+                Ver Planes
+            </a>
+        </div>
+
+    {% elif transaccion.estado == 'aprobado' %}
+        <!-- Pago exitoso -->
+        <div class="bg-green-50 border border-green-200 rounded-xl p-8">
+            <svg class="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-green-700 mb-2">¡Pago exitoso!</h2>
+
+            {% if transaccion.plan_seleccionado == 'ADDON' %}
+                <!-- Resultado de Add-ons -->
+                <p class="text-green-600 mb-4">Tus add-ons ya están activos en tu cuenta.</p>
+
+                {% if transaccion.datos_addon %}
+                <div class="bg-white border border-green-200 rounded-lg p-4 text-sm text-gray-700 text-left mb-4">
+                    <p class="font-semibold text-gray-600 mb-2 border-b pb-2">Recursos activados</p>
+                    {% with d=transaccion.datos_addon %}
+                        {% if d.tecnicos and d.tecnicos != 0 and d.tecnicos != '0' %}
+                        <div class="flex items-center gap-2 py-1">
+                            <span class="text-lg">👷</span>
+                            <span>+{{ d.tecnicos }} usuario{{ d.tecnicos|pluralize }} <strong>Técnico</strong></span>
+                        </div>
+                        {% endif %}
+                        {% if d.admins and d.admins != 0 and d.admins != '0' %}
+                        <div class="flex items-center gap-2 py-1">
+                            <span class="text-lg">🔧</span>
+                            <span>+{{ d.admins }} usuario{{ d.admins|pluralize }} <strong>Administrador</strong></span>
+                        </div>
+                        {% endif %}
+                        {% if d.gerentes and d.gerentes != 0 and d.gerentes != '0' %}
+                        <div class="flex items-center gap-2 py-1">
+                            <span class="text-lg">👔</span>
+                            <span>+{{ d.gerentes }} usuario{{ d.gerentes|pluralize }} <strong>Gerente</strong></span>
+                        </div>
+                        {% endif %}
+                        {% if d.bloques_equipos and d.bloques_equipos != 0 and d.bloques_equipos != '0' %}
+                        <div class="flex items-center gap-2 py-1">
+                            <span class="text-lg">⚙️</span>
+                            <span>+{{ d.bloques_equipos }} bloque{{ d.bloques_equipos|pluralize }} de equipos (+{{ d.bloques_equipos|add:0|add:0 }} × 50 eq.)</span>
+                        </div>
+                        {% endif %}
+                        {% if d.bloques_storage and d.bloques_storage != 0 and d.bloques_storage != '0' %}
+                        <div class="flex items-center gap-2 py-1">
+                            <span class="text-lg">💾</span>
+                            <span>+{{ d.bloques_storage }} bloque{{ d.bloques_storage|pluralize }} de almacenamiento (+{{ d.bloques_storage|add:0|add:0 }} × 5 GB)</span>
+                        </div>
+                        {% endif %}
+                    {% endwith %}
+                    <div class="border-t border-gray-100 mt-2 pt-2 flex justify-between text-xs text-gray-400">
+                        <span>Monto cobrado</span>
+                        <span>${{ transaccion.monto|floatformat:0 }} COP (con IVA)</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Si compraron usuarios: CTA para crearlos -->
+                {% with d=transaccion.datos_addon %}
+                {% if d.tecnicos or d.admins or d.gerentes %}
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700 text-left mb-4">
+                    <p class="font-semibold mb-1">Siguiente paso: crea los nuevos usuarios</p>
+                    <p class="text-blue-600 text-xs mb-3">
+                        Se aumentó el límite de usuarios de tu empresa. Ve a "Crear usuario" para
+                        registrar las credenciales de acceso.
+                    </p>
+                    <a href="{% url 'core:crear_usuario_empresa' %}"
+                       class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg transition text-xs">
+                        Crear usuarios ahora
+                    </a>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+            {% else %}
+                <!-- Resultado de Plan de suscripción -->
+                <p class="text-green-600 mb-4">
+                    Tu <strong>{{ transaccion.get_plan_seleccionado_display }}</strong> ya está activo.
+                </p>
+                <div class="bg-white border border-green-200 rounded-lg p-4 text-sm text-gray-600 text-left mb-6">
+                    <div class="flex justify-between py-1 border-b border-gray-100">
+                        <span class="text-gray-400">Referencia</span>
+                        <span class="font-mono font-medium">{{ transaccion.referencia_pago }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-gray-100">
+                        <span class="text-gray-400">Plan</span>
+                        <span class="font-medium">{{ transaccion.get_plan_seleccionado_display }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-gray-100">
+                        <span class="text-gray-400">Monto</span>
+                        <span class="font-medium">${{ transaccion.monto|floatformat:0 }} COP</span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-gray-400">Método</span>
+                        <span class="font-medium">{{ transaccion.get_metodo_pago_display|default:"—" }}</span>
+                    </div>
+                </div>
+            {% endif %}
+
+            <a href="{% url 'core:dashboard' %}"
+               class="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition">
+                Ir al Dashboard
+            </a>
+        </div>
+
+    {% elif transaccion.estado == 'rechazado' %}
+        <!-- Pago rechazado -->
+        <div class="bg-red-50 border border-red-200 rounded-xl p-8">
+            <svg class="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-red-700 mb-2">Pago rechazado</h2>
+            <p class="text-red-600 mb-4">
+                El pago no fue procesado. Puedes intentarlo de nuevo con otro método.
+            </p>
+            <p class="text-xs text-gray-400 mb-6">Referencia: <span class="font-mono">{{ transaccion.referencia_pago }}</span></p>
+            <a href="{% url 'core:planes' %}"
+               class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition">
+                Intentar de nuevo
+            </a>
+        </div>
+
+    {% elif transaccion.estado == 'pendiente' %}
+        <!-- Pago pendiente (procesando) -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-8">
+            <svg class="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-yellow-700 mb-2">Procesando pago</h2>
+            <p class="text-yellow-600 mb-4">
+                Tu pago está siendo confirmado. Esto puede tomar unos minutos.
+                Recibirás una confirmación cuando el proceso finalice.
+            </p>
+            <p class="text-xs text-gray-400 mb-6">Referencia: <span class="font-mono">{{ transaccion.referencia_pago }}</span></p>
+            <a href="{% url 'core:dashboard' %}"
+               class="inline-block bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-8 rounded-lg transition">
+                Volver al Dashboard
+            </a>
+        </div>
+
+    {% else %}
+        <!-- Error -->
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-8">
+            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-gray-700 mb-2">Ocurrió un error</h2>
+            <p class="text-gray-500 mb-4">
+                Hubo un problema al procesar tu pago. Si realizaste el cobro contacta a soporte.
+            </p>
+            <p class="text-xs text-gray-400 mb-6">Referencia: <span class="font-mono">{{ transaccion.referencia_pago }}</span></p>
+            <div class="flex justify-center gap-3">
+                <a href="{% url 'core:planes' %}"
+                   class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition">
+                    Intentar de nuevo
+                </a>
+                <a href="https://wa.me/573000000000" target="_blank" rel="noopener noreferrer"
+                   class="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition">
+                    Soporte WhatsApp
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -368,21 +368,48 @@
     }
 
     // =========================================================================
+    // Buscar el siguiente paso que tenga navigateTo para saltar páginas
+    // =========================================================================
+    function buscarSiguientePaginaDesde(fromStep) {
+        var todos = obtenerTodosLosPasos();
+        // Buscar el paso actual o el siguiente que navegue a otra página
+        for (var i = 0; i < todos.length; i++) {
+            if (todos[i].stepNum >= fromStep && todos[i].navigateTo) {
+                var nextStep = todos[i].stepNum + 1;
+                var url = todos[i].navigateTo;
+                if (url === '__EQUIPO_DEMO__') {
+                    // Saltar detalle equipo, ir a proveedores
+                    return { step: 15, url: '/core/proveedores/' };
+                }
+                return { step: nextStep, url: url };
+            }
+        }
+        // Si no hay más navegaciones, ir al final en dashboard
+        return { step: 21, url: '/core/dashboard/' };
+    }
+
+    // =========================================================================
     // Ejecutar tour en la página actual
     // =========================================================================
     function ejecutarTour(fromStep) {
         var pagina = detectarPagina();
-        if (!pagina) return;
+
+        // Si la página no se reconoce (403, error, redirect), saltar a la siguiente
+        if (!pagina) {
+            var siguiente = buscarSiguientePaginaDesde(fromStep);
+            guardarEstado(siguiente.step);
+            window.location.href = siguiente.url;
+            return;
+        }
 
         var pasos = obtenerPasosPagina(pagina, fromStep);
         if (pasos.length === 0) {
-            // No hay pasos para esta página desde este step.
+            // Estamos en una página reconocida pero no hay pasos desde este step.
             // Buscar a qué página debería ir el step actual.
             var todos = obtenerTodosLosPasos();
             for (var i = 0; i < todos.length; i++) {
                 if (todos[i].stepNum === fromStep) {
                     var targetPagina = todos[i].pagina;
-                    // Map page names to URLs
                     var urlMap = {
                         'dashboard': '/core/dashboard/',
                         'equipos': '/core/',
@@ -393,13 +420,17 @@
                         'aprobaciones': '/core/aprobaciones/',
                         'informes': '/core/informes/'
                     };
-                    if (urlMap[targetPagina]) {
+                    if (urlMap[targetPagina] && targetPagina !== pagina) {
                         window.location.href = urlMap[targetPagina];
                         return;
                     }
                     break;
                 }
             }
+            // Si estamos en la página correcta pero no hay pasos, saltar al siguiente
+            var sig = buscarSiguientePaginaDesde(fromStep);
+            guardarEstado(sig.step);
+            window.location.href = sig.url;
             return;
         }
 

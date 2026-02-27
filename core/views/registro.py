@@ -35,7 +35,7 @@ PERMISOS_TECNICO = [
     'add_comprobacion', 'change_comprobacion', 'view_comprobacion',
     'view_proveedor',
     'view_procedimiento',
-    'can_view_prestamo',
+    'can_view_prestamo', 'can_add_prestamo', 'can_change_prestamo',
 ]
 
 PERMISOS_ADMINISTRADOR = PERMISOS_TECNICO + [

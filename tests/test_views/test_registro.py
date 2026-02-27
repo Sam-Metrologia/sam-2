@@ -277,12 +277,14 @@ class TestPermisosAutomaticos:
         permisos_user = set(tecnico.user_permissions.values_list('codename', flat=True))
         assert 'can_view_prestamo' in permisos_user, "Técnico debería tener can_view_prestamo"
 
-    def test_tecnico_no_puede_crear_prestamo(self, client):
-        """El TECNICO NO tiene permiso can_add_prestamo."""
+    def test_tecnico_puede_gestionar_prestamos(self, client):
+        """El TECNICO tiene permisos completos de préstamos."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
         tecnico = CustomUser.objects.get(username=TECNICO_USERNAME)
         permisos_user = set(tecnico.user_permissions.values_list('codename', flat=True))
-        assert 'can_add_prestamo' not in permisos_user, "Técnico NO debería tener can_add_prestamo"
+        assert 'can_view_prestamo' in permisos_user
+        assert 'can_add_prestamo' in permisos_user
+        assert 'can_change_prestamo' in permisos_user
 
     def test_gerencia_tiene_permisos_prestamos(self, client):
         """Gerencia creado por trial tiene permisos de préstamos (hereda de admin)."""

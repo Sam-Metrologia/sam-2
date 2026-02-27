@@ -1,0 +1,454 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+
+{% block title %}Planes y Precios — SAM Metrología{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+
+    <!-- Encabezado -->
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Elige tu Plan</h1>
+        {% if estado_plan == "Período de Prueba Activo" and dias_restantes is not None %}
+            <p class="text-yellow-600 font-medium">
+                Tu trial vence en <strong>{{ dias_restantes }} día{{ dias_restantes|pluralize }}</strong>.
+                Activa tu plan para no perder el acceso.
+            </p>
+        {% elif estado_plan == "Período de Prueba Expirado" or estado_plan == "Plan Expirado" or estado_plan == "Expirado" %}
+            <p class="text-red-600 font-semibold">
+                Tu acceso está restringido. Activa un plan para continuar usando SAM Metrología.
+            </p>
+        {% else %}
+            <p class="text-gray-500">Todos los planes incluyen <strong>3 usuarios base</strong> (1 técnico · 1 administrador · 1 gerente). Agrega más según lo que necesites.</p>
+        {% endif %}
+    </div>
+
+    <!-- Toggle Mensual / Anual -->
+    <div class="flex justify-center mb-8">
+        <div class="inline-flex items-center bg-gray-100 rounded-xl p-1 gap-1">
+            <button id="btn-mensual" onclick="switchPeriodo('mensual')"
+                class="px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-white text-blue-700 shadow">
+                Mensual
+            </button>
+            <button id="btn-anual" onclick="switchPeriodo('anual')"
+                class="px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 text-gray-500 hover:text-gray-700">
+                Anual
+                <span class="ml-1 text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">2 meses gratis</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tarjetas de planes -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+        {% for tier in tiers %}
+        {% with m=tier.mensual a=tier.anual %}
+
+        <!-- ── MENSUAL ── -->
+        <div class="periodo-mensual {% if m.tier == 'Estándar' %}bg-blue-50 border-2 border-blue-500 shadow-md{% else %}bg-white border border-gray-200 shadow-sm{% endif %} rounded-xl p-5 flex flex-col relative">
+            {% if m.tier == 'Estándar' %}
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                <span class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Más popular</span>
+            </div>
+            {% endif %}
+            <div class="mb-4 {% if m.tier == 'Estándar' %}mt-2{% endif %}">
+                <span class="text-xs font-semibold uppercase tracking-wide {% if m.tier == 'Estándar' %}text-blue-500{% else %}text-gray-400{% endif %}">{{ m.tier }}</span>
+                <div class="mt-1 flex items-end gap-1">
+                    <span class="text-3xl font-bold text-gray-900">{{ m.precio_base|cop }}</span>
+                    <span class="text-gray-400 text-xs pb-1">/mes</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-0.5">+ IVA = <strong>{{ m.precio_total|cop }}</strong> total</p>
+            </div>
+            <ul class="space-y-1.5 text-xs text-gray-600 mb-5 flex-1">
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><strong>3 usuarios base</strong> incluidos</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Hasta <strong>{{ m.equipos }}</strong> equipos</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>{% widthratio m.almacenamiento_mb 1024 1 %} GB almacenamiento</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Calibraciones, comprobaciones y mantenimientos</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Reportes PDF y Excel</li>
+            </ul>
+            <form method="post" action="{% url 'core:iniciar_pago' %}">
+                {% csrf_token %}
+                <input type="hidden" name="plan" value="{{ m.key }}">
+                <button type="submit" class="w-full {% if m.tier == 'Estándar' %}bg-blue-600 hover:bg-blue-700{% else %}bg-gray-700 hover:bg-gray-800{% endif %} text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition duration-200">Activar Plan</button>
+            </form>
+        </div>
+
+        <!-- ── ANUAL ── -->
+        <div class="periodo-anual hidden {% if a.tier == 'Estándar' %}bg-blue-50 border-2 border-blue-500 shadow-md{% else %}bg-white border border-gray-200 shadow-sm{% endif %} rounded-xl p-5 flex flex-col relative">
+            {% if a.tier == 'Estándar' %}
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                <span class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Más popular</span>
+            </div>
+            {% endif %}
+            <div class="mb-4 {% if a.tier == 'Estándar' %}mt-2{% endif %}">
+                <span class="text-xs font-semibold uppercase tracking-wide {% if a.tier == 'Estándar' %}text-blue-500{% else %}text-gray-400{% endif %}">{{ a.tier }}</span>
+                <div class="mt-1 flex items-end gap-1">
+                    <span class="text-3xl font-bold text-gray-900">{{ a.precio_base|cop }}</span>
+                    <span class="text-gray-400 text-xs pb-1">/año</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-0.5">+ IVA = <strong>{{ a.precio_total|cop }}</strong> total</p>
+                {% if a.ahorro %}<p class="text-xs text-green-600 font-semibold mt-0.5">Ahorro: {{ a.ahorro|cop }}</p>{% endif %}
+            </div>
+            <ul class="space-y-1.5 text-xs text-gray-600 mb-5 flex-1">
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><strong>3 usuarios base</strong> incluidos</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Hasta <strong>{{ a.equipos }}</strong> equipos</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>{% widthratio a.almacenamiento_mb 1024 1 %} GB almacenamiento</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>12 meses de acceso continuo</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Calibraciones, comprobaciones y mantenimientos</li>
+                <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Reportes PDF y Excel</li>
+            </ul>
+            <form method="post" action="{% url 'core:iniciar_pago' %}">
+                {% csrf_token %}
+                <input type="hidden" name="plan" value="{{ a.key }}">
+                <button type="submit" class="w-full {% if a.tier == 'Estándar' %}bg-blue-600 hover:bg-blue-700{% else %}bg-gray-700 hover:bg-gray-800{% endif %} text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition duration-200">Activar Plan</button>
+            </form>
+        </div>
+
+        {% endwith %}
+        {% endfor %}
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- CALCULADOR COMPLETO + SOLICITUD DE ADD-ONS                       -->
+    <!-- ================================================================ -->
+    <div class="mb-8" id="seccion-addons">
+        <div class="text-center mb-5">
+            <h2 class="text-xl font-bold text-gray-800">Arma exactamente lo que necesitas</h2>
+            <p class="text-sm text-gray-500 mt-1">Todos los planes incluyen 3 usuarios base. Agrega más según tu operación.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- ── Panel izquierdo: calculador ── -->
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <h3 class="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Calculador de add-ons
+                </h3>
+
+                <!-- Plan base del cálculo -->
+                <div class="mb-4">
+                    <label class="text-xs font-semibold text-gray-600 mb-1 block">Plan base que tendrías</label>
+                    <select id="calc-plan" onchange="calcularTotal()"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="80000:50">Básico — $80.000/mes · 50 equipos</option>
+                        <option value="200000:200" selected>Estándar — $200.000/mes · 200 equipos</option>
+                        <option value="380000:500">Profesional — $380.000/mes · 500 equipos</option>
+                        <option value="650000:1000">Empresarial — $650.000/mes · 1.000 equipos</option>
+                    </select>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4 mb-4">
+                    <p class="text-xs font-semibold text-gray-500 uppercase mb-3">Usuarios adicionales</p>
+                    <div class="space-y-3">
+
+                        <!-- Técnico -->
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg w-6 text-center">👷</span>
+                            <div class="flex-1">
+                                <div class="text-xs font-semibold text-gray-700">Técnico</div>
+                                <div class="text-xs text-gray-400">Registra equipos y actividades · $20.000/mes c/u</div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cambiar('tecnico', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
+                                <input type="number" id="calc-tecnico" value="0" min="0" max="99" oninput="calcularTotal()"
+                                    class="w-12 text-center border border-gray-200 rounded-lg text-sm py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                <button onclick="cambiar('tecnico', 1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Admin -->
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg w-6 text-center">🔧</span>
+                            <div class="flex-1">
+                                <div class="text-xs font-semibold text-gray-700">Administrador</div>
+                                <div class="text-xs text-gray-400">Gestiona usuarios y configuración · $28.000/mes c/u</div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cambiar('admin', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
+                                <input type="number" id="calc-admin" value="0" min="0" max="99" oninput="calcularTotal()"
+                                    class="w-12 text-center border border-gray-200 rounded-lg text-sm py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                <button onclick="cambiar('admin', 1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Gerente -->
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg w-6 text-center">👔</span>
+                            <div class="flex-1">
+                                <div class="text-xs font-semibold text-gray-700">Gerente</div>
+                                <div class="text-xs text-gray-400">Dashboard, reportes y panel de decisiones · $35.000/mes c/u</div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cambiar('gerente', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
+                                <input type="number" id="calc-gerente" value="0" min="0" max="99" oninput="calcularTotal()"
+                                    class="w-12 text-center border border-gray-200 rounded-lg text-sm py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                <button onclick="cambiar('gerente', 1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4 mb-4">
+                    <p class="text-xs font-semibold text-gray-500 uppercase mb-3">Recursos adicionales</p>
+                    <div class="space-y-3">
+
+                        <!-- Equipos extra -->
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg w-6 text-center">⚙️</span>
+                            <div class="flex-1">
+                                <div class="text-xs font-semibold text-gray-700">Bloques de +50 equipos</div>
+                                <div class="text-xs text-gray-400">$45.000/bloque/mes · sin límite de bloques</div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cambiar('equipos', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
+                                <input type="number" id="calc-equipos" value="0" min="0" max="999" oninput="calcularTotal()"
+                                    class="w-12 text-center border border-gray-200 rounded-lg text-sm py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                <button onclick="cambiar('equipos', 1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Storage extra -->
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg w-6 text-center">💾</span>
+                            <div class="flex-1">
+                                <div class="text-xs font-semibold text-gray-700">Bloques de +5 GB</div>
+                                <div class="text-xs text-gray-400">$20.000/bloque/mes</div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cambiar('storage', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
+                                <input type="number" id="calc-storage" value="0" min="0" max="99" oninput="calcularTotal()"
+                                    class="w-12 text-center border border-gray-200 rounded-lg text-sm py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                <button onclick="cambiar('storage', 1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumen de totales -->
+                <div id="resumen-total" class="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                    <!-- Llenado por JS -->
+                </div>
+            </div>
+
+            <!-- ── Panel derecho: resumen y solicitud ── -->
+            <div class="flex flex-col gap-4">
+
+                <!-- Resumen del pedido -->
+                <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex-1">
+                    <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        Tu resumen de add-ons
+                    </h3>
+                    <div id="resumen-pedido" class="text-sm text-gray-500 italic">
+                        Ajusta las cantidades en el calculador.
+                    </div>
+
+                    <!-- Formulario de pago directo -->
+                    <div id="btn-pago-container" class="mt-4 hidden">
+                        <form id="form-addon-pago" method="post" action="{% url 'core:iniciar_addon_pago' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="tecnicos"        id="h-tecnicos"        value="0">
+                            <input type="hidden" name="admins"          id="h-admins"          value="0">
+                            <input type="hidden" name="gerentes"        id="h-gerentes"        value="0">
+                            <input type="hidden" name="bloques_equipos" id="h-bloques_equipos" value="0">
+                            <input type="hidden" name="bloques_storage" id="h-bloques_storage" value="0">
+                            <button type="submit"
+                                class="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-sm transition duration-200">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                Pagar con PSE / Tarjeta
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-400 text-center mt-2">
+                            Los add-ons se activan automáticamente al confirmar el pago.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ── Sección: qué pasa en mitad del plan ── -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <div>
+                            <h4 class="text-sm font-bold text-amber-800 mb-2">¿Compraste plan anual y necesitas más a mitad del año?</h4>
+                            <div class="text-xs text-amber-700 space-y-1.5">
+                                <p>✅ <strong>Los add-ons son siempre mensuales</strong>, independiente de si tu plan base es anual.</p>
+                                <p>✅ Se activan desde el mes en que los solicitas y se cobran mensualmente.</p>
+                                <p>✅ Tu plan anual <strong>no se ve afectado</strong> — solo agregas encima de él.</p>
+                                <p>✅ Al renovar el año, puedes <strong>incluir los add-ons en el precio anual</strong> con el mismo descuento del 16.7%.</p>
+                            </div>
+                            <div class="mt-3 bg-white rounded-lg border border-amber-200 p-3 text-xs text-amber-900">
+                                <strong>Ejemplo:</strong> Compraste Plan Estándar Anual en enero. En julio necesitas 2 técnicos más y 100 equipos extra.<br>
+                                → Pagas $40.000 + $90.000 = <strong>$130.000/mes</strong> (+ IVA) desde julio.<br>
+                                → En enero del año siguiente, al renovar, lo incluyes todo en el precio anual.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla comparativa -->
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6">
+        <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <h3 class="text-sm font-semibold text-gray-700">Comparación de planes base</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-gray-600">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Característica</th>
+                        <th class="px-4 py-3 text-center font-semibold">Básico</th>
+                        <th class="px-4 py-3 text-center font-semibold bg-blue-50 text-blue-700">Estándar</th>
+                        <th class="px-4 py-3 text-center font-semibold">Profesional</th>
+                        <th class="px-4 py-3 text-center font-semibold">Empresarial</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr><td class="px-4 py-3">Equipos base</td><td class="px-4 py-3 text-center">50</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-blue-700">200</td><td class="px-4 py-3 text-center">500</td><td class="px-4 py-3 text-center">1.000</td></tr>
+                    <tr class="bg-gray-50"><td class="px-4 py-3">Usuarios base</td><td class="px-4 py-3 text-center font-semibold text-green-700">3</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-green-700">3</td><td class="px-4 py-3 text-center font-semibold text-green-700">3</td><td class="px-4 py-3 text-center font-semibold text-green-700">3</td></tr>
+                    <tr><td class="px-4 py-3">Almacenamiento</td><td class="px-4 py-3 text-center">2 GB</td><td class="px-4 py-3 text-center bg-blue-50 text-blue-700">4 GB</td><td class="px-4 py-3 text-center">10 GB</td><td class="px-4 py-3 text-center">20 GB</td></tr>
+                    <tr class="bg-gray-50"><td class="px-4 py-3">Precio mensual</td><td class="px-4 py-3 text-center">$80.000</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-blue-700">$200.000</td><td class="px-4 py-3 text-center">$380.000</td><td class="px-4 py-3 text-center">$650.000</td></tr>
+                    <tr><td class="px-4 py-3">Precio anual</td><td class="px-4 py-3 text-center">$800.000</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-blue-700">$2.000.000</td><td class="px-4 py-3 text-center">$3.800.000</td><td class="px-4 py-3 text-center">$6.500.000</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
+            Todos los valores en COP antes de IVA (19%). Add-ons: Técnico $20.000 · Admin $28.000 · Gerente $35.000 · +50 equipos $45.000 · +5 GB $20.000 (por mes c/u).
+        </div>
+    </div>
+
+    <!-- Nota pasarela -->
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center mb-4">
+        <p>
+            <svg class="w-4 h-4 inline mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            Pagos procesados de forma segura por <strong>Wompi</strong> (Bancolombia). SAM no almacena datos de tarjetas.
+        </p>
+        {% if wompi_sandbox %}<p class="mt-1 text-yellow-600 font-medium">Modo sandbox — los pagos son de prueba</p>{% endif %}
+    </div>
+
+    <!-- Nota para clientes internacionales -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700 text-center mb-4">
+        <p>
+            <svg class="w-4 h-4 inline mr-1 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
+            <strong>¿Estás fuera de Colombia?</strong>
+            Wompi procesa pagos exclusivamente en Colombia (COP).
+            Si estás en otro país,
+            <a href="https://wa.me/573247990534?text=Hola%2C%20soy%20cliente%20internacional%20y%20quiero%20contratar%20SAM%20Metrolog%C3%ADa"
+               target="_blank" rel="noopener noreferrer"
+               class="font-semibold underline hover:text-blue-900">escríbenos por WhatsApp</a>
+            y gestionamos el pago de forma alternativa.
+        </p>
+    </div>
+
+    <div class="text-center text-sm text-gray-400">
+        ¿Tienes preguntas?
+        <a href="https://wa.me/573247990534" target="_blank" rel="noopener noreferrer" class="text-green-600 hover:text-green-700 font-medium">Escríbenos por WhatsApp</a>
+    </div>
+
+</div>
+
+<script>
+const IVA = 0.19;
+const WA_NUMBER = '573247990534';
+
+function cop(n) {
+    return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+function cambiar(campo, delta) {
+    const el = document.getElementById('calc-' + campo);
+    el.value = Math.max(0, (parseInt(el.value) || 0) + delta);
+    calcularTotal();
+}
+
+function calcularTotal() {
+    const planSel   = document.getElementById('calc-plan').value.split(':');
+    const planPrecio = parseInt(planSel[0]);
+    const planEq    = parseInt(planSel[1]);
+    const planNombre = document.getElementById('calc-plan').options[document.getElementById('calc-plan').selectedIndex].text.split(' — ')[0];
+
+    const tec  = Math.max(0, parseInt(document.getElementById('calc-tecnico').value)  || 0);
+    const adm  = Math.max(0, parseInt(document.getElementById('calc-admin').value)    || 0);
+    const ger  = Math.max(0, parseInt(document.getElementById('calc-gerente').value)  || 0);
+    const bloq = Math.max(0, parseInt(document.getElementById('calc-equipos').value)  || 0);
+    const stor = Math.max(0, parseInt(document.getElementById('calc-storage').value)  || 0);
+
+    const costoTec  = tec  * 20000;
+    const costoAdm  = adm  * 28000;
+    const costoGer  = ger  * 35000;
+    const costoBloq = bloq * 45000;
+    const costoStor = stor * 20000;
+
+    const subtotalAddons = costoTec + costoAdm + costoGer + costoBloq + costoStor;
+    const subtotalTotal  = planPrecio + subtotalAddons;
+    const totalConIva    = subtotalTotal * (1 + IVA);
+
+    const hayAddons = subtotalAddons > 0;
+
+    // ── Resumen del total ──────────────────────────────────────────────
+    let htmlTotal = `<div class="flex justify-between text-gray-500">
+        <span>Plan ${planNombre}</span><span>${cop(planPrecio)}/mes</span></div>`;
+
+    if (costoTec  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>👷 ${tec} técnico${tec>1?'s':''}</span><span>${cop(costoTec)}/mes</span></div>`;
+    if (costoAdm  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>🔧 ${adm} admin${adm>1?'s':''}</span><span>${cop(costoAdm)}/mes</span></div>`;
+    if (costoGer  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>👔 ${ger} gerente${ger>1?'s':''}</span><span>${cop(costoGer)}/mes</span></div>`;
+    if (costoBloq > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>⚙️ ${bloq} bloque${bloq>1?'s':''} +${bloq*50} eq.</span><span>${cop(costoBloq)}/mes</span></div>`;
+    if (costoStor > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>💾 ${stor} bloque${stor>1?'s':''} +${stor*5} GB</span><span>${cop(costoStor)}/mes</span></div>`;
+
+    htmlTotal += `<div class="border-t border-gray-200 mt-2 pt-2 flex justify-between text-xs text-gray-500"><span>Subtotal antes IVA</span><span>${cop(subtotalTotal)}/mes</span></div>`;
+    htmlTotal += `<div class="flex justify-between font-bold text-gray-800 text-sm"><span>Total con IVA (19%)</span><span class="text-green-700">${cop(totalConIva)}/mes</span></div>`;
+
+    if (bloq > 0) {
+        htmlTotal += `<div class="mt-2 text-xs text-blue-600 bg-blue-50 rounded p-2">ℹ️ Equipos totales: ${planEq} (plan) + ${bloq*50} (add-ons) = <strong>${planEq + bloq*50}</strong></div>`;
+    }
+
+    document.getElementById('resumen-total').innerHTML = htmlTotal;
+
+    // ── Resumen del pedido (panel derecho) ─────────────────────────────
+    let htmlPedido = '';
+    if (!hayAddons) {
+        htmlPedido = '<p class="text-gray-400 italic text-xs">Agrega usuarios o recursos en el calculador para ver el resumen.</p>';
+        document.getElementById('btn-pago-container').classList.add('hidden');
+    } else {
+        htmlPedido = `<div class="space-y-2 text-xs">`;
+        htmlPedido += `<div class="flex justify-between font-semibold text-gray-600 border-b pb-1 mb-1"><span>Add-on</span><span>$/mes</span></div>`;
+        if (tec  > 0) htmlPedido += `<div class="flex justify-between"><span>👷 ${tec} Técnico${tec>1?'s':''} adicional${tec>1?'es':''}</span><span>${cop(costoTec)}</span></div>`;
+        if (adm  > 0) htmlPedido += `<div class="flex justify-between"><span>🔧 ${adm} Administrador${adm>1?'es':''} adicional${adm>1?'es':''}</span><span>${cop(costoAdm)}</span></div>`;
+        if (ger  > 0) htmlPedido += `<div class="flex justify-between"><span>👔 ${ger} Gerente${ger>1?'s':''} adicional${ger>1?'es':''}</span><span>${cop(costoGer)}</span></div>`;
+        if (bloq > 0) htmlPedido += `<div class="flex justify-between"><span>⚙️ ${bloq} bloque${bloq>1?'s':''} de +50 equipos (= +${bloq*50} eq.)</span><span>${cop(costoBloq)}</span></div>`;
+        if (stor > 0) htmlPedido += `<div class="flex justify-between"><span>💾 ${stor} bloque${stor>1?'s':''} de +5 GB (= +${stor*5} GB)</span><span>${cop(costoStor)}</span></div>`;
+        htmlPedido += `<div class="border-t pt-1 flex justify-between font-bold text-gray-700"><span>Total add-ons (+ IVA)</span><span class="text-green-700">${cop(subtotalAddons * (1+IVA))}/mes</span></div>`;
+        htmlPedido += `</div>`;
+
+        // Sincronizar hidden inputs del formulario con los valores del calculador
+        document.getElementById('h-tecnicos').value        = tec;
+        document.getElementById('h-admins').value          = adm;
+        document.getElementById('h-gerentes').value        = ger;
+        document.getElementById('h-bloques_equipos').value = bloq;
+        document.getElementById('h-bloques_storage').value = stor;
+
+        document.getElementById('btn-pago-container').classList.remove('hidden');
+    }
+
+    document.getElementById('resumen-pedido').innerHTML = htmlPedido;
+}
+
+function switchPeriodo(periodo) {
+    document.querySelectorAll('.periodo-mensual').forEach(el => el.classList.toggle('hidden', periodo !== 'mensual'));
+    document.querySelectorAll('.periodo-anual').forEach(el   => el.classList.toggle('hidden', periodo !== 'anual'));
+    const btnM = document.getElementById('btn-mensual');
+    const btnA = document.getElementById('btn-anual');
+    if (periodo === 'mensual') {
+        btnM.classList.add('bg-white','text-blue-700','shadow'); btnM.classList.remove('text-gray-500');
+        btnA.classList.remove('bg-white','text-blue-700','shadow'); btnA.classList.add('text-gray-500');
+    } else {
+        btnA.classList.add('bg-white','text-blue-700','shadow'); btnA.classList.remove('text-gray-500');
+        btnM.classList.remove('bg-white','text-blue-700','shadow'); btnM.classList.add('text-gray-500');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', calcularTotal);
+</script>
+{% endblock %}

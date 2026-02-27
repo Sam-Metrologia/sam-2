@@ -2,6 +2,19 @@ from django import template
 
 register = template.Library()
 
+
+@register.filter
+def cop(value):
+    """
+    Formatea un número como precio colombiano con puntos de miles.
+    Ej: 200000 → $200.000 | 2000000 → $2.000.000
+    """
+    try:
+        entero = int(value)
+        return f"${entero:,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return value
+
 @register.filter
 def mul(value, arg):
     """Multiplica value por arg"""

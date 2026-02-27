@@ -1,6 +1,8 @@
 # core/views/companies.py
 # Views para gestión de empresas, ubicaciones y planes
 
+import re
+
 from .base import *
 from ..constants import ESTADO_ACTIVO
 
@@ -275,6 +277,120 @@ def añadir_usuario_a_empresa(request, empresa_pk):
         'titulo_pagina': titulo_pagina,
     }
     return render(request, 'core/añadir_usuario_a_empresa.html', context)
+
+
+# =============================================================================
+# SELF-SERVICE: CREACIÓN DE USUARIOS POR EL ADMINISTRADOR DE LA EMPRESA
+# =============================================================================
+
+@monitor_view
+@access_check
+@login_required
+def crear_usuario_empresa(request):
+    """
+    Permite a usuarios con rol ADMINISTRADOR crear nuevos usuarios para su empresa.
+    Valida que no se supere el límite de usuarios (limite_usuarios_empresa).
+    El ADMINISTRADOR puede crear técnicos, admins y gerentes.
+    """
+    if not request.user.is_superuser and not request.user.is_administrador():
+        messages.error(request, 'Solo administradores pueden crear usuarios.')
+        return redirect('core:dashboard')
+
+    empresa = request.user.empresa
+    if not empresa:
+        messages.error(request, 'No tienes una empresa asociada.')
+        return redirect('core:dashboard')
+
+    # Contar usuarios activos actuales (sin contar superusuarios de SAM)
+    total_usuarios = empresa.usuarios_empresa.filter(is_active=True, is_superuser=False).count()
+    limite = empresa.limite_usuarios_empresa
+    puede_crear = total_usuarios < limite
+
+    password_generado = None  # se muestra solo tras creación exitosa
+
+    if request.method == 'POST':
+        if not puede_crear:
+            messages.error(
+                request,
+                f'Alcanzaste el límite de {limite} usuarios. '
+                'Compra usuarios adicionales en la sección de Add-ons.'
+            )
+            return redirect('core:planes')
+
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name', '').strip()
+        email      = request.POST.get('email', '').strip().lower()
+        rol        = request.POST.get('rol_usuario', 'TECNICO').upper()
+
+        if rol not in ('TECNICO', 'ADMINISTRADOR', 'GERENCIA'):
+            rol = 'TECNICO'
+
+        if not first_name or not email:
+            messages.error(request, 'El nombre y el correo son obligatorios.')
+        else:
+            # Generar username: primeras letras + últimas del NIT
+            nit_clean  = re.sub(r'\D', '', empresa.nit or '')[:6]
+            base       = re.sub(r'[^a-z]', '', (first_name[:3] + last_name[:3]).lower())
+            base_username = base + nit_clean or 'user' + nit_clean
+            username   = base_username
+            counter    = 1
+            while CustomUser.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            # Contraseña temporal segura
+            from django.utils.crypto import get_random_string
+            password = get_random_string(12)
+
+            try:
+                with transaction.atomic():
+                    user = CustomUser.objects.create_user(
+                        username=username,
+                        email=email,
+                        first_name=first_name,
+                        last_name=last_name,
+                        empresa=empresa,
+                        rol_usuario=rol,
+                        is_management_user=(rol == 'GERENCIA'),
+                        can_access_dashboard_decisiones=(rol == 'GERENCIA'),
+                        is_active=True,
+                        password=password,
+                    )
+                    from .registro import asignar_permisos_por_rol
+                    asignar_permisos_por_rol(user)
+
+                    logger.info(
+                        f"Usuario {username} (rol={rol}) creado para empresa "
+                        f"{empresa.nombre} por {request.user.username}"
+                    )
+                    password_generado = password
+                    messages.success(
+                        request,
+                        f'Usuario "{username}" creado con rol {rol}. '
+                        f'Contraseña temporal: {password} — entregala al usuario '
+                        'para que la cambie en su primer ingreso.'
+                    )
+                    # Recargar conteo tras creación exitosa
+                    total_usuarios = empresa.usuarios_empresa.filter(
+                        is_active=True, is_superuser=False
+                    ).count()
+                    puede_crear = total_usuarios < limite
+
+            except Exception as e:
+                messages.error(request, f'Error al crear usuario: {e}')
+                logger.error(
+                    f"Error creando usuario en empresa {empresa.nombre}: {e}"
+                )
+
+    context = {
+        'empresa': empresa,
+        'total_usuarios': total_usuarios,
+        'limite': limite,
+        'puede_crear': puede_crear,
+        'password_generado': password_generado,
+        'titulo_pagina': 'Crear Usuario',
+    }
+    return render(request, 'core/crear_usuario_empresa.html', context)
 
 
 # =============================================================================

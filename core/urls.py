@@ -21,6 +21,13 @@ urlpatterns = [
     path('onboarding/progreso/', views.onboarding_progreso, name='onboarding_progreso'),
     path('onboarding/completar-tour/', views.onboarding_completar_tour, name='onboarding_completar_tour'),
 
+    # Módulo C: Pagos con Wompi
+    path('planes/', views.planes, name='planes'),
+    path('pagos/iniciar/', views.iniciar_pago, name='iniciar_pago'),
+    path('pagos/iniciar-addon/', views.iniciar_addon_pago, name='iniciar_addon_pago'),
+    path('pagos/resultado/', views.pago_resultado, name='pago_resultado'),
+    path('pagos/webhook/', views.wompi_webhook, name='wompi_webhook'),
+
     # Autenticación
     path('login/', views.user_login, name='login'),
     path('logout/', views.user_logout, name='logout'),
@@ -136,6 +143,7 @@ urlpatterns = [
     # Usuarios
     path('usuarios/', views.listar_usuarios, name='listar_usuarios'),
     path('usuarios/añadir/', views.añadir_usuario, name='añadir_usuario'),
+    path('usuarios/crear/', views.crear_usuario_empresa, name='crear_usuario_empresa'),
     path('usuarios/<int:pk>/editar/', views.editar_usuario, name='editar_usuario'), 
     path('usuarios/<int:pk>/eliminar/', views.eliminar_usuario, name='eliminar_usuario'),
     path('usuarios/<int:pk>/', views.detalle_usuario, name='detalle_usuario'),

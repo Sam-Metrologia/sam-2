@@ -96,5 +96,8 @@ from .registro import solicitar_trial, trial_exitoso
 # Onboarding guiado para Trial
 from .onboarding import onboarding_progreso, onboarding_completar_tour
 
+# Módulo C: Pagos con Wompi
+from .pagos import planes, iniciar_pago, iniciar_addon_pago, pago_resultado, wompi_webhook
+
 # MIGRACIÓN COMPLETADA - Ya no necesitamos importar desde el monolítico
 # Todas las funciones han sido migradas a sus respectivos módulos especializados

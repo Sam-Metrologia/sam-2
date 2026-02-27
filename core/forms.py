@@ -1750,8 +1750,9 @@ class DevolucionEquipoForm(forms.Form):
 class RegistroTrialForm(forms.Form):
     """
     Formulario público para auto-registro de Trial.
-    Crea 1 Empresa + 1 Usuario Administrador.
-    Los usuarios de Gerencia y Técnico se generan automáticamente en la vista.
+    Solo pide datos de la empresa. Los 3 usuarios (Administrador, Gerencia
+    y Técnico) se generan automáticamente en la vista con credenciales
+    basadas en el nombre de empresa y NIT.
     Incluye: honeypot anti-bot, campo logo opcional, validación NIT contra eliminadas.
     """
 
@@ -1805,48 +1806,6 @@ class RegistroTrialForm(forms.Form):
         help_text='PNG o JPG, máximo 2 MB. Este logo aparecerá en el encabezado de los formatos e informes generados.'
     )
 
-    # --- Datos del Administrador ---
-    nombre_completo = forms.CharField(
-        max_length=150,
-        label='Nombre Completo del Administrador',
-        widget=forms.TextInput(attrs={
-            'class': 'form-input',
-            'placeholder': 'Ej: Juan Pérez García'
-        })
-    )
-    username = forms.CharField(
-        max_length=30,
-        min_length=3,
-        label='Nombre de Usuario',
-        widget=forms.TextInput(attrs={
-            'class': 'form-input',
-            'placeholder': 'Ej: juan.perez'
-        }),
-        help_text='3-30 caracteres: letras, números, guiones y guiones bajos'
-    )
-    email_usuario = forms.EmailField(
-        label='Email del Administrador',
-        widget=forms.EmailInput(attrs={
-            'class': 'form-input',
-            'placeholder': 'admin@empresa.com'
-        })
-    )
-    password1 = forms.CharField(
-        label='Contraseña',
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-input',
-            'placeholder': 'Mínimo 8 caracteres'
-        }),
-        help_text='Mínimo 8 caracteres, no puede ser solo numérica'
-    )
-    password2 = forms.CharField(
-        label='Confirmar Contraseña',
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-input',
-            'placeholder': 'Repite la contraseña'
-        })
-    )
-
     def clean_nombre_empresa(self):
         nombre = self.cleaned_data.get('nombre_empresa')
         if nombre and Empresa.objects.filter(nombre=nombre).exists():
@@ -1886,38 +1845,3 @@ class RegistroTrialForm(forms.Form):
             if hasattr(logo, 'content_type') and logo.content_type not in allowed:
                 raise ValidationError("Solo se permiten imágenes PNG o JPG.")
         return logo
-
-    def clean_username(self):
-        username = self.cleaned_data.get('username')
-        if username:
-            if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', username):
-                raise ValidationError(
-                    "El nombre de usuario debe tener entre 3-30 caracteres y solo contener "
-                    "letras, números, guiones y guiones bajos."
-                )
-            if CustomUser.objects.filter(username=username).exists():
-                raise ValidationError("Este nombre de usuario ya está en uso.")
-        return username
-
-    def clean_email_usuario(self):
-        email = self.cleaned_data.get('email_usuario')
-        if email and CustomUser.objects.filter(email=email).exists():
-            raise ValidationError("Ya existe un usuario con este correo electrónico.")
-        return email
-
-    def clean_password1(self):
-        password = self.cleaned_data.get('password1')
-        if password:
-            if len(password) < 8:
-                raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
-            if password.isdigit():
-                raise ValidationError("La contraseña no puede ser completamente numérica.")
-        return password
-
-    def clean(self):
-        cleaned_data = super().clean()
-        password1 = cleaned_data.get('password1')
-        password2 = cleaned_data.get('password2')
-        if password1 and password2 and password1 != password2:
-            self.add_error('password2', "Las contraseñas no coinciden.")
-        return cleaned_data
