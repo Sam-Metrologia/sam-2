@@ -6,7 +6,7 @@ services:
   - type: web
     name: sam-metrologia
     runtime: python
-    plan: standard
+    plan: free  # Plan gestionado manualmente en el dashboard de Render
     region: oregon  # Región más cercana: ohio, oregon, frankfurt, singapore
 
     buildCommand: "./build.sh"
