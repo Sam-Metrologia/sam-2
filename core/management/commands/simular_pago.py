@@ -118,4 +118,7 @@ class Command(BaseCommand):
         self.stdout.write(f'  Usuarios:      {empresa.limite_usuarios_empresa}')
         self.stdout.write(f'  Estado:        {empresa.get_estado_suscripcion_display()}')
         self.stdout.write(f'  Referencia:    {referencia}')
+        self.stdout.write(f'  [Setup] configurar_usuarios_plan_pendiente: {empresa.configurar_usuarios_plan_pendiente}')
+        self.stdout.write(f'  [Setup] slots_usuarios_pendientes:          {empresa.slots_usuarios_pendientes}')
+        self.stdout.write(f'  [Setup] tiene_setup_usuarios_pendiente:     {empresa.tiene_setup_usuarios_pendiente}')
         self.stdout.write('=' * 65)
