@@ -4,6 +4,7 @@
 import hashlib
 import json
 import logging
+import re
 import uuid
 from decimal import Decimal
 
@@ -16,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from core.models import TransaccionPago
+from core.models import CustomUser, TransaccionPago
 
 logger = logging.getLogger(__name__)
 

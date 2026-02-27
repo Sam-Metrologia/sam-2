@@ -953,6 +953,10 @@
         {% include 'core/partials/onboarding_checklist.html' %}
     {% endif %}
 
+    {% if setup_usuarios %}
+        {% include 'core/partials/modal_setup_usuarios.html' %}
+    {% endif %}
+
     <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div class="info-card total-equipos">
             <h3>Total de Equipos</h3>
@@ -2643,4 +2647,12 @@
 
     });
 </script>
+
+{% if setup_usuarios %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('setup-usuarios-modal').classList.remove('hidden');
+    });
+</script>
+{% endif %}
 {% endblock content %}

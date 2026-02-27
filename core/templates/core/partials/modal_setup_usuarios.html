@@ -1,0 +1,297 @@
+{# Modal de configuración de usuarios post-compra #}
+{% load static custom_filters %}
+
+<div id="setup-usuarios-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-screen overflow-y-auto">
+        {# Header #}
+        <div class="bg-indigo-600 rounded-t-xl px-6 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-white">
+                    <i class="fas fa-users-cog mr-2"></i>Configurar Usuarios
+                </h2>
+                <p class="text-indigo-200 text-sm mt-1">
+                    Personaliza las cuentas de usuario con nombres y correos reales.
+                </p>
+            </div>
+            <button type="button" onclick="document.getElementById('setup-usuarios-modal').classList.add('hidden')"
+                    class="text-indigo-200 hover:text-white transition-colors" title="Configurar después">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{% url 'core:configurar_usuarios_setup' %}">
+            {% csrf_token %}
+            <div class="px-6 py-5 space-y-6">
+
+                {# SECCIÓN A: Usuarios existentes (post-compra de plan) #}
+                {% if setup_usuarios.configurar_plan and setup_usuarios.usuarios_existentes %}
+                <div>
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold mr-2">A</span>
+                        Actualizar usuarios del plan
+                    </h3>
+                    <p class="text-sm text-gray-500 mb-4">
+                        Estos usuarios fueron creados automáticamente. Ponles nombres y correos reales.
+                        La contraseña es opcional — déjala vacía para mantener la actual.
+                    </p>
+                    <div class="space-y-4">
+                        {% for usuario in setup_usuarios.usuarios_existentes %}
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div class="flex items-center mb-3">
+                                {% if usuario.rol_usuario == 'ADMINISTRADOR' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <i class="fas fa-user-shield mr-1"></i>Administrador
+                                    </span>
+                                {% elif usuario.rol_usuario == 'GERENCIA' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        <i class="fas fa-user-tie mr-1"></i>Gerencia
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        <i class="fas fa-user-cog mr-1"></i>Técnico
+                                    </span>
+                                {% endif %}
+                                <span class="ml-2 text-sm text-gray-500">Usuario actual: <strong>{{ usuario.username }}</strong></span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Nombre de usuario <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text"
+                                           name="usuario_{{ usuario.id }}_username"
+                                           value="{{ usuario.username }}"
+                                           required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Correo electrónico</label>
+                                    <input type="email"
+                                           name="usuario_{{ usuario.id }}_email"
+                                           value="{{ usuario.email }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                                    <input type="text"
+                                           name="usuario_{{ usuario.id }}_first_name"
+                                           value="{{ usuario.first_name }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                                    <input type="text"
+                                           name="usuario_{{ usuario.id }}_last_name"
+                                           value="{{ usuario.last_name }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Nueva contraseña
+                                        <span class="text-gray-400 font-normal">(dejar vacío para no cambiar)</span>
+                                    </label>
+                                    <input type="password"
+                                           name="usuario_{{ usuario.id }}_password"
+                                           placeholder="Dejar vacío para no cambiar"
+                                           autocomplete="new-password"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# SECCIÓN B: Nuevos usuarios (add-ons) #}
+                {% with slots=setup_usuarios.slots %}
+                {% if slots %}
+
+                    {# Técnicos adicionales #}
+                    {% if slots.tecnicos %}
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold mr-2">+</span>
+                            Crear técnicos adicionales
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">
+                            Completa los datos para los técnicos adicionales que compraste. La contraseña es obligatoria.
+                        </p>
+                        {% for i in slots.tecnicos|make_list %}
+                        <div class="border border-blue-200 rounded-lg p-4 bg-blue-50 mb-3">
+                            <div class="flex items-center mb-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <i class="fas fa-user-cog mr-1"></i>Técnico nuevo {{ forloop.counter }}
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Nombre de usuario <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" name="nuevo_tecnicos_{{ forloop.counter0 }}_username" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Correo electrónico</label>
+                                    <input type="email" name="nuevo_tecnicos_{{ forloop.counter0 }}_email"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                                    <input type="text" name="nuevo_tecnicos_{{ forloop.counter0 }}_first_name"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                                    <input type="text" name="nuevo_tecnicos_{{ forloop.counter0 }}_last_name"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Contraseña <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="password" name="nuevo_tecnicos_{{ forloop.counter0 }}_password"
+                                           required autocomplete="new-password"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {# Administradores adicionales #}
+                    {% if slots.admins %}
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold mr-2">+</span>
+                            Crear administradores adicionales
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">
+                            Completa los datos para los administradores adicionales que compraste.
+                        </p>
+                        {% for i in slots.admins|make_list %}
+                        <div class="border border-green-200 rounded-lg p-4 bg-green-50 mb-3">
+                            <div class="flex items-center mb-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-user-shield mr-1"></i>Administrador nuevo {{ forloop.counter }}
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Nombre de usuario <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" name="nuevo_admins_{{ forloop.counter0 }}_username" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Correo electrónico</label>
+                                    <input type="email" name="nuevo_admins_{{ forloop.counter0 }}_email"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                                    <input type="text" name="nuevo_admins_{{ forloop.counter0 }}_first_name"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                                    <input type="text" name="nuevo_admins_{{ forloop.counter0 }}_last_name"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Contraseña <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="password" name="nuevo_admins_{{ forloop.counter0 }}_password"
+                                           required autocomplete="new-password"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {# Gerentes adicionales #}
+                    {% if slots.gerentes %}
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-bold mr-2">+</span>
+                            Crear gerentes adicionales
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">
+                            Completa los datos para los gerentes adicionales que compraste.
+                        </p>
+                        {% for i in slots.gerentes|make_list %}
+                        <div class="border border-purple-200 rounded-lg p-4 bg-purple-50 mb-3">
+                            <div class="flex items-center mb-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    <i class="fas fa-user-tie mr-1"></i>Gerente nuevo {{ forloop.counter }}
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Nombre de usuario <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" name="nuevo_gerentes_{{ forloop.counter0 }}_username" required
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Correo electrónico</label>
+                                    <input type="email" name="nuevo_gerentes_{{ forloop.counter0 }}_email"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                                    <input type="text" name="nuevo_gerentes_{{ forloop.counter0 }}_first_name"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                                    <input type="text" name="nuevo_gerentes_{{ forloop.counter0 }}_last_name"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">
+                                        Contraseña <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="password" name="nuevo_gerentes_{{ forloop.counter0 }}_password"
+                                           required autocomplete="new-password"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                {% endif %}
+                {% endwith %}
+
+            </div>
+
+            {# Footer con botones #}
+            <div class="bg-gray-50 rounded-b-xl px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200">
+                <p class="text-xs text-gray-400">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Si cierras sin completar, volverá a aparecer en tu próximo inicio de sesión.
+                </p>
+                <div class="flex items-center gap-3">
+                    <button type="button"
+                            onclick="document.getElementById('setup-usuarios-modal').classList.add('hidden')"
+                            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                        Configurar después
+                    </button>
+                    <button type="submit"
+                            class="px-6 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
+                        Guardar y continuar →
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

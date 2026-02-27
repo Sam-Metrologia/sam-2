@@ -464,6 +464,17 @@ class Empresa(models.Model):
         help_text="Máximo de usuarios activos permitidos. Base: 3 (técnico, admin, gerente)."
     )
 
+    configurar_usuarios_plan_pendiente = models.BooleanField(
+        default=False,
+        verbose_name="Configuración de Usuarios Pendiente",
+        help_text="True si el cliente debe configurar sus usuarios al próximo login (post-compra de plan)"
+    )
+    slots_usuarios_pendientes = models.JSONField(
+        null=True, blank=True, default=dict,
+        verbose_name="Slots de Usuarios Pendientes",
+        help_text="Usuarios comprados pero no creados: {tecnicos: N, admins: N, gerentes: N}"
+    )
+
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
         max_length=50,
@@ -870,6 +881,9 @@ class Empresa(models.Model):
         # Actualizar estados relacionados
         self.estado_suscripcion = 'Activo'
 
+        # Marcar que los usuarios deben configurarse en el próximo login
+        self.configurar_usuarios_plan_pendiente = True
+
         self.save()
 
         # Log de la transición
@@ -908,16 +922,39 @@ class Empresa(models.Model):
         if storage_extra_mb > 0:
             self.limite_almacenamiento_mb += storage_extra_mb
 
+        # Acumular slots de usuarios pendientes por rol
+        tecnicos = int(datos_addon.get('tecnicos', 0))
+        admins = int(datos_addon.get('admins', 0))
+        gerentes = int(datos_addon.get('gerentes', 0))
+        if tecnicos or admins or gerentes:
+            slots = self.slots_usuarios_pendientes or {}
+            if tecnicos:
+                slots['tecnicos'] = slots.get('tecnicos', 0) + tecnicos
+            if admins:
+                slots['admins'] = slots.get('admins', 0) + admins
+            if gerentes:
+                slots['gerentes'] = slots.get('gerentes', 0) + gerentes
+            self.slots_usuarios_pendientes = slots
+
         self.save(update_fields=[
             'limite_usuarios_empresa',
             'limite_equipos_empresa',
             'limite_almacenamiento_mb',
+            'slots_usuarios_pendientes',
         ])
         logger.info(
             f"Add-ons activados para empresa {self.nombre}: "
             f"+{usuarios_extra} usuarios, +{equipos_extra} equipos, "
             f"+{storage_extra_mb}MB almacenamiento"
         )
+
+    @property
+    def tiene_setup_usuarios_pendiente(self):
+        """True si hay alguna configuración de usuarios pendiente post-compra."""
+        if self.configurar_usuarios_plan_pendiente:
+            return True
+        slots = self.slots_usuarios_pendientes or {}
+        return any(v > 0 for v in slots.values())
 
     def activar_periodo_prueba(self, duracion_dias=7):
         """

@@ -21,6 +21,9 @@ urlpatterns = [
     path('onboarding/progreso/', views.onboarding_progreso, name='onboarding_progreso'),
     path('onboarding/completar-tour/', views.onboarding_completar_tour, name='onboarding_completar_tour'),
 
+    # Setup usuarios post-compra
+    path('usuarios/configurar-setup/', views.configurar_usuarios_setup, name='configurar_usuarios_setup'),
+
     # Módulo C: Pagos con Wompi
     path('planes/', views.planes, name='planes'),
     path('pagos/iniciar/', views.iniciar_pago, name='iniciar_pago'),

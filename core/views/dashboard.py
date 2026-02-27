@@ -293,6 +293,21 @@ def dashboard(request):
             pass
     context['onboarding_progress'] = onboarding_progress
 
+    # Setup usuarios (NO se cachea - cambia por acción del usuario)
+    setup_usuarios = None
+    if user.empresa and user.empresa.tiene_setup_usuarios_pendiente:
+        empresa_obj = user.empresa
+        setup_usuarios = {
+            'configurar_plan': empresa_obj.configurar_usuarios_plan_pendiente,
+            'slots': empresa_obj.slots_usuarios_pendientes or {},
+            'usuarios_existentes': list(
+                empresa_obj.usuarios_empresa
+                .filter(is_active=True)
+                .values('id', 'username', 'first_name', 'last_name', 'email', 'rol_usuario')
+            ) if empresa_obj.configurar_usuarios_plan_pendiente else [],
+        }
+    context['setup_usuarios'] = setup_usuarios
+
     return render(request, 'core/dashboard.html', context)
 
 

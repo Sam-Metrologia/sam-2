@@ -1085,3 +1085,79 @@ def _generate_procedimiento_info_excel_content(procedimientos_queryset):
     workbook.save(excel_buffer)
     excel_buffer.seek(0)
     return excel_buffer.getvalue()
+
+# =============================================================================
+# SETUP DE USUARIOS POST-COMPRA
+# =============================================================================
+
+@login_required
+def configurar_usuarios_setup(request):
+    """Procesa el modal de setup de usuarios post-compra."""
+    from django.http import HttpResponseForbidden
+    from .registro import asignar_permisos_por_rol
+
+    empresa = request.user.empresa
+    if not empresa:
+        return redirect('core:dashboard')
+
+    # Solo ADMINISTRADOR o GERENCIA puede hacer esto
+    if not (request.user.is_administrador() or request.user.is_gerente()):
+        return HttpResponseForbidden()
+
+    if request.method == 'POST':
+        # --- Sección A: Actualizar usuarios existentes (post-plan) ---
+        if empresa.configurar_usuarios_plan_pendiente:
+            for usuario in empresa.usuarios_empresa.filter(is_active=True):
+                prefix = f"usuario_{usuario.id}_"
+                nuevo_username = request.POST.get(f"{prefix}username", "").strip()
+                first_name     = request.POST.get(f"{prefix}first_name", "").strip()
+                last_name      = request.POST.get(f"{prefix}last_name", "").strip()
+                email          = request.POST.get(f"{prefix}email", "").strip()
+                nueva_password = request.POST.get(f"{prefix}password", "").strip()
+
+                if nuevo_username:
+                    usuario.username   = nuevo_username
+                    usuario.first_name = first_name
+                    usuario.last_name  = last_name
+                    usuario.email      = email
+                    if nueva_password:
+                        usuario.set_password(nueva_password)
+                    usuario.save()
+
+            empresa.configurar_usuarios_plan_pendiente = False
+            empresa.save(update_fields=['configurar_usuarios_plan_pendiente'])
+
+        # --- Sección B: Crear usuarios de add-ons ---
+        slots = empresa.slots_usuarios_pendientes or {}
+        ROL_MAP = {'tecnicos': 'TECNICO', 'admins': 'ADMINISTRADOR', 'gerentes': 'GERENCIA'}
+
+        for tipo, cantidad in list(slots.items()):
+            for i in range(int(cantidad)):
+                prefix = f"nuevo_{tipo}_{i}_"
+                username  = request.POST.get(f"{prefix}username", "").strip()
+                fname     = request.POST.get(f"{prefix}first_name", "").strip()
+                lname     = request.POST.get(f"{prefix}last_name", "").strip()
+                email     = request.POST.get(f"{prefix}email", "").strip()
+                password  = request.POST.get(f"{prefix}password", "").strip()
+
+                if username and password and tipo in ROL_MAP:
+                    nuevo_user = CustomUser.objects.create_user(
+                        username=username,
+                        first_name=fname,
+                        last_name=lname,
+                        email=email,
+                        password=password,
+                        empresa=empresa,
+                        rol_usuario=ROL_MAP[tipo],
+                        is_active=True,
+                    )
+                    asignar_permisos_por_rol(nuevo_user)
+                    slots[tipo] = max(0, int(slots[tipo]) - 1)
+
+        empresa.slots_usuarios_pendientes = {k: v for k, v in slots.items() if v > 0}
+        empresa.save(update_fields=['slots_usuarios_pendientes'])
+
+        messages.success(request, 'Usuarios configurados exitosamente.')
+        return redirect('core:dashboard')
+
+    return redirect('core:dashboard')
