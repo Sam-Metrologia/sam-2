@@ -713,36 +713,48 @@
 
     {# Notificación del Plan Actual #}
     {% if plan_info.plan_actual == 'trial' %}
-        <div class="bg-gradient-to-r from-blue-100 to-blue-200 border border-blue-300 rounded-lg p-4 mb-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+        {% if plan_info.dias_restantes <= 5 %}
+        <div class="bg-gradient-to-r from-orange-100 to-red-100 border border-orange-400 rounded-lg p-4 mb-6">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-start gap-3 flex-1">
+                    <svg class="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                     </svg>
-                </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-blue-800">
-                        🎯 Período de Prueba Activo
-                    </h3>
-                    <div class="mt-2 text-sm text-blue-700">
-                        <p>
-                            <strong>{{ plan_info.dias_restantes }} días restantes</strong> de su período de prueba.
-                            Disfrute de <strong>{{ plan_info.limite_equipos_actual }} equipos</strong> y
-                            <strong>{{ plan_info.limite_almacenamiento_display }}</strong> de almacenamiento.
+                    <div>
+                        <h3 class="text-sm font-semibold text-orange-800">⚠️ Trial expira en {{ plan_info.dias_restantes }} día{{ plan_info.dias_restantes|pluralize }}</h3>
+                        <p class="mt-1 text-sm text-orange-700">
+                            Activa tu plan ahora para no perder el acceso ni tus datos.
                         </p>
-                        {% if plan_info.dias_restantes <= 5 %}
-                        <p class="mt-2">
-                            ⚠️ Su trial expira pronto.
-                            <a href="{% url 'core:planes' %}"
-                               class="inline-block ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1 rounded transition">
-                                Ver Planes →
-                            </a>
-                        </p>
-                        {% endif %}
                     </div>
                 </div>
+                <a href="{% url 'core:planes' %}"
+                   class="flex-shrink-0 inline-block bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition">
+                    🔓 Activar Plan Ahora
+                </a>
             </div>
         </div>
+        {% else %}
+        <div class="bg-gradient-to-r from-blue-100 to-blue-200 border border-blue-300 rounded-lg p-4 mb-6">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-start gap-3 flex-1">
+                    <svg class="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                    <div>
+                        <h3 class="text-sm font-medium text-blue-800">🎯 Período de Prueba Activo</h3>
+                        <p class="mt-1 text-sm text-blue-700">
+                            <strong>{{ plan_info.dias_restantes }} días restantes</strong> &mdash;
+                            {{ plan_info.limite_equipos_actual }} equipos &middot; {{ plan_info.limite_almacenamiento_display }} de almacenamiento.
+                        </p>
+                    </div>
+                </div>
+                <a href="{% url 'core:planes' %}"
+                   class="flex-shrink-0 inline-block bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                    Contratar Plan →
+                </a>
+            </div>
+        </div>
+        {% endif %}
     {% elif plan_info.plan_actual == 'paid' %}
         <div class="plan-pagado-card border rounded-lg p-4 mb-6" style="background-color: #e8f5e9; border-color: #66bb6a;">
             <div class="flex items-center justify-between gap-4 flex-wrap">

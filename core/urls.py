@@ -26,6 +26,7 @@ urlpatterns = [
     path('pagos/iniciar/', views.iniciar_pago, name='iniciar_pago'),
     path('pagos/iniciar-addon/', views.iniciar_addon_pago, name='iniciar_addon_pago'),
     path('pagos/resultado/', views.pago_resultado, name='pago_resultado'),
+    path('pagos/no-disponible/', views.pago_no_disponible, name='pago_no_disponible'),
     path('pagos/webhook/', views.wompi_webhook, name='wompi_webhook'),
 
     # Autenticación

@@ -18,6 +18,17 @@
         {% endif %}
 
         {% for field in form %}
+            {% if field.name == 'correos_facturacion' %}
+            <div class="border-t-2 border-blue-100 pt-5 mt-4">
+                <h3 class="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-3">
+                    <i class="fas fa-envelope mr-2"></i> Correos de Comunicación
+                </h3>
+                <p class="text-xs text-gray-500 mb-4">
+                    Configura correos adicionales para facturación y notificaciones.
+                    Separa varios correos con coma. Si no se configuran, se usan los correos de los usuarios activos.
+                </p>
+            </div>
+            {% endif %}
             <div class="mb-4">
                 <label for="{{ field.id_for_label }}" class="block text-gray-700 text-sm font-bold mb-2">
                     {{ field.label }}

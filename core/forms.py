@@ -213,7 +213,9 @@ class EmpresaForm(forms.ModelForm):
     class Meta:
         model = Empresa
         fields = [
-            'nombre', 'nit', 'direccion', 'telefono', 'email', 'logo_empresa',
+            'nombre', 'nit', 'direccion', 'telefono', 'email',
+            'correos_facturacion', 'correos_notificaciones',
+            'logo_empresa',
             'formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa',
             'es_periodo_prueba', 'duracion_prueba_dias', 'fecha_inicio_plan',
             'limite_equipos_empresa', 'limite_almacenamiento_mb', 'duracion_suscripcion_meses',
@@ -225,6 +227,16 @@ class EmpresaForm(forms.ModelForm):
             'direccion': forms.TextInput(attrs={'class': 'form-input'}),
             'telefono': forms.TextInput(attrs={'class': 'form-input'}),
             'email': forms.EmailInput(attrs={'class': 'form-input'}),
+            'correos_facturacion': forms.Textarea(attrs={
+                'class': 'form-input',
+                'rows': 2,
+                'placeholder': 'facturacion@empresa.com, admin@empresa.com'
+            }),
+            'correos_notificaciones': forms.Textarea(attrs={
+                'class': 'form-input',
+                'rows': 2,
+                'placeholder': 'tecnico@empresa.com, supervisor@empresa.com'
+            }),
             'logo_empresa': ClearableFileInput(attrs={'class': 'form-input-file'}),
             'formato_version_empresa': forms.TextInput(attrs={'class': 'form-input'}),
             'formato_fecha_version_empresa': DateInput(attrs={'type': 'date', 'class': 'form-input'}),
@@ -1795,6 +1807,34 @@ class RegistroTrialForm(forms.Form):
             'class': 'form-input',
             'placeholder': '+57 300 123 4567'
         })
+    )
+    direccion = forms.CharField(
+        max_length=255,
+        required=False,
+        label='Dirección',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Calle 123 # 45-67, Bogotá, Colombia'
+        }),
+        help_text='Dirección fiscal de la empresa (requerida para la factura electrónica).'
+    )
+    correos_facturacion = forms.CharField(
+        required=False,
+        label='Correos de Facturación',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'facturacion@empresa.com, admin@empresa.com'
+        }),
+        help_text='Correos que recibirán las facturas. Separa varios con coma.'
+    )
+    correos_notificaciones = forms.CharField(
+        required=False,
+        label='Correos de Notificaciones',
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'tecnico@empresa.com, supervisor@empresa.com'
+        }),
+        help_text='Correos que recibirán alertas del sistema. Separa varios con coma.'
     )
     logo_empresa = forms.ImageField(
         required=False,

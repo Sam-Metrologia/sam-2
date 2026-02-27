@@ -263,11 +263,7 @@ def iniciar_pago(request):
 
     if not public_key:
         logger.error("WOMPI_PUBLIC_KEY no configurado. No se puede iniciar pago.")
-        messages.error(
-            request,
-            'El sistema de pagos no está configurado. Contacta a soporte.'
-        )
-        return redirect('core:planes')
+        return redirect('core:pago_no_disponible')
 
     # Referencia única para esta transacción
     referencia = f"SAM-{empresa.id}-{uuid.uuid4().hex[:12].upper()}"
@@ -326,8 +322,8 @@ def iniciar_addon_pago(request):
     integrity_secret = getattr(settings, 'WOMPI_INTEGRITY_SECRET', '')
 
     if not public_key:
-        messages.error(request, 'El sistema de pagos no está configurado. Contacta a soporte.')
-        return redirect('core:planes')
+        logger.error("WOMPI_PUBLIC_KEY no configurado. No se puede iniciar addon.")
+        return redirect('core:pago_no_disponible')
 
     # Leer cantidades del formulario (mínimo 0 en cada campo)
     def _pos_int(key):
@@ -397,6 +393,19 @@ def iniciar_addon_pago(request):
     )
 
     return redirect(checkout_url)
+
+
+# ============================================================================
+# C6b — Pagos no disponibles (Wompi aún no configurado)
+# ============================================================================
+
+@login_required
+def pago_no_disponible(request):
+    """
+    Página temporal mientras se configura la pasarela de pagos.
+    Muestra información de contacto para gestionar el plan manualmente.
+    """
+    return render(request, 'core/pago_no_disponible.html')
 
 
 # ============================================================================

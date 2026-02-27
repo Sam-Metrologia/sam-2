@@ -63,6 +63,36 @@
                         {% endif %}
                     </div>
                     <div class="md:col-span-2">
+                        <label for="id_direccion" class="block text-gray-700 text-sm font-bold mb-1">{{ form.direccion.label }}</label>
+                        {{ form.direccion }}
+                        {% if form.direccion.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.direccion.help_text }}</p>
+                        {% endif %}
+                        {% if form.direccion.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.direccion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_correos_facturacion" class="block text-gray-700 text-sm font-bold mb-1">{{ form.correos_facturacion.label }}</label>
+                        {{ form.correos_facturacion }}
+                        {% if form.correos_facturacion.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.correos_facturacion.help_text }}</p>
+                        {% endif %}
+                        {% if form.correos_facturacion.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.correos_facturacion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="id_correos_notificaciones" class="block text-gray-700 text-sm font-bold mb-1">{{ form.correos_notificaciones.label }}</label>
+                        {{ form.correos_notificaciones }}
+                        {% if form.correos_notificaciones.help_text %}
+                            <p class="text-gray-400 text-xs mt-1">{{ form.correos_notificaciones.help_text }}</p>
+                        {% endif %}
+                        {% if form.correos_notificaciones.errors %}
+                            <p class="text-red-500 text-xs mt-1">{{ form.correos_notificaciones.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="md:col-span-2">
                         <label for="id_logo_empresa" class="block text-gray-700 text-sm font-bold mb-1">{{ form.logo_empresa.label }}</label>
                         {{ form.logo_empresa }}
                         {% if form.logo_empresa.help_text %}

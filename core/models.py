@@ -223,6 +223,18 @@ class Empresa(models.Model):
     direccion = models.CharField(max_length=255, blank=True, null=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
+    correos_facturacion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Correos de Facturación",
+        help_text="Correos adicionales para recibir facturas (separados por coma). Ej: admin@empresa.com, gerente@empresa.com"
+    )
+    correos_notificaciones = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Correos de Notificaciones",
+        help_text="Correos adicionales para notificaciones del sistema (separados por coma). Ej: tecnico@empresa.com, supervisor@empresa.com"
+    )
     logo_empresa = models.ImageField(upload_to='empresas_logos/', blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     

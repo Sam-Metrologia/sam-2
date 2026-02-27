@@ -151,6 +151,9 @@ def solicitar_trial(request):
                         nit=data['nit'],
                         email=data['email_empresa'],
                         telefono=data.get('telefono', ''),
+                        direccion=data.get('direccion', ''),
+                        correos_facturacion=data.get('correos_facturacion', ''),
+                        correos_notificaciones=data.get('correos_notificaciones', ''),
                     )
                     empresa._plan_set_manually = True
                     empresa.save()

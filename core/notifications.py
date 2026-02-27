@@ -227,22 +227,30 @@ class NotificationService:
     @staticmethod
     def _get_company_recipients(empresa):
         """
-        Obtiene lista de emails de usuarios de la empresa.
+        Obtiene lista de emails de notificaciones de la empresa.
+        Prioridad: correos_notificaciones (si configurado) → usuarios activos → email empresa.
         """
         recipients = []
 
-        # Obtener usuarios activos de la empresa con email
-        users = CustomUser.objects.filter(
-            empresa=empresa,
-            is_active=True,
-            email__isnull=False
-        ).exclude(email='')
+        # 1. Usar correos_notificaciones si están configurados
+        if empresa.correos_notificaciones:
+            for email in empresa.correos_notificaciones.split(','):
+                email = email.strip()
+                if email:
+                    recipients.append(email)
 
-        for user in users:
-            if user.email:
-                recipients.append(user.email)
+        # 2. Si no hay correos_notificaciones, usar usuarios activos con email
+        if not recipients:
+            users = CustomUser.objects.filter(
+                empresa=empresa,
+                is_active=True,
+                email__isnull=False
+            ).exclude(email='')
+            for user in users:
+                if user.email:
+                    recipients.append(user.email)
 
-        # Si no hay usuarios con email, usar email de la empresa si existe
+        # 3. Último recurso: email principal de la empresa
         if not recipients and empresa.email:
             recipients.append(empresa.email)
 
