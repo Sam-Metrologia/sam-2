@@ -10,6 +10,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -439,6 +440,130 @@ def pago_resultado(request):
 
 
 # ============================================================================
+# Helpers de email post-pago
+# ============================================================================
+
+def _get_correos_empresa(empresa):
+    """Devuelve lista de correos de facturación de la empresa."""
+    correos = []
+    if empresa.correos_facturacion:
+        for c in empresa.correos_facturacion.split(','):
+            c = c.strip()
+            if c:
+                correos.append(c)
+    if not correos and empresa.email:
+        correos.append(empresa.email)
+    return correos
+
+
+def _enviar_email_confirmacion_plan(transaccion, plan):
+    """Envía confirmación de activación de plan al cliente y aviso a SAM."""
+    empresa = transaccion.empresa
+    from_email = settings.DEFAULT_FROM_EMAIL
+    sam_admin = getattr(settings, 'ADMIN_EMAIL', from_email)
+
+    # ── Email al cliente ──────────────────────────────────────────────────
+    destinatarios = _get_correos_empresa(empresa)
+    duracion = f"{plan['duracion_meses']} mes" if plan['duracion_meses'] == 1 else f"{plan['duracion_meses']} meses"
+    almac_gb = plan['almacenamiento_mb'] // 1024
+
+    asunto_cliente = f"✅ Tu {plan['nombre']} en SAM está activo"
+    cuerpo_cliente = (
+        f"Hola {empresa.nombre},\n\n"
+        f"¡Tu pago fue aprobado! Aquí el resumen de tu plan:\n\n"
+        f"  Plan:           {plan['nombre']}\n"
+        f"  Equipos:        hasta {plan['equipos']}\n"
+        f"  Almacenamiento: {almac_gb} GB\n"
+        f"  Duración:       {duracion}\n"
+        f"  Valor pagado:   ${transaccion.monto:,.0f} COP (IVA incluido)\n"
+        f"  Referencia:     {transaccion.referencia_pago}\n\n"
+        f"Tu plan ya está activo. Puedes ingresar en https://app.sammetrologia.com\n\n"
+        f"Si tienes dudas escríbenos:\n"
+        f"  WhatsApp: +57 324 799 0534\n"
+        f"  Correo:   direccion@sammetrologia.com\n\n"
+        f"SAM Metrologia S.A.S"
+    )
+    try:
+        if destinatarios:
+            send_mail(asunto_cliente, cuerpo_cliente, from_email, destinatarios, fail_silently=True)
+            logger.info(f"Email confirmación plan enviado a {destinatarios} | Ref: {transaccion.referencia_pago}")
+    except Exception as e:
+        logger.error(f"Error enviando email confirmación plan: {e}")
+
+    # ── Aviso interno a SAM ───────────────────────────────────────────────
+    asunto_sam = f"💰 Nuevo pago recibido — {empresa.nombre}"
+    cuerpo_sam = (
+        f"Se recibió un pago aprobado:\n\n"
+        f"  Empresa:    {empresa.nombre} (ID: {empresa.id})\n"
+        f"  NIT:        {empresa.nit}\n"
+        f"  Plan:       {plan['nombre']}\n"
+        f"  Monto:      ${transaccion.monto:,.0f} COP\n"
+        f"  Método:     {transaccion.metodo_pago or 'N/A'}\n"
+        f"  Referencia: {transaccion.referencia_pago}\n"
+    )
+    try:
+        send_mail(asunto_sam, cuerpo_sam, from_email, [sam_admin], fail_silently=True)
+    except Exception as e:
+        logger.error(f"Error enviando aviso de pago a SAM: {e}")
+
+
+def _enviar_email_confirmacion_addon(transaccion):
+    """Envía confirmación de add-ons activados al cliente y aviso a SAM."""
+    empresa = transaccion.empresa
+    from_email = settings.DEFAULT_FROM_EMAIL
+    sam_admin = getattr(settings, 'ADMIN_EMAIL', from_email)
+    datos = transaccion.datos_addon or {}
+
+    lineas = []
+    if datos.get('tecnicos'):
+        lineas.append(f"  +{datos['tecnicos']} usuario(s) Técnico")
+    if datos.get('admins'):
+        lineas.append(f"  +{datos['admins']} usuario(s) Administrador")
+    if datos.get('gerentes'):
+        lineas.append(f"  +{datos['gerentes']} usuario(s) Gerente")
+    if datos.get('bloques_equipos'):
+        lineas.append(f"  +{datos['bloques_equipos'] * 50} equipos ({datos['bloques_equipos']} bloque(s))")
+    if datos.get('bloques_storage'):
+        lineas.append(f"  +{datos['bloques_storage'] * 5} GB almacenamiento")
+
+    detalle = '\n'.join(lineas) if lineas else '  (sin detalle)'
+
+    # ── Email al cliente ──────────────────────────────────────────────────
+    destinatarios = _get_correos_empresa(empresa)
+    asunto_cliente = "✅ Tus add-ons en SAM están activos"
+    cuerpo_cliente = (
+        f"Hola {empresa.nombre},\n\n"
+        f"¡Tu pago fue aprobado! Los siguientes add-ons ya están activos:\n\n"
+        f"{detalle}\n\n"
+        f"  Valor pagado: ${transaccion.monto:,.0f} COP (IVA incluido)\n"
+        f"  Referencia:   {transaccion.referencia_pago}\n\n"
+        f"Puedes verificarlos en tu dashboard: https://app.sammetrologia.com\n\n"
+        f"SAM Metrologia S.A.S\n"
+        f"WhatsApp: +57 324 799 0534"
+    )
+    try:
+        if destinatarios:
+            send_mail(asunto_cliente, cuerpo_cliente, from_email, destinatarios, fail_silently=True)
+            logger.info(f"Email confirmación addon enviado a {destinatarios} | Ref: {transaccion.referencia_pago}")
+    except Exception as e:
+        logger.error(f"Error enviando email confirmación addon: {e}")
+
+    # ── Aviso interno a SAM ───────────────────────────────────────────────
+    asunto_sam = f"💰 Add-ons comprados — {empresa.nombre}"
+    cuerpo_sam = (
+        f"Add-ons activados:\n\n"
+        f"  Empresa:    {empresa.nombre} (ID: {empresa.id})\n"
+        f"  Monto:      ${transaccion.monto:,.0f} COP\n"
+        f"  Referencia: {transaccion.referencia_pago}\n"
+        f"  Detalle:\n{detalle}\n"
+    )
+    try:
+        send_mail(asunto_sam, cuerpo_sam, from_email, [sam_admin], fail_silently=True)
+    except Exception as e:
+        logger.error(f"Error enviando aviso addon a SAM: {e}")
+
+
+# ============================================================================
 # C6 — Webhook de Confirmación (Wompi → SAM)
 # ============================================================================
 
@@ -533,6 +658,7 @@ def wompi_webhook(request):
                         f"Add-ons activados para empresa {transaccion.empresa.nombre}: "
                         f"{transaccion.datos_addon} | Ref: {referencia}"
                     )
+                    _enviar_email_confirmacion_addon(transaccion)
                 except Exception as e:
                     logger.error(
                         f"Error activando add-ons para empresa {transaccion.empresa.nombre}: {e}"
@@ -553,6 +679,7 @@ def wompi_webhook(request):
                         f"Plan activado para empresa {transaccion.empresa.nombre}: "
                         f"{transaccion.plan_seleccionado} | Ref: {referencia}"
                     )
+                    _enviar_email_confirmacion_plan(transaccion, plan)
                 except Exception as e:
                     logger.error(
                         f"Error activando plan para empresa {transaccion.empresa.nombre}: {e}"
