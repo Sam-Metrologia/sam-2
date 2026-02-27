@@ -38,27 +38,21 @@ class Command(BaseCommand):
             ))
             return
 
-        # Verificar si ya existe v1.1
-        if TerminosYCondiciones.objects.filter(version=VERSION).exists():
-            self.stdout.write(self.style.WARNING(f'\n[!] Ya existe la versión {VERSION}'))
-            respuesta = input('¿Desea reemplazarla? (s/n): ')
-            if respuesta.lower() != 's':
-                self.stdout.write(self.style.ERROR('[X] Operación cancelada'))
-                return
-            TerminosYCondiciones.objects.filter(version=VERSION).delete()
-            self.stdout.write(self.style.WARNING(f'[OK] Versión {VERSION} anterior eliminada'))
-
         # Leer el contenido HTML
         with open(ruta_html, 'r', encoding='utf-8') as f:
             contenido_html = f.read()
 
-        # Crear el registro
-        terminos = TerminosYCondiciones.objects.create(
+        # Crear o actualizar (update_or_create para no romper FK de aceptaciones)
+        terminos, creado = TerminosYCondiciones.objects.update_or_create(
             version=VERSION,
-            contenido_html=contenido_html,
-            fecha_vigencia='2026-02-26',
-            activo=True,
+            defaults={
+                'contenido_html': contenido_html,
+                'fecha_vigencia': '2026-02-26',
+                'activo': True,
+            },
         )
+        accion = 'creado' if creado else 'actualizado'
+        self.stdout.write(self.style.SUCCESS(f'\n[OK] Registro {accion}'))
 
         # Desactivar versiones anteriores
         TerminosYCondiciones.objects.exclude(pk=terminos.pk).update(activo=False)
