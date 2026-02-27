@@ -237,10 +237,15 @@
                 <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex-1">
                     <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                         <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        Tu resumen de add-ons
+                        Tu resumen total
                     </h3>
+                    <!-- Total del plan siempre visible -->
+                    <div id="resumen-plan-fijo" class="text-xs bg-blue-50 rounded-lg p-3 mb-3 flex justify-between items-center">
+                        <span class="text-blue-700 font-medium">Plan seleccionado</span>
+                        <span id="resumen-plan-precio" class="text-blue-800 font-bold">—</span>
+                    </div>
                     <div id="resumen-pedido" class="text-sm text-gray-500 italic">
-                        Ajusta las cantidades en el calculador.
+                        Agrega add-ons en el calculador para ver el desglose.
                     </div>
 
                     <!-- Formulario de pago directo -->
@@ -262,6 +267,8 @@
                             Los add-ons se activan automáticamente al confirmar el pago.
                         </p>
                     </div>
+                    <!-- Total general: plan + add-ons -->
+                    <div id="resumen-total-general"></div>
                 </div>
 
                 <!-- ── Sección: qué pasa en mitad del plan ── -->
@@ -329,22 +336,8 @@
         {% if wompi_sandbox %}<p class="mt-1 text-yellow-600 font-medium">Modo sandbox — los pagos son de prueba</p>{% endif %}
     </div>
 
-    <!-- Nota para clientes internacionales -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700 text-center mb-4">
-        <p>
-            <svg class="w-4 h-4 inline mr-1 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
-            <strong>¿Estás fuera de Colombia?</strong>
-            Wompi procesa pagos exclusivamente en Colombia (COP).
-            Si estás en otro país,
-            <a href="https://wa.me/573247990534?text=Hola%2C%20soy%20cliente%20internacional%20y%20quiero%20contratar%20SAM%20Metrolog%C3%ADa"
-               target="_blank" rel="noopener noreferrer"
-               class="font-semibold underline hover:text-blue-900">escríbenos por WhatsApp</a>
-            y gestionamos el pago de forma alternativa.
-        </p>
-    </div>
-
-    <div class="text-center text-sm text-gray-400">
-        ¿Tienes preguntas?
+    <div class="text-center text-sm text-gray-400 mb-2">
+        ¿Tienes alguna duda o necesitas algo especial?
         <a href="https://wa.me/573247990534" target="_blank" rel="noopener noreferrer" class="text-green-600 hover:text-green-700 font-medium">Escríbenos por WhatsApp</a>
     </div>
 
@@ -404,10 +397,13 @@ function calcularTotal() {
 
     document.getElementById('resumen-total').innerHTML = htmlTotal;
 
+    // ── Panel derecho: actualizar precio del plan siempre ──────────────
+    document.getElementById('resumen-plan-precio').textContent = cop(planTotal) + '/mes';
+
     // ── Resumen del pedido (panel derecho) ─────────────────────────────
     let htmlPedido = '';
     if (!hayAddons) {
-        htmlPedido = '<p class="text-gray-400 italic text-xs">Agrega usuarios o recursos en el calculador para ver el resumen.</p>';
+        htmlPedido = '<p class="text-gray-400 italic text-xs">Agrega usuarios o recursos para ver el desglose.</p>';
         document.getElementById('btn-pago-container').classList.add('hidden');
     } else {
         htmlPedido = `<div class="space-y-2 text-xs">`;
@@ -415,9 +411,9 @@ function calcularTotal() {
         if (tec  > 0) htmlPedido += `<div class="flex justify-between"><span>👷 ${tec} Técnico${tec>1?'s':''} adicional${tec>1?'es':''}</span><span>${cop(costoTec)}</span></div>`;
         if (adm  > 0) htmlPedido += `<div class="flex justify-between"><span>🔧 ${adm} Administrador${adm>1?'es':''} adicional${adm>1?'es':''}</span><span>${cop(costoAdm)}</span></div>`;
         if (ger  > 0) htmlPedido += `<div class="flex justify-between"><span>👔 ${ger} Gerente${ger>1?'s':''} adicional${ger>1?'es':''}</span><span>${cop(costoGer)}</span></div>`;
-        if (bloq > 0) htmlPedido += `<div class="flex justify-between"><span>⚙️ ${bloq} bloque${bloq>1?'s':''} de +50 equipos (= +${bloq*50} eq.)</span><span>${cop(costoBloq)}</span></div>`;
-        if (stor > 0) htmlPedido += `<div class="flex justify-between"><span>💾 ${stor} bloque${stor>1?'s':''} de +5 GB (= +${stor*5} GB)</span><span>${cop(costoStor)}</span></div>`;
-        htmlPedido += `<div class="border-t pt-1 flex justify-between font-bold text-gray-700"><span>Total add-ons · IVA incluido</span><span class="text-green-700">${cop(totalAddons)}/mes</span></div>`;
+        if (bloq > 0) htmlPedido += `<div class="flex justify-between"><span>⚙️ ${bloq} bloque${bloq>1?'s':''} +${bloq*50} eq.</span><span>${cop(costoBloq)}</span></div>`;
+        if (stor > 0) htmlPedido += `<div class="flex justify-between"><span>💾 ${stor} bloque${stor>1?'s':''} +${stor*5} GB</span><span>${cop(costoStor)}</span></div>`;
+        htmlPedido += `<div class="border-t pt-1 mt-1 flex justify-between text-gray-500 text-xs"><span>Add-ons</span><span>${cop(totalAddons)}/mes</span></div>`;
         htmlPedido += `</div>`;
 
         // Sincronizar hidden inputs del formulario con los valores del calculador
@@ -431,6 +427,16 @@ function calcularTotal() {
     }
 
     document.getElementById('resumen-pedido').innerHTML = htmlPedido;
+
+    // ── Total general siempre visible (plan + add-ons) ─────────────────
+    let totalHtml = `<div class="mt-3 pt-3 border-t-2 border-green-200 flex justify-between items-center">
+        <span class="text-sm font-bold text-gray-800">Total mensual</span>
+        <span class="text-lg font-bold text-green-700">${cop(totalFinal)}/mes</span>
+    </div>
+    <p class="text-xs text-gray-400 text-right mt-0.5">IVA incluido · plan + add-ons</p>`;
+    // Insertar después de resumen-pedido (dentro del mismo contenedor)
+    let totalEl = document.getElementById('resumen-total-general');
+    if (totalEl) totalEl.innerHTML = totalHtml;
 }
 
 function switchPeriodo(periodo) {
