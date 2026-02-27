@@ -135,6 +135,8 @@ for _km, _ka, _nom, _eq, _mb, _usr, _pm, _pa in _TIER_BASE:
 for _plan in PLANES.values():
     _plan['iva'] = (_plan['precio_base'] * IVA).quantize(Decimal('1'))
     _plan['precio_total'] = _plan['precio_base'] + _plan['iva']
+    # Ahorro expresado en precio total (IVA incluido) para mostrar en template
+    _plan['ahorro_total'] = ((_plan['ahorro'] * (1 + IVA)).quantize(Decimal('1'))) if _plan.get('ahorro') else None
 
 # Lista ordenada de tiers para el template (mensual primero de cada par)
 TIERS_ORDENADOS = [

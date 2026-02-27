@@ -53,10 +53,10 @@
             <div class="mb-4 {% if m.tier == 'Estándar' %}mt-2{% endif %}">
                 <span class="text-xs font-semibold uppercase tracking-wide {% if m.tier == 'Estándar' %}text-blue-500{% else %}text-gray-400{% endif %}">{{ m.tier }}</span>
                 <div class="mt-1 flex items-end gap-1">
-                    <span class="text-3xl font-bold text-gray-900">{{ m.precio_base|cop }}</span>
+                    <span class="text-3xl font-bold text-gray-900">{{ m.precio_total|cop }}</span>
                     <span class="text-gray-400 text-xs pb-1">/mes</span>
                 </div>
-                <p class="text-xs text-gray-400 mt-0.5">+ IVA = <strong>{{ m.precio_total|cop }}</strong> total</p>
+                <p class="text-xs text-green-600 font-medium mt-0.5">IVA incluido</p>
             </div>
             <ul class="space-y-1.5 text-xs text-gray-600 mb-5 flex-1">
                 <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><strong>3 usuarios base</strong> incluidos</li>
@@ -82,11 +82,11 @@
             <div class="mb-4 {% if a.tier == 'Estándar' %}mt-2{% endif %}">
                 <span class="text-xs font-semibold uppercase tracking-wide {% if a.tier == 'Estándar' %}text-blue-500{% else %}text-gray-400{% endif %}">{{ a.tier }}</span>
                 <div class="mt-1 flex items-end gap-1">
-                    <span class="text-3xl font-bold text-gray-900">{{ a.precio_base|cop }}</span>
+                    <span class="text-3xl font-bold text-gray-900">{{ a.precio_total|cop }}</span>
                     <span class="text-gray-400 text-xs pb-1">/año</span>
                 </div>
-                <p class="text-xs text-gray-400 mt-0.5">+ IVA = <strong>{{ a.precio_total|cop }}</strong> total</p>
-                {% if a.ahorro %}<p class="text-xs text-green-600 font-semibold mt-0.5">Ahorro: {{ a.ahorro|cop }}</p>{% endif %}
+                <p class="text-xs text-green-600 font-medium mt-0.5">IVA incluido</p>
+                {% if a.ahorro_total %}<p class="text-xs text-green-700 font-bold mt-0.5">Ahorras {{ a.ahorro_total|cop }} vs mensual</p>{% endif %}
             </div>
             <ul class="space-y-1.5 text-xs text-gray-600 mb-5 flex-1">
                 <li class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><strong>3 usuarios base</strong> incluidos</li>
@@ -130,10 +130,10 @@
                     <label class="text-xs font-semibold text-gray-600 mb-1 block">Plan base que tendrías</label>
                     <select id="calc-plan" onchange="calcularTotal()"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="80000:50">Básico — $80.000/mes · 50 equipos</option>
-                        <option value="200000:200" selected>Estándar — $200.000/mes · 200 equipos</option>
-                        <option value="380000:500">Profesional — $380.000/mes · 500 equipos</option>
-                        <option value="650000:1000">Empresarial — $650.000/mes · 1.000 equipos</option>
+                        <option value="95200:50">Básico — $95.200/mes · 50 equipos</option>
+                        <option value="238000:200" selected>Estándar — $238.000/mes · 200 equipos</option>
+                        <option value="452200:500">Profesional — $452.200/mes · 500 equipos</option>
+                        <option value="773500:1000">Empresarial — $773.500/mes · 1.000 equipos</option>
                     </select>
                 </div>
 
@@ -146,7 +146,7 @@
                             <span class="text-lg w-6 text-center">👷</span>
                             <div class="flex-1">
                                 <div class="text-xs font-semibold text-gray-700">Técnico</div>
-                                <div class="text-xs text-gray-400">Registra equipos y actividades · $20.000/mes c/u</div>
+                                <div class="text-xs text-gray-400">Registra equipos y actividades · <strong>$23.800/mes</strong> c/u</div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <button onclick="cambiar('tecnico', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
@@ -161,7 +161,7 @@
                             <span class="text-lg w-6 text-center">🔧</span>
                             <div class="flex-1">
                                 <div class="text-xs font-semibold text-gray-700">Administrador</div>
-                                <div class="text-xs text-gray-400">Gestiona usuarios y configuración · $28.000/mes c/u</div>
+                                <div class="text-xs text-gray-400">Gestiona usuarios y configuración · <strong>$33.320/mes</strong> c/u</div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <button onclick="cambiar('admin', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
@@ -176,7 +176,7 @@
                             <span class="text-lg w-6 text-center">👔</span>
                             <div class="flex-1">
                                 <div class="text-xs font-semibold text-gray-700">Gerente</div>
-                                <div class="text-xs text-gray-400">Dashboard, reportes y panel de decisiones · $35.000/mes c/u</div>
+                                <div class="text-xs text-gray-400">Dashboard, reportes y panel de decisiones · <strong>$41.650/mes</strong> c/u</div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <button onclick="cambiar('gerente', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
@@ -197,7 +197,7 @@
                             <span class="text-lg w-6 text-center">⚙️</span>
                             <div class="flex-1">
                                 <div class="text-xs font-semibold text-gray-700">Bloques de +50 equipos</div>
-                                <div class="text-xs text-gray-400">$45.000/bloque/mes · sin límite de bloques</div>
+                                <div class="text-xs text-gray-400"><strong>$53.550/bloque/mes</strong> · sin límite de bloques</div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <button onclick="cambiar('equipos', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
@@ -212,7 +212,7 @@
                             <span class="text-lg w-6 text-center">💾</span>
                             <div class="flex-1">
                                 <div class="text-xs font-semibold text-gray-700">Bloques de +5 GB</div>
-                                <div class="text-xs text-gray-400">$20.000/bloque/mes</div>
+                                <div class="text-xs text-gray-400"><strong>$23.800/bloque/mes</strong></div>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 <button onclick="cambiar('storage', -1)" class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
@@ -278,7 +278,7 @@
                             </div>
                             <div class="mt-3 bg-white rounded-lg border border-amber-200 p-3 text-xs text-amber-900">
                                 <strong>Ejemplo:</strong> Compraste Plan Estándar Anual en enero. En julio necesitas 2 técnicos más y 100 equipos extra.<br>
-                                → Pagas $40.000 + $90.000 = <strong>$130.000/mes</strong> (+ IVA) desde julio.<br>
+                                → Pagas $47.600 + $107.100 = <strong>$154.700/mes</strong> (IVA incluido) desde julio.<br>
                                 → En enero del año siguiente, al renovar, lo incluyes todo en el precio anual.
                             </div>
                         </div>
@@ -292,7 +292,7 @@
     <!-- Tabla comparativa -->
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6">
         <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <h3 class="text-sm font-semibold text-gray-700">Comparación de planes base</h3>
+            <h3 class="text-sm font-semibold text-gray-700">Comparación de planes</h3>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-gray-600">
@@ -309,13 +309,14 @@
                     <tr><td class="px-4 py-3">Equipos base</td><td class="px-4 py-3 text-center">50</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-blue-700">200</td><td class="px-4 py-3 text-center">500</td><td class="px-4 py-3 text-center">1.000</td></tr>
                     <tr class="bg-gray-50"><td class="px-4 py-3">Usuarios base</td><td class="px-4 py-3 text-center font-semibold text-green-700">3</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-green-700">3</td><td class="px-4 py-3 text-center font-semibold text-green-700">3</td><td class="px-4 py-3 text-center font-semibold text-green-700">3</td></tr>
                     <tr><td class="px-4 py-3">Almacenamiento</td><td class="px-4 py-3 text-center">2 GB</td><td class="px-4 py-3 text-center bg-blue-50 text-blue-700">4 GB</td><td class="px-4 py-3 text-center">10 GB</td><td class="px-4 py-3 text-center">20 GB</td></tr>
-                    <tr class="bg-gray-50"><td class="px-4 py-3">Precio mensual</td><td class="px-4 py-3 text-center">$80.000</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-blue-700">$200.000</td><td class="px-4 py-3 text-center">$380.000</td><td class="px-4 py-3 text-center">$650.000</td></tr>
-                    <tr><td class="px-4 py-3">Precio anual</td><td class="px-4 py-3 text-center">$800.000</td><td class="px-4 py-3 text-center bg-blue-50 font-semibold text-blue-700">$2.000.000</td><td class="px-4 py-3 text-center">$3.800.000</td><td class="px-4 py-3 text-center">$6.500.000</td></tr>
+                    <tr class="bg-gray-50"><td class="px-4 py-3 font-medium">Precio mensual</td><td class="px-4 py-3 text-center font-semibold">$95.200</td><td class="px-4 py-3 text-center bg-blue-50 font-bold text-blue-700">$238.000</td><td class="px-4 py-3 text-center font-semibold">$452.200</td><td class="px-4 py-3 text-center font-semibold">$773.500</td></tr>
+                    <tr><td class="px-4 py-3 font-medium">Precio anual</td><td class="px-4 py-3 text-center font-semibold">$952.000</td><td class="px-4 py-3 text-center bg-blue-50 font-bold text-blue-700">$2.380.000</td><td class="px-4 py-3 text-center font-semibold">$4.522.000</td><td class="px-4 py-3 text-center font-semibold">$7.735.000</td></tr>
+                    <tr class="bg-gray-50"><td class="px-4 py-3 text-green-700 font-medium">Ahorras al año</td><td class="px-4 py-3 text-center text-green-700 font-semibold">$190.400</td><td class="px-4 py-3 text-center bg-blue-50 text-green-700 font-bold">$476.000</td><td class="px-4 py-3 text-center text-green-700 font-semibold">$904.400</td><td class="px-4 py-3 text-center text-green-700 font-semibold">$1.547.000</td></tr>
                 </tbody>
             </table>
         </div>
         <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
-            Todos los valores en COP antes de IVA (19%). Add-ons: Técnico $20.000 · Admin $28.000 · Gerente $35.000 · +50 equipos $45.000 · +5 GB $20.000 (por mes c/u).
+            Precios en COP · IVA incluido · Add-ons: Técnico $23.800 · Admin $33.320 · Gerente $41.650 · +50 equipos $53.550 · +5 GB $23.800 (por mes c/u, IVA incluido).
         </div>
     </div>
 
@@ -350,9 +351,7 @@
 </div>
 
 <script>
-const IVA = 0.19;
-const WA_NUMBER = '573247990534';
-
+// Precios "todo incluido" (IVA ya incluido en cada valor)
 function cop(n) {
     return '$' + Math.round(n).toLocaleString('es-CO');
 }
@@ -364,9 +363,9 @@ function cambiar(campo, delta) {
 }
 
 function calcularTotal() {
-    const planSel   = document.getElementById('calc-plan').value.split(':');
-    const planPrecio = parseInt(planSel[0]);
-    const planEq    = parseInt(planSel[1]);
+    const planSel    = document.getElementById('calc-plan').value.split(':');
+    const planTotal  = parseInt(planSel[0]);   // ya incluye IVA
+    const planEq     = parseInt(planSel[1]);
     const planNombre = document.getElementById('calc-plan').options[document.getElementById('calc-plan').selectedIndex].text.split(' — ')[0];
 
     const tec  = Math.max(0, parseInt(document.getElementById('calc-tecnico').value)  || 0);
@@ -375,21 +374,21 @@ function calcularTotal() {
     const bloq = Math.max(0, parseInt(document.getElementById('calc-equipos').value)  || 0);
     const stor = Math.max(0, parseInt(document.getElementById('calc-storage').value)  || 0);
 
-    const costoTec  = tec  * 20000;
-    const costoAdm  = adm  * 28000;
-    const costoGer  = ger  * 35000;
-    const costoBloq = bloq * 45000;
-    const costoStor = stor * 20000;
+    // Precios con IVA incluido
+    const costoTec  = tec  * 23800;
+    const costoAdm  = adm  * 33320;
+    const costoGer  = ger  * 41650;
+    const costoBloq = bloq * 53550;
+    const costoStor = stor * 23800;
 
-    const subtotalAddons = costoTec + costoAdm + costoGer + costoBloq + costoStor;
-    const subtotalTotal  = planPrecio + subtotalAddons;
-    const totalConIva    = subtotalTotal * (1 + IVA);
+    const totalAddons = costoTec + costoAdm + costoGer + costoBloq + costoStor;
+    const totalFinal  = planTotal + totalAddons;
 
-    const hayAddons = subtotalAddons > 0;
+    const hayAddons = totalAddons > 0;
 
     // ── Resumen del total ──────────────────────────────────────────────
     let htmlTotal = `<div class="flex justify-between text-gray-500">
-        <span>Plan ${planNombre}</span><span>${cop(planPrecio)}/mes</span></div>`;
+        <span>Plan ${planNombre}</span><span>${cop(planTotal)}/mes</span></div>`;
 
     if (costoTec  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>👷 ${tec} técnico${tec>1?'s':''}</span><span>${cop(costoTec)}/mes</span></div>`;
     if (costoAdm  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>🔧 ${adm} admin${adm>1?'s':''}</span><span>${cop(costoAdm)}/mes</span></div>`;
@@ -397,8 +396,7 @@ function calcularTotal() {
     if (costoBloq > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>⚙️ ${bloq} bloque${bloq>1?'s':''} +${bloq*50} eq.</span><span>${cop(costoBloq)}/mes</span></div>`;
     if (costoStor > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>💾 ${stor} bloque${stor>1?'s':''} +${stor*5} GB</span><span>${cop(costoStor)}/mes</span></div>`;
 
-    htmlTotal += `<div class="border-t border-gray-200 mt-2 pt-2 flex justify-between text-xs text-gray-500"><span>Subtotal antes IVA</span><span>${cop(subtotalTotal)}/mes</span></div>`;
-    htmlTotal += `<div class="flex justify-between font-bold text-gray-800 text-sm"><span>Total con IVA (19%)</span><span class="text-green-700">${cop(totalConIva)}/mes</span></div>`;
+    htmlTotal += `<div class="border-t border-gray-200 mt-2 pt-2 flex justify-between font-bold text-gray-800 text-sm"><span>Total mensual · IVA incluido</span><span class="text-green-700">${cop(totalFinal)}/mes</span></div>`;
 
     if (bloq > 0) {
         htmlTotal += `<div class="mt-2 text-xs text-blue-600 bg-blue-50 rounded p-2">ℹ️ Equipos totales: ${planEq} (plan) + ${bloq*50} (add-ons) = <strong>${planEq + bloq*50}</strong></div>`;
@@ -419,7 +417,7 @@ function calcularTotal() {
         if (ger  > 0) htmlPedido += `<div class="flex justify-between"><span>👔 ${ger} Gerente${ger>1?'s':''} adicional${ger>1?'es':''}</span><span>${cop(costoGer)}</span></div>`;
         if (bloq > 0) htmlPedido += `<div class="flex justify-between"><span>⚙️ ${bloq} bloque${bloq>1?'s':''} de +50 equipos (= +${bloq*50} eq.)</span><span>${cop(costoBloq)}</span></div>`;
         if (stor > 0) htmlPedido += `<div class="flex justify-between"><span>💾 ${stor} bloque${stor>1?'s':''} de +5 GB (= +${stor*5} GB)</span><span>${cop(costoStor)}</span></div>`;
-        htmlPedido += `<div class="border-t pt-1 flex justify-between font-bold text-gray-700"><span>Total add-ons (+ IVA)</span><span class="text-green-700">${cop(subtotalAddons * (1+IVA))}/mes</span></div>`;
+        htmlPedido += `<div class="border-t pt-1 flex justify-between font-bold text-gray-700"><span>Total add-ons · IVA incluido</span><span class="text-green-700">${cop(totalAddons)}/mes</span></div>`;
         htmlPedido += `</div>`;
 
         // Sincronizar hidden inputs del formulario con los valores del calculador
