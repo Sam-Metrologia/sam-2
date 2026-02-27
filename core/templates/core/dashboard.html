@@ -834,8 +834,8 @@
                     </h3>
                     <div class="mt-2 text-sm text-gray-700">
                         <p>
-                            Plan gratuito: <strong>{{ plan_info.limite_equipos_actual }} equipos</strong> y
-                            <strong>{{ plan_info.limite_almacenamiento_actual|filesizeformat }}</strong> de almacenamiento.
+                            Plan gratuito: <strong>{% if plan_info.limite_equipos_actual %}{{ plan_info.limite_equipos_actual }}{% else %}Ilimitados{% endif %} equipos</strong> y
+                            <strong>{{ plan_info.limite_almacenamiento_display }}</strong> de almacenamiento.
                         </p>
                         <p class="mt-2 font-semibold">
                             <a href="{% url 'core:planes' %}"

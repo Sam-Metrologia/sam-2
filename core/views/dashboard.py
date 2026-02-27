@@ -985,10 +985,19 @@ def _get_plan_info(user, selected_company_id):
 
     # Convertir almacenamiento a formato legible
     almacenamiento_mb = empresa.get_limite_almacenamiento()
-    if almacenamiento_mb >= 1000:
+    limite_equipos = empresa.get_limite_equipos()
+
+    # acceso_manual_activo devuelve float('inf') — proteger filesizeformat y otros filtros
+    if almacenamiento_mb == float('inf'):
+        almacenamiento_mb = None
+        almacenamiento_display = 'Ilimitado'
+    elif almacenamiento_mb >= 1000:
         almacenamiento_display = f"{almacenamiento_mb / 1000:.1f} GB".replace(".0", "")
     else:
         almacenamiento_display = f"{almacenamiento_mb} MB"
+
+    if limite_equipos == float('inf'):
+        limite_equipos = None
 
     # Detectar si es un trial expirado (diferente de plan gratuito real)
     es_trial_expirado = (
@@ -998,7 +1007,7 @@ def _get_plan_info(user, selected_company_id):
 
     plan_info = {
         'plan_actual': plan_actual,
-        'limite_equipos_actual': empresa.get_limite_equipos(),
+        'limite_equipos_actual': limite_equipos,
         'limite_almacenamiento_actual': almacenamiento_mb,
         'limite_almacenamiento_display': almacenamiento_display,
         'dias_restantes': dias_restantes if dias_restantes != float('inf') else 'inf',
