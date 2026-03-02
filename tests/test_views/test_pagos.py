@@ -240,13 +240,13 @@ class TestIniciarPago:
 
     @patch('core.views.pagos.settings')
     def test_sin_wompi_key_muestra_error(self, mock_settings, authenticated_client):
-        """Sin WOMPI_PUBLIC_KEY configurado, muestra error y redirige a planes."""
+        """Sin WOMPI_PUBLIC_KEY configurado, muestra error y redirige a pago_no_disponible."""
         mock_settings.WOMPI_PUBLIC_KEY = ''
         mock_settings.WOMPI_INTEGRITY_SECRET = ''
         mock_settings.WOMPI_SANDBOX = True
         response = authenticated_client.post(_url('iniciar_pago'), {'plan': 'MENSUAL'})
         assert response.status_code == 302
-        assert response['Location'].endswith(_url('planes'))
+        assert response['Location'].endswith(_url('pago_no_disponible'))
 
     @patch('core.views.pagos.settings')
     def test_crea_transaccion_pendiente(self, mock_settings, authenticated_client, sample_empresa):
