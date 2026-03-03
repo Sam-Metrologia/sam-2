@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from core.models import CustomUser, TransaccionPago
+from core.models import CustomUser, TransaccionPago, LinkPago
 
 logger = logging.getLogger(__name__)
 
@@ -857,17 +857,35 @@ def wompi_webhook(request):
         if transaccion.plan_seleccionado == 'ADDON':
             # ── Activar add-ons ────────────────────────────────────────
             if transaccion.datos_addon:
+                # Filtrar la clave interna _link_pago_token antes de activar
+                datos_addon_limpios = {
+                    k: v for k, v in transaccion.datos_addon.items()
+                    if not k.startswith('_')
+                }
                 try:
-                    transaccion.empresa.activar_addons(transaccion.datos_addon)
+                    if datos_addon_limpios:
+                        transaccion.empresa.activar_addons(datos_addon_limpios)
                     logger.info(
                         f"Add-ons activados para empresa {transaccion.empresa.nombre}: "
-                        f"{transaccion.datos_addon} | Ref: {referencia}"
+                        f"{datos_addon_limpios} | Ref: {referencia}"
                     )
                     _enviar_email_confirmacion_addon(transaccion)
                 except Exception as e:
                     logger.error(
                         f"Error activando add-ons para empresa {transaccion.empresa.nombre}: {e}"
                     )
+                # Marcar LinkPago como pagado si aplica
+                link_token = transaccion.datos_addon.get('_link_pago_token')
+                if link_token:
+                    try:
+                        lp = LinkPago.objects.get(token=link_token)
+                        lp.estado = 'pagado'
+                        lp.save(update_fields=['estado'])
+                        # Actualizar addons_recurrentes
+                        transaccion.empresa.addons_recurrentes = datos_addon_limpios
+                        transaccion.empresa.save(update_fields=['addons_recurrentes'])
+                    except LinkPago.DoesNotExist:
+                        pass
             else:
                 logger.warning(f"Transacción addon {referencia} aprobada pero sin datos_addon")
         else:
@@ -899,6 +917,23 @@ def wompi_webhook(request):
                         _guardar_payment_source(transaccion, card_token)
                     except Exception as e:
                         logger.error(f"Error guardando payment source: {e}")
+
+                # Si viene de un LinkPago, aplicar add-ons y marcarlo como pagado
+                link_token = (transaccion.datos_addon or {}).get('_link_pago_token')
+                if link_token:
+                    try:
+                        link_obj = LinkPago.objects.get(token=link_token)
+                        addons_link = {k: v for k, v in (link_obj.addons or {}).items()}
+                        if addons_link:
+                            transaccion.empresa.activar_addons(addons_link)
+                        # Actualizar addons_recurrentes con los nuevos valores
+                        transaccion.empresa.addons_recurrentes = addons_link
+                        transaccion.empresa.save(update_fields=['addons_recurrentes'])
+                        link_obj.estado = 'pagado'
+                        link_obj.save(update_fields=['estado'])
+                        logger.info(f"LinkPago {link_token[:8]} marcado como pagado para {transaccion.empresa.nombre}")
+                    except LinkPago.DoesNotExist:
+                        logger.warning(f"LinkPago no encontrado: {link_token[:8]}")
     else:
         logger.info(
             f"Transacción {referencia} → estado: {nuevo_estado} "
@@ -951,6 +986,337 @@ border-radius:8px;cursor:pointer;width:100%;}}
 <a href="/core/planes/" style="color:#6b7280;">&larr; Volver a planes reales</a>
 </body></html>"""
     return HttpResponse(html)
+
+
+# ============================================================================
+# Add-ons Recurrentes — Validación y Link de Pago
+# ============================================================================
+
+def _calcular_monto_link(plan_key, addons_dict):
+    """Calcula el monto total (IVA incluido) de un plan + add-ons."""
+    monto = Decimal('0')
+    if plan_key and plan_key in PLANES:
+        monto += PLANES[plan_key]['precio_total']
+    monto += Decimal(str(addons_dict.get('tecnicos', 0) or 0)) * ADDONS['usuario_tecnico']['precio_total']
+    monto += Decimal(str(addons_dict.get('admins', 0) or 0)) * ADDONS['usuario_admin']['precio_total']
+    monto += Decimal(str(addons_dict.get('gerentes', 0) or 0)) * ADDONS['usuario_gerente']['precio_total']
+    monto += Decimal(str(addons_dict.get('bloques_equipos', 0) or 0)) * ADDONS['equipos_50']['precio_total']
+    monto += Decimal(str(addons_dict.get('bloques_storage', 0) or 0)) * ADDONS['storage_5gb']['precio_total']
+    return monto
+
+
+def _validar_reduccion_addons(empresa, plan_key, nuevos_addons):
+    """
+    Verifica que reducir add-ons no deje la empresa por debajo de su uso actual.
+    Retorna lista de mensajes de error (vacía = todo ok).
+    """
+    errores = []
+
+    # ── Límite de equipos ──────────────────────────────────────────────────
+    equipos_base = PLANES[plan_key]['equipos'] if plan_key and plan_key in PLANES else (
+        empresa.limite_equipos_empresa
+        - (empresa.addons_recurrentes.get('bloques_equipos', 0) * 50)
+    )
+    nuevo_limite_eq = equipos_base + int(nuevos_addons.get('bloques_equipos', 0)) * 50
+    equipos_activos = empresa.equipo_set.filter(is_deleted=False).exclude(estado='Dado de Baja').count()
+    if equipos_activos > nuevo_limite_eq:
+        errores.append(
+            f"Tienes {equipos_activos} equipos activos. El nuevo límite sería {nuevo_limite_eq}. "
+            f"Debes tener máximo {nuevo_limite_eq} equipos activos para reducir."
+        )
+
+    # ── Límite de almacenamiento ───────────────────────────────────────────
+    if plan_key and plan_key in PLANES:
+        storage_base_mb = PLANES[plan_key]['almacenamiento_mb']
+    else:
+        storage_base_mb = (
+            empresa.limite_almacenamiento_mb
+            - (empresa.addons_recurrentes.get('bloques_storage', 0) * 5 * 1024)
+        )
+    nuevo_limite_mb = storage_base_mb + int(nuevos_addons.get('bloques_storage', 0)) * 5 * 1024
+    try:
+        storage_usado_mb = empresa.get_total_storage_used_mb()
+    except Exception:
+        storage_usado_mb = 0
+    if storage_usado_mb > nuevo_limite_mb:
+        usado_gb = round(storage_usado_mb / 1024, 1)
+        nuevo_gb = round(nuevo_limite_mb / 1024, 1)
+        errores.append(
+            f"Estás usando {usado_gb} GB de almacenamiento. El nuevo límite sería {nuevo_gb} GB. "
+            f"Libera archivos antes de reducir el almacenamiento."
+        )
+
+    # ── Usuarios activos (si se reducen) ──────────────────────────────────
+    addons_ant = empresa.addons_recurrentes or {}
+    usuarios_extra_ant = (
+        int(addons_ant.get('tecnicos', 0)) +
+        int(addons_ant.get('admins', 0)) +
+        int(addons_ant.get('gerentes', 0))
+    )
+    usuarios_extra_nuevo = (
+        int(nuevos_addons.get('tecnicos', 0)) +
+        int(nuevos_addons.get('admins', 0)) +
+        int(nuevos_addons.get('gerentes', 0))
+    )
+    if usuarios_extra_nuevo < usuarios_extra_ant:
+        # Solo advertencia — los usuarios se inactivan al vencer, no inmediatamente
+        errores.append(
+            '__advertencia_usuarios__'  # señal especial: mostrar aviso, no bloquear
+        )
+
+    return errores
+
+
+def _enviar_link_pago_contabilidad(link):
+    """Envía el link de pago a los correos de facturación de la empresa."""
+    from django.conf import settings as _settings
+    destinatarios = _get_correos_empresa(link.empresa)
+    if not destinatarios:
+        logger.warning(f"Sin correos de facturación para enviar link de pago: {link.empresa.nombre}")
+        return
+
+    app_url = getattr(_settings, 'APP_URL', 'https://app.sammetrologia.com')
+    link_url = f"{app_url}/core/pagar/{link.token}/"
+
+    plan_nombre = PLANES[link.plan_seleccionado]['nombre'] if link.plan_seleccionado and link.plan_seleccionado in PLANES else None
+    addons = link.addons or {}
+    monto_fmt = f"${link.monto_total:,.0f} COP"
+
+    filas_html = ''
+    filas_txt = ''
+    if plan_nombre:
+        filas_html += f"<tr><td>Plan</td><td><strong>{plan_nombre}</strong></td></tr>"
+        filas_txt += f"  Plan: {plan_nombre}\n"
+    if addons.get('tecnicos'):
+        filas_html += f"<tr><td>Técnicos adicionales</td><td>+{addons['tecnicos']}</td></tr>"
+        filas_txt += f"  Técnicos adicionales: +{addons['tecnicos']}\n"
+    if addons.get('admins'):
+        filas_html += f"<tr><td>Admins adicionales</td><td>+{addons['admins']}</td></tr>"
+        filas_txt += f"  Admins adicionales: +{addons['admins']}\n"
+    if addons.get('gerentes'):
+        filas_html += f"<tr><td>Gerentes adicionales</td><td>+{addons['gerentes']}</td></tr>"
+        filas_txt += f"  Gerentes adicionales: +{addons['gerentes']}\n"
+    if addons.get('bloques_equipos'):
+        filas_html += f"<tr><td>Equipos adicionales</td><td>+{addons['bloques_equipos'] * 50} ({addons['bloques_equipos']} bloque(s))</td></tr>"
+        filas_txt += f"  Equipos adicionales: +{addons['bloques_equipos'] * 50}\n"
+    if addons.get('bloques_storage'):
+        filas_html += f"<tr><td>Almacenamiento adicional</td><td>+{addons['bloques_storage'] * 5} GB</td></tr>"
+        filas_txt += f"  Almacenamiento adicional: +{addons['bloques_storage'] * 5} GB\n"
+
+    expira = link.fecha_expiracion.strftime('%d/%m/%Y')
+    asunto = f"Pago pendiente SAM — {monto_fmt}"
+    html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
+<body><div class="wrap"><div class="card">
+  <div class="hdr"><h1>SAM METROLOGÍA</h1><p>Link de pago para {link.empresa.nombre}</p></div>
+  <div class="body">
+    <span class="badge" style="background:#dbeafe;color:#1e40af;">Pago pendiente</span>
+    <p>Hay un pago pendiente para la cuenta <strong>{link.empresa.nombre}</strong>:</p>
+    <table class="det">
+      {filas_html}
+      <tr><td>Total (IVA incluido)</td><td><strong>{monto_fmt}</strong></td></tr>
+      <tr><td>Link válido hasta</td><td>{expira}</td></tr>
+    </table>
+    <a href="{link_url}" class="btn">Pagar ahora — {monto_fmt} →</a>
+    <p style="font-size:12px;color:#888;">No necesitas iniciar sesión para pagar. El link expira el {expira}.</p>
+    <div class="sig-name">Equipo Comercial SAM Metrología</div>
+    <div class="sig-info">
+      SAM Metrología S.A.S<br>
+      <a href="https://sammetrologia.com">sammetrologia.com</a><br>
+      WhatsApp: +57 324 799 0534 &nbsp;|&nbsp; comercial@sammetrologia.com
+    </div>
+  </div>
+  <div class="ftr"><strong>SAM Metrología | Gestión Metrológica 4.0</strong></div>
+</div></div></body></html>"""
+
+    texto = (
+        f"Pago pendiente para {link.empresa.nombre}:\n\n"
+        f"{filas_txt}"
+        f"  Total: {monto_fmt}\n\n"
+        f"Pagar en: {link_url}\n"
+        f"(Link válido hasta el {expira})\n\n"
+        f"SAM Metrología — comercial@sammetrologia.com"
+    )
+    ok = _send_html_email(asunto, texto, html, destinatarios)
+    if ok:
+        logger.info(f"Link de pago enviado a {destinatarios} para {link.empresa.nombre} — {link.token[:8]}")
+        link.correo_notificado = True
+        link.save(update_fields=['correo_notificado'])
+
+
+@login_required
+@require_POST
+def generar_link_pago(request):
+    """
+    Admin/Gerente configura plan + add-ons y genera un link de pago único.
+    Envía el link por email a correos_facturacion y lo devuelve en JSON.
+    """
+    empresa = request.user.empresa
+    if not empresa:
+        return JsonResponse({'ok': False, 'errores': ['Sin empresa asociada.']})
+    if not (request.user.is_administrador() or request.user.is_gerente()):
+        return JsonResponse({'ok': False, 'errores': ['Sin permisos.']}, status=403)
+
+    def _int(key):
+        try:
+            return max(0, int(request.POST.get(key, 0) or 0))
+        except (ValueError, TypeError):
+            return 0
+
+    plan_key = request.POST.get('plan', '').upper() or None
+    if plan_key and plan_key not in PLANES:
+        plan_key = None
+
+    nuevos_addons = {
+        'tecnicos':        _int('tecnicos'),
+        'admins':          _int('admins'),
+        'gerentes':        _int('gerentes'),
+        'bloques_equipos': _int('bloques_equipos'),
+        'bloques_storage': _int('bloques_storage'),
+    }
+
+    # Validar reducción de límites
+    errores_raw = _validar_reduccion_addons(empresa, plan_key, nuevos_addons)
+    tiene_advertencia_usuarios = '__advertencia_usuarios__' in errores_raw
+    errores = [e for e in errores_raw if e != '__advertencia_usuarios__']
+    if errores:
+        return JsonResponse({'ok': False, 'errores': errores})
+
+    monto_total = _calcular_monto_link(plan_key, nuevos_addons)
+    if monto_total <= 0:
+        return JsonResponse({'ok': False, 'errores': ['Selecciona al menos un plan o add-on.']})
+
+    from django.utils import timezone
+    from datetime import timedelta
+
+    token = uuid.uuid4().hex
+    link = LinkPago.objects.create(
+        empresa=empresa,
+        token=token,
+        plan_seleccionado=plan_key,
+        addons=nuevos_addons,
+        monto_total=monto_total,
+        fecha_expiracion=timezone.now() + timedelta(days=7),
+        creado_por=request.user,
+    )
+
+    # Guardar add-ons recurrentes inmediatamente
+    empresa.addons_recurrentes = nuevos_addons
+    empresa.save(update_fields=['addons_recurrentes'])
+
+    # Enviar email a contabilidad
+    try:
+        _enviar_link_pago_contabilidad(link)
+    except Exception as e:
+        logger.error(f"Error enviando link de pago por email: {e}")
+
+    app_url = getattr(settings, 'APP_URL', 'https://app.sammetrologia.com')
+    link_url = f"{app_url}/core/pagar/{token}/"
+
+    return JsonResponse({
+        'ok': True,
+        'link': link_url,
+        'token': token,
+        'monto': str(monto_total),
+        'advertencia_usuarios': tiene_advertencia_usuarios,
+    })
+
+
+def pagar_link(request, token):
+    """
+    Página pública de pago. No requiere login.
+    Contabilidad entra aquí desde el email y paga directamente con Wompi.
+    """
+    try:
+        link = LinkPago.objects.select_related('empresa').get(token=token)
+    except LinkPago.DoesNotExist:
+        return render(request, 'core/pagar_link.html', {'error': 'Link no encontrado o inválido.'})
+
+    if not link.esta_vigente():
+        return render(request, 'core/pagar_link.html', {
+            'error': 'Este link ya fue usado o expiró.',
+            'empresa': link.empresa,
+        })
+
+    if request.method == 'POST':
+        # Crear transacción y redirigir a Wompi
+        public_key = getattr(settings, 'WOMPI_PUBLIC_KEY', '')
+        integrity_secret = getattr(settings, 'WOMPI_INTEGRITY_SECRET', '')
+        if not public_key:
+            return render(request, 'core/pagar_link.html', {
+                'error': 'Pasarela de pagos no disponible. Contacta soporte.',
+                'link': link,
+            })
+
+        referencia = f"SAM-LINK-{link.empresa.id}-{uuid.uuid4().hex[:10].upper()}"
+        monto_centavos = int(link.monto_total * 100)
+
+        transaccion = TransaccionPago.objects.create(
+            empresa=link.empresa,
+            referencia_pago=referencia,
+            estado='pendiente',
+            monto=link.monto_total,
+            moneda='COP',
+            plan_seleccionado=link.plan_seleccionado or 'ADDON',
+            datos_addon={
+                **(link.addons or {}),
+                '_link_pago_token': link.token,
+            },
+            ip_cliente=_get_ip(request),
+        )
+        link.transaccion = transaccion
+        link.save(update_fields=['transaccion'])
+
+        redirect_url = quote(
+            request.build_absolute_uri(f"/core/pagar/{token}/confirmado/"),
+            safe=''
+        )
+        firma = _calcular_firma_integridad(referencia, monto_centavos, 'COP', integrity_secret)
+        checkout_url = (
+            f"{_get_wompi_checkout_url()}"
+            f"?public-key={public_key}"
+            f"&currency=COP"
+            f"&amount-in-cents={monto_centavos}"
+            f"&reference={referencia}"
+            f"&redirect-url={redirect_url}"
+            f"&signature:integrity={firma}"
+        )
+        return redirect(checkout_url)
+
+    # GET — mostrar resumen de pago
+    plan_nombre = PLANES[link.plan_seleccionado]['nombre'] if link.plan_seleccionado and link.plan_seleccionado in PLANES else None
+    addons = link.addons or {}
+    items = []
+    if plan_nombre:
+        items.append({'nombre': plan_nombre, 'monto': PLANES[link.plan_seleccionado]['precio_total']})
+    if addons.get('tecnicos'):
+        items.append({'nombre': f"+{addons['tecnicos']} Técnico(s) adicional(es)", 'monto': addons['tecnicos'] * ADDONS['usuario_tecnico']['precio_total']})
+    if addons.get('admins'):
+        items.append({'nombre': f"+{addons['admins']} Admin(s) adicional(es)", 'monto': addons['admins'] * ADDONS['usuario_admin']['precio_total']})
+    if addons.get('gerentes'):
+        items.append({'nombre': f"+{addons['gerentes']} Gerente(s) adicional(es)", 'monto': addons['gerentes'] * ADDONS['usuario_gerente']['precio_total']})
+    if addons.get('bloques_equipos'):
+        items.append({'nombre': f"+{addons['bloques_equipos'] * 50} equipos ({addons['bloques_equipos']} bloque(s))", 'monto': addons['bloques_equipos'] * ADDONS['equipos_50']['precio_total']})
+    if addons.get('bloques_storage'):
+        items.append({'nombre': f"+{addons['bloques_storage'] * 5} GB almacenamiento", 'monto': addons['bloques_storage'] * ADDONS['storage_5gb']['precio_total']})
+
+    return render(request, 'core/pagar_link.html', {
+        'link': link,
+        'items': items,
+        'empresa': link.empresa,
+    })
+
+
+def pagar_link_confirmado(request, token):
+    """Página de confirmación después de que Wompi redirige de vuelta."""
+    try:
+        link = LinkPago.objects.select_related('empresa', 'transaccion').get(token=token)
+    except LinkPago.DoesNotExist:
+        return render(request, 'core/pagar_link.html', {'error': 'Link no encontrado.'})
+    return render(request, 'core/pagar_link.html', {
+        'link': link,
+        'confirmacion': True,
+        'empresa': link.empresa,
+    })
 
 
 # ============================================================================

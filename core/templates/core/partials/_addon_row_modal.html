@@ -1,0 +1,16 @@
+<div class="flex items-center gap-3">
+  <span class="text-base w-5 text-center flex-shrink-0">{{ emoji }}</span>
+  <div class="flex-1 min-w-0">
+    <div class="text-xs font-semibold text-gray-700">{{ label }}</div>
+    <div class="text-xs text-gray-400">{{ precio }}</div>
+  </div>
+  <div class="flex items-center gap-1.5 flex-shrink-0">
+    <button type="button" onclick="cambiarModal('{{ id|cut:'m-' }}', -1)"
+      class="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs flex items-center justify-center">−</button>
+    <input type="number" id="{{ id }}" value="{{ default|default:0 }}" min="0" max="99"
+      oninput="recalcularModal()"
+      class="w-10 text-center border border-gray-200 rounded-lg text-xs py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    <button type="button" onclick="cambiarModal('{{ id|cut:'m-' }}', 1)"
+      class="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs flex items-center justify-center">+</button>
+  </div>
+</div>

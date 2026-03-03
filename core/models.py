@@ -480,6 +480,11 @@ class Empresa(models.Model):
         max_length=80, null=True, blank=True,
         verbose_name="Wompi Payment Source ID"
     )
+    addons_recurrentes = models.JSONField(
+        default=dict, blank=True,
+        verbose_name="Add-ons Recurrentes",
+        help_text="Add-ons que se cobran automáticamente en cada renovación: {tecnicos, admins, gerentes, bloques_equipos, bloques_storage}"
+    )
 
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
@@ -891,6 +896,10 @@ class Empresa(models.Model):
         self.configurar_usuarios_plan_pendiente = True
 
         self.save()
+
+        # Restaurar add-ons recurrentes encima del plan base
+        if self.addons_recurrentes:
+            self.activar_addons(self.addons_recurrentes)
 
         # Log de la transición
         import logging
@@ -4396,3 +4405,52 @@ class TransaccionPago(models.Model):
 
     def esta_aprobada(self):
         return self.estado == 'aprobado'
+
+
+class LinkPago(models.Model):
+    """
+    Link de pago único que permite a contabilidad pagar sin iniciar sesión.
+    Generado por admin/gerente desde el modal de renovación del dashboard.
+    Expira en 7 días si no se usa.
+    """
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('pagado', 'Pagado'),
+        ('expirado', 'Expirado'),
+    ]
+
+    empresa = models.ForeignKey(
+        'Empresa', on_delete=models.CASCADE,
+        related_name='links_pago', verbose_name="Empresa"
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    plan_seleccionado = models.CharField(max_length=40, blank=True, null=True,
+        verbose_name="Plan seleccionado")
+    addons = models.JSONField(default=dict, blank=True,
+        verbose_name="Add-ons",
+        help_text="{tecnicos, admins, gerentes, bloques_equipos, bloques_storage}")
+    monto_total = models.DecimalField(max_digits=12, decimal_places=2,
+        verbose_name="Monto total (IVA incl.)")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_expiracion = models.DateTimeField()
+    transaccion = models.OneToOneField(
+        'TransaccionPago', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='link_pago'
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='links_pago_creados'
+    )
+
+    class Meta:
+        verbose_name = "Link de Pago"
+        verbose_name_plural = "Links de Pago"
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return f"LinkPago {self.token[:8]}… — {self.empresa.nombre}"
+
+    def esta_vigente(self):
+        from django.utils import timezone
+        return self.estado == 'pendiente' and self.fecha_expiracion > timezone.now()

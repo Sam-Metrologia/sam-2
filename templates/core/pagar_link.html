@@ -1,0 +1,117 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pago SAM Metrología</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+
+<div class="w-full max-w-md">
+
+  <!-- Logo / Marca -->
+  <div class="text-center mb-6">
+    <div class="inline-flex items-center gap-2 text-blue-900 font-bold text-xl">
+      <svg class="w-8 h-8 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+      </svg>
+      SAM Metrología
+    </div>
+    {% if empresa %}
+    <p class="text-sm text-gray-500 mt-1">{{ empresa.nombre }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Tarjeta principal -->
+  <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+
+    {% if error %}
+    <!-- Error -->
+    <div class="p-8 text-center">
+      <div class="text-4xl mb-3">⚠️</div>
+      <h2 class="text-lg font-bold text-gray-800 mb-2">Link no disponible</h2>
+      <p class="text-sm text-gray-500 mb-6">{{ error }}</p>
+      <a href="https://app.sammetrologia.com/core/planes/"
+         class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition">
+        Ver planes →
+      </a>
+    </div>
+
+    {% elif confirmacion %}
+    <!-- Confirmación post-pago -->
+    {% if link.estado == 'pagado' %}
+    <div class="bg-green-50 border-b border-green-100 px-6 py-4 text-center">
+      <div class="text-3xl mb-1">✅</div>
+      <h2 class="text-base font-bold text-green-800">¡Pago aprobado!</h2>
+      <p class="text-xs text-green-600 mt-0.5">Tu plan ya está activo en SAM Metrología.</p>
+    </div>
+    {% else %}
+    <div class="bg-yellow-50 border-b border-yellow-100 px-6 py-4 text-center">
+      <div class="text-3xl mb-1">⏳</div>
+      <h2 class="text-base font-bold text-yellow-800">Pago en proceso</h2>
+      <p class="text-xs text-yellow-600 mt-0.5">Recibirás un email de confirmación en minutos.</p>
+    </div>
+    {% endif %}
+    <div class="px-6 py-5 text-center">
+      <p class="text-sm text-gray-500">¿Tienes preguntas?
+        <a href="https://wa.me/573247990534" class="text-green-600 font-medium">WhatsApp +57 324 799 0534</a>
+      </p>
+    </div>
+
+    {% else %}
+    <!-- Resumen de pago + botón -->
+    <div class="bg-blue-900 px-6 py-5 text-white">
+      <h1 class="text-base font-bold">Resumen de pago</h1>
+      <p class="text-xs text-blue-200 mt-0.5">Procesado de forma segura por Wompi (Bancolombia)</p>
+    </div>
+
+    <div class="px-6 py-5">
+      <!-- Desglose -->
+      <div class="space-y-2 mb-4">
+        {% for item in items %}
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-600">{{ item.nombre }}</span>
+          <span class="font-medium text-gray-800">{{ item.monto|cop }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Total -->
+      <div class="border-t border-gray-100 pt-3 flex justify-between items-center mb-5">
+        <span class="font-bold text-gray-800">Total (IVA incluido)</span>
+        <span class="text-lg font-bold text-green-700">{{ link.monto_total|cop }} COP</span>
+      </div>
+
+      <!-- Botón pagar -->
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit"
+          class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+          </svg>
+          Pagar {{ link.monto_total|cop }} COP con PSE / Tarjeta
+        </button>
+      </form>
+
+      <!-- Expiración -->
+      <p class="text-xs text-gray-400 text-center mt-3">
+        Link válido hasta el {{ link.fecha_expiracion|date:"d/m/Y" }} · SAM no almacena datos de tarjeta.
+      </p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <p class="text-center text-xs text-gray-400 mt-4">
+    <a href="https://sammetrologia.com" class="hover:text-gray-600">sammetrologia.com</a>
+    &nbsp;·&nbsp; WhatsApp: +57 324 799 0534
+  </p>
+</div>
+
+</body>
+</html>

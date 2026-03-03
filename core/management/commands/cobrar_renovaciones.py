@@ -190,9 +190,31 @@ def _enviar_email_cobro_fallido(empresa):
     logger.warning(f"Email cobro fallido enviado a {empresa.nombre} → {destinatarios}")
 
 
+def _calcular_monto_renovacion(empresa, ultima_tx):
+    """
+    Calcula el monto de renovación = plan base + add-ons recurrentes.
+    Retorna (monto_total, addons_dict).
+    """
+    from core.views.pagos import PLANES, ADDONS
+    from decimal import Decimal
+
+    plan_key = ultima_tx.plan_seleccionado
+    monto = PLANES[plan_key]['precio_total'] if plan_key and plan_key in PLANES else ultima_tx.monto
+
+    addons = empresa.addons_recurrentes or {}
+    monto += Decimal(str(addons.get('tecnicos', 0) or 0)) * ADDONS['usuario_tecnico']['precio_total']
+    monto += Decimal(str(addons.get('admins', 0) or 0)) * ADDONS['usuario_admin']['precio_total']
+    monto += Decimal(str(addons.get('gerentes', 0) or 0)) * ADDONS['usuario_gerente']['precio_total']
+    monto += Decimal(str(addons.get('bloques_equipos', 0) or 0)) * ADDONS['equipos_50']['precio_total']
+    monto += Decimal(str(addons.get('bloques_storage', 0) or 0)) * ADDONS['storage_5gb']['precio_total']
+
+    return monto, addons
+
+
 def _cobrar_automatico(empresa, ultima_tx):
     """
     Realiza el cobro automático usando el payment_source_id guardado en Wompi.
+    Incluye plan base + add-ons recurrentes en el monto.
     Retorna True si Wompi aceptó la transacción, False en caso contrario.
     El webhook de Wompi activará el plan al recibir APPROVED.
     """
@@ -203,8 +225,9 @@ def _cobrar_automatico(empresa, ultima_tx):
 
     from core.models import TransaccionPago
 
+    monto_total, addons_recurrentes = _calcular_monto_renovacion(empresa, ultima_tx)
     referencia = f"SAM-AUTO-{empresa.id}-{uuid.uuid4().hex[:10].upper()}"
-    monto_centavos = int(ultima_tx.monto * 100)
+    monto_centavos = int(monto_total * 100)
     correos = _get_correos_empresa(empresa)
     correo = correos[0] if correos else empresa.email or ''
 
@@ -225,9 +248,10 @@ def _cobrar_automatico(empresa, ultima_tx):
         empresa=empresa,
         referencia_pago=referencia,
         estado='pendiente',
-        monto=ultima_tx.monto,
+        monto=monto_total,
         moneda='COP',
         plan_seleccionado=ultima_tx.plan_seleccionado,
+        datos_addon=addons_recurrentes if addons_recurrentes else None,
         ip_cliente='auto',
     )
 

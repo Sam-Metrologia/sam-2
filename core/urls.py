@@ -32,6 +32,9 @@ urlpatterns = [
     path('pagos/no-disponible/', views.pago_no_disponible, name='pago_no_disponible'),
     path('pagos/webhook/', views.wompi_webhook, name='wompi_webhook'),
     path('pagos/renovacion-automatica/', views.toggle_renovacion_automatica, name='toggle_renovacion_automatica'),
+    path('pagos/generar-link/', views.generar_link_pago, name='generar_link_pago'),
+    path('pagar/<str:token>/', views.pagar_link, name='pagar_link'),
+    path('pagar/<str:token>/confirmado/', views.pagar_link_confirmado, name='pagar_link_confirmado'),
     path('test-pago/', views.test_pago_view, name='test_pago_view'),  # TEMPORAL
 
     # Autenticación

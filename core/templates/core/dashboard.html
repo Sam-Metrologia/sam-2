@@ -781,6 +781,15 @@
                     </div>
                 </div>
                 <div class="flex-shrink-0 flex flex-col items-end gap-2">
+                    {% if request.user.is_administrador or request.user.is_gerente %}
+                    <button onclick="document.getElementById('modal-renovacion').classList.remove('hidden')"
+                       class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors duration-150">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Renovar / Agregar
+                    </button>
+                    {% else %}
                     <a href="{% url 'core:planes' %}"
                        class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors duration-150">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -788,6 +797,7 @@
                         </svg>
                         Agregar capacidad
                     </a>
+                    {% endif %}
                     {% if request.user.is_administrador or request.user.is_gerente %}
                     <form method="post" action="{% url 'core:toggle_renovacion_automatica' %}">
                         {% csrf_token %}
@@ -2681,4 +2691,283 @@
     });
 </script>
 {% endif %}
+
+{% if request.user.is_administrador or request.user.is_gerente %}
+<!-- ================================================================ -->
+<!-- MODAL DE RENOVACIÓN / AGREGAR CAPACIDAD                          -->
+<!-- ================================================================ -->
+<div id="modal-renovacion" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between px-6 py-4 border-b">
+      <h2 class="font-bold text-gray-800 text-base" id="modal-titulo">Renovar / Agregar capacidad</h2>
+      <button onclick="cerrarModal()" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- PASO 1: Resumen -->
+    <div id="modal-paso1">
+      <div class="px-6 py-5">
+        <p class="text-xs text-gray-500 mb-3">Plan actual + add-ons recurrentes configurados:</p>
+        <div id="resumen-actual" class="space-y-1.5 text-sm mb-4"></div>
+        <div class="border-t pt-3 flex justify-between font-bold text-gray-800">
+          <span>Total mensual (IVA incl.)</span>
+          <span id="total-actual" class="text-green-700"></span>
+        </div>
+      </div>
+      <div class="px-6 pb-5 flex flex-col gap-2">
+        <button onclick="irAPaso2()"
+          class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl text-sm transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+          </svg>
+          Generar link de pago
+        </button>
+        <button onclick="irAPaso2()" class="w-full text-xs text-gray-500 hover:text-gray-700 py-1">
+          Modificar antes de pagar ↓
+        </button>
+      </div>
+    </div>
+
+    <!-- PASO 2: Editar -->
+    <div id="modal-paso2" class="hidden">
+      <div class="px-6 py-5 space-y-4">
+
+        <!-- Plan -->
+        <div>
+          <label class="text-xs font-semibold text-gray-600 mb-1 block">¿Cambiar de plan?</label>
+          <select id="m-plan" onchange="recalcularModal()"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="">Mantener plan actual (sin cambio)</option>
+            <option value="BASICO_MENSUAL">Básico Mensual — $95.200</option>
+            <option value="MENSUAL">Estándar Mensual — $238.000</option>
+            <option value="PRO_MENSUAL">Profesional Mensual — $452.200</option>
+            <option value="ENTERPRISE_MENSUAL">Empresarial Mensual — $773.500</option>
+            <option value="BASICO_ANUAL">Básico Anual — $952.000</option>
+            <option value="ANUAL">Estándar Anual — $2.380.000</option>
+            <option value="PRO_ANUAL">Profesional Anual — $4.522.000</option>
+            <option value="ENTERPRISE_ANUAL">Empresarial Anual — $7.735.000</option>
+          </select>
+        </div>
+
+        <!-- Usuarios adicionales -->
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Usuarios adicionales</p>
+          <div class="space-y-2">
+            {% include "core/partials/_addon_row_modal.html" with id="m-tecnico" emoji="👷" label="Técnico" precio="$23.800/mes" default=empresa.addons_recurrentes.tecnicos|default:0 only %}
+            {% include "core/partials/_addon_row_modal.html" with id="m-admin" emoji="🔧" label="Administrador" precio="$33.320/mes" default=empresa.addons_recurrentes.admins|default:0 only %}
+            {% include "core/partials/_addon_row_modal.html" with id="m-gerente" emoji="👔" label="Gerente" precio="$41.650/mes" default=empresa.addons_recurrentes.gerentes|default:0 only %}
+          </div>
+        </div>
+
+        <!-- Recursos -->
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Recursos adicionales</p>
+          <div class="space-y-2">
+            {% include "core/partials/_addon_row_modal.html" with id="m-equipos" emoji="⚙️" label="+50 Equipos" precio="$53.550/bloque" default=empresa.addons_recurrentes.bloques_equipos|default:0 only %}
+            {% include "core/partials/_addon_row_modal.html" with id="m-storage" emoji="💾" label="+5 GB Storage" precio="$23.800/bloque" default=empresa.addons_recurrentes.bloques_storage|default:0 only %}
+          </div>
+        </div>
+
+        <!-- Advertencia usuarios -->
+        <div id="advertencia-usuarios" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+          ⚠️ Al reducir usuarios, los que sobrepasen el nuevo límite quedarán inactivos al vencer el período actual.
+        </div>
+
+        <!-- Error validación -->
+        <div id="error-validacion" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700"></div>
+
+        <!-- Total -->
+        <div class="border-t pt-3 flex justify-between font-bold text-gray-800">
+          <span>Total mensual (IVA incl.)</span>
+          <span id="total-modal" class="text-green-700">$0</span>
+        </div>
+      </div>
+
+      <div class="px-6 pb-5 flex flex-col gap-2">
+        <button onclick="confirmarYGenerar()"
+          class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl text-sm transition">
+          Confirmar y generar link de pago
+        </button>
+        <button onclick="volverAPaso1()" class="text-xs text-gray-500 hover:text-gray-700 py-1 text-center">
+          ← Volver
+        </button>
+      </div>
+    </div>
+
+    <!-- PASO 3: Link generado -->
+    <div id="modal-paso3" class="hidden px-6 py-8 text-center">
+      <div class="text-4xl mb-3">🔗</div>
+      <h3 class="font-bold text-gray-800 mb-1">Link de pago generado</h3>
+      <p class="text-xs text-gray-500 mb-4">Se envió por email a contabilidad. También puedes copiar y compartir el link:</p>
+      <div class="flex gap-2 mb-4">
+        <input id="link-generado" type="text" readonly
+          class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 bg-gray-50 focus:outline-none">
+        <button onclick="copiarLink()" class="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 transition">
+          Copiar
+        </button>
+      </div>
+      <p id="msg-advertencia-usuarios" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
+        ⚠️ Los usuarios reducidos quedarán inactivos al vencer el período actual.
+      </p>
+      <button onclick="cerrarModal()" class="text-xs text-gray-500 hover:text-gray-700">Cerrar</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  // Precios con IVA incluido
+  const PRECIOS_PLAN = {
+    'BASICO_MENSUAL': 95200, 'MENSUAL': 238000, 'PRO_MENSUAL': 452200, 'ENTERPRISE_MENSUAL': 773500,
+    'BASICO_ANUAL': 952000, 'ANUAL': 2380000, 'PRO_ANUAL': 4522000, 'ENTERPRISE_ANUAL': 7735000,
+  };
+  const PRECIOS_ADDON = { tecnico: 23800, admin: 33320, gerente: 41650, equipos: 53550, storage: 23800 };
+
+  // Límites actuales para validación (del servidor)
+  const EQUIPOS_ACTIVOS = {{ empresa.equipo_set.filter_activos|default:0 }};
+  const LIMITE_EQ_BASE = {{ empresa.limite_equipos_empresa|default:50 }};
+  const ADDONS_RECURRENTES = {
+    tecnicos:        {{ empresa.addons_recurrentes.tecnicos|default:0 }},
+    admins:          {{ empresa.addons_recurrentes.admins|default:0 }},
+    gerentes:        {{ empresa.addons_recurrentes.gerentes|default:0 }},
+    bloques_equipos: {{ empresa.addons_recurrentes.bloques_equipos|default:0 }},
+    bloques_storage: {{ empresa.addons_recurrentes.bloques_storage|default:0 }},
+  };
+
+  function cop(n) { return '$' + Math.round(n).toLocaleString('es-CO'); }
+
+  function getVal(id) { return Math.max(0, parseInt(document.getElementById(id)?.value) || 0); }
+
+  function recalcularModal() {
+    const plan = document.getElementById('m-plan').value;
+    const tec  = getVal('m-tecnico');
+    const adm  = getVal('m-admin');
+    const ger  = getVal('m-gerente');
+    const eq   = getVal('m-equipos');
+    const st   = getVal('m-storage');
+
+    const total = (PRECIOS_PLAN[plan] || 0)
+      + tec * PRECIOS_ADDON.tecnico + adm * PRECIOS_ADDON.admin + ger * PRECIOS_ADDON.gerente
+      + eq * PRECIOS_ADDON.equipos + st * PRECIOS_ADDON.storage;
+
+    document.getElementById('total-modal').textContent = cop(total);
+
+    // Validación de equipos en tiempo real
+    const limiteEqBase = PRECIOS_PLAN[plan] ? (PRECIOS_PLAN[plan] === 95200 ? 50 : PRECIOS_PLAN[plan] === 238000 ? 200 : PRECIOS_PLAN[plan] === 452200 ? 500 : 1000) : LIMITE_EQ_BASE;
+    const nuevoLimiteEq = limiteEqBase + eq * 50;
+    const errEl = document.getElementById('error-validacion');
+    if (EQUIPOS_ACTIVOS > nuevoLimiteEq) {
+      errEl.textContent = `Tienes ${EQUIPOS_ACTIVOS} equipos activos. El nuevo límite sería ${nuevoLimiteEq}. Agrega más bloques o no reduzcas.`;
+      errEl.classList.remove('hidden');
+    } else {
+      errEl.classList.add('hidden');
+    }
+
+    // Advertencia usuarios si se reduce
+    const usuariosNuevos = tec + adm + ger;
+    const usuariosAnt = ADDONS_RECURRENTES.tecnicos + ADDONS_RECURRENTES.admins + ADDONS_RECURRENTES.gerentes;
+    document.getElementById('advertencia-usuarios').classList.toggle('hidden', usuariosNuevos >= usuariosAnt);
+  }
+
+  function cambiarModal(campo, delta) {
+    const el = document.getElementById('m-' + campo);
+    if (el) { el.value = Math.max(0, (parseInt(el.value) || 0) + delta); recalcularModal(); }
+  }
+  window.cambiarModal = cambiarModal;
+
+  // Construir resumen paso 1
+  function construirResumen() {
+    const planNombre = '{{ plan_info.plan_actual|default:"" }}' === 'paid' ? 'Plan actual' : 'Plan';
+    let html = '';
+    let total = 0;
+    // Add-ons recurrentes
+    if (ADDONS_RECURRENTES.tecnicos)        { const c = ADDONS_RECURRENTES.tecnicos * PRECIOS_ADDON.tecnico;  total += c; html += `<div class="flex justify-between text-gray-600"><span>👷 ${ADDONS_RECURRENTES.tecnicos} Técnico(s)</span><span>${cop(c)}/mes</span></div>`; }
+    if (ADDONS_RECURRENTES.admins)          { const c = ADDONS_RECURRENTES.admins * PRECIOS_ADDON.admin;    total += c; html += `<div class="flex justify-between text-gray-600"><span>🔧 ${ADDONS_RECURRENTES.admins} Admin(s)</span><span>${cop(c)}/mes</span></div>`; }
+    if (ADDONS_RECURRENTES.gerentes)        { const c = ADDONS_RECURRENTES.gerentes * PRECIOS_ADDON.gerente;  total += c; html += `<div class="flex justify-between text-gray-600"><span>👔 ${ADDONS_RECURRENTES.gerentes} Gerente(s)</span><span>${cop(c)}/mes</span></div>`; }
+    if (ADDONS_RECURRENTES.bloques_equipos) { const c = ADDONS_RECURRENTES.bloques_equipos * PRECIOS_ADDON.equipos; total += c; html += `<div class="flex justify-between text-gray-600"><span>⚙️ +${ADDONS_RECURRENTES.bloques_equipos*50} equipos</span><span>${cop(c)}/mes</span></div>`; }
+    if (ADDONS_RECURRENTES.bloques_storage) { const c = ADDONS_RECURRENTES.bloques_storage * PRECIOS_ADDON.storage; total += c; html += `<div class="flex justify-between text-gray-600"><span>💾 +${ADDONS_RECURRENTES.bloques_storage*5} GB</span><span>${cop(c)}/mes</span></div>`; }
+    if (!html) html = '<p class="text-gray-400 italic text-xs">Sin add-ons recurrentes configurados.</p>';
+    document.getElementById('resumen-actual').innerHTML = html;
+    document.getElementById('total-actual').textContent = cop(total) + '/mes (add-ons)';
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal-renovacion').classList.add('hidden');
+    volverAPaso1();
+  }
+  window.cerrarModal = cerrarModal;
+
+  function irAPaso2() {
+    document.getElementById('modal-paso1').classList.add('hidden');
+    document.getElementById('modal-paso2').classList.remove('hidden');
+    document.getElementById('modal-titulo').textContent = 'Personaliza tu renovación';
+    recalcularModal();
+  }
+  window.irAPaso2 = irAPaso2;
+
+  function volverAPaso1() {
+    document.getElementById('modal-paso1').classList.remove('hidden');
+    document.getElementById('modal-paso2').classList.add('hidden');
+    document.getElementById('modal-paso3').classList.add('hidden');
+    document.getElementById('modal-titulo').textContent = 'Renovar / Agregar capacidad';
+  }
+  window.volverAPaso1 = volverAPaso1;
+
+  function confirmarYGenerar() {
+    const errEl = document.getElementById('error-validacion');
+    if (!errEl.classList.contains('hidden')) return;
+
+    const plan = document.getElementById('m-plan').value;
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}');
+    if (plan) fd.append('plan', plan);
+    fd.append('tecnicos',        getVal('m-tecnico'));
+    fd.append('admins',          getVal('m-admin'));
+    fd.append('gerentes',        getVal('m-gerente'));
+    fd.append('bloques_equipos', getVal('m-equipos'));
+    fd.append('bloques_storage', getVal('m-storage'));
+
+    fetch('{% url "core:generar_link_pago" %}', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          document.getElementById('modal-paso2').classList.add('hidden');
+          document.getElementById('modal-paso3').classList.remove('hidden');
+          document.getElementById('modal-titulo').textContent = 'Link generado';
+          document.getElementById('link-generado').value = data.link;
+          if (data.advertencia_usuarios) {
+            document.getElementById('msg-advertencia-usuarios').classList.remove('hidden');
+          }
+        } else {
+          errEl.textContent = data.errores.join(' · ');
+          errEl.classList.remove('hidden');
+        }
+      })
+      .catch(() => {
+        errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+        errEl.classList.remove('hidden');
+      });
+  }
+  window.confirmarYGenerar = confirmarYGenerar;
+
+  function copiarLink() {
+    const input = document.getElementById('link-generado');
+    input.select();
+    navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
+  }
+  window.copiarLink = copiarLink;
+
+  document.addEventListener('DOMContentLoaded', construirResumen);
+  // Cerrar con Escape
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+})();
+</script>
+{% endif %}
+
 {% endblock content %}
