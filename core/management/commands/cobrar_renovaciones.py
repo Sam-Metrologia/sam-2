@@ -69,20 +69,71 @@ def _send_html_email(asunto, texto_plano, html, destinatarios):
         return False
 
 
-def _url_pago(empresa):
-    """Construye URL de la página de planes para la empresa."""
-    app_url = getattr(settings, 'APP_URL', 'https://app.sammetrologia.com')
-    return f"{app_url}/core/planes/"
+def _crear_link_pago_automatico(empresa, ultima_tx=None):
+    """
+    Crea un LinkPago automático con el monto correcto (plan + add-ons recurrentes)
+    y devuelve la URL directa para incluir en emails a contabilidad.
+    Si ya existe un LinkPago pendiente vigente para esta empresa, lo reutiliza.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    from core.models import LinkPago
+
+    # Reutilizar link vigente si existe (evitar spam de links)
+    link_existente = (
+        LinkPago.objects
+        .filter(empresa=empresa, estado='pendiente', fecha_expiracion__gt=timezone.now())
+        .order_by('-fecha_creacion')
+        .first()
+    )
+    if link_existente:
+        app_url = getattr(settings, 'APP_URL', 'https://app.sammetrologia.com')
+        return f"{app_url}/core/pagar/{link_existente.token}/"
+
+    # Calcular monto
+    if ultima_tx:
+        monto_total, addons = _calcular_monto_renovacion(empresa, ultima_tx)
+    else:
+        # Sin transacción previa — usar add-ons recurrentes sobre plan desconocido
+        from core.views.pagos import ADDONS
+        addons = empresa.addons_recurrentes or {}
+        monto_total = (
+            Decimal(str(addons.get('tecnicos', 0) or 0)) * ADDONS['usuario_tecnico']['precio_total'] +
+            Decimal(str(addons.get('admins', 0) or 0)) * ADDONS['usuario_admin']['precio_total'] +
+            Decimal(str(addons.get('gerentes', 0) or 0)) * ADDONS['usuario_gerente']['precio_total'] +
+            Decimal(str(addons.get('bloques_equipos', 0) or 0)) * ADDONS['equipos_50']['precio_total'] +
+            Decimal(str(addons.get('bloques_storage', 0) or 0)) * ADDONS['storage_5gb']['precio_total']
+        )
+
+    plan_key = ultima_tx.plan_seleccionado if ultima_tx else None
+    token = uuid.uuid4().hex
+
+    try:
+        LinkPago.objects.create(
+            empresa=empresa,
+            token=token,
+            plan_seleccionado=plan_key,
+            addons=addons if addons else {},
+            monto_total=monto_total if monto_total > 0 else Decimal('0'),
+            fecha_expiracion=timezone.now() + timedelta(days=8),  # 7 días + 1 de margen
+        )
+        app_url = getattr(settings, 'APP_URL', 'https://app.sammetrologia.com')
+        logger.info(f"LinkPago automático creado para {empresa.nombre}: token={token[:8]}")
+        return f"{app_url}/core/pagar/{token}/"
+    except Exception as e:
+        logger.error(f"Error creando LinkPago automático para {empresa.nombre}: {e}")
+        app_url = getattr(settings, 'APP_URL', 'https://app.sammetrologia.com')
+        return f"{app_url}/core/planes/"
 
 
-def _enviar_aviso_vencimiento(empresa):
+def _enviar_aviso_vencimiento(empresa, ultima_tx=None):
     """Envía aviso único: el plan vence en 7 días."""
     destinatarios = _get_correos_empresa(empresa)
     if not destinatarios:
         logger.warning(f"Sin correos para aviso vencimiento: {empresa.nombre}")
         return
 
-    link = _url_pago(empresa)
+    link = _crear_link_pago_automatico(empresa, ultima_tx)
     asunto = "Tu plan SAM vence en 7 días"
     html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
 <body><div class="wrap"><div class="card">
@@ -120,7 +171,7 @@ def _enviar_recordatorio_pago(empresa, ultima_tx):
     if not destinatarios:
         return
 
-    link = _url_pago(empresa)
+    link = _crear_link_pago_automatico(empresa, ultima_tx)
     asunto = "Tu plan SAM venció hoy — renueva aquí"
     html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
 <body><div class="wrap"><div class="card">
@@ -151,13 +202,13 @@ def _enviar_recordatorio_pago(empresa, ultima_tx):
     logger.info(f"Recordatorio pago (vencido hoy) enviado a {empresa.nombre} → {destinatarios}")
 
 
-def _enviar_email_cobro_fallido(empresa):
+def _enviar_email_cobro_fallido(empresa, ultima_tx=None):
     """Notifica que el cobro automático falló y pide renovar manualmente."""
     destinatarios = _get_correos_empresa(empresa)
     if not destinatarios:
         return
 
-    link = _url_pago(empresa)
+    link = _crear_link_pago_automatico(empresa, ultima_tx)
     asunto = "No pudimos renovar tu plan SAM automáticamente"
     html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
 <body><div class="wrap"><div class="card">
@@ -278,14 +329,14 @@ def _cobrar_automatico(empresa, ultima_tx):
             )
             transaccion.estado = 'rechazado'
             transaccion.save(update_fields=['estado'])
-            _enviar_email_cobro_fallido(empresa)
+            _enviar_email_cobro_fallido(empresa, ultima_tx)
             return False
 
     except Exception as e:
         logger.error(f"Error en cobro automático para {empresa.nombre}: {e}")
         transaccion.estado = 'error'
         transaccion.save(update_fields=['estado'])
-        _enviar_email_cobro_fallido(empresa)
+        _enviar_email_cobro_fallido(empresa, ultima_tx)
         return False
 
 
@@ -315,7 +366,14 @@ class Command(BaseCommand):
 
             # Aviso único 7 días antes
             if dias == 7:
-                _enviar_aviso_vencimiento(empresa)
+                ultima_tx_aviso = (
+                    TransaccionPago.objects
+                    .filter(empresa=empresa, estado='aprobado')
+                    .exclude(plan_seleccionado='ADDON')
+                    .order_by('-fecha_creacion')
+                    .first()
+                )
+                _enviar_aviso_vencimiento(empresa, ultima_tx_aviso)
                 avisos += 1
 
             # Acción en el día del vencimiento
