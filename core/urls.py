@@ -31,6 +31,7 @@ urlpatterns = [
     path('pagos/resultado/', views.pago_resultado, name='pago_resultado'),
     path('pagos/no-disponible/', views.pago_no_disponible, name='pago_no_disponible'),
     path('pagos/webhook/', views.wompi_webhook, name='wompi_webhook'),
+    path('pagos/renovacion-automatica/', views.toggle_renovacion_automatica, name='toggle_renovacion_automatica'),
     path('test-pago/', views.test_pago_view, name='test_pago_view'),  # TEMPORAL
 
     # Autenticación
@@ -252,6 +253,7 @@ urlpatterns = [
     path('api/scheduled/notifications/weekly-overdue/', views.trigger_weekly_overdue, name='trigger_weekly_overdue'),
     path('api/scheduled/check-trials/', views.trigger_check_trials, name='trigger_check_trials'),
     path('api/scheduled/cleanup/notifications/', views.trigger_cleanup_notifications, name='trigger_cleanup_notifications'),
+    path('api/scheduled/renovaciones/', views.trigger_cobrar_renovaciones, name='trigger_cobrar_renovaciones'),
 
     # ==============================================================================
     # SISTEMA DE PRÉSTAMOS DE EQUIPOS

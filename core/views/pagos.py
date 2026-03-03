@@ -9,11 +9,13 @@ import uuid
 from decimal import Decimal
 from urllib.parse import quote
 
+import requests as _requests
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.mail import EmailMultiAlternatives
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -286,6 +288,12 @@ def iniciar_pago(request):
 
     plan = PLANES[plan_key]
     empresa = request.user.empresa
+
+    # Activar renovación automática si el cliente marcó el checkbox
+    if request.POST.get('renovacion_automatica'):
+        if not empresa.renovacion_automatica:
+            empresa.renovacion_automatica = True
+            empresa.save(update_fields=['renovacion_automatica'])
     integrity_secret = getattr(settings, 'WOMPI_INTEGRITY_SECRET', '')
     public_key = getattr(settings, 'WOMPI_PUBLIC_KEY', '')
 
@@ -725,6 +733,42 @@ def _enviar_email_confirmacion_addon(transaccion):
 
 
 # ============================================================================
+# Renovación Automática — Payment Source
+# ============================================================================
+
+def _guardar_payment_source(transaccion, card_token):
+    """Crea un payment_source en Wompi y guarda el ID en la empresa."""
+    private_key = getattr(settings, 'WOMPI_PRIVATE_KEY', '')
+    if not private_key:
+        logger.warning("WOMPI_PRIVATE_KEY no configurado; no se puede crear payment_source.")
+        return
+    correos = _get_correos_empresa(transaccion.empresa)
+    correo = correos[0] if correos else ''
+    try:
+        r = _requests.post(
+            f"{_get_wompi_base_url()}/payment_sources",
+            json={'type': 'CARD', 'token': card_token, 'customer_email': correo},
+            headers={'Authorization': f'Bearer {private_key}'},
+            timeout=10,
+        )
+        if r.status_code in (200, 201):
+            ps_id = r.json().get('data', {}).get('id')
+            if ps_id:
+                transaccion.empresa.wompi_payment_source_id = str(ps_id)
+                transaccion.empresa.save(update_fields=['wompi_payment_source_id'])
+                logger.info(
+                    f"Payment source guardado para {transaccion.empresa.nombre}: {ps_id}"
+                )
+        else:
+            logger.warning(
+                f"Wompi /payment_sources devolvió {r.status_code} para "
+                f"{transaccion.empresa.nombre}: {r.text[:200]}"
+            )
+    except Exception as e:
+        logger.error(f"Error creando payment_source en Wompi: {e}")
+
+
+# ============================================================================
 # C6 — Webhook de Confirmación (Wompi → SAM)
 # ============================================================================
 
@@ -845,6 +889,16 @@ def wompi_webhook(request):
                     logger.error(
                         f"Error activando plan para empresa {transaccion.empresa.nombre}: {e}"
                     )
+
+                # Guardar token de tarjeta si el cliente activó renovación automática
+                card_token = transaction_data.get('payment_method', {}).get('token')
+                if (card_token
+                        and transaccion.empresa.renovacion_automatica
+                        and not transaccion.empresa.wompi_payment_source_id):
+                    try:
+                        _guardar_payment_source(transaccion, card_token)
+                    except Exception as e:
+                        logger.error(f"Error guardando payment source: {e}")
     else:
         logger.info(
             f"Transacción {referencia} → estado: {nuevo_estado} "
@@ -897,3 +951,23 @@ border-radius:8px;cursor:pointer;width:100%;}}
 <a href="/core/planes/" style="color:#6b7280;">&larr; Volver a planes reales</a>
 </body></html>"""
     return HttpResponse(html)
+
+
+# ============================================================================
+# Toggle Renovación Automática
+# ============================================================================
+
+@login_required
+@require_POST
+def toggle_renovacion_automatica(request):
+    """Activa o desactiva la renovación automática para la empresa del usuario."""
+    empresa = request.user.empresa
+    if not empresa:
+        return HttpResponseForbidden()
+    if not (request.user.is_administrador() or request.user.is_gerente()):
+        return HttpResponseForbidden()
+    empresa.renovacion_automatica = not empresa.renovacion_automatica
+    empresa.save(update_fields=['renovacion_automatica'])
+    estado = 'activada' if empresa.renovacion_automatica else 'desactivada'
+    messages.success(request, f"Renovación automática {estado}.")
+    return redirect(request.POST.get('next', 'core:planes'))

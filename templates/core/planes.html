@@ -68,6 +68,12 @@
             <form method="post" action="{% url 'core:iniciar_pago' %}">
                 {% csrf_token %}
                 <input type="hidden" name="plan" value="{{ m.key }}">
+                <div class="flex items-center gap-2 mt-3 mb-2 text-xs text-gray-500">
+                    <input type="checkbox" name="renovacion_automatica" id="ra_{{ m.key }}"
+                           class="rounded border-gray-300"
+                           {% if empresa.renovacion_automatica %}checked{% endif %}>
+                    <label for="ra_{{ m.key }}">Renovar automáticamente (solo tarjeta)</label>
+                </div>
                 <button type="submit" class="w-full {% if m.tier == 'Estándar' %}bg-blue-600 hover:bg-blue-700{% else %}bg-gray-700 hover:bg-gray-800{% endif %} text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition duration-200">Activar Plan</button>
             </form>
         </div>
@@ -99,6 +105,12 @@
             <form method="post" action="{% url 'core:iniciar_pago' %}">
                 {% csrf_token %}
                 <input type="hidden" name="plan" value="{{ a.key }}">
+                <div class="flex items-center gap-2 mt-3 mb-2 text-xs text-gray-500">
+                    <input type="checkbox" name="renovacion_automatica" id="ra_{{ a.key }}"
+                           class="rounded border-gray-300"
+                           {% if empresa.renovacion_automatica %}checked{% endif %}>
+                    <label for="ra_{{ a.key }}">Renovar automáticamente (solo tarjeta)</label>
+                </div>
                 <button type="submit" class="w-full {% if a.tier == 'Estándar' %}bg-blue-600 hover:bg-blue-700{% else %}bg-gray-700 hover:bg-gray-800{% endif %} text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition duration-200">Activar Plan</button>
             </form>
         </div>

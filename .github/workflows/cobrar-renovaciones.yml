@@ -1,0 +1,16 @@
+name: Cobrar Renovaciones
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # 7:00 AM Colombia (UTC-5)
+  workflow_dispatch:
+
+jobs:
+  cobrar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar cobros y recordatorios de vencimiento
+        run: |
+          curl -f -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/renovaciones/"

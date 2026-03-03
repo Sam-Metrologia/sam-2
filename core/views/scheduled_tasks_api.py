@@ -243,6 +243,39 @@ def trigger_cleanup_notifications(request):
 
 
 @csrf_exempt
+@require_http_methods(["POST", "GET"])
+def trigger_cobrar_renovaciones(request):
+    """
+    Ejecuta cobros automáticos y recordatorios de vencimiento.
+    Endpoint: /core/api/scheduled/renovaciones/
+    """
+    if not verify_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    try:
+        logger.info('💳 GitHub Actions: Ejecutando cobrar_renovaciones')
+
+        from django.core.management import call_command
+        from io import StringIO
+
+        output = StringIO()
+        call_command('cobrar_renovaciones', stdout=output)
+
+        result = output.getvalue()
+        logger.info(f'✅ cobrar_renovaciones completado: {result}')
+
+        return JsonResponse({
+            'success': True,
+            'task': 'cobrar_renovaciones',
+            'output': result,
+        })
+
+    except Exception as e:
+        logger.error(f'❌ Error en cobrar_renovaciones: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
 @require_http_methods(["GET"])
 def health_check(request):
     """

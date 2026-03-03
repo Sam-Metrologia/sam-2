@@ -46,7 +46,8 @@ from .scheduled_tasks_api import (
     trigger_cleanup_zips,
     trigger_weekly_overdue,
     trigger_check_trials,
-    trigger_cleanup_notifications
+    trigger_cleanup_notifications,
+    trigger_cobrar_renovaciones,
 )
 
 # Confirmación Metrológica e Intervalos de Calibración
@@ -97,7 +98,10 @@ from .registro import solicitar_trial, trial_exitoso
 from .onboarding import onboarding_progreso, onboarding_completar_tour
 
 # Módulo C: Pagos con Wompi
-from .pagos import planes, iniciar_pago, iniciar_addon_pago, pago_resultado, pago_no_disponible, wompi_webhook, test_pago_view
+from .pagos import (
+    planes, iniciar_pago, iniciar_addon_pago, pago_resultado, pago_no_disponible,
+    wompi_webhook, test_pago_view, toggle_renovacion_automatica,
+)
 
 # Setup de usuarios post-compra
 from .admin import configurar_usuarios_setup

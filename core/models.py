@@ -475,6 +475,12 @@ class Empresa(models.Model):
         help_text="Usuarios comprados pero no creados: {tecnicos: N, admins: N, gerentes: N}"
     )
 
+    renovacion_automatica = models.BooleanField(default=False, verbose_name="Renovación Automática")
+    wompi_payment_source_id = models.CharField(
+        max_length=80, null=True, blank=True,
+        verbose_name="Wompi Payment Source ID"
+    )
+
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
     estado_suscripcion = models.CharField(
         max_length=50,
