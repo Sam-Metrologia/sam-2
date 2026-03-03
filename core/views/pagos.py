@@ -204,11 +204,12 @@ def _validar_firma_webhook(payload_bytes, signature_props, checksum_recibido, ev
     try:
         payload = json.loads(payload_bytes)
 
+        # Wompi envía las props como "transaction.id" (relativas a payload['data'])
+        data_context = payload.get('data', payload)
         valores = []
         for prop in signature_props:
-            # prop puede ser "data.transaction.id", "transaction.id", etc.
             partes = prop.split('.')
-            valor = payload
+            valor = data_context
             for parte in partes:
                 valor = valor.get(parte, '') if isinstance(valor, dict) else ''
             valores.append(str(valor))
