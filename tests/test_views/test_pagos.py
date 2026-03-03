@@ -73,17 +73,19 @@ def _make_webhook_payload(referencia, estado='APPROVED', amount_in_cents=2380000
 
 
 def _firmar_payload(payload, events_secret):
-    """Genera el checksum correcto para un payload de webhook."""
-    transaction = payload['data']['transaction']
+    """Genera el checksum correcto para un payload de webhook.
+    Fórmula Wompi: SHA256(valores_props + timestamp + events_secret)
+    """
     props = payload['signature']['properties']
     valores = []
     for prop in props:
         partes = prop.split('.')
         valor = payload
         for parte in partes:
-            valor = valor.get(parte, {}) if isinstance(valor, dict) else ''
+            valor = valor.get(parte, '') if isinstance(valor, dict) else ''
         valores.append(str(valor))
-    cadena = ''.join(valores) + events_secret
+    timestamp = payload.get('timestamp', '')
+    cadena = ''.join(valores) + str(timestamp) + events_secret
     return hashlib.sha256(cadena.encode('utf-8')).hexdigest()
 
 

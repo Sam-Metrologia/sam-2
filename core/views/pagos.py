@@ -197,24 +197,30 @@ def _calcular_firma_integridad(referencia, monto_centavos, moneda, integrity_sec
 def _validar_firma_webhook(payload_bytes, signature_props, checksum_recibido, events_secret):
     """
     Valida la firma del webhook de Wompi.
-    Fórmula: SHA-256(prop1_value + prop2_value + ... + events_secret)
+    Fórmula: SHA-256(prop1_value + prop2_value + ... + timestamp + events_secret)
+    El timestamp es el campo raíz 'timestamp' del payload (entero Unix).
     Retorna True si la firma es válida.
     """
     try:
         payload = json.loads(payload_bytes)
-        transaction = payload.get('data', {}).get('transaction', {})
 
         valores = []
         for prop in signature_props:
-            # prop puede ser "transaction.id", "transaction.status", etc.
+            # prop puede ser "data.transaction.id", "transaction.id", etc.
             partes = prop.split('.')
             valor = payload
             for parte in partes:
-                valor = valor.get(parte, {}) if isinstance(valor, dict) else ''
+                valor = valor.get(parte, '') if isinstance(valor, dict) else ''
             valores.append(str(valor))
 
-        cadena = ''.join(valores) + events_secret
+        timestamp = payload.get('timestamp', '')
+        cadena = ''.join(valores) + str(timestamp) + events_secret
         checksum_calculado = hashlib.sha256(cadena.encode('utf-8')).hexdigest()
+
+        logger.info(
+            f"Webhook Wompi firma — props: {signature_props} | "
+            f"timestamp: {timestamp} | calculado: {checksum_calculado} | recibido: {checksum_recibido}"
+        )
         return checksum_calculado == checksum_recibido
     except Exception as e:
         logger.error(f"Error validando firma webhook Wompi: {e}")
