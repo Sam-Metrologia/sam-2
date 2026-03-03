@@ -148,9 +148,9 @@ PLANES['PLAN_TEST'] = {
     'precio_base': Decimal('4202'),
     'iva': Decimal('798'),
     'precio_total': Decimal('5000'),
-    'equipos': 3,
-    'almacenamiento_mb': 512,
-    'usuarios': 1,
+    'equipos': 50,           # igual que Básico real → verificable en dashboard
+    'almacenamiento_mb': 2048,  # 2 GB
+    'usuarios': 3,
     'duracion_meses': 1,
     'descripcion': 'Prueba técnica de webhook Wompi',
     'ahorro': None,
