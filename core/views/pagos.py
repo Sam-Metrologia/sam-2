@@ -719,10 +719,8 @@ def wompi_webhook(request):
 @login_required
 def test_pago_view(request):
     """Página temporal para probar el flujo Wompi con $1.000 COP."""
-    from django.http import HttpResponse, HttpResponseForbidden
+    from django.http import HttpResponse
     from django.middleware.csrf import get_token
-    if not request.user.is_superuser:
-        return HttpResponseForbidden("Solo superusuarios.")
 
     empresa = request.user.empresa
     if not empresa:
