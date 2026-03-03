@@ -143,14 +143,15 @@ class TestPaginaPlanes:
         assert len(response.context['tiers']) == 4  # Básico, Estándar, Profesional, Empresarial
 
     def test_cuatro_tiers_presentes_en_planes(self):
-        """PLANES contiene los 8 keys (4 tiers × mensual/anual)."""
+        """PLANES contiene los 8 keys productivos (4 tiers × mensual/anual)."""
         expected_keys = {
             'BASICO_MENSUAL', 'BASICO_ANUAL',
             'MENSUAL', 'ANUAL',
             'PRO_MENSUAL', 'PRO_ANUAL',
             'ENTERPRISE_MENSUAL', 'ENTERPRISE_ANUAL',
         }
-        assert expected_keys == set(PLANES.keys())
+        planes_prod = {k for k in PLANES.keys() if not k.startswith('PLAN_TEST')}
+        assert expected_keys == planes_prod
 
     def test_precios_tiers_con_iva(self):
         """Cada tier tiene precio_total = precio_base × 1.19."""
@@ -175,8 +176,10 @@ class TestPaginaPlanes:
         assert PLANES['ENTERPRISE_MENSUAL']['precio_base'] == Decimal('650000')
 
     def test_todos_los_planes_tienen_3_usuarios(self):
-        """Todos los tiers incluyen exactamente 3 usuarios base."""
+        """Todos los tiers productivos incluyen exactamente 3 usuarios base."""
         for key, plan in PLANES.items():
+            if key.startswith('PLAN_TEST'):
+                continue  # planes temporales de prueba se excluyen
             assert plan['usuarios'] == 3, \
                 f"Plan {key} tiene {plan['usuarios']} usuarios, esperado 3"
 
