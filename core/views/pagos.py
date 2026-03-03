@@ -7,6 +7,7 @@ import logging
 import re
 import uuid
 from decimal import Decimal
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -139,24 +140,6 @@ for _plan in PLANES.values():
     _plan['precio_total'] = _plan['precio_base'] + _plan['iva']
     # Ahorro expresado en precio total (IVA incluido) para mostrar en template
     _plan['ahorro_total'] = ((_plan['ahorro'] * (1 + IVA)).quantize(Decimal('1'))) if _plan.get('ahorro') else None
-
-# ── Plan de prueba temporal $1.000 (solo superusuarios) — ELIMINAR DESPUÉS DEL TEST ──
-PLANES['PLAN_TEST'] = {
-    'nombre': 'Plan Prueba $5.000',
-    'tier': 'Test',
-    'precio_base': Decimal('4202'),
-    'iva': Decimal('798'),
-    'precio_total': Decimal('5000'),
-    'equipos': 3,
-    'almacenamiento_mb': 512,
-    'usuarios': 1,
-    'duracion_meses': 1,
-    'descripcion': 'Prueba técnica de webhook Wompi',
-    'ahorro': None,
-    'ahorro_total': None,
-    'es_anual': False,
-    'key_alternativo': None,
-}
 
 # Lista ordenada de tiers para el template (mensual primero de cada par)
 TIERS_ORDENADOS = [
@@ -313,8 +296,11 @@ def iniciar_pago(request):
         f"Plan: {plan_key} | Monto: {monto_total} COP"
     )
 
-    # Construir URL de retorno al resultado
-    redirect_url = request.build_absolute_uri(f"/core/pagos/resultado/?ref={referencia}")
+    # Construir URL de retorno al resultado (URL-encoded para que Wompi la preserve)
+    redirect_url = quote(
+        request.build_absolute_uri(f"/core/pagos/resultado/?ref={referencia}"),
+        safe=''
+    )
 
     # Calcular firma de integridad para Wompi
     firma = _calcular_firma_integridad(referencia, monto_centavos, 'COP', integrity_secret)
@@ -406,7 +392,10 @@ def iniciar_addon_pago(request):
         f"Detalle: {datos_addon} | Monto: {total_con_iva} COP"
     )
 
-    redirect_url = request.build_absolute_uri(f"/core/pagos/resultado/?ref={referencia}")
+    redirect_url = quote(
+        request.build_absolute_uri(f"/core/pagos/resultado/?ref={referencia}"),
+        safe=''
+    )
     firma = _calcular_firma_integridad(referencia, monto_centavos, 'COP', integrity_secret)
 
     checkout_url = (
@@ -447,6 +436,7 @@ def pago_resultado(request):
     Nota: el estado definitivo lo actualiza el webhook; esta vista solo informa.
     """
     referencia = request.GET.get('ref', '')
+    wompi_id = request.GET.get('id', '')
     transaccion = None
 
     if referencia:
@@ -455,6 +445,17 @@ def pago_resultado(request):
                 referencia_pago=referencia,
                 empresa=request.user.empresa
             )
+        except TransaccionPago.DoesNotExist:
+            pass
+
+    # Fallback: buscar por el ID de Wompi en datos_respuesta (por si ref llegó vacío)
+    if not transaccion and wompi_id and request.user.empresa:
+        try:
+            transaccion = TransaccionPago.objects.get(
+                datos_respuesta__id=wompi_id,
+                empresa=request.user.empresa
+            )
+            referencia = transaccion.referencia_pago
         except TransaccionPago.DoesNotExist:
             pass
 
@@ -718,60 +719,5 @@ def wompi_webhook(request):
 
     return HttpResponse(status=200)
 
-
-# ============================================================================
-# VISTA TEMPORAL DE PRUEBA — ELIMINAR DESPUÉS DEL TEST DE WEBHOOK
-# Acceso: /core/test-pago/ (solo superusuarios)
-# ============================================================================
-@login_required
-def test_pago_view(request):
-    """Página temporal para probar el flujo Wompi con $1.000 COP."""
-    from django.http import HttpResponse
-    from django.middleware.csrf import get_token
-
-    empresa = request.user.empresa
-    if not empresa:
-        html = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Test Pago - Sin empresa</title>
-<style>body{font-family:sans-serif;max-width:500px;margin:60px auto;padding:20px;}
-.err{background:#fee2e2;border:1px solid #f87171;padding:14px;border-radius:6px;}
-</style></head><body>
-<h2>🧪 Prueba de Pago Wompi</h2>
-<div class="err">
-  <strong>Este usuario no tiene empresa asignada.</strong><br><br>
-  Inicia sesión con un usuario que pertenezca a una empresa (ej. GerenciaSAM de la empresa demo)
-  y vuelve a esta URL: <code>/core/test-pago/</code>
-</div>
-</body></html>"""
-        return HttpResponse(html)
-
-    csrf = get_token(request)
-    html = f"""<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Test Pago Wompi $1.000</title>
-<style>body{{font-family:sans-serif;max-width:500px;margin:60px auto;padding:20px;}}
-.btn{{background:#2563eb;color:#fff;border:none;padding:14px 28px;font-size:16px;
-border-radius:8px;cursor:pointer;width:100%;}}
-.btn:hover{{background:#1d4ed8;}}
-.info{{background:#fef9c3;border:1px solid #fde047;padding:12px;border-radius:6px;margin-bottom:20px;}}
-</style></head>
-<body>
-<h2>🧪 Prueba de Pago Wompi</h2>
-<div class="info">
-  <strong>Plan:</strong> PLAN_TEST<br>
-  <strong>Monto:</strong> $1.000 COP (IVA incluido)<br>
-  <strong>Empresa:</strong> {empresa.nombre}<br>
-  <strong>Usuario:</strong> {request.user.username}<br>
-  <em>Esta página es temporal — solo para verificar el webhook.</em>
-</div>
-<form method="post" action="/core/pagos/iniciar/">
-  <input type="hidden" name="csrfmiddlewaretoken" value="{csrf}">
-  <input type="hidden" name="plan" value="PLAN_TEST">
-  <button type="submit" class="btn">💳 Ir al checkout Wompi ($1.000)</button>
-</form>
-<br>
-<a href="/core/planes/" style="color:#6b7280;">← Volver a planes reales</a>
-</body></html>"""
-    return HttpResponse(html)
 
     return HttpResponse(status=200)

@@ -31,7 +31,6 @@ urlpatterns = [
     path('pagos/resultado/', views.pago_resultado, name='pago_resultado'),
     path('pagos/no-disponible/', views.pago_no_disponible, name='pago_no_disponible'),
     path('pagos/webhook/', views.wompi_webhook, name='wompi_webhook'),
-    path('test-pago/', views.test_pago_view, name='test_pago_view'),  # TEMPORAL
 
     # Autenticación
     path('login/', views.user_login, name='login'),
