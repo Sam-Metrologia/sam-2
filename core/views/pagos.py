@@ -142,11 +142,11 @@ for _plan in PLANES.values():
 
 # ── Plan de prueba temporal $1.000 (solo superusuarios) — ELIMINAR DESPUÉS DEL TEST ──
 PLANES['PLAN_TEST'] = {
-    'nombre': 'Plan Prueba $1.000',
+    'nombre': 'Plan Prueba $5.000',
     'tier': 'Test',
-    'precio_base': Decimal('840'),
-    'iva': Decimal('160'),
-    'precio_total': Decimal('1000'),
+    'precio_base': Decimal('4202'),
+    'iva': Decimal('798'),
+    'precio_total': Decimal('5000'),
     'equipos': 3,
     'almacenamiento_mb': 512,
     'usuarios': 1,
