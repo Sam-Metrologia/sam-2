@@ -141,6 +141,24 @@ for _plan in PLANES.values():
     # Ahorro expresado en precio total (IVA incluido) para mostrar en template
     _plan['ahorro_total'] = ((_plan['ahorro'] * (1 + IVA)).quantize(Decimal('1'))) if _plan.get('ahorro') else None
 
+# ── Plan de prueba temporal $5.000 — ELIMINAR DESPUÉS DEL TEST ──────────────
+PLANES['PLAN_TEST'] = {
+    'nombre': 'Plan Prueba $5.000',
+    'tier': 'Test',
+    'precio_base': Decimal('4202'),
+    'iva': Decimal('798'),
+    'precio_total': Decimal('5000'),
+    'equipos': 3,
+    'almacenamiento_mb': 512,
+    'usuarios': 1,
+    'duracion_meses': 1,
+    'descripcion': 'Prueba técnica de webhook Wompi',
+    'ahorro': None,
+    'ahorro_total': None,
+    'es_anual': False,
+    'key_alternativo': None,
+}
+
 # Lista ordenada de tiers para el template (mensual primero de cada par)
 TIERS_ORDENADOS = [
     ('BASICO_MENSUAL',    'BASICO_ANUAL'),
@@ -720,4 +738,46 @@ def wompi_webhook(request):
     return HttpResponse(status=200)
 
 
-    return HttpResponse(status=200)
+# ============================================================================
+# VISTA TEMPORAL DE PRUEBA — ELIMINAR DESPUÉS DEL TEST DE WEBHOOK
+# Acceso: /core/test-pago/ (cualquier usuario con empresa)
+# ============================================================================
+@login_required
+def test_pago_view(request):
+    """Página temporal para probar el flujo Wompi con $5.000 COP."""
+    from django.http import HttpResponse
+    from django.middleware.csrf import get_token
+
+    empresa = request.user.empresa
+    if not empresa:
+        return HttpResponse(
+            "<h3>Este usuario no tiene empresa. Inicia sesión con una cuenta de empresa.</h3>"
+        )
+
+    csrf = get_token(request)
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Test Pago Wompi $5.000</title>
+<style>body{{font-family:sans-serif;max-width:500px;margin:60px auto;padding:20px;}}
+.btn{{background:#2563eb;color:#fff;border:none;padding:14px 28px;font-size:16px;
+border-radius:8px;cursor:pointer;width:100%;}}
+.btn:hover{{background:#1d4ed8;}}
+.info{{background:#fef9c3;border:1px solid #fde047;padding:12px;border-radius:6px;margin-bottom:20px;}}
+</style></head>
+<body>
+<h2>&#129514; Prueba de Pago Wompi</h2>
+<div class="info">
+  <strong>Plan:</strong> PLAN_TEST<br>
+  <strong>Monto:</strong> $5.000 COP (IVA incluido)<br>
+  <strong>Empresa:</strong> {empresa.nombre}<br>
+  <strong>Usuario:</strong> {request.user.username}
+</div>
+<form method="post" action="/core/pagos/iniciar/">
+  <input type="hidden" name="csrfmiddlewaretoken" value="{csrf}">
+  <input type="hidden" name="plan" value="PLAN_TEST">
+  <button type="submit" class="btn">&#128179; Ir al checkout Wompi ($5.000)</button>
+</form>
+<br>
+<a href="/core/planes/" style="color:#6b7280;">&larr; Volver a planes reales</a>
+</body></html>"""
+    return HttpResponse(html)
