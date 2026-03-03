@@ -719,11 +719,27 @@ def wompi_webhook(request):
 @login_required
 def test_pago_view(request):
     """Página temporal para probar el flujo Wompi con $1.000 COP."""
-    from django.http import HttpResponseForbidden
+    from django.http import HttpResponse, HttpResponseForbidden
+    from django.middleware.csrf import get_token
     if not request.user.is_superuser:
         return HttpResponseForbidden("Solo superusuarios.")
 
-    from django.middleware.csrf import get_token
+    empresa = request.user.empresa
+    if not empresa:
+        html = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Test Pago - Sin empresa</title>
+<style>body{font-family:sans-serif;max-width:500px;margin:60px auto;padding:20px;}
+.err{background:#fee2e2;border:1px solid #f87171;padding:14px;border-radius:6px;}
+</style></head><body>
+<h2>🧪 Prueba de Pago Wompi</h2>
+<div class="err">
+  <strong>Este usuario no tiene empresa asignada.</strong><br><br>
+  Inicia sesión con un usuario que pertenezca a una empresa (ej. GerenciaSAM de la empresa demo)
+  y vuelve a esta URL: <code>/core/test-pago/</code>
+</div>
+</body></html>"""
+        return HttpResponse(html)
+
     csrf = get_token(request)
     html = f"""<!DOCTYPE html>
 <html lang="es">
@@ -739,7 +755,8 @@ border-radius:8px;cursor:pointer;width:100%;}}
 <div class="info">
   <strong>Plan:</strong> PLAN_TEST<br>
   <strong>Monto:</strong> $1.000 COP (IVA incluido)<br>
-  <strong>Empresa:</strong> {request.user.empresa.nombre if request.user.empresa else 'Sin empresa'}<br>
+  <strong>Empresa:</strong> {empresa.nombre}<br>
+  <strong>Usuario:</strong> {request.user.username}<br>
   <em>Esta página es temporal — solo para verificar el webhook.</em>
 </div>
 <form method="post" action="/core/pagos/iniciar/">
@@ -750,7 +767,6 @@ border-radius:8px;cursor:pointer;width:100%;}}
 <br>
 <a href="/core/planes/" style="color:#6b7280;">← Volver a planes reales</a>
 </body></html>"""
-    from django.http import HttpResponse
     return HttpResponse(html)
 
     return HttpResponse(status=200)
