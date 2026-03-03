@@ -139,11 +139,12 @@
 
                 <!-- Plan base del cálculo -->
                 <div class="mb-4">
-                    <label class="text-xs font-semibold text-gray-600 mb-1 block">Plan base que tendrías</label>
+                    <label class="text-xs font-semibold text-gray-600 mb-1 block">¿También cambias de plan?</label>
                     <select id="calc-plan" onchange="calcularTotal()"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="0:0" {% if empresa.estado_suscripcion == 'Activo' %}selected{% endif %}>Sin plan — solo add-ons</option>
                         <option value="95200:50">Básico — $95.200/mes · 50 equipos</option>
-                        <option value="238000:200" selected>Estándar — $238.000/mes · 200 equipos</option>
+                        <option value="238000:200" {% if empresa.estado_suscripcion != 'Activo' %}selected{% endif %}>Estándar — $238.000/mes · 200 equipos</option>
                         <option value="452200:500">Profesional — $452.200/mes · 500 equipos</option>
                         <option value="773500:1000">Empresarial — $773.500/mes · 1.000 equipos</option>
                     </select>
@@ -392,8 +393,11 @@ function calcularTotal() {
     const hayAddons = totalAddons > 0;
 
     // ── Resumen del total ──────────────────────────────────────────────
-    let htmlTotal = `<div class="flex justify-between text-gray-500">
-        <span>Plan ${planNombre}</span><span>${cop(planTotal)}/mes</span></div>`;
+    let htmlTotal = '';
+    if (planTotal > 0) {
+        htmlTotal += `<div class="flex justify-between text-gray-500">
+            <span>Plan ${planNombre}</span><span>${cop(planTotal)}/mes</span></div>`;
+    }
 
     if (costoTec  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>👷 ${tec} técnico${tec>1?'s':''}</span><span>${cop(costoTec)}/mes</span></div>`;
     if (costoAdm  > 0) htmlTotal += `<div class="flex justify-between text-gray-500"><span>🔧 ${adm} admin${adm>1?'s':''}</span><span>${cop(costoAdm)}/mes</span></div>`;
@@ -409,8 +413,14 @@ function calcularTotal() {
 
     document.getElementById('resumen-total').innerHTML = htmlTotal;
 
-    // ── Panel derecho: actualizar precio del plan siempre ──────────────
-    document.getElementById('resumen-plan-precio').textContent = cop(planTotal) + '/mes';
+    // ── Panel derecho: mostrar u ocultar la fila del plan ──────────────
+    const planFijoEl = document.getElementById('resumen-plan-fijo');
+    if (planTotal > 0) {
+        planFijoEl.classList.remove('hidden');
+        document.getElementById('resumen-plan-precio').textContent = cop(planTotal) + '/mes';
+    } else {
+        planFijoEl.classList.add('hidden');
+    }
 
     // ── Resumen del pedido (panel derecho) ─────────────────────────────
     let htmlPedido = '';
