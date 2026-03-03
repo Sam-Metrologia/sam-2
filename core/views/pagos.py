@@ -12,7 +12,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -501,111 +501,227 @@ def _get_correos_empresa(empresa):
     return correos
 
 
+SAM_FROM_EMAIL = 'comercial@sammetrologia.com'
+SAM_FROM_LABEL = f'SAM Metrología <{SAM_FROM_EMAIL}>'
+
+_EMAIL_STYLE = """
+<style>
+  body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0;padding:0;background:#f4f4f4;}
+  .wrap{max-width:600px;margin:30px auto;}
+  .card{border:1px solid #e1e1e1;border-radius:10px;overflow:hidden;box-shadow:0 4px 10px rgba(0,0,0,.07);}
+  .hdr{background:#003366;color:#fff;padding:28px 35px;text-align:center;}
+  .hdr h1{margin:0;font-size:22px;letter-spacing:1px;}
+  .hdr p{margin:5px 0 0;opacity:.85;font-size:13px;}
+  .body{padding:35px;background:#fff;}
+  .badge{display:inline-block;background:#d1fae5;color:#065f46;font-weight:700;
+         padding:8px 18px;border-radius:20px;font-size:15px;margin-bottom:20px;}
+  table.det{width:100%;border-collapse:collapse;margin:20px 0;}
+  table.det td{padding:10px 14px;font-size:14px;border-bottom:1px solid #f0f0f0;}
+  table.det td:first-child{color:#555;font-weight:600;width:45%;}
+  .btn{display:inline-block;background:#003366;color:#fff!important;padding:12px 28px;
+       border-radius:6px;text-decoration:none;font-weight:600;margin:20px 0;}
+  .sig-name{color:#003366;font-weight:700;font-size:15px;margin-top:22px;}
+  .sig-info{font-size:13px;color:#666;line-height:1.7;}
+  .ftr{background:#1a1a1a;padding:22px 35px;text-align:center;color:#888;font-size:12px;}
+  .ftr strong{color:#aaa;}
+  a{color:#0056b3;}
+</style>"""
+
+
+def _send_html_email(asunto, texto_plano, html, destinatarios, from_label=None):
+    """Envía email con versión HTML y texto plano como fallback."""
+    remitente = from_label or SAM_FROM_LABEL
+    try:
+        msg = EmailMultiAlternatives(asunto, texto_plano, remitente, destinatarios)
+        msg.attach_alternative(html, 'text/html')
+        msg.send()
+        return True
+    except Exception as e:
+        logger.error(f"Error enviando email '{asunto}' a {destinatarios}: {e}")
+        return False
+
+
 def _enviar_email_confirmacion_plan(transaccion, plan):
     """Envía confirmación de activación de plan al cliente y aviso a SAM."""
     empresa = transaccion.empresa
-    from_email = settings.DEFAULT_FROM_EMAIL
-    sam_admin = getattr(settings, 'ADMIN_EMAIL', from_email)
-
-    # ── Email al cliente ──────────────────────────────────────────────────
+    sam_admin = getattr(settings, 'ADMIN_EMAIL', SAM_FROM_EMAIL)
     destinatarios = _get_correos_empresa(empresa)
-    duracion = f"{plan['duracion_meses']} mes" if plan['duracion_meses'] == 1 else f"{plan['duracion_meses']} meses"
-    almac_gb = plan['almacenamiento_mb'] // 1024
 
+    duracion = f"{plan['duracion_meses']} mes" if plan['duracion_meses'] == 1 else f"{plan['duracion_meses']} meses"
+    almac_gb = round(plan['almacenamiento_mb'] / 1024, 1)
+    monto_fmt = f"${transaccion.monto:,.0f} COP"
+    metodo = transaccion.metodo_pago or 'N/A'
+
+    # ── Email al cliente (HTML) ───────────────────────────────────────────
     asunto_cliente = f"✅ Tu {plan['nombre']} en SAM está activo"
-    cuerpo_cliente = (
+    html_cliente = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
+<body><div class="wrap"><div class="card">
+  <div class="hdr">
+    <h1>SAM METROLOGÍA</h1>
+    <p>Control Digital e Inteligencia Metrológica</p>
+  </div>
+  <div class="body">
+    <span class="badge">✅ Pago Aprobado</span>
+    <p>Cordial saludo, estimado(a) <strong>{empresa.nombre}</strong>:</p>
+    <p>¡Excelente! Tu pago fue procesado exitosamente y tu plan ya está activo en la plataforma.</p>
+    <table class="det">
+      <tr><td>Plan</td><td><strong>{plan['nombre']}</strong></td></tr>
+      <tr><td>Equipos incluidos</td><td>Hasta {plan['equipos']} equipos</td></tr>
+      <tr><td>Almacenamiento</td><td>{almac_gb} GB</td></tr>
+      <tr><td>Duración</td><td>{duracion}</td></tr>
+      <tr><td>Valor pagado</td><td><strong>{monto_fmt}</strong> (IVA incluido)</td></tr>
+      <tr><td>Método de pago</td><td>{metodo}</td></tr>
+      <tr><td>Referencia</td><td style="font-family:monospace;font-size:13px">{transaccion.referencia_pago}</td></tr>
+    </table>
+    <a href="https://app.sammetrologia.com" class="btn">Ingresar a la plataforma →</a>
+    <p>Si tienes alguna duda o requerimiento no dudes en contactarnos.</p>
+    <p>Atentamente,</p>
+    <div class="sig-name">Equipo Comercial SAM Metrología</div>
+    <div class="sig-info">
+      SAM Metrología S.A.S<br>
+      <a href="https://sammetrologia.com">sammetrologia.com</a><br>
+      WhatsApp: +57 324 799 0534 &nbsp;|&nbsp; comercial@sammetrologia.com
+    </div>
+  </div>
+  <div class="ftr"><strong>SAM Metrología | Gestión Metrológica 4.0</strong><br>
+    Colombia — Soluciones Avanzadas en Medición</div>
+</div></div></body></html>"""
+
+    texto_cliente = (
         f"Hola {empresa.nombre},\n\n"
-        f"¡Tu pago fue aprobado! Aquí el resumen de tu plan:\n\n"
+        f"Tu pago fue aprobado. Resumen:\n\n"
         f"  Plan:           {plan['nombre']}\n"
         f"  Equipos:        hasta {plan['equipos']}\n"
         f"  Almacenamiento: {almac_gb} GB\n"
         f"  Duración:       {duracion}\n"
-        f"  Valor pagado:   ${transaccion.monto:,.0f} COP (IVA incluido)\n"
+        f"  Valor pagado:   {monto_fmt} (IVA incluido)\n"
         f"  Referencia:     {transaccion.referencia_pago}\n\n"
-        f"Tu plan ya está activo. Puedes ingresar en https://app.sammetrologia.com\n\n"
-        f"Si tienes dudas escríbenos:\n"
-        f"  WhatsApp: +57 324 799 0534\n"
-        f"  Correo:   direccion@sammetrologia.com\n\n"
-        f"SAM Metrologia S.A.S"
+        f"Ingresa en: https://app.sammetrologia.com\n\n"
+        f"SAM Metrología S.A.S — comercial@sammetrologia.com"
     )
-    try:
-        if destinatarios:
-            send_mail(asunto_cliente, cuerpo_cliente, from_email, destinatarios, fail_silently=True)
-            logger.info(f"Email confirmación plan enviado a {destinatarios} | Ref: {transaccion.referencia_pago}")
-    except Exception as e:
-        logger.error(f"Error enviando email confirmación plan: {e}")
 
-    # ── Aviso interno a SAM ───────────────────────────────────────────────
+    if destinatarios:
+        ok = _send_html_email(asunto_cliente, texto_cliente, html_cliente, destinatarios)
+        if ok:
+            logger.info(f"Email confirmación plan enviado a {destinatarios} | Ref: {transaccion.referencia_pago}")
+
+    # ── Aviso interno a SAM (HTML) ────────────────────────────────────────
     asunto_sam = f"💰 Nuevo pago recibido — {empresa.nombre}"
-    cuerpo_sam = (
-        f"Se recibió un pago aprobado:\n\n"
-        f"  Empresa:    {empresa.nombre} (ID: {empresa.id})\n"
-        f"  NIT:        {empresa.nit}\n"
-        f"  Plan:       {plan['nombre']}\n"
-        f"  Monto:      ${transaccion.monto:,.0f} COP\n"
-        f"  Método:     {transaccion.metodo_pago or 'N/A'}\n"
-        f"  Referencia: {transaccion.referencia_pago}\n"
+    html_sam = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
+<body><div class="wrap"><div class="card">
+  <div class="hdr"><h1>SAM METROLOGÍA</h1><p>Notificación interna de pago</p></div>
+  <div class="body">
+    <span class="badge" style="background:#dbeafe;color:#1e40af;">💰 Pago Recibido</span>
+    <p>Se procesó un nuevo pago exitosamente:</p>
+    <table class="det">
+      <tr><td>Empresa</td><td><strong>{empresa.nombre}</strong> (ID: {empresa.id})</td></tr>
+      <tr><td>NIT</td><td>{empresa.nit}</td></tr>
+      <tr><td>Plan</td><td>{plan['nombre']}</td></tr>
+      <tr><td>Monto</td><td><strong>{monto_fmt}</strong></td></tr>
+      <tr><td>Método</td><td>{metodo}</td></tr>
+      <tr><td>Referencia</td><td style="font-family:monospace;font-size:13px">{transaccion.referencia_pago}</td></tr>
+    </table>
+  </div>
+  <div class="ftr"><strong>SAM Metrología | Notificación Interna</strong></div>
+</div></div></body></html>"""
+
+    texto_sam = (
+        f"Pago aprobado:\n  Empresa: {empresa.nombre} (ID: {empresa.id})\n"
+        f"  NIT: {empresa.nit}\n  Plan: {plan['nombre']}\n"
+        f"  Monto: {monto_fmt}\n  Ref: {transaccion.referencia_pago}"
     )
-    try:
-        send_mail(asunto_sam, cuerpo_sam, from_email, [sam_admin], fail_silently=True)
-    except Exception as e:
-        logger.error(f"Error enviando aviso de pago a SAM: {e}")
+    _send_html_email(asunto_sam, texto_sam, html_sam, [sam_admin])
 
 
 def _enviar_email_confirmacion_addon(transaccion):
     """Envía confirmación de add-ons activados al cliente y aviso a SAM."""
     empresa = transaccion.empresa
-    from_email = settings.DEFAULT_FROM_EMAIL
-    sam_admin = getattr(settings, 'ADMIN_EMAIL', from_email)
+    sam_admin = getattr(settings, 'ADMIN_EMAIL', SAM_FROM_EMAIL)
     datos = transaccion.datos_addon or {}
+    monto_fmt = f"${transaccion.monto:,.0f} COP"
 
-    lineas = []
+    items_txt = []
+    items_html = []
     if datos.get('tecnicos'):
-        lineas.append(f"  +{datos['tecnicos']} usuario(s) Técnico")
+        items_txt.append(f"  +{datos['tecnicos']} usuario(s) Técnico")
+        items_html.append(f"<tr><td>Técnicos adicionales</td><td>+{datos['tecnicos']} usuario(s)</td></tr>")
     if datos.get('admins'):
-        lineas.append(f"  +{datos['admins']} usuario(s) Administrador")
+        items_txt.append(f"  +{datos['admins']} usuario(s) Administrador")
+        items_html.append(f"<tr><td>Administradores adicionales</td><td>+{datos['admins']} usuario(s)</td></tr>")
     if datos.get('gerentes'):
-        lineas.append(f"  +{datos['gerentes']} usuario(s) Gerente")
+        items_txt.append(f"  +{datos['gerentes']} usuario(s) Gerente")
+        items_html.append(f"<tr><td>Gerentes adicionales</td><td>+{datos['gerentes']} usuario(s)</td></tr>")
     if datos.get('bloques_equipos'):
-        lineas.append(f"  +{datos['bloques_equipos'] * 50} equipos ({datos['bloques_equipos']} bloque(s))")
+        items_txt.append(f"  +{datos['bloques_equipos'] * 50} equipos ({datos['bloques_equipos']} bloque(s))")
+        items_html.append(f"<tr><td>Equipos adicionales</td><td>+{datos['bloques_equipos'] * 50} ({datos['bloques_equipos']} bloque(s))</td></tr>")
     if datos.get('bloques_storage'):
-        lineas.append(f"  +{datos['bloques_storage'] * 5} GB almacenamiento")
+        items_txt.append(f"  +{datos['bloques_storage'] * 5} GB almacenamiento")
+        items_html.append(f"<tr><td>Almacenamiento adicional</td><td>+{datos['bloques_storage'] * 5} GB</td></tr>")
 
-    detalle = '\n'.join(lineas) if lineas else '  (sin detalle)'
+    detalle_txt = '\n'.join(items_txt) if items_txt else '  (sin detalle)'
+    detalle_html = '\n'.join(items_html) if items_html else '<tr><td colspan="2">Sin detalle</td></tr>'
 
-    # ── Email al cliente ──────────────────────────────────────────────────
+    # ── Email al cliente (HTML) ───────────────────────────────────────────
     destinatarios = _get_correos_empresa(empresa)
     asunto_cliente = "✅ Tus add-ons en SAM están activos"
-    cuerpo_cliente = (
-        f"Hola {empresa.nombre},\n\n"
-        f"¡Tu pago fue aprobado! Los siguientes add-ons ya están activos:\n\n"
-        f"{detalle}\n\n"
-        f"  Valor pagado: ${transaccion.monto:,.0f} COP (IVA incluido)\n"
-        f"  Referencia:   {transaccion.referencia_pago}\n\n"
-        f"Puedes verificarlos en tu dashboard: https://app.sammetrologia.com\n\n"
-        f"SAM Metrologia S.A.S\n"
-        f"WhatsApp: +57 324 799 0534"
-    )
-    try:
-        if destinatarios:
-            send_mail(asunto_cliente, cuerpo_cliente, from_email, destinatarios, fail_silently=True)
-            logger.info(f"Email confirmación addon enviado a {destinatarios} | Ref: {transaccion.referencia_pago}")
-    except Exception as e:
-        logger.error(f"Error enviando email confirmación addon: {e}")
+    html_cliente = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
+<body><div class="wrap"><div class="card">
+  <div class="hdr"><h1>SAM METROLOGÍA</h1><p>Control Digital e Inteligencia Metrológica</p></div>
+  <div class="body">
+    <span class="badge">✅ Add-ons Activados</span>
+    <p>Cordial saludo, estimado(a) <strong>{empresa.nombre}</strong>:</p>
+    <p>Tu pago fue aprobado. Los siguientes add-ons ya están disponibles en tu cuenta:</p>
+    <table class="det">
+      {detalle_html}
+      <tr><td>Valor pagado</td><td><strong>{monto_fmt}</strong> (IVA incluido)</td></tr>
+      <tr><td>Referencia</td><td style="font-family:monospace;font-size:13px">{transaccion.referencia_pago}</td></tr>
+    </table>
+    <a href="https://app.sammetrologia.com" class="btn">Ver mi cuenta →</a>
+    <p>Atentamente,</p>
+    <div class="sig-name">Equipo Comercial SAM Metrología</div>
+    <div class="sig-info">
+      SAM Metrología S.A.S<br>
+      <a href="https://sammetrologia.com">sammetrologia.com</a><br>
+      WhatsApp: +57 324 799 0534 &nbsp;|&nbsp; comercial@sammetrologia.com
+    </div>
+  </div>
+  <div class="ftr"><strong>SAM Metrología | Gestión Metrológica 4.0</strong><br>
+    Colombia — Soluciones Avanzadas en Medición</div>
+</div></div></body></html>"""
 
-    # ── Aviso interno a SAM ───────────────────────────────────────────────
-    asunto_sam = f"💰 Add-ons comprados — {empresa.nombre}"
-    cuerpo_sam = (
-        f"Add-ons activados:\n\n"
-        f"  Empresa:    {empresa.nombre} (ID: {empresa.id})\n"
-        f"  Monto:      ${transaccion.monto:,.0f} COP\n"
-        f"  Referencia: {transaccion.referencia_pago}\n"
-        f"  Detalle:\n{detalle}\n"
+    texto_cliente = (
+        f"Hola {empresa.nombre},\nAdd-ons activos:\n{detalle_txt}\n\n"
+        f"  Valor: {monto_fmt}  |  Ref: {transaccion.referencia_pago}\n"
+        f"Ingresa en: https://app.sammetrologia.com"
     )
-    try:
-        send_mail(asunto_sam, cuerpo_sam, from_email, [sam_admin], fail_silently=True)
-    except Exception as e:
-        logger.error(f"Error enviando aviso addon a SAM: {e}")
+
+    if destinatarios:
+        ok = _send_html_email(asunto_cliente, texto_cliente, html_cliente, destinatarios)
+        if ok:
+            logger.info(f"Email confirmación addon enviado a {destinatarios} | Ref: {transaccion.referencia_pago}")
+
+    # ── Aviso interno a SAM (HTML) ────────────────────────────────────────
+    asunto_sam = f"💰 Add-ons comprados — {empresa.nombre}"
+    html_sam = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
+<body><div class="wrap"><div class="card">
+  <div class="hdr"><h1>SAM METROLOGÍA</h1><p>Notificación interna de add-ons</p></div>
+  <div class="body">
+    <span class="badge" style="background:#dbeafe;color:#1e40af;">💰 Add-ons Comprados</span>
+    <table class="det">
+      <tr><td>Empresa</td><td><strong>{empresa.nombre}</strong> (ID: {empresa.id})</td></tr>
+      <tr><td>Monto</td><td><strong>{monto_fmt}</strong></td></tr>
+      <tr><td>Referencia</td><td style="font-family:monospace;font-size:13px">{transaccion.referencia_pago}</td></tr>
+      {detalle_html}
+    </table>
+  </div>
+  <div class="ftr"><strong>SAM Metrología | Notificación Interna</strong></div>
+</div></div></body></html>"""
+
+    texto_sam = (
+        f"Add-ons: {empresa.nombre} (ID: {empresa.id})\n"
+        f"Monto: {monto_fmt} | Ref: {transaccion.referencia_pago}\n{detalle_txt}"
+    )
+    _send_html_email(asunto_sam, texto_sam, html_sam, [sam_admin])
 
 
 # ============================================================================
