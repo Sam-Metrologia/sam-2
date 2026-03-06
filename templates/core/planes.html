@@ -142,11 +142,11 @@
                     <label class="text-xs font-semibold text-gray-600 mb-1 block">¿También cambias de plan?</label>
                     <select id="calc-plan" onchange="calcularTotal()"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="0:0" {% if empresa.estado_suscripcion == 'Activo' %}selected{% endif %}>Sin plan — solo add-ons</option>
-                        <option value="95200:50">Básico — $95.200/mes · 50 equipos</option>
-                        <option value="238000:200" {% if empresa.estado_suscripcion != 'Activo' %}selected{% endif %}>Estándar — $238.000/mes · 200 equipos</option>
-                        <option value="452200:500">Profesional — $452.200/mes · 500 equipos</option>
-                        <option value="773500:1000">Empresarial — $773.500/mes · 1.000 equipos</option>
+                        <option value="0:0" data-plan-key="" {% if empresa.estado_suscripcion == 'Activo' %}selected{% endif %}>Sin plan — solo add-ons</option>
+                        <option value="95200:50"   data-plan-key="BASICO_MENSUAL">Básico — $95.200/mes · 50 equipos</option>
+                        <option value="238000:200" data-plan-key="ESTANDAR_MENSUAL" {% if empresa.estado_suscripcion != 'Activo' %}selected{% endif %}>Estándar — $238.000/mes · 200 equipos</option>
+                        <option value="452200:500" data-plan-key="PROFESIONAL_MENSUAL">Profesional — $452.200/mes · 500 equipos</option>
+                        <option value="773500:1000" data-plan-key="EMPRESARIAL_MENSUAL">Empresarial — $773.500/mes · 1.000 equipos</option>
                     </select>
                 </div>
 
@@ -282,6 +282,37 @@
                     </div>
                     <!-- Total general: plan + add-ons -->
                     <div id="resumen-total-general"></div>
+
+                    {% if request.user.is_administrador or request.user.is_gerente %}
+                    <!-- Generar link para contabilidad (admin/gerente) -->
+                    <div id="btn-link-container" class="hidden mt-3 border-t border-dashed border-gray-200 pt-3">
+                        <p class="text-xs text-gray-500 mb-2">¿Prefiere que contabilidad pague directamente?</p>
+                        <button type="button" onclick="generarLinkContabilidad(this)"
+                            class="flex items-center justify-center gap-2 w-full bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 font-semibold py-2.5 px-4 rounded-lg text-sm transition duration-200">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                            </svg>
+                            Generar link para contabilidad
+                        </button>
+                        <p class="text-xs text-gray-400 text-center mt-1">Se envía por email a contabilidad · no requiere login</p>
+
+                        <!-- Resultado -->
+                        <div id="link-result-ok" class="hidden mt-3 bg-green-50 border border-green-200 rounded-lg p-3">
+                            <p class="text-xs text-green-700 font-semibold mb-2">Link enviado a contabilidad:</p>
+                            <div class="flex gap-2">
+                                <input type="text" id="link-result-url" readonly
+                                    class="flex-1 text-xs bg-white border border-green-300 rounded px-2 py-1.5 text-gray-700 min-w-0">
+                                <button onclick="copiarLinkPlanes()" class="flex-shrink-0 text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 transition">Copiar</button>
+                            </div>
+                            <p id="link-result-advertencia" class="hidden text-xs text-amber-700 mt-2 bg-amber-50 border border-amber-200 rounded p-2">
+                                Al reducir usuarios, los que queden por encima del nuevo límite se desactivarán al vencer el período actual.
+                            </p>
+                        </div>
+                        <div id="link-result-err" class="hidden mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                            <p class="text-xs text-red-700" id="link-result-err-msg"></p>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- ── Sección: qué pasa en mitad del plan ── -->
@@ -450,6 +481,19 @@ function calcularTotal() {
 
     document.getElementById('resumen-pedido').innerHTML = htmlPedido;
 
+    // ── Botón "Generar link para contabilidad" ─────────────────────────
+    const btnLink = document.getElementById('btn-link-container');
+    if (btnLink) {
+        if (totalFinal > 0) {
+            btnLink.classList.remove('hidden');
+        } else {
+            btnLink.classList.add('hidden');
+        }
+        // Limpiar resultado anterior al recalcular
+        document.getElementById('link-result-ok')?.classList.add('hidden');
+        document.getElementById('link-result-err')?.classList.add('hidden');
+    }
+
     // ── Total general siempre visible (plan + add-ons) ─────────────────
     let totalHtml = `<div class="mt-3 pt-3 border-t-2 border-green-200 flex justify-between items-center">
         <span class="text-sm font-bold text-gray-800">Total mensual</span>
@@ -476,5 +520,58 @@ function switchPeriodo(periodo) {
 }
 
 document.addEventListener('DOMContentLoaded', calcularTotal);
+
+function generarLinkContabilidad(btn) {
+    const sel     = document.getElementById('calc-plan');
+    const planKey = sel.options[sel.selectedIndex].dataset.planKey || '';
+    const tec  = parseInt(document.getElementById('calc-tecnico').value)  || 0;
+    const adm  = parseInt(document.getElementById('calc-admin').value)    || 0;
+    const ger  = parseInt(document.getElementById('calc-gerente').value)  || 0;
+    const bloq = parseInt(document.getElementById('calc-equipos').value)  || 0;
+    const stor = parseInt(document.getElementById('calc-storage').value)  || 0;
+
+    document.getElementById('link-result-ok').classList.add('hidden');
+    document.getElementById('link-result-err').classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    if (planKey) fd.append('plan', planKey);
+    fd.append('tecnicos',        tec);
+    fd.append('admins',          adm);
+    fd.append('gerentes',        ger);
+    fd.append('bloques_equipos', bloq);
+    fd.append('bloques_storage', stor);
+
+    fetch('{% url "core:generar_link_pago" %}', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                document.getElementById('link-result-url').value = data.link;
+                document.getElementById('link-result-ok').classList.remove('hidden');
+                if (data.advertencia_usuarios) {
+                    document.getElementById('link-result-advertencia').classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('link-result-err-msg').textContent = (data.errores || []).join(' ');
+                document.getElementById('link-result-err').classList.remove('hidden');
+            }
+        })
+        .catch(() => {
+            document.getElementById('link-result-err-msg').textContent = 'Error de conexión. Intenta de nuevo.';
+            document.getElementById('link-result-err').classList.remove('hidden');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg> Generar link para contabilidad';
+        });
+}
+
+function copiarLinkPlanes() {
+    const input = document.getElementById('link-result-url');
+    input.select();
+    navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
+}
 </script>
 {% endblock %}
