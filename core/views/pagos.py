@@ -881,10 +881,13 @@ def wompi_webhook(request):
                         lp = LinkPago.objects.get(token=link_token)
                         lp.estado = 'pagado'
                         lp.save(update_fields=['estado'])
-                        # El link ya guardó addons_recurrentes en generar_link_pago()
-                        # Solo confirmamos que coincide con lo pagado
-                        transaccion.empresa.addons_recurrentes = datos_addon_limpios
-                        transaccion.empresa.save(update_fields=['addons_recurrentes'])
+                        # Acumular add-ons pagados sobre los existentes
+                        if datos_addon_limpios:
+                            recurrentes = dict(transaccion.empresa.addons_recurrentes or {})
+                            for k, v in datos_addon_limpios.items():
+                                recurrentes[k] = recurrentes.get(k, 0) + int(v or 0)
+                            transaccion.empresa.addons_recurrentes = recurrentes
+                            transaccion.empresa.save(update_fields=['addons_recurrentes'])
                     except LinkPago.DoesNotExist:
                         pass
                 else:
@@ -940,9 +943,12 @@ def wompi_webhook(request):
                         addons_link = {k: v for k, v in (link_obj.addons or {}).items()}
                         if addons_link:
                             transaccion.empresa.activar_addons(addons_link)
-                        # Actualizar addons_recurrentes con los nuevos valores
-                        transaccion.empresa.addons_recurrentes = addons_link
-                        transaccion.empresa.save(update_fields=['addons_recurrentes'])
+                            # Acumular add-ons del link sobre los existentes
+                            recurrentes = dict(transaccion.empresa.addons_recurrentes or {})
+                            for k, v in addons_link.items():
+                                recurrentes[k] = recurrentes.get(k, 0) + int(v or 0)
+                            transaccion.empresa.addons_recurrentes = recurrentes
+                            transaccion.empresa.save(update_fields=['addons_recurrentes'])
                         link_obj.estado = 'pagado'
                         link_obj.save(update_fields=['estado'])
                         logger.info(f"LinkPago {link_token[:8]} marcado como pagado para {transaccion.empresa.nombre}")
@@ -1212,10 +1218,7 @@ def generar_link_pago(request):
         fecha_expiracion=timezone.now() + timedelta(days=7),
         creado_por=request.user,
     )
-
-    # Guardar add-ons recurrentes inmediatamente
-    empresa.addons_recurrentes = nuevos_addons
-    empresa.save(update_fields=['addons_recurrentes'])
+    # addons_recurrentes se actualiza SOLO cuando el pago sea confirmado (en el webhook)
 
     # Enviar email a contabilidad
     try:
