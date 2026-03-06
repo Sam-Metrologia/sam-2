@@ -175,9 +175,10 @@ def solicitar_trial(request):
                     admin_username = f"dir{letras}{nit_sufijo}"
                     gerente_username = f"ger{letras}{nit_sufijo}"
                     tecnico_username = f"tec{letras}{nit_sufijo}"
-                    admin_password = f"Dir.{data['nit']}"
-                    gerente_password = f"Ger.{data['nit']}"
-                    tecnico_password = f"Tec.{data['nit']}"
+                    # Contraseñas aleatorias seguras (16 chars, letras + dígitos)
+                    admin_password = get_random_string(16)
+                    gerente_password = get_random_string(16)
+                    tecnico_password = get_random_string(16)
 
                     # 5. Crear usuario ADMINISTRADOR
                     admin_user = CustomUser.objects.create_user(

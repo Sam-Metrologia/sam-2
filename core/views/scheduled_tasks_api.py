@@ -1,6 +1,8 @@
 # core/views/scheduled_tasks_api.py
 # API endpoints para ejecutar tareas programadas desde GitHub Actions
 
+import hmac
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -13,21 +15,29 @@ from core.admin_services import AdminService
 logger = logging.getLogger('core')
 
 # Token de seguridad - debe coincidir con el configurado en GitHub Secrets
-SCHEDULED_TASKS_TOKEN = getattr(settings, 'SCHEDULED_TASKS_TOKEN', 'change-this-secret-token')
+SCHEDULED_TASKS_TOKEN = getattr(settings, 'SCHEDULED_TASKS_TOKEN', '')
 
 
 def verify_token(request):
-    """Verifica que el token de autorización sea correcto."""
+    """
+    Verifica que el token de autorización sea correcto.
+    - Requiere header 'Authorization: Bearer TOKEN' (no se acepta query string).
+    - Si el token no está configurado, siempre rechaza (fail-closed).
+    - Usa hmac.compare_digest para evitar ataques de timing.
+    """
+    if not SCHEDULED_TASKS_TOKEN:
+        logger.critical(
+            "SCHEDULED_TASKS_TOKEN no está configurado. "
+            "Rechazando todas las solicitudes a tareas programadas."
+        )
+        return False
+
     auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return False
 
-    # Formato: "Bearer TOKEN"
-    if auth_header.startswith('Bearer '):
-        token = auth_header[7:]
-        return token == SCHEDULED_TASKS_TOKEN
-
-    # También permitir en query string para facilidad
-    token = request.GET.get('token', '')
-    return token == SCHEDULED_TASKS_TOKEN
+    token = auth_header[7:]
+    return hmac.compare_digest(token, SCHEDULED_TASKS_TOKEN)
 
 
 @csrf_exempt

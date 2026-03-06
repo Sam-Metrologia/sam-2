@@ -827,6 +827,14 @@ def wompi_webhook(request):
     payload_bytes = request.body
     events_secret = getattr(settings, 'WOMPI_EVENTS_SECRET', '')
 
+    # Rechazar si el secret no está configurado — nunca procesar sin firma verificada
+    if not events_secret:
+        logger.critical(
+            "WOMPI_EVENTS_SECRET no configurado. "
+            "Rechazando webhook para evitar activaciones fraudulentas."
+        )
+        return HttpResponse(status=500)
+
     # Parsear payload
     try:
         payload = json.loads(payload_bytes)
@@ -834,12 +842,12 @@ def wompi_webhook(request):
         logger.warning("Webhook Wompi: payload JSON inválido")
         return HttpResponse(status=400)
 
-    # Validar firma
+    # Validar firma — siempre requerida
     signature = payload.get('signature', {})
     checksum_recibido = signature.get('checksum', '')
     signature_props = signature.get('properties', [])
 
-    if events_secret and not _validar_firma_webhook(
+    if not _validar_firma_webhook(
         payload_bytes, signature_props, checksum_recibido, events_secret
     ):
         logger.warning(
