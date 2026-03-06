@@ -248,12 +248,33 @@ def planes(request):
     if dias_restantes == float('inf'):
         dias_restantes = None
 
-    # Construir lista de tiers para el template: [{mensual: {...}, anual: {...}}, ...]
+    # Determinar rango del plan actual para bloquear planes inferiores
+    # Básico=1, Estándar=2, Profesional=3, Empresarial=4
+    _tier_rank = {}
+    for rango, (key_mes, key_año) in enumerate(TIERS_ORDENADOS, start=1):
+        _tier_rank[key_mes] = rango
+        _tier_rank[key_año] = rango
+
+    plan_actual_rango = 0
+    if estado_plan == 'Activo':
+        from core.models import TransaccionPago as _TX
+        ultima_tx = (
+            _TX.objects
+            .filter(empresa=empresa, estado='aprobado')
+            .exclude(plan_seleccionado='ADDON')
+            .order_by('-fecha_creacion')
+            .first()
+        )
+        if ultima_tx:
+            plan_actual_rango = _tier_rank.get(ultima_tx.plan_seleccionado, 0)
+
+    # Construir lista de tiers para el template: [{mensual: {...}, anual: {...}, rango: N}, ...]
     tiers_lista = []
-    for key_mes, key_año in TIERS_ORDENADOS:
+    for rango, (key_mes, key_año) in enumerate(TIERS_ORDENADOS, start=1):
         tiers_lista.append({
             'mensual': {'key': key_mes, **PLANES[key_mes]},
-            'anual': {'key': key_año, **PLANES[key_año]},
+            'anual':   {'key': key_año, **PLANES[key_año]},
+            'rango':   rango,
         })
 
     context = {
@@ -263,6 +284,7 @@ def planes(request):
         'empresa': empresa,
         'estado_plan': estado_plan,
         'dias_restantes': dias_restantes,
+        'plan_actual_rango': plan_actual_rango,
         'wompi_public_key': getattr(settings, 'WOMPI_PUBLIC_KEY', ''),
         'wompi_sandbox': getattr(settings, 'WOMPI_SANDBOX', True),
     }
