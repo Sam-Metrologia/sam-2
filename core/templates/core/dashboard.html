@@ -781,23 +781,13 @@
                     </div>
                 </div>
                 <div class="flex-shrink-0 flex flex-col items-end gap-2">
-                    {% if request.user.is_administrador or request.user.is_gerente %}
-                    <button onclick="document.getElementById('modal-renovacion').classList.remove('hidden')"
-                       class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors duration-150">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                        </svg>
-                        Renovar / Agregar
-                    </button>
-                    {% else %}
                     <a href="{% url 'core:planes' %}"
                        class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors duration-150">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                         </svg>
-                        Agregar capacidad
+                        Renovar / Agregar
                     </a>
-                    {% endif %}
                     {% if request.user.is_administrador or request.user.is_gerente %}
                     <form method="post" action="{% url 'core:toggle_renovacion_automatica' %}">
                         {% csrf_token %}
@@ -2692,11 +2682,8 @@
 </script>
 {% endif %}
 
-{% if request.user.is_administrador or request.user.is_gerente %}
-<!-- ================================================================ -->
-<!-- MODAL DE RENOVACIÓN / AGREGAR CAPACIDAD                          -->
-<!-- ================================================================ -->
-<div id="modal-renovacion" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+{% if False %}{# modal-renovacion eliminado: flujo de compra unificado en /core/planes/ #}
+<div id="modal-renovacion-eliminado">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
 
     <!-- Encabezado -->
