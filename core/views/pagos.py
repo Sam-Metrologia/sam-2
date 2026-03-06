@@ -1018,7 +1018,7 @@ def _validar_reduccion_addons(empresa, plan_key, nuevos_addons):
         - (empresa.addons_recurrentes.get('bloques_equipos', 0) * 50)
     )
     nuevo_limite_eq = equipos_base + int(nuevos_addons.get('bloques_equipos', 0)) * 50
-    equipos_activos = empresa.equipos.filter(is_deleted=False).exclude(estado='Dado de Baja').count()
+    equipos_activos = empresa.equipos.exclude(estado__in=['De Baja', 'Inactivo']).count()
     if equipos_activos > nuevo_limite_eq:
         errores.append(
             f"Tienes {equipos_activos} equipos activos. El nuevo límite sería {nuevo_limite_eq}. "

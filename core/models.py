@@ -901,6 +901,13 @@ class Empresa(models.Model):
         if self.addons_recurrentes:
             self.activar_addons(self.addons_recurrentes)
 
+        # Invalidar caché del dashboard para que refleje el nuevo plan inmediatamente
+        try:
+            from core.signals import invalidate_dashboard_cache
+            invalidate_dashboard_cache(self.id)
+        except Exception:
+            pass
+
         # Log de la transición
         import logging
         logger = logging.getLogger(__name__)
@@ -957,6 +964,14 @@ class Empresa(models.Model):
             'limite_almacenamiento_mb',
             'slots_usuarios_pendientes',
         ])
+
+        # Invalidar caché del dashboard para que refleje los nuevos límites
+        try:
+            from core.signals import invalidate_dashboard_cache
+            invalidate_dashboard_cache(self.id)
+        except Exception:
+            pass
+
         logger.info(
             f"Add-ons activados para empresa {self.nombre}: "
             f"+{usuarios_extra} usuarios, +{equipos_extra} equipos, "
