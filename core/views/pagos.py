@@ -758,36 +758,48 @@ def _enviar_email_confirmacion_addon(transaccion):
 # Renovación Automática — Payment Source
 # ============================================================================
 
-def _guardar_payment_source(transaccion, card_token):
-    """Crea un payment_source en Wompi y guarda el ID en la empresa."""
+def _guardar_payment_source(empresa, card_token, customer_email,
+                            acceptance_token='', personal_auth_token=''):
+    """
+    Crea un payment_source en Wompi y guarda el ID en la empresa.
+    Devuelve el payment_source_id (str) si tuvo éxito, None si falló.
+    """
     private_key = getattr(settings, 'WOMPI_PRIVATE_KEY', '')
     if not private_key:
         logger.warning("WOMPI_PRIVATE_KEY no configurado; no se puede crear payment_source.")
-        return
-    correos = _get_correos_empresa(transaccion.empresa)
-    correo = correos[0] if correos else ''
+        return None
+    payload = {
+        'type': 'CARD',
+        'token': card_token,
+        'customer_email': customer_email,
+    }
+    if acceptance_token:
+        payload['acceptance_token'] = acceptance_token
+    if personal_auth_token:
+        payload['accept_personal_auth'] = personal_auth_token
     try:
         r = _requests.post(
             f"{_get_wompi_base_url()}/payment_sources",
-            json={'type': 'CARD', 'token': card_token, 'customer_email': correo},
+            json=payload,
             headers={'Authorization': f'Bearer {private_key}'},
             timeout=10,
         )
         if r.status_code in (200, 201):
             ps_id = r.json().get('data', {}).get('id')
             if ps_id:
-                transaccion.empresa.wompi_payment_source_id = str(ps_id)
-                transaccion.empresa.save(update_fields=['wompi_payment_source_id'])
-                logger.info(
-                    f"Payment source guardado para {transaccion.empresa.nombre}: {ps_id}"
-                )
-        else:
-            logger.warning(
-                f"Wompi /payment_sources devolvió {r.status_code} para "
-                f"{transaccion.empresa.nombre}: {r.text[:200]}"
-            )
+                empresa.wompi_payment_source_id = str(ps_id)
+                empresa.renovacion_automatica = True
+                empresa.save(update_fields=['wompi_payment_source_id', 'renovacion_automatica'])
+                logger.info(f"Payment source guardado para {empresa.nombre}: {ps_id}")
+                return str(ps_id)
+        logger.warning(
+            f"Wompi /payment_sources devolvió {r.status_code} para "
+            f"{empresa.nombre}: {r.text[:200]}"
+        )
+        return None
     except Exception as e:
         logger.error(f"Error creando payment_source en Wompi: {e}")
+        return None
 
 
 # ============================================================================
@@ -946,16 +958,6 @@ def wompi_webhook(request):
                     logger.error(
                         f"Error activando plan para empresa {transaccion.empresa.nombre}: {e}"
                     )
-
-                # Guardar token de tarjeta si el cliente activó renovación automática
-                card_token = transaction_data.get('payment_method', {}).get('token')
-                if (card_token
-                        and transaccion.empresa.renovacion_automatica
-                        and not transaccion.empresa.wompi_payment_source_id):
-                    try:
-                        _guardar_payment_source(transaccion, card_token)
-                    except Exception as e:
-                        logger.error(f"Error guardando payment source: {e}")
 
                 # Si viene de un LinkPago, aplicar add-ons y marcarlo como pagado
                 link_token = (transaccion.datos_addon or {}).get('_link_pago_token')
@@ -1376,3 +1378,89 @@ def toggle_renovacion_automatica(request):
     estado = 'activada' if empresa.renovacion_automatica else 'desactivada'
     messages.success(request, f"Renovación automática {estado}.")
     return redirect(request.POST.get('next', 'core:planes'))
+
+
+# ============================================================================
+# Guardar Tarjeta para Autopago
+# ============================================================================
+
+@login_required
+def guardar_tarjeta_autopago(request):
+    """
+    Permite al administrador/gerente guardar una tarjeta para cobros automáticos.
+
+    GET:  Obtiene los acceptance_tokens de Wompi y renderiza el formulario.
+    POST: Recibe el card_token (ya tokenizado en el frontend vía JS + public_key)
+          y crea un payment_source en Wompi con la clave privada.
+    """
+    empresa = request.user.empresa
+    if not empresa:
+        return HttpResponseForbidden()
+    if not (request.user.is_administrador() or request.user.is_gerente()):
+        return HttpResponseForbidden()
+
+    public_key = getattr(settings, 'WOMPI_PUBLIC_KEY', '')
+    wompi_base = _get_wompi_base_url()
+
+    if request.method == 'POST':
+        card_token = request.POST.get('card_token', '').strip()
+        acceptance_token = request.POST.get('acceptance_token', '').strip()
+        personal_auth_token = request.POST.get('personal_auth_token', '').strip()
+
+        if not card_token:
+            messages.error(request, "No se recibió el token de tarjeta. Verifica los datos e intenta de nuevo.")
+            return redirect('core:guardar_tarjeta_autopago')
+
+        correos = _get_correos_empresa(empresa)
+        correo = correos[0] if correos else empresa.email or ''
+
+        ps_id = _guardar_payment_source(
+            empresa, card_token, correo,
+            acceptance_token=acceptance_token,
+            personal_auth_token=personal_auth_token,
+        )
+        if ps_id:
+            messages.success(
+                request,
+                "Tarjeta guardada correctamente. Tu plan se renovará automáticamente al vencer."
+            )
+            return redirect('core:planes')
+        else:
+            messages.error(
+                request,
+                "No se pudo guardar la tarjeta. Verifica los datos o usa una tarjeta diferente."
+            )
+            return redirect('core:guardar_tarjeta_autopago')
+
+    # GET — obtener acceptance_tokens de Wompi
+    acceptance_token = personal_auth_token = terms_permalink = personal_permalink = ''
+    try:
+        r = _requests.get(
+            f"{wompi_base}/merchants/{public_key}",
+            timeout=10,
+        )
+        if r.status_code == 200:
+            data = r.json().get('data', {})
+            presigned = data.get('presigned_acceptance', {})
+            presigned_personal = data.get('presigned_personal_data_auth', {})
+            acceptance_token = presigned.get('acceptance_token', '')
+            personal_auth_token = presigned_personal.get('acceptance_token', '')
+            terms_permalink = presigned.get('permalink', '')
+            personal_permalink = presigned_personal.get('permalink', '')
+        else:
+            logger.warning(f"Wompi /merchants devolvió {r.status_code}")
+    except Exception as e:
+        logger.error(f"Error obteniendo acceptance tokens de Wompi: {e}")
+        messages.warning(request, "No se pudo conectar con el sistema de pagos. Intenta más tarde.")
+        return redirect('core:planes')
+
+    return render(request, 'core/guardar_tarjeta.html', {
+        'empresa': empresa,
+        'public_key': public_key,
+        'wompi_sandbox': getattr(settings, 'WOMPI_SANDBOX', True),
+        'wompi_base_url': wompi_base,
+        'acceptance_token': acceptance_token,
+        'personal_auth_token': personal_auth_token,
+        'terms_permalink': terms_permalink,
+        'personal_permalink': personal_permalink,
+    })

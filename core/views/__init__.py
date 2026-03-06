@@ -102,6 +102,7 @@ from .pagos import (
     planes, iniciar_pago, iniciar_addon_pago, pago_resultado, pago_no_disponible,
     wompi_webhook, test_pago_view, toggle_renovacion_automatica,
     generar_link_pago, pagar_link, pagar_link_confirmado,
+    guardar_tarjeta_autopago,
 )
 
 # Setup de usuarios post-compra
