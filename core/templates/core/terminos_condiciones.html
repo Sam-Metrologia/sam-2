@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static custom_filters %}
 
 {% block extra_head %}
 <style>
@@ -349,7 +349,7 @@
     <div style="margin-bottom: 2rem;">
         <h3 style="margin-bottom: 1rem; color: #2d3748; font-size: 1.3rem;">📜 Contrato Completo</h3>
         <div class="contrato-content">
-            {{ terminos.contenido_html|safe }}
+            {{ terminos.contenido_html|sanitize_html }}
         </div>
     </div>
 

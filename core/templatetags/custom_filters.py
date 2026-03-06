@@ -1,6 +1,58 @@
 from django import template
+from django.utils.safestring import mark_safe
 
 register = template.Library()
+
+
+# Tags HTML permitidos para contenido de términos y condiciones (texto legal)
+_TERMINOS_ALLOWED_TAGS = {
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "p", "br", "hr",
+    "strong", "b", "em", "i", "u", "s", "del", "ins",
+    "ul", "ol", "li",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "blockquote", "pre", "code",
+    "a", "span", "div", "section", "article",
+    "sup", "sub",
+}
+
+# Atributos permitidos por tag (scripts y on* quedan fuera)
+_TERMINOS_ALLOWED_ATTRS = {
+    "a": {"href", "title", "target"},
+    "td": {"colspan", "rowspan"},
+    "th": {"colspan", "rowspan", "scope"},
+    "div": {"class"},
+    "p": {"class"},
+    "span": {"class"},
+    "h1": {"class"}, "h2": {"class"}, "h3": {"class"},
+    "h4": {"class"}, "h5": {"class"}, "h6": {"class"},
+    "table": {"class"},
+    "ul": {"class"}, "ol": {"class"}, "li": {"class"},
+}
+
+
+@register.filter
+def sanitize_html(value):
+    """
+    Sanitiza HTML manteniendo etiquetas estructurales seguras pero eliminando
+    <script>, event handlers (on*) y atributos peligrosos (javascript: hrefs).
+    Usar en lugar de |safe para contenido HTML almacenado en BD.
+    """
+    if not value:
+        return ""
+    try:
+        import nh3
+        cleaned = nh3.clean(
+            str(value),
+            tags=_TERMINOS_ALLOWED_TAGS,
+            attributes=_TERMINOS_ALLOWED_ATTRS,
+            link_rel=None,  # no añadir rel="noopener" automático
+        )
+        return mark_safe(cleaned)
+    except ImportError:
+        # Si nh3 no está disponible, no renderizar HTML sin sanitizar
+        from django.utils.html import escape
+        return escape(str(value))
 
 
 @register.filter

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static custom_filters %}
 
 {% block extra_head %}
 <style>
@@ -133,7 +133,7 @@
     <div style="margin-bottom: 2rem;">
         <h3 style="margin-bottom: 1rem; color: #2d3748;">📜 Contrato que Aceptaste</h3>
         <div style="background-color: white; padding: 2rem; border-radius: 0.5rem; border: 2px solid #e2e8f0; max-height: 600px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-            {{ terminos.contenido_html|safe }}
+            {{ terminos.contenido_html|sanitize_html }}
         </div>
     </div>
 
