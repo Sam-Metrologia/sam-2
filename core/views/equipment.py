@@ -935,7 +935,7 @@ def eliminar_equipo(request, pk):
             messages.success(request, f'Equipo {codigo_interno} eliminado exitosamente.')
         except Exception as e:
             logger.error(f"Error eliminando equipo {equipo.codigo_interno}: {e}")
-            messages.error(request, f'Error al eliminar equipo: {str(e)}')
+            messages.error(request, 'No se pudo eliminar el equipo. Intenta de nuevo.')
 
         return redirect('core:home')
 
@@ -999,7 +999,7 @@ def inactivar_equipo(request, equipo_pk):
         messages.success(request, f'Equipo {equipo.codigo_interno} inactivado exitosamente.')
     except Exception as e:
         logger.error(f"Error inactivando equipo {equipo.codigo_interno}: {e}")
-        messages.error(request, f'Error al inactivar equipo: {str(e)}')
+        messages.error(request, 'No se pudo inactivar el equipo. Intenta de nuevo.')
 
     return redirect('core:detalle_equipo', pk=equipo.pk)
 
@@ -1042,7 +1042,7 @@ def activar_equipo(request, equipo_pk):
             messages.success(request, f'Equipo {equipo.codigo_interno} activado exitosamente.')
     except Exception as e:
         logger.error(f"Error activando equipo {equipo.codigo_interno}: {e}")
-        messages.error(request, f'Error al activar equipo: {str(e)}')
+        messages.error(request, 'No se pudo activar el equipo. Intenta de nuevo.')
 
     return redirect('core:detalle_equipo', pk=equipo.pk)
 
@@ -1083,7 +1083,7 @@ def _process_add_equipment_form(request, empresa_actual, limite_alcanzado):
             try:
                 StorageLimitValidator.validate_equipment_limit(equipo.empresa)
             except ValidationError as e:
-                messages.error(request, str(e))
+                messages.error(request, 'Ha ocurrido un error inesperado. Intenta de nuevo.')
                 return render(request, 'core/añadir_equipo.html', {
                     'form': form,
                     'titulo_pagina': 'Añadir Nuevo Equipo',
@@ -1106,7 +1106,7 @@ def _process_add_equipment_form(request, empresa_actual, limite_alcanzado):
 
         except Exception as e:
             logger.error(f"Error general al guardar equipo: {str(e)}")
-            messages.error(request, f'Error al guardar el equipo: {str(e)}')
+            messages.error(request, 'No se pudo guardar el equipo. Intenta de nuevo.')
     else:
         _show_form_errors(request, form)
 
@@ -1142,7 +1142,7 @@ def _process_edit_equipment_form(request, equipo):
 
         except Exception as e:
             logger.error(f"Error actualizando equipo {equipo.codigo_interno}: {str(e)}")
-            messages.error(request, f'Error al actualizar equipo: {str(e)}')
+            messages.error(request, 'No se pudo actualizar el equipo. Intenta de nuevo.')
     else:
         _show_form_errors(request, form)
 
@@ -1202,7 +1202,7 @@ def _validate_and_process_files(request, equipo, is_edit=False):
             try:
                 StorageLimitValidator.validate_storage_limit(equipo.empresa, total_file_size)
             except ValidationError as e:
-                messages.error(request, str(e))
+                messages.error(request, 'Ha ocurrido un error inesperado. Intenta de nuevo.')
                 return False
 
         # Procesar archivos
@@ -1237,7 +1237,7 @@ def _validate_and_process_files(request, equipo, is_edit=False):
 
     except Exception as e:
         logger.error(f"Error procesando archivos: {str(e)}")
-        messages.error(request, f'Error procesando archivos: {str(e)}')
+        messages.error(request, 'Error procesando los archivos. Intenta de nuevo.')
         return False
 
 
@@ -1448,7 +1448,7 @@ def equipos_eliminar_masivo(request):
             messages.success(request, f'{cantidad} equipo(s) eliminado(s) correctamente.')
         except Exception as e:
             logger.error(f"Error en eliminación masiva: {e}")
-            messages.error(request, f'Error al eliminar equipos: {str(e)}')
+            messages.error(request, 'No se pudieron eliminar los equipos. Intenta de nuevo.')
 
         return redirect('core:home')
 

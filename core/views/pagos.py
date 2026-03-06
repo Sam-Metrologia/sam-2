@@ -1386,14 +1386,19 @@ def toggle_renovacion_automatica(request):
         return HttpResponseForbidden()
     if not (request.user.is_administrador() or request.user.is_gerente()):
         return HttpResponseForbidden()
-    empresa.renovacion_automatica = not empresa.renovacion_automatica
+    # Usa el estado explícito enviado por el form para evitar inconsistencias con caché
+    activar = request.POST.get('activar')
+    if activar is not None:
+        empresa.renovacion_automatica = (activar == '1')
+    else:
+        empresa.renovacion_automatica = not empresa.renovacion_automatica
     empresa.save(update_fields=['renovacion_automatica'])
     try:
         from core.signals import invalidate_dashboard_cache
         invalidate_dashboard_cache(empresa.id)
     except Exception:
         pass
-    estado = 'activada' if empresa.renovacion_automatica else 'desactivada'
+    estado = 'activa' if empresa.renovacion_automatica else 'inactiva'
     messages.success(request, f"Renovación automática {estado}.")
     return redirect(request.POST.get('next', 'core:planes'))
 

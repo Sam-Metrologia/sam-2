@@ -475,7 +475,6 @@ def activar_plan_pagado(request, empresa_id):
 @access_check
 @login_required
 @require_POST
-@csrf_exempt
 def update_empresa_formato(request):
     """
     Actualiza la información de formato de empresa via AJAX POST.

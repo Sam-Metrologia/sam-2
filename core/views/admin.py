@@ -57,7 +57,6 @@ def redirect_to_change_password(request, pk):
 @login_required
 @superuser_required
 @require_POST
-@csrf_exempt
 def toggle_download_permission(request):
     """
     Alterna permisos de descarga de un usuario vía AJAX.
@@ -429,7 +428,6 @@ def change_user_password(request, pk):
 @login_required
 @superuser_required
 @require_POST
-@csrf_exempt
 def toggle_user_active_status(request):
     """
     Alterna el estado 'is_active' de un usuario vía AJAX.

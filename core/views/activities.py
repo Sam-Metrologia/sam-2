@@ -67,14 +67,14 @@ def añadir_calibracion(request, equipo_pk):
 
             except ValidationError as e:
                 logger.error(f"[ERROR] ERROR DE VALIDACIÓN: {e}")
-                messages.error(request, str(e))
+                messages.error(request, 'Ha ocurrido un error inesperado. Intenta de nuevo.')
                 return _render_calibracion_form_with_error(request, equipo, CalibracionForm(empresa=equipo.empresa))
             except Exception as e:
                 logger.error(f"[ERROR] ERROR GENERAL al guardar calibración: {e}")
                 logger.error(f"Tipo de error: {type(e).__name__}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                messages.error(request, f'Hubo un error al guardar la calibración: {e}')
+                messages.error(request, 'No se pudo guardar la calibración. Intenta de nuevo.')
         else:
             logger.error("[ERROR] FORMULARIO INVÁLIDO")
             logger.error(f"Errores del formulario: {form.errors}")
@@ -131,7 +131,7 @@ def editar_calibracion(request, equipo_pk, pk):
 
             except Exception as e:
                 logger.error(f"ERROR al actualizar calibración: {e}")
-                messages.error(request, f'Hubo un error al actualizar la calibración: {e}')
+                messages.error(request, 'No se pudo actualizar la calibración. Intenta de nuevo.')
     else:
         form = CalibracionForm(instance=calibracion, empresa=equipo.empresa)
 
@@ -167,7 +167,7 @@ def eliminar_calibracion(request, equipo_pk, pk):
             messages.success(request, 'Calibración eliminada exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
-            messages.error(request, f'Error al eliminar la calibración: {e}')
+            messages.error(request, 'No se pudo eliminar la calibración. Intenta de nuevo.')
             logger.error(f"Error al eliminar calibración {calibracion.pk}: {e}")
             return redirect('core:detalle_equipo', pk=equipo.pk)
 
@@ -229,14 +229,14 @@ def añadir_mantenimiento(request, equipo_pk):
 
             except ValidationError as e:
                 logger.error(f"[ERROR] ERROR DE VALIDACIÓN MANTENIMIENTO: {e}")
-                messages.error(request, str(e))
+                messages.error(request, 'Ha ocurrido un error inesperado. Intenta de nuevo.')
                 return _render_mantenimiento_form_with_error(request, equipo, MantenimientoForm(empresa=equipo.empresa))
             except Exception as e:
                 logger.error(f"[ERROR] ERROR GENERAL al guardar mantenimiento: {e}")
                 logger.error(f"Tipo de error: {type(e).__name__}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                messages.error(request, f'Hubo un error al guardar el mantenimiento: {e}')
+                messages.error(request, 'No se pudo guardar el mantenimiento. Intenta de nuevo.')
         else:
             logger.error("[ERROR] FORMULARIO MANTENIMIENTO INVÁLIDO")
             logger.error(f"Errores del formulario: {form.errors}")
@@ -290,7 +290,7 @@ def editar_mantenimiento(request, equipo_pk, pk):
 
             except Exception as e:
                 logger.error(f"ERROR al actualizar mantenimiento: {e}")
-                messages.error(request, f'Hubo un error al actualizar el mantenimiento: {e}')
+                messages.error(request, 'No se pudo actualizar el mantenimiento. Intenta de nuevo.')
     else:
         form = MantenimientoForm(instance=mantenimiento, empresa=equipo.empresa)
 
@@ -326,7 +326,7 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
             messages.success(request, 'Mantenimiento eliminado exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
-            messages.error(request, f'Error al eliminar el mantenimiento: {e}')
+            messages.error(request, 'No se pudo eliminar el mantenimiento. Intenta de nuevo.')
             logger.error(f"Error al eliminar mantenimiento {mantenimiento.pk}: {e}")
             return redirect('core:detalle_equipo', pk=equipo.pk)
 
@@ -417,14 +417,14 @@ def añadir_comprobacion(request, equipo_pk):
 
             except ValidationError as e:
                 logger.error(f"[ERROR] ERROR DE VALIDACIÓN COMPROBACIÓN: {e}")
-                messages.error(request, str(e))
+                messages.error(request, 'Ha ocurrido un error inesperado. Intenta de nuevo.')
                 return _render_comprobacion_form_with_error(request, equipo, ComprobacionForm(empresa=equipo.empresa))
             except Exception as e:
                 logger.error(f"[ERROR] ERROR GENERAL al guardar comprobación: {e}")
                 logger.error(f"Tipo de error: {type(e).__name__}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                messages.error(request, f'Hubo un error al guardar la comprobación: {e}')
+                messages.error(request, 'No se pudo guardar la comprobación. Intenta de nuevo.')
         else:
             logger.error("[ERROR] FORMULARIO COMPROBACIÓN INVÁLIDO")
             logger.error(f"Errores del formulario: {form.errors}")
@@ -478,7 +478,7 @@ def editar_comprobacion(request, equipo_pk, pk):
 
             except Exception as e:
                 logger.error(f"ERROR al actualizar comprobación: {e}")
-                messages.error(request, f'Hubo un error al actualizar la comprobación: {e}')
+                messages.error(request, 'No se pudo actualizar la comprobación. Intenta de nuevo.')
     else:
         form = ComprobacionForm(instance=comprobacion, empresa=equipo.empresa)
 
@@ -514,7 +514,7 @@ def eliminar_comprobacion(request, equipo_pk, pk):
             messages.success(request, 'Comprobación eliminada exitosamente.')
             return redirect('core:detalle_equipo', pk=equipo.pk)
         except Exception as e:
-            messages.error(request, f'Error al eliminar la comprobación: {e}')
+            messages.error(request, 'No se pudo eliminar la comprobación. Intenta de nuevo.')
             logger.error(f"Error al eliminar comprobación {comprobacion.pk}: {e}")
             return redirect('core:detalle_equipo', pk=equipo.pk)
 
