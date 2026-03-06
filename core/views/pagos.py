@@ -881,11 +881,25 @@ def wompi_webhook(request):
                         lp = LinkPago.objects.get(token=link_token)
                         lp.estado = 'pagado'
                         lp.save(update_fields=['estado'])
-                        # Actualizar addons_recurrentes
+                        # El link ya guardó addons_recurrentes en generar_link_pago()
+                        # Solo confirmamos que coincide con lo pagado
                         transaccion.empresa.addons_recurrentes = datos_addon_limpios
                         transaccion.empresa.save(update_fields=['addons_recurrentes'])
                     except LinkPago.DoesNotExist:
                         pass
+                else:
+                    # Pago directo (sin link) — acumular en addons_recurrentes
+                    # para que la renovación automática los incluya el próximo ciclo
+                    if datos_addon_limpios:
+                        recurrentes = dict(transaccion.empresa.addons_recurrentes or {})
+                        for k, v in datos_addon_limpios.items():
+                            recurrentes[k] = recurrentes.get(k, 0) + int(v or 0)
+                        transaccion.empresa.addons_recurrentes = recurrentes
+                        transaccion.empresa.save(update_fields=['addons_recurrentes'])
+                        logger.info(
+                            f"addons_recurrentes actualizado para {transaccion.empresa.nombre}: "
+                            f"{recurrentes}"
+                        )
             else:
                 logger.warning(f"Transacción addon {referencia} aprobada pero sin datos_addon")
         else:
