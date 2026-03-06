@@ -790,6 +790,11 @@ def _guardar_payment_source(empresa, card_token, customer_email,
                 empresa.wompi_payment_source_id = str(ps_id)
                 empresa.renovacion_automatica = True
                 empresa.save(update_fields=['wompi_payment_source_id', 'renovacion_automatica'])
+                try:
+                    from core.signals import invalidate_dashboard_cache
+                    invalidate_dashboard_cache(empresa.id)
+                except Exception:
+                    pass
                 logger.info(f"Payment source guardado para {empresa.nombre}: {ps_id}")
                 return str(ps_id)
         logger.warning(
@@ -1375,6 +1380,11 @@ def toggle_renovacion_automatica(request):
         return HttpResponseForbidden()
     empresa.renovacion_automatica = not empresa.renovacion_automatica
     empresa.save(update_fields=['renovacion_automatica'])
+    try:
+        from core.signals import invalidate_dashboard_cache
+        invalidate_dashboard_cache(empresa.id)
+    except Exception:
+        pass
     estado = 'activada' if empresa.renovacion_automatica else 'desactivada'
     messages.success(request, f"Renovación automática {estado}.")
     return redirect(request.POST.get('next', 'core:planes'))
