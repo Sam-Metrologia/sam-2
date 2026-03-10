@@ -576,7 +576,15 @@ class MantenimientoForm(forms.ModelForm):
 
     class Meta:
         model = Mantenimiento
-        exclude = ('equipo',)
+        exclude = (
+            'equipo',
+            'tiempo_empleado_horas',
+            'tecnico_asignado_sam',
+            'costo_interno',
+            'fecha_realizacion',
+            'fecha_emision',
+            'fecha_aprobacion_ajustable',
+        )
         widgets = {
             'proveedor': forms.Select(attrs={'class': 'form-select'}),
             'nombre_proveedor': forms.TextInput(attrs={'class': 'form-input', 'maxlength': '255'}),

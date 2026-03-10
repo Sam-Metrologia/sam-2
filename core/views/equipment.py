@@ -38,6 +38,7 @@ def home(request):
     query = request.GET.get('q')
     tipo_equipo_filter = request.GET.get('tipo_equipo')
     estado_filter = request.GET.get('estado')
+    orden_filter = request.GET.get('orden')
 
     # Lógica para el filtro de empresa para superusuarios y obtener info de formato
     selected_company_id = request.GET.get('empresa_id')
@@ -117,6 +118,16 @@ def home(request):
         if not user.is_superuser or (user.is_superuser and not selected_company_id):
             equipos_list = equipos_list.exclude(estado=ESTADO_DE_BAJA).exclude(estado=ESTADO_INACTIVO)
 
+    # Ordenamiento por fecha de próxima actividad (nulls al final)
+    from django.db.models import F
+    ORDEN_MAP = {
+        'calibracion': F('proxima_calibracion').asc(nulls_last=True),
+        'mantenimiento': F('proximo_mantenimiento').asc(nulls_last=True),
+        'comprobacion': F('proxima_comprobacion').asc(nulls_last=True),
+    }
+    if orden_filter in ORDEN_MAP:
+        equipos_list = equipos_list.order_by(ORDEN_MAP[orden_filter])
+
     # Añadir lógica para el estado de las fechas de próxima actividad
     for equipo in equipos_list:
         # Calibración
@@ -190,6 +201,7 @@ def home(request):
         'current_company_format_info': current_company_format_info,
         'limite_alcanzado': limite_alcanzado,
         'proximas_actividades': proximas_actividades,
+        'orden_filter': orden_filter or '',
     }
     return render(request, 'core/home.html', context)
 
