@@ -29,7 +29,8 @@ class RateLimitMiddleware(MiddlewareMixin):
         client_ip = self.get_client_ip(request)
 
         # Aplicar diferentes límites según la ruta
-        if request.path.startswith('/core/login/'):
+        # Solo contar intentos POST (login real), no cargas de página GET
+        if request.path.startswith('/core/login/') and request.method == 'POST':
             return self.check_rate_limit(
                 request, client_ip, 'LOGIN_ATTEMPTS',
                 rate_config.get('LOGIN_ATTEMPTS', {'limit': 5, 'period': 300})

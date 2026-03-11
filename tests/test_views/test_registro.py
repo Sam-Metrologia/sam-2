@@ -142,7 +142,7 @@ class TestSolicitarTrialPOSTValido:
         assert get_exitoso_url() in response.url
 
     def test_credenciales_en_sesion(self, client):
-        """Las credenciales se guardan en la sesión."""
+        """Las credenciales se guardan en la sesión con contraseñas aleatorias seguras."""
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
         session = client.session
         creds = session.get('trial_credenciales')
@@ -151,10 +151,10 @@ class TestSolicitarTrialPOSTValido:
         assert creds['admin']['username'] == ADMIN_USERNAME
         assert creds['gerente']['username'] == GERENTE_USERNAME
         assert creds['tecnico']['username'] == TECNICO_USERNAME
-        # Las contraseñas siguen formato Rol.NIT
-        assert creds['admin']['password'] == 'Dir.900123456-7'
-        assert creds['gerente']['password'] == 'Ger.900123456-7'
-        assert creds['tecnico']['password'] == 'Tec.900123456-7'
+        # Contraseñas aleatorias seguras de 16 caracteres
+        assert creds['admin']['password'] and len(creds['admin']['password']) == 16
+        assert creds['gerente']['password'] and len(creds['gerente']['password']) == 16
+        assert creds['tecnico']['password'] and len(creds['tecnico']['password']) == 16
 
 
 # ============================================================================

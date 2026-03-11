@@ -75,72 +75,81 @@ logger = logging.getLogger('core')
 
 
 # ==============================================================================
-# 📋 TABLA DE CONTENIDOS - NAVEGACIÓN RÁPIDA
+# TABLA DE CONTENIDOS - NAVEGACION RAPIDA
 # ==============================================================================
 """
-Este archivo contiene TODOS los modelos del sistema SAM Metrología (3,214 líneas).
-Use Ctrl+F para buscar rápidamente por número de línea o nombre de modelo.
+Este archivo contiene TODOS los modelos del sistema SAM Metrologia (~4,600 lineas).
+Use Ctrl+F para buscar por numero de linea o nombre de modelo.
 
 ESTRUCTURA DEL ARCHIVO:
 ------------------------
 
-1. FUNCIONES AUXILIARES ................................. líneas 29-62
-   └─ meses_decimales_a_relativedelta()
-   └─ get_upload_path()
+1. FUNCIONES AUXILIARES ....................................... lineas 150-212
+   meses_decimales_a_relativedelta()
+   get_upload_path()
 
-2. EMPRESA Y SUSCRIPCIONES .............................. líneas 68-850
-   ├─ Empresa (línea 68) ................................. Multi-tenant principal
-   │  └─ Relaciones: usuarios, equipos, ubicaciones, procedimientos, proveedores
-   └─ PlanSuscripcion (línea 825) ........................ Planes de pago
+2. EMPRESA Y SUSCRIPCIONES .................................... lineas 213-1427
+   Empresa        (linea  213)  Multi-tenant principal; stats pre-computadas del dashboard
+   PlanSuscripcion(linea 1401)  Planes de suscripcion historicos
 
-3. USUARIOS ............................................. líneas 852-1050
-   └─ CustomUser (línea 852) ............................. Usuario personalizado
-      └─ Roles: GERENCIA, OPERATIVO, VISUALIZADOR
+3. USUARIOS ................................................... lineas 1428-1628
+   CustomUser     (linea 1428)  Usuario personalizado (AbstractUser)
+                                Roles: Administrador, Tecnico, Visualizador
 
-4. CATÁLOGOS BÁSICOS .................................... líneas 1053-1157
-   ├─ Unidad (línea 1053) ................................ Unidades de medida
-   ├─ Ubicacion (línea 1067) ............................. Ubicaciones físicas
-   ├─ Procedimiento (línea 1092) ......................... Procedimientos técnicos
-   └─ Proveedor (línea 1123) ............................. Proveedores de servicios
+4. CATALOGOS BASICOS .......................................... lineas 1629-1734
+   Unidad         (linea 1629)  Unidades de medida
+   Ubicacion      (linea 1643)  Ubicaciones fisicas
+   Procedimiento  (linea 1668)  Procedimientos tecnicos
+   Proveedor      (linea 1699)  Proveedores de servicios
 
-5. EQUIPOS .............................................. líneas 1159-1428
-   └─ Equipo (línea 1159) ................................ Modelo principal de equipos
-      └─ Relaciones: calibraciones, mantenimientos, comprobaciones
+5. EQUIPOS .................................................... lineas 1735-2026
+   Equipo         (linea 1735)  Modelo principal; recalcula proximas_fechas en save()
 
-6. ACTIVIDADES METROLÓGICAS ............................. líneas 1430-1664
-   ├─ Calibracion (línea 1430) ........................... Certificados de calibración
-   ├─ Mantenimiento (línea 1494) ......................... Mantenimientos preventivos
-   └─ Comprobacion (línea 1585) .......................... Comprobaciones metrológicas
+6. ACTIVIDADES METROLOGICAS ................................... lineas 2027-2613
+   Calibracion    (linea 2027)  Certificados de calibracion
+   Mantenimiento  (linea 2249)  Mantenimientos preventivos/correctivos
+   Comprobacion   (linea 2347)  Comprobaciones intermedias
 
-7. DOCUMENTACIÓN Y BAJAS ................................ líneas 1666-1891
-   ├─ BajaEquipo (línea 1666) ............................ Registro de bajas
-   └─ Documento (línea 1693) ............................. Documentos generales
+7. DOCUMENTACION Y BAJAS ...................................... lineas 2614-2840
+   BajaEquipo     (linea 2614)  Registro de bajas de equipo
+   Documento      (linea 2641)  Documentos adjuntos generales
 
-8. SISTEMA DE ARCHIVOS ZIP .............................. líneas 1893-2006
-   ├─ ZipRequest (línea 1893) ............................ Solicitudes de ZIP
-   └─ NotificacionZip (línea 1973) ....................... Notificaciones de ZIP
+8. SISTEMA DE ARCHIVOS ZIP .................................... lineas 2841-2955
+   ZipRequest     (linea 2841)  Cola de solicitudes de descarga ZIP
+   NotificacionZip(linea 2921)  Notificaciones de ZIP listo
 
-9. CONFIGURACIÓN DEL SISTEMA ............................ líneas 2008-2679
-   ├─ EmailConfiguration (línea 2008) .................... Config de emails
-   └─ SystemScheduleConfig (línea 2234) .................. Config de programación
+9. CONFIGURACION DEL SISTEMA .................................. lineas 2956-3629
+   EmailConfiguration     (linea 2956)  Config de emails por empresa
+   SystemScheduleConfig   (linea 3182)  Config de tareas programadas
 
-10. MÉTRICAS Y NOTIFICACIONES ........................... líneas 2437-2790
-    ├─ MetricasEficienciaMetrologica (línea 2437) ........ Métricas de eficiencia
-    └─ NotificacionVencimiento (línea 2681) .............. Notificaciones
+10. METRICAS Y NOTIFICACIONES ................................. lineas 3385-3739
+    MetricasEficienciaMetrologica(linea 3385)  Metricas KPIs anuales
+    NotificacionVencimiento      (linea 3629)  Notificaciones de vencimiento
 
-11. TÉRMINOS Y CONDICIONES .............................. líneas 2792-2975
-    ├─ TerminosYCondiciones (línea 2792) ................. T&C del sistema
-    └─ AceptacionTerminos (línea 2859) ................... Aceptación de usuarios
+11. TERMINOS Y CONDICIONES .................................... lineas 3740-3924
+    TerminosYCondiciones  (linea 3740)  T&C legales del sistema
+    AceptacionTerminos    (linea 3807)  Registro de aceptacion por usuario
 
-12. SISTEMA Y MANTENIMIENTO ............................. líneas 2977-3214
-    ├─ MaintenanceTask (línea 2977) ...................... Tareas de mantenimiento
-    ├─ CommandLog (línea 3083) ........................... Log de comandos
-    └─ SystemHealthCheck (línea 3126) .................... Chequeos de salud
+12. SISTEMA Y MANTENIMIENTO ................................... lineas 3925-4151
+    MaintenanceTask   (linea 3925)  Tareas de mantenimiento del sistema
+    CommandLog        (linea 4031)  Log de comandos de gestion
+    SystemHealthCheck (linea 4074)  Chequeos de salud del sistema
 
-TOTAL MODELOS: 24 clases
-TOTAL LÍNEAS: 3,214 líneas
+13. PRESTAMOS DE EQUIPOS ...................................... lineas 4152-4400
+    AgrupacionPrestamo(linea 4152)  Agrupaciones de prestamo
+    PrestamoEquipo    (linea 4186)  Prestamos individuales de equipo
 
-NOTA: Para refactorizar este archivo en módulos separados, ver:
+14. ONBOARDING ................................................ lineas 4401-4456
+    OnboardingProgress(linea 4401)  Progreso de onboarding (empresas trial)
+
+15. PAGOS WOMPI ............................................... lineas 4457-4600
+    TransaccionPago   (linea 4457)  Transacciones de pago con Wompi
+    LinkPago          (linea 4554)  Links de pago para clientes
+
+TOTAL MODELOS: 28 clases
+TOTAL LINEAS: ~4,600 lineas
+
+NOTA: Para refactorizar este archivo en modulos separados, ver:
       auditorias/RESULTADO_REFACTORIZACION_2025-12-05.md
 """
 
@@ -603,6 +612,30 @@ class Empresa(models.Model):
         help_text="Ej: ISO 17020, ISO 17025, ISO 9001"
     )
 
+    # ── Stats pre-computadas del dashboard ──────────────────────────────────────
+    stats_total_equipos = models.IntegerField(default=0)
+    stats_equipos_activos = models.IntegerField(default=0)
+    stats_equipos_inactivos = models.IntegerField(default=0)
+    stats_equipos_de_baja = models.IntegerField(default=0)
+
+    # Dependen de la fecha de hoy — se refrescan a diario por cron
+    stats_calibraciones_vencidas = models.IntegerField(default=0)
+    stats_calibraciones_proximas = models.IntegerField(default=0)
+    stats_mantenimientos_vencidos = models.IntegerField(default=0)
+    stats_mantenimientos_proximos = models.IntegerField(default=0)
+    stats_comprobaciones_vencidas = models.IntegerField(default=0)
+    stats_comprobaciones_proximas = models.IntegerField(default=0)
+
+    # Cumplimiento anual para tortas — formato: {"realizadas": N, "no_cumplidas": N, "pendientes": N}
+    stats_compliance_calibracion = models.JSONField(default=dict, blank=True)
+    stats_compliance_mantenimiento = models.JSONField(default=dict, blank=True)
+    stats_compliance_comprobacion = models.JSONField(default=dict, blank=True)
+
+    # Metadatos
+    stats_ultima_actualizacion = models.DateTimeField(null=True, blank=True)
+    stats_fecha_calculo = models.DateField(null=True, blank=True)
+    # ────────────────────────────────────────────────────────────────────────────
+
     class Meta:
         verbose_name = "Empresa"
         verbose_name_plural = "Empresas"
@@ -616,6 +649,111 @@ class Empresa(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    def recalcular_stats_dashboard(self):
+        """
+        Calcula y persiste las métricas del dashboard para esta empresa.
+
+        Reutiliza las funciones get_projected_activities_for_year() y
+        get_projected_maintenance_compliance_for_year() de dashboard.py.
+        Se llama desde señales (post_save/post_delete de Equipo, Calibracion,
+        Mantenimiento, Comprobacion) y desde el comando de gestión diario.
+        """
+        from django.db.models import Count, Case, When, IntegerField as IntF
+        from django.utils import timezone
+        from datetime import date, timedelta
+        from core.views.dashboard import (
+            get_projected_activities_for_year,
+            get_projected_maintenance_compliance_for_year,
+        )
+
+        today = date.today()
+        fecha_limite = today + timedelta(days=30)
+        year = today.year
+
+        equipos = self.equipos.prefetch_related('calibraciones', 'mantenimientos', 'comprobaciones')
+
+        # Conteos básicos — 1 query agregada
+        counts = equipos.aggregate(
+            total=Count('id'),
+            activos=Count(Case(When(estado='Activo', then=1), output_field=IntF())),
+            inactivos=Count(Case(When(estado='Inactivo', then=1), output_field=IntF())),
+            de_baja=Count(Case(When(estado='De Baja', then=1), output_field=IntF())),
+        )
+
+        # Actividades vencidas/proximas — solo equipos activos
+        equipos_activos = equipos.exclude(estado__in=['De Baja', 'Inactivo'])
+        actividades = equipos_activos.aggregate(
+            cal_v=Count(Case(When(
+                proxima_calibracion__isnull=False, proxima_calibracion__lt=today, then=1
+            ), output_field=IntF())),
+            cal_p=Count(Case(When(
+                proxima_calibracion__isnull=False,
+                proxima_calibracion__gte=today,
+                proxima_calibracion__lte=fecha_limite,
+                then=1,
+            ), output_field=IntF())),
+            mant_v=Count(Case(When(
+                proximo_mantenimiento__isnull=False, proximo_mantenimiento__lt=today, then=1
+            ), output_field=IntF())),
+            mant_p=Count(Case(When(
+                proximo_mantenimiento__isnull=False,
+                proximo_mantenimiento__gte=today,
+                proximo_mantenimiento__lte=fecha_limite,
+                then=1,
+            ), output_field=IntF())),
+            comp_v=Count(Case(When(
+                proxima_comprobacion__isnull=False, proxima_comprobacion__lt=today, then=1
+            ), output_field=IntF())),
+            comp_p=Count(Case(When(
+                proxima_comprobacion__isnull=False,
+                proxima_comprobacion__gte=today,
+                proxima_comprobacion__lte=fecha_limite,
+                then=1,
+            ), output_field=IntF())),
+        )
+
+        # Cumplimiento anual (queries N+1 — se ejecutan 1 vez y se guardan)
+        cal_proj = get_projected_activities_for_year(equipos_activos, 'calibracion', year, today)
+        comp_proj = get_projected_activities_for_year(equipos_activos, 'comprobacion', year, today)
+        mant_proj = get_projected_maintenance_compliance_for_year(equipos_activos, year, today)
+
+        def _contar(proyeccion):
+            r = n = p = 0
+            for item in proyeccion:
+                s = item['status']
+                if s == 'Realizado':
+                    r += 1
+                elif s == 'No Cumplido':
+                    n += 1
+                else:
+                    p += 1
+            return {'realizadas': r, 'no_cumplidas': n, 'pendientes': p}
+
+        self.stats_total_equipos = counts['total'] or 0
+        self.stats_equipos_activos = counts['activos'] or 0
+        self.stats_equipos_inactivos = counts['inactivos'] or 0
+        self.stats_equipos_de_baja = counts['de_baja'] or 0
+        self.stats_calibraciones_vencidas = actividades['cal_v'] or 0
+        self.stats_calibraciones_proximas = actividades['cal_p'] or 0
+        self.stats_mantenimientos_vencidos = actividades['mant_v'] or 0
+        self.stats_mantenimientos_proximos = actividades['mant_p'] or 0
+        self.stats_comprobaciones_vencidas = actividades['comp_v'] or 0
+        self.stats_comprobaciones_proximas = actividades['comp_p'] or 0
+        self.stats_compliance_calibracion = _contar(cal_proj)
+        self.stats_compliance_mantenimiento = _contar(mant_proj)
+        self.stats_compliance_comprobacion = _contar(comp_proj)
+        self.stats_ultima_actualizacion = timezone.now()
+        self.stats_fecha_calculo = today
+
+        self.save(update_fields=[
+            'stats_total_equipos', 'stats_equipos_activos', 'stats_equipos_inactivos',
+            'stats_equipos_de_baja', 'stats_calibraciones_vencidas', 'stats_calibraciones_proximas',
+            'stats_mantenimientos_vencidos', 'stats_mantenimientos_proximos',
+            'stats_comprobaciones_vencidas', 'stats_comprobaciones_proximas',
+            'stats_compliance_calibracion', 'stats_compliance_mantenimiento',
+            'stats_compliance_comprobacion', 'stats_ultima_actualizacion', 'stats_fecha_calculo',
+        ])
 
     def soft_delete(self, user=None, reason=None):
         """

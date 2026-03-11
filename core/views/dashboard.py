@@ -202,10 +202,11 @@ def dashboard(request):
 
     Optimizaciones implementadas:
     - Primera carga: <1s (optimizaciones de queries con prefetch)
-    - Cache deshabilitado temporalmente por issues de serialización
+    - Stats pre-computadas en Empresa para usuarios con empresa propia
+    - Cache del dashboard (5 min, invalidado por signals)
 
     Esta función ha sido refactorizada para mejor mantenibilidad.
-    La lógica compleja se ha dividido en funciones auxiliares.
+    La lógica compleja se ha dividida en funciones auxiliares.
     """
     user = request.user
     today = date.today()
@@ -223,42 +224,65 @@ def dashboard(request):
     # list() fuerza evaluación del QuerySet para que sea serializable en cache
     empresas_disponibles = list(Empresa.objects.filter(is_deleted=False).order_by('nombre'))
 
+    # Determinar si podemos usar stats pre-computadas
+    empresa = user.empresa if not user.is_superuser else None
+    usar_stats_cached = (
+        empresa is not None
+        and not user.is_superuser
+        and empresa.stats_fecha_calculo == today
+    )
+
     # Obtener queryset de equipos según permisos
     equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
 
-    # Equipos para dashboard (excluir De Baja e Inactivo para estadísticas y vencimientos)
-    equipos_para_dashboard = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
-
-    # Equipos para proyecciones anuales (TODOS los equipos, incluso inactivos/dados de baja)
-    # Si un equipo se dio de baja durante el año, sus actividades programadas siguen contando
-    equipos_para_proyecciones = equipos_queryset
-
-    # Estadísticas principales
-    estadisticas_equipos = _get_estadisticas_equipos(equipos_queryset)
-
-    # Datos de almacenamiento y límites
+    # Datos de almacenamiento, límites y plan (siempre se calculan igual)
     storage_data = _get_storage_data(user, selected_company_id)
     equipment_limits_data = _get_equipment_limits_data(user, selected_company_id, equipos_queryset)
-
-    # Información del plan
     plan_info_data = _get_plan_info(user, selected_company_id)
+    latest_corrective_maintenances = _get_latest_corrective_maintenances(user, selected_company_id)
+    prestamos_data = _get_prestamos_data(user, selected_company_id)
 
-    # Actividades vencidas y próximas
-    actividades_data = _get_actividades_data(equipos_para_dashboard, today)
+    if usar_stats_cached:
+        # ── Path rápido: stats pre-computadas desde la BD ──────────────────────
+        estadisticas_equipos = {
+            'total_equipos': empresa.stats_total_equipos,
+            'equipos_activos': empresa.stats_equipos_activos,
+            'equipos_inactivos': empresa.stats_equipos_inactivos,
+            'equipos_de_baja': empresa.stats_equipos_de_baja,
+        }
 
-    # Datos para gráficos
-    graficos_data = _get_graficos_data(equipos_queryset, equipos_para_dashboard, equipos_para_proyecciones, current_year, today)
+        # Conteos de actividades desde campos pre-computados
+        actividades_data = {
+            'calibraciones_vencidas': empresa.stats_calibraciones_vencidas,
+            'calibraciones_proximas': empresa.stats_calibraciones_proximas,
+            'mantenimientos_vencidos': empresa.stats_mantenimientos_vencidos,
+            'mantenimientos_proximas': empresa.stats_mantenimientos_proximos,
+            'comprobaciones_vencidas': empresa.stats_comprobaciones_vencidas,
+            'comprobaciones_proximas': empresa.stats_comprobaciones_proximas,
+        }
+
+        # Códigos de equipos vencidos — 1 sola query (rápida)
+        equipos_para_dashboard = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+        actividades_data.update(_get_vencidos_codigos(equipos_para_dashboard, today))
+
+        # Datos para gráficos: tortas desde JSON pre-computado + líneas normales
+        equipos_para_proyecciones = equipos_queryset
+        line_data = _get_line_chart_data(equipos_para_dashboard, equipos_para_proyecciones, today)
+        pie_data = _build_pie_data_from_empresa_stats(empresa, equipos_queryset)
+        graficos_data = {**line_data, **pie_data}
+    else:
+        # ── Path normal: cálculo completo (superusuario o stats no inicializados) ──
+        equipos_para_dashboard = equipos_queryset.exclude(estado__in=['De Baja', 'Inactivo'])
+        equipos_para_proyecciones = equipos_queryset
+
+        estadisticas_equipos = _get_estadisticas_equipos(equipos_queryset)
+        actividades_data = _get_actividades_data(equipos_para_dashboard, today)
+        graficos_data = _get_graficos_data(
+            equipos_queryset, equipos_para_dashboard, equipos_para_proyecciones, current_year, today
+        )
 
     # Generar datos JSON para gráficos
     chart_json_data = _get_chart_json_data(graficos_data)
-
-    # Chart data generado correctamente
-
-    # Mantenimientos correctivos recientes
-    latest_corrective_maintenances = _get_latest_corrective_maintenances(user, selected_company_id)
-
-    # Datos de préstamos de equipos (NUEVO)
-    prestamos_data = _get_prestamos_data(user, selected_company_id)
 
     # Construir contexto
     context = {
@@ -277,7 +301,7 @@ def dashboard(request):
         **actividades_data,
         **graficos_data,
         **chart_json_data,
-        **prestamos_data  # AGREGAR ESTA LÍNEA
+        **prestamos_data
     }
 
     # Cache por 5 minutos (invalidado automáticamente por signals)
@@ -526,31 +550,7 @@ def _get_actividades_data(equipos_para_dashboard, today):
     )
 
     # OPTIMIZACIÓN: Códigos de equipos vencidos en 1 query en lugar de 3
-    # Obtener todos los equipos vencidos con sus campos de vencimiento en una sola query
-    equipos_vencidos = equipos_para_dashboard.filter(
-        Q(proxima_calibracion__lt=today) |
-        Q(proximo_mantenimiento__lt=today) |
-        Q(proxima_comprobacion__lt=today)
-    ).values_list('codigo_interno', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion')
-
-    # Separar por tipo en Python (más rápido que 3 queries SQL)
-    vencidos_calibracion_codigos = []
-    vencidos_mantenimiento_codigos = []
-    vencidos_comprobacion_codigos = []
-
-    for codigo, prox_cal, prox_mant, prox_comp in equipos_vencidos:
-        if prox_cal and prox_cal < today:
-            vencidos_calibracion_codigos.append(codigo)
-        if prox_mant and prox_mant < today:
-            vencidos_mantenimiento_codigos.append(codigo)
-        if prox_comp and prox_comp < today:
-            vencidos_comprobacion_codigos.append(codigo)
-
-    estadisticas_actividades.update({
-        'vencidos_calibracion_codigos': vencidos_calibracion_codigos,
-        'vencidos_mantenimiento_codigos': vencidos_mantenimiento_codigos,
-        'vencidos_comprobacion_codigos': vencidos_comprobacion_codigos,
-    })
+    estadisticas_actividades.update(_get_vencidos_codigos(equipos_para_dashboard, today))
 
     return estadisticas_actividades
 
@@ -947,6 +947,99 @@ def _process_projected_activities_for_pie(projected_activities, prefix):
         f'{prefix}_no_cumplido_anual_percent': round((no_cumplido / total_programmed) * 100),
         f'{prefix}_pendiente_anual_percent': round((pendiente / total_programmed) * 100),
     }
+
+
+def _get_vencidos_codigos(equipos_para_dashboard, today):
+    """
+    Obtiene los códigos internos de equipos con actividades vencidas.
+    1 sola query — se usa tanto en el path normal como en el path de stats cached.
+    """
+    equipos_vencidos = equipos_para_dashboard.filter(
+        Q(proxima_calibracion__lt=today) |
+        Q(proximo_mantenimiento__lt=today) |
+        Q(proxima_comprobacion__lt=today)
+    ).values_list('codigo_interno', 'proxima_calibracion', 'proximo_mantenimiento', 'proxima_comprobacion')
+
+    vencidos_calibracion_codigos = []
+    vencidos_mantenimiento_codigos = []
+    vencidos_comprobacion_codigos = []
+
+    for codigo, prox_cal, prox_mant, prox_comp in equipos_vencidos:
+        if prox_cal and prox_cal < today:
+            vencidos_calibracion_codigos.append(codigo)
+        if prox_mant and prox_mant < today:
+            vencidos_mantenimiento_codigos.append(codigo)
+        if prox_comp and prox_comp < today:
+            vencidos_comprobacion_codigos.append(codigo)
+
+    return {
+        'vencidos_calibracion_codigos': vencidos_calibracion_codigos,
+        'vencidos_mantenimiento_codigos': vencidos_mantenimiento_codigos,
+        'vencidos_comprobacion_codigos': vencidos_comprobacion_codigos,
+    }
+
+
+def _build_pie_data_from_empresa_stats(empresa, equipos_queryset):
+    """
+    Construye datos para gráficos de torta usando stats pre-computadas de Empresa.
+    Retorna el mismo formato que _get_pie_chart_data().
+    """
+    from collections import defaultdict
+
+    def _expand(data, prefix):
+        r = data.get('realizadas', 0) if data else 0
+        n = data.get('no_cumplidas', 0) if data else 0
+        p = data.get('pendientes', 0) if data else 0
+        total = r + n + p
+        if total == 0:
+            return {
+                f'{prefix}_total_programmed_anual': 0,
+                f'{prefix}_realized_anual': 0,
+                f'{prefix}_no_cumplido_anual': 0,
+                f'{prefix}_pendiente_anual': 0,
+                f'{prefix}_realized_anual_percent': 0,
+                f'{prefix}_no_cumplido_anual_percent': 0,
+                f'{prefix}_pendiente_anual_percent': 0,
+            }
+        return {
+            f'{prefix}_total_programmed_anual': total,
+            f'{prefix}_realized_anual': r,
+            f'{prefix}_no_cumplido_anual': n,
+            f'{prefix}_pendiente_anual': p,
+            f'{prefix}_realized_anual_percent': round((r / total) * 100),
+            f'{prefix}_no_cumplido_anual_percent': round((n / total) * 100),
+            f'{prefix}_pendiente_anual_percent': round((p / total) * 100),
+        }
+
+    pie_data = {}
+
+    # Estados de equipos desde campos pre-computados
+    pie_data.update({
+        'estado_equipos_labels': ['Activo', 'Inactivo', 'De Baja'],
+        'estado_equipos_data': [
+            empresa.stats_equipos_activos,
+            empresa.stats_equipos_inactivos,
+            empresa.stats_equipos_de_baja,
+        ],
+    })
+
+    # Cumplimiento anual desde JSON pre-computado
+    pie_data.update(_expand(empresa.stats_compliance_calibracion, 'cal'))
+    pie_data.update(_expand(empresa.stats_compliance_comprobacion, 'comp'))
+    pie_data.update(_expand(empresa.stats_compliance_mantenimiento, 'mant'))
+
+    # Mantenimientos por tipo — 1 query rápida
+    mantenimientos_tipo_counts = defaultdict(int)
+    for mant in Mantenimiento.objects.filter(equipo__in=equipos_queryset):
+        mantenimientos_tipo_counts[mant.tipo_mantenimiento] += 1
+
+    pie_data.update({
+        'mantenimientos_tipo_labels': list(mantenimientos_tipo_counts.keys()),
+        'mantenimientos_tipo_data': list(mantenimientos_tipo_counts.values()),
+        'pie_chart_colors_mant_types': ['#ffc107', '#dc3545', '#17a2b8', '#6c757d', '#8672cb'],
+    })
+
+    return pie_data
 
 
 def _get_latest_corrective_maintenances(user, selected_company_id):

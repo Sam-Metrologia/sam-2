@@ -245,3 +245,19 @@ cronJobs:
           property: connectionString
       - key: SECRET_KEY
         sync: false
+
+  # 7. RECALCULAR STATS DASHBOARD - 2:00 AM Colombia (7:00 UTC)
+  # Refresca métricas de vencidas/próximas que dependen de la fecha de hoy
+  - name: recalcular-stats-dashboard
+    schedule: "0 7 * * *"  # Diaria a las 7:00 UTC = 2:00 AM Colombia
+    command: "python manage.py recalcular_stats_empresas"
+    runtime: python
+    plan: free
+    region: oregon
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sam-metrologia-db
+          property: connectionString
+      - key: SECRET_KEY
+        sync: false

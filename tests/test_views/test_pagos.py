@@ -91,6 +91,10 @@ def _firmar_payload(payload, events_secret):
     return hashlib.sha256(cadena.encode('utf-8')).hexdigest()
 
 
+# Secret fijo para todos los tests de webhook (evita depender de settings reales)
+_TEST_EVENTS_SECRET = 'test_events_secret_wompi_sam'
+
+
 # ============================================================================
 # C4 — Página de Planes
 # ============================================================================
@@ -439,7 +443,7 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_pago_aprobado_activa_plan(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED activa el plan de la empresa y marca transacción como aprobada."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''  # Sin validación de firma
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -451,7 +455,7 @@ class TestWompiWebhook:
         )
         payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
 
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 200
 
         tx.refresh_from_db()
@@ -465,7 +469,7 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_pago_rechazado_no_activa_plan(self, mock_settings, client, sample_empresa):
         """Webhook DECLINED no activa el plan y marca transacción como rechazada."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -478,7 +482,7 @@ class TestWompiWebhook:
         estado_prueba_antes = sample_empresa.es_periodo_prueba
 
         payload = _make_webhook_payload(tx.referencia_pago, estado='DECLINED')
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 200
 
         tx.refresh_from_db()
@@ -490,7 +494,7 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_webhook_es_idempotente(self, mock_settings, client, sample_empresa):
         """Webhook duplicado con APPROVED no reprocesa ni genera doble activación."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -501,7 +505,7 @@ class TestWompiWebhook:
             plan_seleccionado='MENSUAL',
         )
         payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 200
 
         tx.refresh_from_db()
@@ -510,17 +514,17 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_referencia_inexistente_retorna_404(self, mock_settings, client):
         """Webhook con referencia que no existe en BD retorna 404."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         payload = _make_webhook_payload('SAM-NO-EXISTE-999')
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 404
 
     @patch('core.views.pagos.settings')
     def test_guarda_datos_respuesta_wompi(self, mock_settings, client, sample_empresa):
         """El webhook almacena la respuesta completa de Wompi en datos_respuesta."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -531,7 +535,7 @@ class TestWompiWebhook:
             plan_seleccionado='MENSUAL',
         )
         payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
-        self._post_webhook(client, payload)
+        self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
 
         tx.refresh_from_db()
         assert tx.datos_respuesta is not None
@@ -540,7 +544,7 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_pago_aprobado_activa_plan_anual(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED para plan anual configura 12 meses de suscripción."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -551,7 +555,7 @@ class TestWompiWebhook:
             plan_seleccionado='ANUAL',
         )
         payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 200
 
         sample_empresa.refresh_from_db()
@@ -560,7 +564,7 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_pago_aprobado_activa_plan_pro(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED para plan Profesional configura 500 equipos."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -571,7 +575,7 @@ class TestWompiWebhook:
             plan_seleccionado='PRO_MENSUAL',
         )
         payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 200
 
         sample_empresa.refresh_from_db()
@@ -580,7 +584,7 @@ class TestWompiWebhook:
     @patch('core.views.pagos.settings')
     def test_pago_aprobado_activa_plan_basico(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED para plan Básico configura 50 equipos."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         mock_settings.WOMPI_SANDBOX = True
 
         tx = TransaccionPago.objects.create(
@@ -591,7 +595,7 @@ class TestWompiWebhook:
             plan_seleccionado='BASICO_MENSUAL',
         )
         payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
-        response = self._post_webhook(client, payload)
+        response = self._post_webhook(client, payload, _TEST_EVENTS_SECRET)
         assert response.status_code == 200
 
         sample_empresa.refresh_from_db()
@@ -767,7 +771,10 @@ class TestIniciarAddonPago:
 @pytest.mark.django_db
 class TestActivacionAddons:
 
-    def _post_webhook(self, client, payload):
+    def _post_webhook(self, client, payload, events_secret=_TEST_EVENTS_SECRET):
+        if events_secret:
+            checksum = _firmar_payload(payload, events_secret)
+            payload['signature']['checksum'] = checksum
         return client.post(
             _url('wompi_webhook'),
             data=json.dumps(payload),
@@ -777,7 +784,7 @@ class TestActivacionAddons:
     @patch('core.views.pagos.settings')
     def test_webhook_addon_activa_usuarios(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED para addon incrementa limite_usuarios_empresa."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         sample_empresa.limite_usuarios_empresa = 3
         sample_empresa.save()
 
@@ -799,7 +806,7 @@ class TestActivacionAddons:
     @patch('core.views.pagos.settings')
     def test_webhook_addon_activa_equipos(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED para addon incrementa limite_equipos_empresa."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         equipos_antes = sample_empresa.limite_equipos_empresa
 
         tx = TransaccionPago.objects.create(
@@ -820,7 +827,7 @@ class TestActivacionAddons:
     @patch('core.views.pagos.settings')
     def test_webhook_addon_activa_storage(self, mock_settings, client, sample_empresa):
         """Webhook APPROVED para addon incrementa limite_almacenamiento_mb."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         storage_antes = sample_empresa.limite_almacenamiento_mb
 
         tx = TransaccionPago.objects.create(
@@ -841,7 +848,7 @@ class TestActivacionAddons:
     @patch('core.views.pagos.settings')
     def test_addon_idempotente(self, mock_settings, client, sample_empresa):
         """Webhook duplicado no vuelve a activar add-ons."""
-        mock_settings.WOMPI_EVENTS_SECRET = ''
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
         sample_empresa.limite_usuarios_empresa = 3
         sample_empresa.save()
 

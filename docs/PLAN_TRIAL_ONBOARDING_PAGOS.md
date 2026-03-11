@@ -61,21 +61,32 @@ Orden de implementacion: A -> B -> C (cada uno funciona independiente)
   - Escenario B: crear usuarios nuevos post-compra de addons
   - Flags: configurar_usuarios_plan_pendiente + slots_usuarios_pendientes
   - Migracion 0067
-- [ ] C16. Arreglar test fallido: test_sin_wompi_key_muestra_error
+- [x] C16. Tests Wompi webhook corregidos: firma con secret real, todos pasan (2026-03-11)
 - [ ] C17. reCAPTCHA en formulario de registro trial (A7 pendiente)
 
-### DEPLOY FINAL
-- [x] D1. Desplegar en Render (activo en produccion)
-- [x] D2. Wompi sandbox configurado y probado
-- [x] D3. Contrato v1.1 cargado en BD
-- [ ] D4. Correr suite completo de tests (1 fallo preexistente: test_sin_wompi_key)
-- [ ] D5. Actualizar este documento al 100% al cerrar todos los pendientes
+### MODULO D: Dashboard Pre-computado (Opcion E Simplificada)
+- [x] D1. 15 campos stats_* en Empresa (equipos, calibraciones, mantenimientos, comprobaciones, compliance)
+- [x] D2. Metodo recalcular_stats_dashboard() en Empresa
+- [x] D3. Migracion 0070_empresa_stats_dashboard
+- [x] D4. 4 signals extendidos para llamar recalcular_stats_dashboard() con try/except
+- [x] D5. Dashboard usa stats pre-computados cuando stats_fecha_calculo == today
+- [x] D6. Comando recalcular_stats_empresas (--empresa-id, --dry-run)
+- [x] D7. Cron diario en render.yaml (2:00 AM Colombia / 7:00 UTC)
+- [x] D8. 30 tests en 4 archivos: test_empresa_stats, test_stats_signals, test_recalcular_stats, test_dashboard_stats
 
-**Progreso general: 31/36 tareas completadas (86%)**
-- Modulo A: 8/9 (89%) - falta reCAPTCHA
+### DEPLOY FINAL
+- [x] E1. Desplegar en Render (activo en produccion)
+- [x] E2. Wompi sandbox configurado y probado
+- [x] E3. Contrato v1.1 cargado en BD
+- [x] E4. Suite completa: 1,209 passing, 0 failing, 1 skipped (2026-03-11)
+- [x] E5. Documentacion actualizada (PLAN, CLAUDE.md, models.py indice)
+
+**Progreso general: 42/43 tareas completadas (98%)**
+- Modulo A: 8/9 (89%) - falta reCAPTCHA (baja prioridad)
 - Modulo B: 13/13 (100%)
-- Modulo C: 15/17 (88%) - 1 test fallido, reCAPTCHA pendiente
-- Deploy: 3/5
+- Modulo C: 17/17 (100%)
+- Modulo D (dashboard pre-computado): 8/8 (100%)
+- Deploy: 5/5 (100%)
 
 ---
 
@@ -120,9 +131,16 @@ sam-2/
     cargar_terminos_v11.py  # Carga/actualiza contrato v1.1 en BD
 
   tests/test_views/
-    test_registro.py   # 39 tests registro trial
-    test_onboarding.py # 41 tests onboarding
-    test_pagos.py      # Tests pagos Wompi (1 fallo preexistente)
+    test_registro.py        # 39 tests registro trial
+    test_onboarding.py      # 41 tests onboarding
+    test_pagos.py           # 65 tests pagos Wompi (todos pasan)
+    test_dashboard_stats.py # 5 tests dashboard pre-computado
+  tests/test_models/
+    test_empresa_stats.py   # 11 tests stats pre-computados
+  tests/test_signals/
+    test_stats_signals.py   # 9 tests signals → recalcular
+  tests/test_commands/
+    test_recalcular_stats.py # 5 tests comando gestion
 ```
 
 ---
@@ -166,10 +184,9 @@ Addons:
 
 | # | Tarea | Prioridad |
 |---|-------|-----------|
-| 1 | Arreglar test_sin_wompi_key_muestra_error | Media |
-| 2 | reCAPTCHA en formulario registro trial | Baja |
+| 1 | reCAPTCHA en formulario registro trial (A7/C17) | Baja |
 
 ---
 
 **Documento creado:** 2026-02-19
-**Ultima actualizacion:** 2026-02-27
+**Ultima actualizacion:** 2026-03-11
