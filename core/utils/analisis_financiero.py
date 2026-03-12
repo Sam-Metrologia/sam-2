@@ -299,8 +299,12 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
         if not freq_meses or int(freq_meses) <= 0:
             return None
         f = int(freq_meses)
-        if proxima:
-            return proxima.month if proxima.year == year else None
+        # Si proxima es exactamente en el año calculado, usarla directamente
+        if proxima and proxima.year == year:
+            return proxima.month
+        # Si proxima es para otro año (pasado o futuro), calcular desde ultima_fecha
+        # Esto cubre el caso donde el equipo ya hizo su actividad este año
+        # y proxima_X apunta al año siguiente
         ref = ultima_fecha or fecha_adquisicion
         if not ref:
             return None

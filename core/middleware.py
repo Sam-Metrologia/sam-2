@@ -29,12 +29,11 @@ class RateLimitMiddleware(MiddlewareMixin):
         client_ip = self.get_client_ip(request)
 
         # Aplicar diferentes límites según la ruta
-        # Solo contar intentos POST (login real), no cargas de página GET
+        # Para login: solo VERIFICAR el límite aquí; el contador se incrementa
+        # en process_response solo si el intento FALLÓ (evita bloquear re-logins legítimos)
         if request.path.startswith('/core/login/') and request.method == 'POST':
-            return self.check_rate_limit(
-                request, client_ip, 'LOGIN_ATTEMPTS',
-                rate_config.get('LOGIN_ATTEMPTS', {'limit': 5, 'period': 300})
-            )
+            config = rate_config.get('LOGIN_ATTEMPTS', {'limit': 5, 'period': 300})
+            return self.check_rate_limit_only(request, client_ip, 'LOGIN_ATTEMPTS', config)
         elif request.method == 'POST' and 'upload' in request.path.lower():
             return self.check_rate_limit(
                 request, client_ip, 'UPLOAD_FILES',
@@ -48,6 +47,24 @@ class RateLimitMiddleware(MiddlewareMixin):
 
         return None
 
+    def process_response(self, request, response):
+        # Solo en producción
+        if getattr(settings, 'DEBUG', False):
+            return response
+
+        # Incrementar contador de intentos fallidos de login
+        # Un login fallido retorna 200 (muestra el formulario con error)
+        # Un login exitoso retorna 302 (redirect)
+        if (request.path.startswith('/core/login/')
+                and request.method == 'POST'
+                and response.status_code == 200):
+            rate_config = getattr(settings, 'RATE_LIMIT_CONFIG', {})
+            config = rate_config.get('LOGIN_ATTEMPTS', {'limit': 5, 'period': 300})
+            client_ip = self.get_client_ip(request)
+            self._increment_rate_limit(client_ip, 'LOGIN_ATTEMPTS', config.get('period', 300))
+
+        return response
+
     def get_client_ip(self, request):
         """Obtiene la IP real del cliente considerando proxies."""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -58,7 +75,7 @@ class RateLimitMiddleware(MiddlewareMixin):
         return ip
 
     def check_rate_limit(self, request, client_ip, limit_type, config):
-        """Verifica si se ha excedido el límite de rate."""
+        """Verifica el límite de rate E incrementa el contador (para APIs/uploads)."""
         limit = config.get('limit', 10)
         period = config.get('period', 300)  # 5 minutos por defecto
 
@@ -70,32 +87,8 @@ class RateLimitMiddleware(MiddlewareMixin):
             current_count = cache.get(cache_key, 0)
 
             if current_count >= limit:
-                # Loguear intento de abuso
-                logger.warning(
-                    f"Rate limit exceeded for {limit_type}",
-                    extra={
-                        'client_ip': client_ip,
-                        'user_agent': request.META.get('HTTP_USER_AGENT', 'Unknown'),
-                        'path': request.path,
-                        'limit_type': limit_type,
-                        'current_count': current_count,
-                        'limit': limit
-                    }
-                )
-
-                # Retornar respuesta de rate limiting
-                if request.path.startswith('/api/') or request.headers.get('Accept', '').startswith('application/json'):
-                    return JsonResponse({
-                        'error': 'Rate limit exceeded',
-                        'detail': f'Too many requests. Try again in {period} seconds.'
-                    }, status=429)
-                else:
-                    response = HttpResponse(
-                        f"Too many requests. Please try again in {period} seconds.",
-                        status=429
-                    )
-                    response['Retry-After'] = str(period)
-                    return response
+                self._log_rate_limit_exceeded(request, client_ip, limit_type, current_count, limit)
+                return self._build_rate_limit_response(request, period)
 
             # Incrementar contador
             cache.set(cache_key, current_count + 1, period)
@@ -105,6 +98,60 @@ class RateLimitMiddleware(MiddlewareMixin):
             logger.error(f"Error in rate limiting: {e}")
 
         return None
+
+    def check_rate_limit_only(self, request, client_ip, limit_type, config):
+        """Solo verifica si se excedió el límite; NO incrementa el contador.
+        Usar para login: el contador se incrementa en process_response solo si falló."""
+        limit = config.get('limit', 10)
+        period = config.get('period', 300)
+
+        cache_key = f"rate_limit_{limit_type}_{client_ip}"
+
+        try:
+            current_count = cache.get(cache_key, 0)
+            if current_count >= limit:
+                self._log_rate_limit_exceeded(request, client_ip, limit_type, current_count, limit)
+                return self._build_rate_limit_response(request, period)
+        except Exception as e:
+            logger.error(f"Error in rate limiting check: {e}")
+
+        return None
+
+    def _increment_rate_limit(self, client_ip, limit_type, period):
+        """Incrementa el contador de rate limit para una IP."""
+        cache_key = f"rate_limit_{limit_type}_{client_ip}"
+        try:
+            current_count = cache.get(cache_key, 0)
+            cache.set(cache_key, current_count + 1, period)
+        except Exception as e:
+            logger.error(f"Error incrementing rate limit: {e}")
+
+    def _log_rate_limit_exceeded(self, request, client_ip, limit_type, current_count, limit):
+        logger.warning(
+            f"Rate limit exceeded for {limit_type}",
+            extra={
+                'client_ip': client_ip,
+                'user_agent': request.META.get('HTTP_USER_AGENT', 'Unknown'),
+                'path': request.path,
+                'limit_type': limit_type,
+                'current_count': current_count,
+                'limit': limit
+            }
+        )
+
+    def _build_rate_limit_response(self, request, period):
+        if request.path.startswith('/api/') or request.headers.get('Accept', '').startswith('application/json'):
+            return JsonResponse({
+                'error': 'Rate limit exceeded',
+                'detail': f'Too many requests. Try again in {period} seconds.'
+            }, status=429)
+        else:
+            response = HttpResponse(
+                f"Too many requests. Please try again in {period} seconds.",
+                status=429
+            )
+            response['Retry-After'] = str(period)
+            return response
 
 
 class SecurityHeadersMiddleware(MiddlewareMixin):
