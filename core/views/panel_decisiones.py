@@ -21,6 +21,7 @@ from ..utils.decision_intelligence import (
     calcular_optimizacion_cronogramas
 )
 from .dashboard import get_projected_activities_for_year
+from django.core.cache import cache
 import json
 
 
@@ -479,6 +480,12 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
     user = request.user
     empresa = empresa_override if empresa_override else user.empresa
 
+    # Cache de 5 min, invalidado por las mismas señales del dashboard
+    cache_key = f"panel_decisiones_{empresa.id}_{date.today().year}"
+    cached_context = cache.get(cache_key)
+    if cached_context:
+        return render(request, 'core/panel_decisiones.html', cached_context)
+
     # Usar la misma lógica del dashboard técnico
     equipos_queryset = Equipo.objects.filter(empresa=empresa)
     # Para salud, eficiencia y actividades críticas: solo equipos activos (sin cambio)
@@ -715,6 +722,9 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
         'presupuesto_vs_ejecutado_chart_data': json.dumps(decimal_to_float(presupuesto_vs_ejecutado)),
         'meses_tarjetas': meses_tarjetas,
     }
+
+    # Cachear por 5 min (invalidado automáticamente por signals)
+    cache.set(cache_key, context, 300)
 
     return render(request, 'core/panel_decisiones.html', context)
 

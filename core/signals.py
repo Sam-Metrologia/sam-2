@@ -27,6 +27,8 @@ def invalidate_dashboard_cache(empresa_id=None):
         cache_pattern = f"dashboard_*_{empresa_id}"
         # También invalidar el cache 'all' para superusuarios
         cache_pattern_all = "dashboard_*_all"
+        # Invalidar panel de decisiones de esta empresa
+        cache_pattern_panel = f"panel_decisiones_{empresa_id}_*"
 
         # Django cache no soporta delete_pattern nativamente con LocalMemCache
         # Solución: invalidar limpiando todo el cache del dashboard
@@ -35,12 +37,13 @@ def invalidate_dashboard_cache(empresa_id=None):
             # Intentar con Redis delete_pattern si está disponible
             cache.delete_pattern(cache_pattern)
             cache.delete_pattern(cache_pattern_all)
+            cache.delete_pattern(cache_pattern_panel)
         except AttributeError:
             # Fallback: limpiar todo el cache
-            # Esto es seguro porque el cache del dashboard se regenera rápido
+            # Esto es seguro porque el cache se regenera rápido
             cache.clear()
     else:
-        # Invalidar todos los caches del dashboard
+        # Invalidar todos los caches
         cache.clear()
 
 

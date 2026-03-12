@@ -63,42 +63,76 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
     Incluye equipos De Baja/Inactivos del año actual para cumplimiento correcto:
     - Equipo De Baja: actividades desde fecha_baja → No Cumplido; año anterior → excluido
     - Equipo Inactivo: fechas pasadas no realizadas → No Cumplido; fechas futuras → Pendiente
+
+    OPTIMIZACIÓN: Pre-fetch bulk — 2-3 queries total independiente del número de equipos.
+    Elimina el N+1 anterior (1 query por equipo × fecha programada).
     """
+    from django.db.models import Max
+
+    equipos = list(equipos_queryset)
+    if not equipos:
+        return []
+
+    equipo_ids = [e.id for e in equipos]
+
+    # ── Pre-fetch 1: última actividad por equipo (para plan_start_date) ──
+    # ── Pre-fetch 2: actividades del año → set O(1) para lookup ──────────
+    if activity_type == 'calibracion':
+        ultimas = dict(
+            Calibracion.objects.filter(equipo_id__in=equipo_ids)
+            .values('equipo_id')
+            .annotate(u=Max('fecha_calibracion'))
+            .values_list('equipo_id', 'u')
+        )
+        realizadas_set = set(
+            Calibracion.objects.filter(
+                equipo_id__in=equipo_ids,
+                fecha_calibracion__year=year,
+            ).values_list('equipo_id', 'fecha_calibracion__month')
+        )
+    elif activity_type == 'comprobacion':
+        ultimas = dict(
+            Comprobacion.objects.filter(equipo_id__in=equipo_ids)
+            .values('equipo_id')
+            .annotate(u=Max('fecha_comprobacion'))
+            .values_list('equipo_id', 'u')
+        )
+        ultimas_cal = dict(
+            Calibracion.objects.filter(equipo_id__in=equipo_ids)
+            .values('equipo_id')
+            .annotate(u=Max('fecha_calibracion'))
+            .values_list('equipo_id', 'u')
+        )
+        realizadas_set = set(
+            Comprobacion.objects.filter(
+                equipo_id__in=equipo_ids,
+                fecha_comprobacion__year=year,
+            ).values_list('equipo_id', 'fecha_comprobacion__month')
+        )
+    else:
+        return []
+
     projected_activities = []
 
-    for equipo in equipos_queryset:
-        if activity_type == 'calibracion' and equipo.frecuencia_calibracion_meses:
+    for equipo in equipos:
+        if activity_type == 'calibracion':
+            if not equipo.frecuencia_calibracion_meses:
+                continue
             freq = int(equipo.frecuencia_calibracion_meses)
-            activity_model = Calibracion
-            date_field = 'fecha_calibracion'
-            # Usar la última calibración REAL
-            latest_activity = equipo.calibraciones.order_by('-fecha_calibracion').first()
-            if latest_activity:
-                plan_start_date = latest_activity.fecha_calibracion
-            elif equipo.fecha_adquisicion:
-                plan_start_date = equipo.fecha_adquisicion
-            else:
-                continue  # Sin fecha válida, saltar este equipo
-
-        elif activity_type == 'comprobacion' and equipo.frecuencia_comprobacion_meses:
+            plan_start_date = ultimas.get(equipo.id) or equipo.fecha_adquisicion
+            if not plan_start_date:
+                continue
+        else:  # comprobacion
+            if not equipo.frecuencia_comprobacion_meses:
+                continue
             freq = int(equipo.frecuencia_comprobacion_meses)
-            activity_model = Comprobacion
-            date_field = 'fecha_comprobacion'
-            # Jerarquía: última comprobación -> última calibración -> adquisición
-            latest_activity = equipo.comprobaciones.order_by('-fecha_comprobacion').first()
-            if latest_activity:
-                plan_start_date = latest_activity.fecha_comprobacion
-            else:
-                # Si no hay comprobación, usar última calibración
-                latest_calibracion = equipo.calibraciones.order_by('-fecha_calibracion').first()
-                if latest_calibracion:
-                    plan_start_date = latest_calibracion.fecha_calibracion
-                elif equipo.fecha_adquisicion:
-                    plan_start_date = equipo.fecha_adquisicion
-                else:
-                    continue  # Sin fecha válida, saltar este equipo
-        else:
-            continue
+            plan_start_date = (
+                ultimas.get(equipo.id)
+                or ultimas_cal.get(equipo.id)
+                or equipo.fecha_adquisicion
+            )
+            if not plan_start_date:
+                continue
 
         if freq <= 0:
             continue
@@ -109,37 +143,26 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
         if equipo.estado == ESTADO_DE_BAJA:
             if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
                 fecha_baja = equipo.baja_registro.fecha_baja
-                # Si se dio de baja ANTES del año calculado → no proyectar nada
                 if fecha_baja.year < year:
                     continue
             else:
-                # De Baja sin registro → excluir (no sabemos cuándo)
                 continue
         # ----------------------------------------
 
-        # Calcular fechas programadas en el año
         current_date = plan_start_date
         while current_date.year < year:
             current_date += relativedelta(months=freq)
 
         while current_date.year == year:
-            # Verificar si se realizó la actividad
-            realizadas = activity_model.objects.filter(
-                equipo=equipo,
-                **{f"{date_field}__year": year,
-                   f"{date_field}__month": current_date.month}
-            ).exists()
+            realizadas = (equipo.id, current_date.month) in realizadas_set
 
             if realizadas:
                 status = 'Realizado'
             elif fecha_baja and current_date >= fecha_baja:
-                # De Baja: actividades desde la fecha de baja = No Cumplido (definitivo)
                 status = 'No Cumplido'
             elif current_date < today:
-                # Fecha pasada y no realizada → No Cumplido (incluye Inactivos con fechas pasadas)
                 status = 'No Cumplido'
             else:
-                # Fecha futura → Pendiente (incluye Inactivos: pueden reactivarse)
                 status = 'Pendiente/Programado'
 
             projected_activities.append({
@@ -167,26 +190,52 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
     Incluye equipos De Baja/Inactivos del año actual para cumplimiento correcto:
     - Equipo De Baja: actividades desde fecha_baja → No Cumplido; año anterior → excluido
     - Equipo Inactivo: fechas pasadas no realizadas → No Cumplido; fechas futuras → Pendiente
+
+    OPTIMIZACIÓN: Pre-fetch bulk — 3 queries total independiente del número de equipos.
+    Elimina el N+1 anterior (1 query por equipo × fecha programada).
     """
+    from django.db.models import Max
+
+    equipos = list(equipos_queryset)
+    if not equipos:
+        return []
+
+    equipo_ids = [e.id for e in equipos]
+
+    # ── Pre-fetch bulk: 3 queries total ──────────────────────────────────
+    ultimas_mant = dict(
+        Mantenimiento.objects.filter(equipo_id__in=equipo_ids)
+        .values('equipo_id')
+        .annotate(u=Max('fecha_mantenimiento'))
+        .values_list('equipo_id', 'u')
+    )
+    ultimas_cal = dict(
+        Calibracion.objects.filter(equipo_id__in=equipo_ids)
+        .values('equipo_id')
+        .annotate(u=Max('fecha_calibracion'))
+        .values_list('equipo_id', 'u')
+    )
+    realizados_set = set(
+        Mantenimiento.objects.filter(
+            equipo_id__in=equipo_ids,
+            fecha_mantenimiento__year=year,
+        ).values_list('equipo_id', 'fecha_mantenimiento__month')
+    )
+    # ─────────────────────────────────────────────────────────────────────
+
     projected_maintenances = []
 
-    for equipo in equipos_queryset:
+    for equipo in equipos:
         if not equipo.frecuencia_mantenimiento_meses:
             continue
 
-        # Jerarquía: último mantenimiento -> última calibración -> adquisición
-        latest_mantenimiento = equipo.mantenimientos.order_by('-fecha_mantenimiento').first()
-        if latest_mantenimiento:
-            plan_start_date = latest_mantenimiento.fecha_mantenimiento
-        else:
-            # Si no hay mantenimiento, usar última calibración
-            latest_calibracion = equipo.calibraciones.order_by('-fecha_calibracion').first()
-            if latest_calibracion:
-                plan_start_date = latest_calibracion.fecha_calibracion
-            elif equipo.fecha_adquisicion:
-                plan_start_date = equipo.fecha_adquisicion
-            else:
-                continue  # Sin fecha válida, saltar este equipo
+        plan_start_date = (
+            ultimas_mant.get(equipo.id)
+            or ultimas_cal.get(equipo.id)
+            or equipo.fecha_adquisicion
+        )
+        if not plan_start_date:
+            continue
 
         freq = int(equipo.frecuencia_mantenimiento_meses)
         if freq <= 0:
@@ -198,11 +247,9 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
         if equipo.estado == ESTADO_DE_BAJA:
             if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
                 fecha_baja = equipo.baja_registro.fecha_baja
-                # Si se dio de baja ANTES del año calculado → no proyectar nada
                 if fecha_baja.year < year:
                     continue
             else:
-                # De Baja sin registro → excluir (no sabemos cuándo)
                 continue
         # ----------------------------------------
 
@@ -211,20 +258,13 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
             current_date += relativedelta(months=freq)
 
         while current_date.year == year:
-            # Verificar si se realizó el mantenimiento
-            realizados = Mantenimiento.objects.filter(
-                equipo=equipo,
-                fecha_mantenimiento__year=year,
-                fecha_mantenimiento__month=current_date.month
-            ).exists()
+            realizados = (equipo.id, current_date.month) in realizados_set
 
             if realizados:
                 status = 'Realizado'
             elif fecha_baja and current_date >= fecha_baja:
-                # De Baja: actividades desde la fecha de baja = No Cumplido (definitivo)
                 status = 'No Cumplido'
             elif current_date < today:
-                # Fecha pasada y no realizada → No Cumplido (incluye Inactivos con fechas pasadas)
                 status = 'No Cumplido'
             else:
                 status = 'Pendiente/Programado'
