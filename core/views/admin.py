@@ -1098,8 +1098,8 @@ def configurar_usuarios_setup(request):
     if not empresa:
         return redirect('core:dashboard')
 
-    # Solo ADMINISTRADOR o GERENCIA puede hacer esto
-    if not (request.user.is_administrador() or request.user.is_gerente()):
+    # Solo ADMINISTRADOR, GERENCIA o superusuario puede hacer esto
+    if not (request.user.is_superuser or request.user.is_administrador() or request.user.is_gerente()):
         return HttpResponseForbidden()
 
     if request.method == 'POST':
@@ -1121,6 +1121,7 @@ def configurar_usuarios_setup(request):
                     if nueva_password:
                         usuario.set_password(nueva_password)
                     usuario.save()
+                    asignar_permisos_por_rol(usuario)
 
             empresa.configurar_usuarios_plan_pendiente = False
             empresa.save(update_fields=['configurar_usuarios_plan_pendiente'])

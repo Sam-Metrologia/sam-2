@@ -7,50 +7,30 @@ from core.models import CustomUser
 
 
 class Command(BaseCommand):
-    help = 'Crea los permisos necesarios para el sistema'
+    help = 'Sincroniza permisos Django de todos los usuarios según su rol_usuario'
 
     def handle(self, *args, **options):
-        """
-        Crea los permisos personalizados necesarios para el sistema.
-        """
         try:
-            # Obtener el ContentType para el modelo core
-            content_type = ContentType.objects.get_or_create(
-                app_label='core',
-                model='customuser'
-            )[0]
+            from core.views.registro import asignar_permisos_por_rol
 
-            # Crear el permiso de exportar informes
-            permission, created = Permission.objects.get_or_create(
-                codename='can_export_reports',
-                name='Can export reports',
-                content_type=content_type,
-            )
+            usuarios = CustomUser.objects.filter(is_superuser=False).select_related('empresa')
+            total = usuarios.count()
+            actualizados = 0
 
-            if created:
+            self.stdout.write(f'Sincronizando permisos para {total} usuarios...')
+
+            for user in usuarios:
+                asignar_permisos_por_rol(user)
+                cnt = user.user_permissions.count()
                 self.stdout.write(
-                    self.style.SUCCESS(f'Permiso "can_export_reports" creado exitosamente.')
+                    f'  {user.username} ({user.rol_usuario}) -> {cnt} permisos'
                 )
-            else:
-                self.stdout.write(
-                    self.style.WARNING(f'Permiso "can_export_reports" ya existe.')
-                )
-
-            # Verificar que los superusuarios tengan el permiso
-            superusers = CustomUser.objects.filter(is_superuser=True)
-            for user in superusers:
-                if not user.has_perm('core.can_export_reports'):
-                    user.user_permissions.add(permission)
-                    self.stdout.write(
-                        self.style.SUCCESS(f'Permiso otorgado al superusuario: {user.username}')
-                    )
+                actualizados += 1
 
             self.stdout.write(
-                self.style.SUCCESS('Setup de permisos completado exitosamente.')
+                self.style.SUCCESS(f'Listo. {actualizados}/{total} usuarios sincronizados.')
             )
 
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f'Error durante setup de permisos: {str(e)}')
-            )
+            self.stdout.write(self.style.ERROR(f'Error: {str(e)}'))
             raise

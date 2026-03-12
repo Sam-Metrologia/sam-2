@@ -19,4 +19,8 @@ python manage.py collectstatic --noinput
 echo "Verificando tabla de cache..."
 python manage.py createcachetable sam_cache_table --noinput || true
 
+# Sincronizar permisos de todos los usuarios según su rol
+echo "Sincronizando permisos de usuarios..."
+python manage.py setup_permissions
+
 echo "Build completado!"
