@@ -1327,7 +1327,7 @@ class Empresa(models.Model):
     def invalidate_storage_cache(self):
         """Invalida el cache de almacenamiento cuando se modifican archivos."""
         from django.core.cache import cache
-        cache_key = f"storage_usage_empresa_{self.id}_v2"
+        cache_key = f"storage_usage_empresa_{self.id}_v5"
         try:
             cache.delete(cache_key)
         except Exception as e:

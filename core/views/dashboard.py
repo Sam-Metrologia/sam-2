@@ -302,8 +302,17 @@ def dashboard(request):
     # Filtrado por empresa para superusuarios (solo empresas activas)
     selected_company_id = request.GET.get('empresa_id')
 
-    # Cache del dashboard (5 min, invalidado por signals en core/signals.py)
-    cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}"
+    # Cache del dashboard (5 min, invalidado por signals vía versioning)
+    # El version_key permite invalidar sin delete_pattern ni cache.clear()
+    empresa = user.empresa if not user.is_superuser else None
+    _empresa_id_para_version = selected_company_id or (str(empresa.id) if empresa else 'all')
+    _version_key = (
+        f"dashboard_version_{_empresa_id_para_version}"
+        if _empresa_id_para_version != 'all'
+        else "dashboard_version_all"
+    )
+    _cache_version = cache.get(_version_key, 0)
+    cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}_v{_cache_version}"
     cached_context = cache.get(cache_key)
     if cached_context:
         return render(request, 'core/dashboard.html', cached_context)
@@ -312,7 +321,6 @@ def dashboard(request):
     empresas_disponibles = list(Empresa.objects.filter(is_deleted=False).order_by('nombre'))
 
     # Determinar si podemos usar stats pre-computadas
-    empresa = user.empresa if not user.is_superuser else None
     usar_stats_cached = (
         empresa is not None
         and not user.is_superuser

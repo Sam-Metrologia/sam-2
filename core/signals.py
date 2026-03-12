@@ -12,38 +12,46 @@ logger = logging.getLogger(__name__)
 
 def invalidate_dashboard_cache(empresa_id=None):
     """
-    Invalida el cache del dashboard.
+    Invalida el cache del dashboard usando versioning (compatible con cualquier backend).
 
-    Si se proporciona empresa_id, invalida solo el cache de esa empresa.
-    Si no se proporciona, invalida todos los caches del dashboard.
+    En lugar de delete_pattern (no disponible en Django nativo) o cache.clear()
+    (que borra el cache de storage y causa llamadas masivas a R2), se incrementa
+    un contador de versión por empresa. El dashboard incluye este contador en su
+    cache key, de modo que las entradas anteriores quedan huérfanas y expiran
+    naturalmente en 5 minutos.
 
     Args:
         empresa_id: ID de la empresa cuyo cache se debe invalidar
     """
-    if empresa_id:
-        # Invalidar cache específico de la empresa
-        # Nota: No podemos invalidar por usuario específico, así que invalidamos
-        # todos los usuarios que vean esta empresa (superusuarios y usuarios de la empresa)
-        cache_pattern = f"dashboard_*_{empresa_id}"
-        # También invalidar el cache 'all' para superusuarios
-        cache_pattern_all = "dashboard_*_all"
-        # Invalidar panel de decisiones de esta empresa
-        cache_pattern_panel = f"panel_decisiones_{empresa_id}_*"
+    from datetime import date
 
-        # Django cache no soporta delete_pattern nativamente con LocalMemCache
-        # Solución: invalidar limpiando todo el cache del dashboard
-        # En producción con Redis, se puede usar delete_pattern
+    if empresa_id:
+        # Bump versión específica de la empresa (usuarios normales y superusuarios
+        # que tengan esa empresa seleccionada)
+        version_key = f"dashboard_version_{empresa_id}"
         try:
-            # Intentar con Redis delete_pattern si está disponible
-            cache.delete_pattern(cache_pattern)
-            cache.delete_pattern(cache_pattern_all)
-            cache.delete_pattern(cache_pattern_panel)
-        except AttributeError:
-            # Fallback: limpiar todo el cache
-            # Esto es seguro porque el cache se regenera rápido
-            cache.clear()
+            cache.incr(version_key)
+        except ValueError:
+            cache.set(version_key, 1, 86400 * 30)  # 30 días de TTL
+        except Exception:
+            current = cache.get(version_key, 0)
+            cache.set(version_key, current + 1, 86400 * 30)
+
+        # Bump versión 'all' para superusuarios sin empresa seleccionada
+        all_version_key = "dashboard_version_all"
+        try:
+            cache.incr(all_version_key)
+        except ValueError:
+            cache.set(all_version_key, 1, 86400 * 30)
+        except Exception:
+            current = cache.get(all_version_key, 0)
+            cache.set(all_version_key, current + 1, 86400 * 30)
+
+        # Panel de decisiones: clave determinista → delete directo (sin pattern)
+        year = date.today().year
+        cache.delete(f"panel_decisiones_{empresa_id}_{year}")
     else:
-        # Invalidar todos los caches
+        # Equipo sin empresa (caso borde) → clear es seguro aquí
         cache.clear()
 
 
