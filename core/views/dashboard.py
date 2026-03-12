@@ -413,8 +413,10 @@ def dashboard(request):
     context['onboarding_progress'] = onboarding_progress
 
     # Setup usuarios (NO se cachea - cambia por acción del usuario)
+    # Solo mostrar a ADMINISTRADOR, GERENCIA o superusuario — TECNICO no puede gestionar usuarios
     setup_usuarios = None
-    if user.empresa and user.empresa.tiene_setup_usuarios_pendiente:
+    puede_gestionar_setup = user.is_superuser or user.is_administrador() or user.is_gerente()
+    if puede_gestionar_setup and user.empresa and user.empresa.tiene_setup_usuarios_pendiente:
         empresa_obj = user.empresa
         setup_usuarios = {
             'configurar_plan': empresa_obj.configurar_usuarios_plan_pendiente,
