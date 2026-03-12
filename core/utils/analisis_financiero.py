@@ -65,7 +65,66 @@ def calcular_proyeccion_costos_empresa(empresa, next_year):
     2. PROYECCIÓN DE COSTOS (Gasto Estimado para el Próximo Año)
     Basado en homogeneidad de equipos (Marca y Modelo) y actividades programadas
     """
-    equipos_empresa = Equipo.objects.filter(empresa=empresa).exclude(estado__in=['De Baja', 'Inactivo'])
+    equipos_empresa = list(
+        Equipo.objects.filter(empresa=empresa).exclude(estado__in=['De Baja', 'Inactivo'])
+    )
+    if not equipos_empresa:
+        return {'proyeccion_gasto_proximo_año': 0, 'actividades_proyectadas_total': 0}
+
+    # --- Pre-fetch de costos en bloque (6 queries en lugar de N×6) ---
+
+    # Último costo de calibración por equipo (order desc → primer visto = más reciente)
+    _ultimo_costo_cal: dict = {}
+    for item in (Calibracion.objects
+                 .filter(equipo__empresa=empresa, costo_calibracion__isnull=False, costo_calibracion__gt=0)
+                 .order_by('equipo_id', '-fecha_calibracion')
+                 .values('equipo_id', 'costo_calibracion')):
+        if item['equipo_id'] not in _ultimo_costo_cal:
+            _ultimo_costo_cal[item['equipo_id']] = item['costo_calibracion']
+
+    # Promedio de calibración por (marca, modelo)
+    _promedio_cal: dict = {
+        (r['equipo__marca'], r['equipo__modelo']): r['promedio']
+        for r in Calibracion.objects.filter(
+            equipo__empresa=empresa, costo_calibracion__isnull=False, costo_calibracion__gt=0
+        ).values('equipo__marca', 'equipo__modelo').annotate(promedio=Avg('costo_calibracion'))
+    }
+
+    # Último costo de mantenimiento preventivo por equipo
+    _ultimo_costo_mant: dict = {}
+    for item in (Mantenimiento.objects
+                 .filter(equipo__empresa=empresa, tipo_mantenimiento='Preventivo',
+                         costo_sam_interno__isnull=False, costo_sam_interno__gt=0)
+                 .order_by('equipo_id', '-fecha_mantenimiento')
+                 .values('equipo_id', 'costo_sam_interno')):
+        if item['equipo_id'] not in _ultimo_costo_mant:
+            _ultimo_costo_mant[item['equipo_id']] = item['costo_sam_interno']
+
+    # Promedio de mantenimiento preventivo por (marca, modelo)
+    _promedio_mant: dict = {
+        (r['equipo__marca'], r['equipo__modelo']): r['promedio']
+        for r in Mantenimiento.objects.filter(
+            equipo__empresa=empresa, tipo_mantenimiento='Preventivo',
+            costo_sam_interno__isnull=False, costo_sam_interno__gt=0
+        ).values('equipo__marca', 'equipo__modelo').annotate(promedio=Avg('costo_sam_interno'))
+    }
+
+    # Último costo de comprobación por equipo
+    _ultimo_costo_comp: dict = {}
+    for item in (Comprobacion.objects
+                 .filter(equipo__empresa=empresa, costo_comprobacion__isnull=False, costo_comprobacion__gt=0)
+                 .order_by('equipo_id', '-fecha_comprobacion')
+                 .values('equipo_id', 'costo_comprobacion')):
+        if item['equipo_id'] not in _ultimo_costo_comp:
+            _ultimo_costo_comp[item['equipo_id']] = item['costo_comprobacion']
+
+    # Promedio de comprobación por (marca, modelo)
+    _promedio_comp: dict = {
+        (r['equipo__marca'], r['equipo__modelo']): r['promedio']
+        for r in Comprobacion.objects.filter(
+            equipo__empresa=empresa, costo_comprobacion__isnull=False, costo_comprobacion__gt=0
+        ).values('equipo__marca', 'equipo__modelo').annotate(promedio=Avg('costo_comprobacion'))
+    }
 
     proyeccion_total = 0
     actividades_proyectadas = 0
@@ -74,29 +133,10 @@ def calcular_proyeccion_costos_empresa(empresa, next_year):
         # CALIBRACIONES PROYECTADAS
         if equipo.frecuencia_calibracion_meses and int(equipo.frecuencia_calibracion_meses) > 0:
             calibraciones_anuales = 12 // int(equipo.frecuencia_calibracion_meses)
-
-            # Buscar último costo conocido para este equipo específico
-            ultimo_costo_cal = Calibracion.objects.filter(
-                equipo=equipo,
-                costo_calibracion__isnull=False,
-                costo_calibracion__gt=0
-            ).order_by('-fecha_calibracion').first()
-
-            if ultimo_costo_cal:
-                costo_unitario = ultimo_costo_cal.costo_calibracion
-            else:
-                # Buscar costo promedio por Marca y Modelo en la empresa
-                costo_promedio = Calibracion.objects.filter(
-                    equipo__empresa=empresa,
-                    equipo__marca=equipo.marca,
-                    equipo__modelo=equipo.modelo,
-                    costo_calibracion__isnull=False,
-                    costo_calibracion__gt=0
-                ).aggregate(promedio=Avg('costo_calibracion'))['promedio']
-
-                costo_unitario = costo_promedio if costo_promedio else None
-
-            # Solo proyectar si tenemos datos históricos reales
+            costo_unitario = (
+                _ultimo_costo_cal.get(equipo.id)
+                or _promedio_cal.get((equipo.marca, equipo.modelo))
+            )
             if costo_unitario is not None:
                 proyeccion_total += calibraciones_anuales * float(costo_unitario)
                 actividades_proyectadas += calibraciones_anuales
@@ -104,31 +144,10 @@ def calcular_proyeccion_costos_empresa(empresa, next_year):
         # MANTENIMIENTOS PROYECTADOS
         if equipo.frecuencia_mantenimiento_meses and int(equipo.frecuencia_mantenimiento_meses) > 0:
             mantenimientos_anuales = 12 // int(equipo.frecuencia_mantenimiento_meses)
-
-            # Buscar último costo conocido para mantenimientos preventivos
-            ultimo_costo_mant = Mantenimiento.objects.filter(
-                equipo=equipo,
-                tipo_mantenimiento='Preventivo',
-                costo_sam_interno__isnull=False,
-                costo_sam_interno__gt=0
-            ).order_by('-fecha_mantenimiento').first()
-
-            if ultimo_costo_mant:
-                costo_unitario = ultimo_costo_mant.costo_sam_interno
-            else:
-                # Buscar costo promedio por Marca y Modelo en la empresa
-                costo_promedio = Mantenimiento.objects.filter(
-                    equipo__empresa=empresa,
-                    equipo__marca=equipo.marca,
-                    equipo__modelo=equipo.modelo,
-                    tipo_mantenimiento='Preventivo',
-                    costo_sam_interno__isnull=False,
-                    costo_sam_interno__gt=0
-                ).aggregate(promedio=Avg('costo_sam_interno'))['promedio']
-
-                costo_unitario = costo_promedio if costo_promedio else None
-
-            # Solo proyectar si tenemos datos históricos reales
+            costo_unitario = (
+                _ultimo_costo_mant.get(equipo.id)
+                or _promedio_mant.get((equipo.marca, equipo.modelo))
+            )
             if costo_unitario is not None:
                 proyeccion_total += mantenimientos_anuales * float(costo_unitario)
                 actividades_proyectadas += mantenimientos_anuales
@@ -136,29 +155,10 @@ def calcular_proyeccion_costos_empresa(empresa, next_year):
         # COMPROBACIONES PROYECTADAS
         if equipo.frecuencia_comprobacion_meses and int(equipo.frecuencia_comprobacion_meses) > 0:
             comprobaciones_anuales = 12 // int(equipo.frecuencia_comprobacion_meses)
-
-            # Buscar último costo conocido para este equipo específico
-            ultimo_costo_comp = Comprobacion.objects.filter(
-                equipo=equipo,
-                costo_comprobacion__isnull=False,
-                costo_comprobacion__gt=0
-            ).order_by('-fecha_comprobacion').first()
-
-            if ultimo_costo_comp:
-                costo_unitario = ultimo_costo_comp.costo_comprobacion
-            else:
-                # Buscar costo promedio por Marca y Modelo en la empresa
-                costo_promedio = Comprobacion.objects.filter(
-                    equipo__empresa=empresa,
-                    equipo__marca=equipo.marca,
-                    equipo__modelo=equipo.modelo,
-                    costo_comprobacion__isnull=False,
-                    costo_comprobacion__gt=0
-                ).aggregate(promedio=Avg('costo_comprobacion'))['promedio']
-
-                costo_unitario = costo_promedio if costo_promedio else None
-
-            # Solo proyectar si tenemos datos históricos reales
+            costo_unitario = (
+                _ultimo_costo_comp.get(equipo.id)
+                or _promedio_comp.get((equipo.marca, equipo.modelo))
+            )
             if costo_unitario is not None:
                 proyeccion_total += comprobaciones_anuales * float(costo_unitario)
                 actividades_proyectadas += comprobaciones_anuales
@@ -191,20 +191,13 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
             'resumen': {...}
         }
     """
-    from datetime import date, timedelta
     from dateutil.relativedelta import relativedelta
-    from decimal import Decimal
 
-    equipos_empresa = Equipo.objects.filter(empresa=empresa).exclude(estado__in=['De Baja', 'Inactivo'])
-
-    # Estructura para almacenar el presupuesto mensual
-    presupuesto_mensual = []
     meses_nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-    # Inicializar estructura para cada mes
-    for mes in range(1, 13):
-        presupuesto_mensual.append({
+    presupuesto_mensual = [
+        {
             'mes': mes,
             'nombre_mes': meses_nombres[mes - 1],
             'calibraciones': [],
@@ -213,99 +206,180 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
             'total_calibraciones': 0,
             'total_mantenimientos': 0,
             'total_comprobaciones': 0,
-            'total_mes': 0
-        })
+            'total_mes': 0,
+        }
+        for mes in range(1, 13)
+    ]
 
-    # Procesar cada equipo
+    equipos_empresa = list(
+        Equipo.objects.filter(empresa=empresa).exclude(estado__in=['De Baja', 'Inactivo'])
+    )
+
+    if not equipos_empresa:
+        resumen = {
+            'total_anual': 0, 'total_calibraciones': 0, 'total_mantenimientos': 0,
+            'total_comprobaciones': 0, 'count_calibraciones': 0, 'count_mantenimientos': 0,
+            'count_comprobaciones': 0, 'count_total_actividades': 0, 'promedio_mensual': 0,
+            'mes_mas_caro': None, 'mes_mas_economico': None,
+        }
+        return {'presupuesto_por_mes': presupuesto_mensual, 'total_anual': 0, 'resumen': resumen, 'año': year}
+
+    # --- Pre-fetch costos (6 queries) ---
+    _ultimo_costo_cal: dict = {}
+    for item in (Calibracion.objects
+                 .filter(equipo__empresa=empresa, costo_calibracion__isnull=False, costo_calibracion__gt=0)
+                 .order_by('equipo_id', '-fecha_calibracion')
+                 .values('equipo_id', 'costo_calibracion')):
+        if item['equipo_id'] not in _ultimo_costo_cal:
+            _ultimo_costo_cal[item['equipo_id']] = item['costo_calibracion']
+
+    _promedio_cal: dict = {
+        (r['equipo__marca'], r['equipo__modelo']): r['promedio']
+        for r in Calibracion.objects.filter(
+            equipo__empresa=empresa, costo_calibracion__isnull=False, costo_calibracion__gt=0
+        ).values('equipo__marca', 'equipo__modelo').annotate(promedio=Avg('costo_calibracion'))
+    }
+
+    _ultimo_costo_mant: dict = {}
+    for item in (Mantenimiento.objects
+                 .filter(equipo__empresa=empresa, tipo_mantenimiento='Preventivo',
+                         costo_sam_interno__isnull=False, costo_sam_interno__gt=0)
+                 .order_by('equipo_id', '-fecha_mantenimiento')
+                 .values('equipo_id', 'costo_sam_interno')):
+        if item['equipo_id'] not in _ultimo_costo_mant:
+            _ultimo_costo_mant[item['equipo_id']] = item['costo_sam_interno']
+
+    _promedio_mant: dict = {
+        (r['equipo__marca'], r['equipo__modelo']): r['promedio']
+        for r in Mantenimiento.objects.filter(
+            equipo__empresa=empresa, tipo_mantenimiento='Preventivo',
+            costo_sam_interno__isnull=False, costo_sam_interno__gt=0
+        ).values('equipo__marca', 'equipo__modelo').annotate(promedio=Avg('costo_sam_interno'))
+    }
+
+    _ultimo_costo_comp: dict = {}
+    for item in (Comprobacion.objects
+                 .filter(equipo__empresa=empresa, costo_comprobacion__isnull=False, costo_comprobacion__gt=0)
+                 .order_by('equipo_id', '-fecha_comprobacion')
+                 .values('equipo_id', 'costo_comprobacion')):
+        if item['equipo_id'] not in _ultimo_costo_comp:
+            _ultimo_costo_comp[item['equipo_id']] = item['costo_comprobacion']
+
+    _promedio_comp: dict = {
+        (r['equipo__marca'], r['equipo__modelo']): r['promedio']
+        for r in Comprobacion.objects.filter(
+            equipo__empresa=empresa, costo_comprobacion__isnull=False, costo_comprobacion__gt=0
+        ).values('equipo__marca', 'equipo__modelo').annotate(promedio=Avg('costo_comprobacion'))
+    }
+
+    # --- Pre-fetch última fecha de actividad por equipo para fallback de mes_inicio (3 queries) ---
+    _ultima_cal_fecha: dict = {}
+    for item in (Calibracion.objects.filter(equipo__empresa=empresa)
+                 .order_by('equipo_id', '-fecha_calibracion')
+                 .values('equipo_id', 'fecha_calibracion')):
+        if item['equipo_id'] not in _ultima_cal_fecha:
+            _ultima_cal_fecha[item['equipo_id']] = item['fecha_calibracion']
+
+    _ultima_mant_fecha: dict = {}
+    for item in (Mantenimiento.objects.filter(equipo__empresa=empresa)
+                 .order_by('equipo_id', '-fecha_mantenimiento')
+                 .values('equipo_id', 'fecha_mantenimiento')):
+        if item['equipo_id'] not in _ultima_mant_fecha:
+            _ultima_mant_fecha[item['equipo_id']] = item['fecha_mantenimiento']
+
+    _ultima_comp_fecha: dict = {}
+    for item in (Comprobacion.objects.filter(equipo__empresa=empresa)
+                 .order_by('equipo_id', '-fecha_comprobacion')
+                 .values('equipo_id', 'fecha_comprobacion')):
+        if item['equipo_id'] not in _ultima_comp_fecha:
+            _ultima_comp_fecha[item['equipo_id']] = item['fecha_comprobacion']
+
+    def _mes_inicio(freq_meses, proxima, ultima_fecha, fecha_adquisicion):
+        """Calcula mes de inicio en el año dado sin hacer queries a DB."""
+        if not freq_meses or int(freq_meses) <= 0:
+            return None
+        f = int(freq_meses)
+        if proxima:
+            return proxima.month if proxima.year == year else None
+        ref = ultima_fecha or fecha_adquisicion
+        if not ref:
+            return None
+        fecha = ref
+        while fecha.year < year:
+            fecha += relativedelta(months=f)
+        return fecha.month if fecha.year == year else None
+
+    # --- Procesar cada equipo ---
     for equipo in equipos_empresa:
+        eq_info = {
+            'equipo': equipo,
+            'codigo': equipo.codigo_interno,
+            'nombre': equipo.nombre,
+            'marca': equipo.marca or 'N/A',
+            'modelo': equipo.modelo or 'N/A',
+        }
+
         # CALIBRACIONES
         if equipo.frecuencia_calibracion_meses and int(equipo.frecuencia_calibracion_meses) > 0:
-            frecuencia_meses = int(equipo.frecuencia_calibracion_meses)
-
-            # Obtener costo estimado
-            costo_calibracion = _obtener_costo_estimado_calibracion(equipo, empresa, year)
-
-            if costo_calibracion:
-                # Determinar mes de inicio basado en la última calibración o fecha de adquisición
-                mes_inicio = _calcular_mes_inicio_actividad(equipo, 'calibracion', year)
-
-                # SOLO incluir si hay actividad programada en este año
+            freq = int(equipo.frecuencia_calibracion_meses)
+            costo = _ultimo_costo_cal.get(equipo.id) or _promedio_cal.get((equipo.marca, equipo.modelo))
+            if costo:
+                mes_inicio = _mes_inicio(
+                    freq, equipo.proxima_calibracion,
+                    _ultima_cal_fecha.get(equipo.id), equipo.fecha_adquisicion
+                )
                 if mes_inicio is not None:
-                    # Proyectar calibraciones a lo largo del año
                     mes_actual = mes_inicio
                     while mes_actual <= 12:
-                        presupuesto_mensual[mes_actual - 1]['calibraciones'].append({
-                            'equipo': equipo,
-                            'codigo': equipo.codigo_interno,
-                            'nombre': equipo.nombre,
-                            'marca': equipo.marca or 'N/A',
-                            'modelo': equipo.modelo or 'N/A',
-                            'costo': float(costo_calibracion)
-                        })
-                        presupuesto_mensual[mes_actual - 1]['total_calibraciones'] += float(costo_calibracion)
-                        mes_actual += frecuencia_meses
+                        presupuesto_mensual[mes_actual - 1]['calibraciones'].append(
+                            {**eq_info, 'costo': float(costo)}
+                        )
+                        presupuesto_mensual[mes_actual - 1]['total_calibraciones'] += float(costo)
+                        mes_actual += freq
 
         # MANTENIMIENTOS
         if equipo.frecuencia_mantenimiento_meses and int(equipo.frecuencia_mantenimiento_meses) > 0:
-            frecuencia_meses = int(equipo.frecuencia_mantenimiento_meses)
-
-            # Obtener costo estimado
-            costo_mantenimiento = _obtener_costo_estimado_mantenimiento(equipo, empresa, year)
-
-            if costo_mantenimiento:
-                # Determinar mes de inicio
-                mes_inicio = _calcular_mes_inicio_actividad(equipo, 'mantenimiento', year)
-
-                # SOLO incluir si hay actividad programada en este año
+            freq = int(equipo.frecuencia_mantenimiento_meses)
+            costo = _ultimo_costo_mant.get(equipo.id) or _promedio_mant.get((equipo.marca, equipo.modelo))
+            if costo:
+                mes_inicio = _mes_inicio(
+                    freq, equipo.proximo_mantenimiento,
+                    _ultima_mant_fecha.get(equipo.id), equipo.fecha_adquisicion
+                )
                 if mes_inicio is not None:
-                    # Proyectar mantenimientos a lo largo del año
                     mes_actual = mes_inicio
                     while mes_actual <= 12:
-                        presupuesto_mensual[mes_actual - 1]['mantenimientos'].append({
-                            'equipo': equipo,
-                            'codigo': equipo.codigo_interno,
-                            'nombre': equipo.nombre,
-                            'marca': equipo.marca or 'N/A',
-                            'modelo': equipo.modelo or 'N/A',
-                            'costo': float(costo_mantenimiento)
-                        })
-                        presupuesto_mensual[mes_actual - 1]['total_mantenimientos'] += float(costo_mantenimiento)
-                        mes_actual += frecuencia_meses
+                        presupuesto_mensual[mes_actual - 1]['mantenimientos'].append(
+                            {**eq_info, 'costo': float(costo)}
+                        )
+                        presupuesto_mensual[mes_actual - 1]['total_mantenimientos'] += float(costo)
+                        mes_actual += freq
 
         # COMPROBACIONES
         if equipo.frecuencia_comprobacion_meses and int(equipo.frecuencia_comprobacion_meses) > 0:
-            frecuencia_meses = int(equipo.frecuencia_comprobacion_meses)
-
-            # Obtener costo estimado
-            costo_comprobacion = _obtener_costo_estimado_comprobacion(equipo, empresa, year)
-
-            if costo_comprobacion:
-                # Determinar mes de inicio
-                mes_inicio = _calcular_mes_inicio_actividad(equipo, 'comprobacion', year)
-
-                # SOLO incluir si hay actividad programada en este año
+            freq = int(equipo.frecuencia_comprobacion_meses)
+            costo = _ultimo_costo_comp.get(equipo.id) or _promedio_comp.get((equipo.marca, equipo.modelo))
+            if costo:
+                mes_inicio = _mes_inicio(
+                    freq, equipo.proxima_comprobacion,
+                    _ultima_comp_fecha.get(equipo.id), equipo.fecha_adquisicion
+                )
                 if mes_inicio is not None:
-                    # Proyectar comprobaciones a lo largo del año
                     mes_actual = mes_inicio
                     while mes_actual <= 12:
-                        presupuesto_mensual[mes_actual - 1]['comprobaciones'].append({
-                            'equipo': equipo,
-                            'codigo': equipo.codigo_interno,
-                            'nombre': equipo.nombre,
-                            'marca': equipo.marca or 'N/A',
-                            'modelo': equipo.modelo or 'N/A',
-                            'costo': float(costo_comprobacion)
-                        })
-                        presupuesto_mensual[mes_actual - 1]['total_comprobaciones'] += float(costo_comprobacion)
-                        mes_actual += frecuencia_meses
+                        presupuesto_mensual[mes_actual - 1]['comprobaciones'].append(
+                            {**eq_info, 'costo': float(costo)}
+                        )
+                        presupuesto_mensual[mes_actual - 1]['total_comprobaciones'] += float(costo)
+                        mes_actual += freq
 
     # Calcular totales mensuales
     total_anual = 0
     for mes_data in presupuesto_mensual:
         mes_data['total_mes'] = (
-            mes_data['total_calibraciones'] +
-            mes_data['total_mantenimientos'] +
-            mes_data['total_comprobaciones']
+            mes_data['total_calibraciones']
+            + mes_data['total_mantenimientos']
+            + mes_data['total_comprobaciones']
         )
         total_anual += mes_data['total_mes']
 
@@ -313,7 +387,6 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
     total_calibraciones_año = sum(m['total_calibraciones'] for m in presupuesto_mensual)
     total_mantenimientos_año = sum(m['total_mantenimientos'] for m in presupuesto_mensual)
     total_comprobaciones_año = sum(m['total_comprobaciones'] for m in presupuesto_mensual)
-
     count_calibraciones = sum(len(m['calibraciones']) for m in presupuesto_mensual)
     count_mantenimientos = sum(len(m['mantenimientos']) for m in presupuesto_mensual)
     count_comprobaciones = sum(len(m['comprobaciones']) for m in presupuesto_mensual)
@@ -329,15 +402,17 @@ def calcular_presupuesto_mensual_detallado(empresa, year):
         'count_total_actividades': count_calibraciones + count_mantenimientos + count_comprobaciones,
         'promedio_mensual': total_anual / 12 if total_anual > 0 else 0,
         'mes_mas_caro': max(presupuesto_mensual, key=lambda x: x['total_mes']) if presupuesto_mensual else None,
-        'mes_mas_economico': min([m for m in presupuesto_mensual if m['total_mes'] > 0],
-                                  key=lambda x: x['total_mes']) if any(m['total_mes'] > 0 for m in presupuesto_mensual) else None
+        'mes_mas_economico': min(
+            [m for m in presupuesto_mensual if m['total_mes'] > 0],
+            key=lambda x: x['total_mes']
+        ) if any(m['total_mes'] > 0 for m in presupuesto_mensual) else None,
     }
 
     return {
         'presupuesto_por_mes': presupuesto_mensual,
         'total_anual': total_anual,
         'resumen': resumen,
-        'año': year
+        'año': year,
     }
 
 

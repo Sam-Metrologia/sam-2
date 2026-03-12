@@ -3,6 +3,7 @@
 # Implementa: Alertas Predictivas, ROI, Tendencias, Compliance, Optimización
 
 from django.db.models import Sum, Avg, Count, Q, F
+from django.db.models.functions import ExtractMonth
 from datetime import date, timedelta, datetime
 from collections import defaultdict, Counter
 import calendar
@@ -236,41 +237,46 @@ def calcular_tendencias_historicas(empresa, current_year):
     3. ANÁLISIS DE TENDENCIAS HISTÓRICAS
     Evolución mensual de gastos y cumplimiento
     """
-    # Datos mensuales del año actual
+    # Pre-fetch: costos y conteos por mes en 3 queries (en lugar de 12 × 6 = 72)
+    cal_por_mes = {
+        item['mes']: {'total': item['total_costo'] or 0, 'count': item['total_count']}
+        for item in (Calibracion.objects
+                     .filter(equipo__empresa=empresa, fecha_calibracion__year=current_year)
+                     .annotate(mes=ExtractMonth('fecha_calibracion'))
+                     .values('mes')
+                     .annotate(total_costo=Sum('costo_calibracion'), total_count=Count('id')))
+    }
+    mant_por_mes = {
+        item['mes']: {'total': item['total_costo'] or 0, 'count': item['total_count']}
+        for item in (Mantenimiento.objects
+                     .filter(equipo__empresa=empresa, fecha_mantenimiento__year=current_year)
+                     .annotate(mes=ExtractMonth('fecha_mantenimiento'))
+                     .values('mes')
+                     .annotate(total_costo=Sum('costo_sam_interno'), total_count=Count('id')))
+    }
+    comp_por_mes = {
+        item['mes']: {'total': item['total_costo'] or 0, 'count': item['total_count']}
+        for item in (Comprobacion.objects
+                     .filter(equipo__empresa=empresa, fecha_comprobacion__year=current_year)
+                     .annotate(mes=ExtractMonth('fecha_comprobacion'))
+                     .values('mes')
+                     .annotate(total_costo=Sum('costo_comprobacion'), total_count=Count('id')))
+    }
+
     datos_mensuales = []
     total_gastos_año = 0
 
     for mes in range(1, 13):
-        # Gastos del mes
-        gastos_calibracion = Calibracion.objects.filter(
-            equipo__empresa=empresa,
-            fecha_calibracion__year=current_year,
-            fecha_calibracion__month=mes,
-            costo_calibracion__isnull=False
-        ).aggregate(total=Sum('costo_calibracion'))['total'] or 0
-
-        gastos_mantenimiento = Mantenimiento.objects.filter(
-            equipo__empresa=empresa,
-            fecha_mantenimiento__year=current_year,
-            fecha_mantenimiento__month=mes,
-            costo_sam_interno__isnull=False
-        ).aggregate(total=Sum('costo_sam_interno'))['total'] or 0
-
-        gastos_comprobacion = Comprobacion.objects.filter(
-            equipo__empresa=empresa,
-            fecha_comprobacion__year=current_year,
-            fecha_comprobacion__month=mes,
-            costo_comprobacion__isnull=False
-        ).aggregate(total=Sum('costo_comprobacion'))['total'] or 0
-
+        gastos_calibracion = cal_por_mes.get(mes, {}).get('total', 0) or 0
+        gastos_mantenimiento = mant_por_mes.get(mes, {}).get('total', 0) or 0
+        gastos_comprobacion = comp_por_mes.get(mes, {}).get('total', 0) or 0
         gasto_total_mes = gastos_calibracion + gastos_mantenimiento + gastos_comprobacion
         total_gastos_año += gasto_total_mes
 
-        # Actividades del mes
         actividades_mes = (
-            Calibracion.objects.filter(equipo__empresa=empresa, fecha_calibracion__year=current_year, fecha_calibracion__month=mes).count() +
-            Mantenimiento.objects.filter(equipo__empresa=empresa, fecha_mantenimiento__year=current_year, fecha_mantenimiento__month=mes).count() +
-            Comprobacion.objects.filter(equipo__empresa=empresa, fecha_comprobacion__year=current_year, fecha_comprobacion__month=mes).count()
+            (cal_por_mes.get(mes, {}).get('count', 0) or 0)
+            + (mant_por_mes.get(mes, {}).get('count', 0) or 0)
+            + (comp_por_mes.get(mes, {}).get('count', 0) or 0)
         )
 
         datos_mensuales.append({
@@ -280,7 +286,7 @@ def calcular_tendencias_historicas(empresa, current_year):
             'actividades': actividades_mes,
             'gasto_calibracion': gastos_calibracion,
             'gasto_mantenimiento': gastos_mantenimiento,
-            'gasto_comprobacion': gastos_comprobacion
+            'gasto_comprobacion': gastos_comprobacion,
         })
 
     # Calcular promedio mensual
@@ -489,38 +495,41 @@ def calcular_optimizacion_cronogramas(empresa, today):
         costo_total=Sum('costo_sam_interno')
     ).order_by('-cantidad')
 
+    # Bulk-fetch equipos problemáticos (1 query en lugar de N individuales)
+    ids_problematicos = [item['equipo_id'] for item in mantenimientos_correctivos if item['cantidad'] >= 3]
+    _equipos_dict = {e.id: e for e in Equipo.objects.filter(id__in=ids_problematicos)}
+
     equipos_problematicos = []
     for item in mantenimientos_correctivos:
         if item['cantidad'] >= 3:  # 3 o más correctivos = problemático
-            try:
-                equipo = Equipo.objects.get(id=item['equipo_id'])
-                costo_total = item['costo_total'] or 0
-
-                # Determinar nivel de problema
-                if item['cantidad'] >= 6:
-                    nivel_problema = 'CRÍTICO'
-                elif item['cantidad'] >= 4:
-                    nivel_problema = 'ALTO'
-                else:
-                    nivel_problema = 'MEDIO'
-
-                # Calcular recomendación
-                if costo_total > 5000000:  # >$5M en correctivos
-                    recomendacion = 'Evaluar reemplazo del equipo'
-                elif item['cantidad'] >= 5:
-                    recomendacion = 'Aumentar frecuencia de mantenimiento preventivo'
-                else:
-                    recomendacion = 'Monitorear más de cerca y revisar procedimientos'
-
-                equipos_problematicos.append({
-                    'equipo': equipo,
-                    'cantidad_correctivos': item['cantidad'],
-                    'costo_total': costo_total,
-                    'nivel_problema': nivel_problema,
-                    'recomendacion': recomendacion
-                })
-            except Equipo.DoesNotExist:
+            equipo = _equipos_dict.get(item['equipo_id'])
+            if not equipo:
                 continue
+            costo_total = item['costo_total'] or 0
+
+            # Determinar nivel de problema
+            if item['cantidad'] >= 6:
+                nivel_problema = 'CRÍTICO'
+            elif item['cantidad'] >= 4:
+                nivel_problema = 'ALTO'
+            else:
+                nivel_problema = 'MEDIO'
+
+            # Calcular recomendación
+            if costo_total > 5000000:  # >$5M en correctivos
+                recomendacion = 'Evaluar reemplazo del equipo'
+            elif item['cantidad'] >= 5:
+                recomendacion = 'Aumentar frecuencia de mantenimiento preventivo'
+            else:
+                recomendacion = 'Monitorear más de cerca y revisar procedimientos'
+
+            equipos_problematicos.append({
+                'equipo': equipo,
+                'cantidad_correctivos': item['cantidad'],
+                'costo_total': costo_total,
+                'nivel_problema': nivel_problema,
+                'recomendacion': recomendacion,
+            })
 
     # Calcular ahorros potenciales totales
     ahorro_total_cronograma = sum(op['ahorro_estimado'] for op in oportunidades_optimizacion)
