@@ -62,7 +62,7 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
 
     Incluye equipos De Baja/Inactivos del año actual para cumplimiento correcto:
     - Equipo De Baja: actividades desde fecha_baja → No Cumplido; año anterior → excluido
-    - Equipo Inactivo: todas las no realizadas → No Cumplido
+    - Equipo Inactivo: fechas pasadas no realizadas → No Cumplido; fechas futuras → Pendiente
     """
     projected_activities = []
 
@@ -103,9 +103,8 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
         if freq <= 0:
             continue
 
-        # --- Determinar restricción por baja/inactivación ---
+        # --- Determinar restricción por baja ---
         fecha_baja = None
-        es_inactivo = (equipo.estado == ESTADO_INACTIVO)
 
         if equipo.estado == ESTADO_DE_BAJA:
             if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
@@ -116,7 +115,7 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
             else:
                 # De Baja sin registro → excluir (no sabemos cuándo)
                 continue
-        # -----------------------------------------------------
+        # ----------------------------------------
 
         # Calcular fechas programadas en el año
         current_date = plan_start_date
@@ -133,15 +132,14 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
 
             if realizadas:
                 status = 'Realizado'
-            elif es_inactivo:
-                # Inactivo: todas las no realizadas = No Cumplido
-                status = 'No Cumplido'
             elif fecha_baja and current_date >= fecha_baja:
-                # De Baja: actividades desde la fecha de baja = No Cumplido
+                # De Baja: actividades desde la fecha de baja = No Cumplido (definitivo)
                 status = 'No Cumplido'
             elif current_date < today:
+                # Fecha pasada y no realizada → No Cumplido (incluye Inactivos con fechas pasadas)
                 status = 'No Cumplido'
             else:
+                # Fecha futura → Pendiente (incluye Inactivos: pueden reactivarse)
                 status = 'Pendiente/Programado'
 
             projected_activities.append({
@@ -168,7 +166,7 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
 
     Incluye equipos De Baja/Inactivos del año actual para cumplimiento correcto:
     - Equipo De Baja: actividades desde fecha_baja → No Cumplido; año anterior → excluido
-    - Equipo Inactivo: todas las no realizadas → No Cumplido
+    - Equipo Inactivo: fechas pasadas no realizadas → No Cumplido; fechas futuras → Pendiente
     """
     projected_maintenances = []
 
@@ -194,9 +192,8 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
         if freq <= 0:
             continue
 
-        # --- Determinar restricción por baja/inactivación ---
+        # --- Determinar restricción por baja ---
         fecha_baja = None
-        es_inactivo = (equipo.estado == ESTADO_INACTIVO)
 
         if equipo.estado == ESTADO_DE_BAJA:
             if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
@@ -207,7 +204,7 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
             else:
                 # De Baja sin registro → excluir (no sabemos cuándo)
                 continue
-        # -----------------------------------------------------
+        # ----------------------------------------
 
         current_date = plan_start_date
         while current_date.year < year:
@@ -223,13 +220,11 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
 
             if realizados:
                 status = 'Realizado'
-            elif es_inactivo:
-                # Inactivo: todas las no realizadas = No Cumplido
-                status = 'No Cumplido'
             elif fecha_baja and current_date >= fecha_baja:
-                # De Baja: actividades desde la fecha de baja = No Cumplido
+                # De Baja: actividades desde la fecha de baja = No Cumplido (definitivo)
                 status = 'No Cumplido'
             elif current_date < today:
+                # Fecha pasada y no realizada → No Cumplido (incluye Inactivos con fechas pasadas)
                 status = 'No Cumplido'
             else:
                 status = 'Pendiente/Programado'

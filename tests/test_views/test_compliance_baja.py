@@ -235,8 +235,12 @@ class TestEquipoBajaEnTorta:
 class TestEquipoInactivoEnTorta:
     """Los equipos Inactivos deben tener todas las actividades no realizadas como No Cumplido."""
 
-    def test_equipo_inactivo_todas_pendientes_son_no_cumplido(self, empresa_factory):
-        """Para un equipo Inactivo, todas las actividades no realizadas = No Cumplido."""
+    def test_equipo_inactivo_pasadas_son_no_cumplido_futuras_son_pendiente(self, empresa_factory):
+        """
+        Para un equipo Inactivo:
+        - Fechas pasadas no realizadas → No Cumplido
+        - Fechas futuras no realizadas → Pendiente/Programado (puede reactivarse)
+        """
         empresa = empresa_factory()
         year = date.today().year
         today = date.today()
@@ -251,10 +255,15 @@ class TestEquipoInactivoEnTorta:
 
         assert len(resultado) >= 1
         for actividad in resultado:
-            if actividad['status'] != 'Realizado':
+            if actividad['status'] == 'Realizado':
+                continue
+            if actividad['fecha_programada'] < today:
                 assert actividad['status'] == 'No Cumplido', (
-                    f"Actividad inactiva en {actividad['fecha_programada']} debería ser 'No Cumplido', "
-                    f"pero es '{actividad['status']}'"
+                    f"Fecha pasada inactiva {actividad['fecha_programada']} debería ser 'No Cumplido'"
+                )
+            else:
+                assert actividad['status'] == 'Pendiente/Programado', (
+                    f"Fecha futura inactiva {actividad['fecha_programada']} debería ser 'Pendiente/Programado'"
                 )
 
     def test_justificacion_inactivo_usa_observaciones(self, empresa_factory):
@@ -353,8 +362,8 @@ class TestMantenimientoBajaInactivo:
         for actividad in desde_baja:
             assert actividad['status'] == 'No Cumplido'
 
-    def test_mantenimiento_equipo_inactivo_todos_no_cumplido(self, empresa_factory):
-        """Para equipo Inactivo, todos los mantenimientos no realizados = No Cumplido."""
+    def test_mantenimiento_equipo_inactivo_pasadas_no_cumplido_futuras_pendiente(self, empresa_factory):
+        """Para equipo Inactivo: pasadas → No Cumplido; futuras → Pendiente/Programado."""
         empresa = empresa_factory()
         year = date.today().year
         today = date.today()
@@ -368,8 +377,12 @@ class TestMantenimientoBajaInactivo:
 
         assert len(resultado) >= 1
         for actividad in resultado:
-            if actividad['status'] != 'Realizado':
+            if actividad['status'] == 'Realizado':
+                continue
+            if actividad['fecha_programada'] < today:
                 assert actividad['status'] == 'No Cumplido'
+            else:
+                assert actividad['status'] == 'Pendiente/Programado'
 
 
 # ---------------------------------------------------------------------------
