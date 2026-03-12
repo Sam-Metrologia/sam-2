@@ -481,13 +481,16 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
 
     # Usar la misma lógica del dashboard técnico
     equipos_queryset = Equipo.objects.filter(empresa=empresa)
+    # Para salud, eficiencia y actividades críticas: solo equipos activos (sin cambio)
     equipos_para_dashboard = equipos_queryset.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
+    # Para cumplimiento (tortas): TODOS los equipos con prefetch de baja
+    equipos_para_cumplimiento = equipos_queryset.select_related('baja_registro')
 
     # 1. SALUD DEL EQUIPO (Pilar 1)
     salud_equipo_data = _calcular_salud_equipo(equipos_para_dashboard, today)
 
     # 2. CUMPLIMIENTO (Pilar 2)
-    cumplimiento_data = _calcular_cumplimiento(equipos_para_dashboard, current_year, today)
+    cumplimiento_data = _calcular_cumplimiento(equipos_para_cumplimiento, current_year, today)
 
     # 3. EFICIENCIA OPERACIONAL (Pilar 3)
     eficiencia_data = _calcular_eficiencia_operacional(equipos_queryset, equipos_para_dashboard)
@@ -745,10 +748,11 @@ def _panel_decisiones_sam(request, today, current_year):
     for empresa in empresas_queryset:
         equipos_queryset = Equipo.objects.filter(empresa=empresa)
         equipos_para_dashboard = equipos_queryset.exclude(estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO])
+        equipos_para_cumplimiento = equipos_queryset.select_related('baja_registro')
 
         # Calcular métricas por empresa usando las mismas funciones
         salud_empresa = _calcular_salud_equipo(equipos_para_dashboard, today)
-        cumplimiento_empresa = _calcular_cumplimiento(equipos_para_dashboard, current_year, today)
+        cumplimiento_empresa = _calcular_cumplimiento(equipos_para_cumplimiento, current_year, today)
         eficiencia_empresa = _calcular_eficiencia_operacional(equipos_queryset, equipos_para_dashboard)
 
         # Agregar a totales

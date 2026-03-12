@@ -59,6 +59,10 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
     2. Última calibración (si no hay actividad del tipo)
     3. Fecha de adquisición
     4. NUNCA fecha de registro
+
+    Incluye equipos De Baja/Inactivos del año actual para cumplimiento correcto:
+    - Equipo De Baja: actividades desde fecha_baja → No Cumplido; año anterior → excluido
+    - Equipo Inactivo: todas las no realizadas → No Cumplido
     """
     projected_activities = []
 
@@ -99,6 +103,21 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
         if freq <= 0:
             continue
 
+        # --- Determinar restricción por baja/inactivación ---
+        fecha_baja = None
+        es_inactivo = (equipo.estado == ESTADO_INACTIVO)
+
+        if equipo.estado == ESTADO_DE_BAJA:
+            if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
+                fecha_baja = equipo.baja_registro.fecha_baja
+                # Si se dio de baja ANTES del año calculado → no proyectar nada
+                if fecha_baja.year < year:
+                    continue
+            else:
+                # De Baja sin registro → excluir (no sabemos cuándo)
+                continue
+        # -----------------------------------------------------
+
         # Calcular fechas programadas en el año
         current_date = plan_start_date
         while current_date.year < year:
@@ -114,6 +133,12 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
 
             if realizadas:
                 status = 'Realizado'
+            elif es_inactivo:
+                # Inactivo: todas las no realizadas = No Cumplido
+                status = 'No Cumplido'
+            elif fecha_baja and current_date >= fecha_baja:
+                # De Baja: actividades desde la fecha de baja = No Cumplido
+                status = 'No Cumplido'
             elif current_date < today:
                 status = 'No Cumplido'
             else:
@@ -122,7 +147,8 @@ def get_projected_activities_for_year(equipos_queryset, activity_type, year, tod
             projected_activities.append({
                 'equipo': equipo,
                 'fecha_programada': current_date,
-                'status': status
+                'status': status,
+                'justificacion': get_justificacion_incumplimiento(equipo, status),
             })
 
             current_date += relativedelta(months=freq)
@@ -139,6 +165,10 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
     2. Última calibración (si no hay mantenimiento)
     3. Fecha de adquisición
     4. NUNCA fecha de registro
+
+    Incluye equipos De Baja/Inactivos del año actual para cumplimiento correcto:
+    - Equipo De Baja: actividades desde fecha_baja → No Cumplido; año anterior → excluido
+    - Equipo Inactivo: todas las no realizadas → No Cumplido
     """
     projected_maintenances = []
 
@@ -164,6 +194,21 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
         if freq <= 0:
             continue
 
+        # --- Determinar restricción por baja/inactivación ---
+        fecha_baja = None
+        es_inactivo = (equipo.estado == ESTADO_INACTIVO)
+
+        if equipo.estado == ESTADO_DE_BAJA:
+            if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
+                fecha_baja = equipo.baja_registro.fecha_baja
+                # Si se dio de baja ANTES del año calculado → no proyectar nada
+                if fecha_baja.year < year:
+                    continue
+            else:
+                # De Baja sin registro → excluir (no sabemos cuándo)
+                continue
+        # -----------------------------------------------------
+
         current_date = plan_start_date
         while current_date.year < year:
             current_date += relativedelta(months=freq)
@@ -178,6 +223,12 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
 
             if realizados:
                 status = 'Realizado'
+            elif es_inactivo:
+                # Inactivo: todas las no realizadas = No Cumplido
+                status = 'No Cumplido'
+            elif fecha_baja and current_date >= fecha_baja:
+                # De Baja: actividades desde la fecha de baja = No Cumplido
+                status = 'No Cumplido'
             elif current_date < today:
                 status = 'No Cumplido'
             else:
@@ -186,7 +237,8 @@ def get_projected_maintenance_compliance_for_year(equipos_queryset, year, today)
             projected_maintenances.append({
                 'equipo': equipo,
                 'fecha_programada': current_date,
-                'status': status
+                'status': status,
+                'justificacion': get_justificacion_incumplimiento(equipo, status),
             })
 
             current_date += relativedelta(months=freq)
@@ -562,8 +614,10 @@ def _get_graficos_data(equipos_queryset, equipos_para_dashboard, equipos_para_pr
     # Realizadas: todos los equipos | Programadas: solo activos
     line_data = _get_line_chart_data(equipos_para_dashboard, equipos_para_proyecciones, today)
 
-    # Datos para gráficas de torta - usar equipos para proyecciones (TODOS)
-    pie_data = _get_pie_chart_data(equipos_queryset, equipos_para_proyecciones, current_year, today)
+    # Datos para gráficas de torta — incluir baja_registro para lógica de baja (evita N+1)
+    equipos_con_baja = equipos_queryset.select_related('baja_registro')
+    equipos_proyecciones_con_baja = equipos_para_proyecciones.select_related('baja_registro')
+    pie_data = _get_pie_chart_data(equipos_con_baja, equipos_proyecciones_con_baja, current_year, today)
 
     return {**line_data, **pie_data}
 

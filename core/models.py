@@ -713,10 +713,11 @@ class Empresa(models.Model):
             ), output_field=IntF())),
         )
 
-        # Cumplimiento anual (queries N+1 — se ejecutan 1 vez y se guardan)
-        cal_proj = get_projected_activities_for_year(equipos_activos, 'calibracion', year, today)
-        comp_proj = get_projected_activities_for_year(equipos_activos, 'comprobacion', year, today)
-        mant_proj = get_projected_maintenance_compliance_for_year(equipos_activos, year, today)
+        # Cumplimiento anual — incluye De Baja/Inactivos del año actual (con select_related)
+        equipos_para_compliance = equipos.select_related('baja_registro')
+        cal_proj = get_projected_activities_for_year(equipos_para_compliance, 'calibracion', year, today)
+        comp_proj = get_projected_activities_for_year(equipos_para_compliance, 'comprobacion', year, today)
+        mant_proj = get_projected_maintenance_compliance_for_year(equipos_para_compliance, year, today)
 
         def _contar(proyeccion):
             r = n = p = 0
