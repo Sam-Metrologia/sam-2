@@ -43,6 +43,29 @@
 
 ---
 
+## [2026-03-16] - Refactoring de Modelos, Permisos y Correcciones
+
+### Modificado
+- **`core/models/` (paquete)**: `core/models.py` (4,600 líneas, 28 modelos) dividido en 12 archivos temáticos: `common.py`, `empresa.py`, `users.py`, `catalogs.py`, `equipment.py`, `activities.py`, `loans.py`, `documents.py`, `payments.py`, `system.py`, `_signals.py`, `__init__.py`. Todos los imports existentes siguen funcionando sin cambios (re-exportación en `__init__.py`).
+- **`core/views/registro.py` — Permisos TÉCNICO ampliados**: Añadidos `can_view_calibracion`, `can_change_calibracion` (permisos de confirmación metrológica), `add_equipo`, `change_equipo`, `can_view_prestamo`, `can_add_prestamo`, `can_change_prestamo`. El técnico puede ahora crear/editar equipos, abrir y corregir confirmaciones metrológicas y gestionar préstamos.
+- **`core/signals.py` — Signal para préstamos**: Añadidos `@receiver(post_save/post_delete)` para `PrestamoEquipo`. Resuelve bug donde el contador "préstamos activos" en el dashboard mostraba 0 tras crear un préstamo.
+- **`.github/workflows/tests.yml` — CI/CD bloquea en vulnerabilidades**: Removido `|| true` de los pasos `safety check` y `bandit -r core/ -ll`. El CI ahora falla si hay CVEs en dependencias o vulnerabilidades HIGH/CRITICAL en código.
+
+### Eliminado
+- **Código muerto en `Empresa.esta_al_dia_con_pagos()`**: Líneas inalcanzables después del `return dias >= -7` (fragmento de `soft_delete()` mal colocado). Eliminadas sin impacto funcional.
+- **`📚-LEER-PRIMERO-DOCS/`**: Eliminados 3 archivos redundantes y desactualizados: `00-START-HERE.md`, `INICIO-AQUI.md`, `CONSOLIDATION.md`. Información consolidada en `README.md` (reescrito).
+
+### Documentación
+- **`📚-LEER-PRIMERO-DOCS/README.md`**: Reescrito con estado actual real (1,804 tests, 8.3/10), estructura `core/models/` y comandos corregidos.
+- **`📚-LEER-PRIMERO-DOCS/DEVELOPER-GUIDE.md`**: Referencias a `core/models.py` actualizadas a `core/models/`. AWS S3 corregido a Cloudflare R2.
+- **`📚-LEER-PRIMERO-DOCS/DESPLEGAR-EN-RENDER.md`**: Sección de almacenamiento corregida (Cloudflare R2).
+
+### Notas operativas
+- **Producción**: Tras el deploy, ejecutar `python manage.py setup_permissions` en Render Shell para actualizar permisos de usuarios existentes.
+- **Tests**: 1,804 pasando · 0 fallando · Cobertura 70% · Score 8.3/10
+
+---
+
 ## [5 Diciembre 2025] - Centralización de Documentación en Carpeta Dedicada
 
 ### Agregado
@@ -365,10 +388,12 @@
 | 13 Nov 2025 | 7.2/10 | +0.2 | 158 | 94% | 0 ✅ |
 | 16 Nov 2025 | 7.2/10 | 0 | 158 | 94% | 0 ✅ |
 | 19 Nov 2025 | 7.2/10 | 0 | 158 | 94% | 0 ✅ |
-| 5 Dic 2025 | **7.8/10** | **+0.6** | **268** | **94.8%** | **0** ✅ |
+| 5 Dic 2025 | 7.8/10 | +0.6 | 268 | 94.8% | 0 ✅ |
+| 15 Mar 2026 | 8.3/10 | +0.5 | 1,804 | 70% | 0 ✅ |
+| **16 Mar 2026** | **8.3/10** | 0 | **1,804** | **70%** | **0** ✅ |
 
-**Mejora Total:** +1.3 puntos (desde ~6.5 hasta 7.8)
-**Próximo Objetivo:** 8.5/10
+**Mejora Total:** +1.8 puntos (desde ~6.5 hasta 8.3)
+**Próximo Objetivo:** 9.0/10
 
 ### Líneas de Código
 

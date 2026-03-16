@@ -1,147 +1,120 @@
-# 📚 Documentación Central - SAM Metrología
+# Documentación para Desarrolladores — SAM Metrología
 
-> **Esta carpeta contiene TODA la documentación que necesitas para trabajar en el proyecto.**
-
----
-
-## 🎯 Punto de Partida
-
-### **[📖 00-START-HERE.md](./00-START-HERE.md)** ⭐ **EMPIEZA AQUÍ**
-
-Si es tu primera vez en el proyecto, abre ese archivo primero. Te guiará paso a paso.
+Esta carpeta es el punto de entrada para cualquier desarrollador que trabaje en el proyecto.
 
 ---
 
-## 📂 Contenido de Esta Carpeta
+## Orden de lectura
 
-### Documentación Principal
+Lee los archivos en este orden:
 
-| Archivo | Descripción | ¿Cuándo leerlo? |
-|---------|-------------|-----------------|
-| **[00-START-HERE.md](./00-START-HERE.md)** | Punto de partida para TODOS los desarrolladores | **PRIMERO** - Siempre |
-| **[INICIO-AQUI.md](./INICIO-AQUI.md)** | Guía de inicio rápido con checklist | Después de START-HERE |
-| **[DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md)** | Guía técnica completa del sistema | **OBLIGATORIO** antes de tocar código |
-| **[CONSOLIDATION.md](./CONSOLIDATION.md)** | Índice maestro de toda la documentación | Cuando busques algo específico |
-| **[CHANGELOG.md](./CHANGELOG.md)** | Historial completo de cambios | **Antes y después de CADA cambio** |
-| **[DESPLEGAR-EN-RENDER.md](./DESPLEGAR-EN-RENDER.md)** | Guía de deployment en producción | Cuando vayas a hacer deploy |
-| **[CLAUDE.md](./CLAUDE.md)** | Instrucciones para Claude Code | Si usas Claude Code como asistente |
+| # | Archivo | Qué encontrarás | Tiempo |
+|---|---------|-----------------|--------|
+| 1 | **[DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md)** | Arquitectura, áreas críticas, convenciones, checklist pre-commit | 40 min |
+| 2 | **[DESPLEGAR-EN-RENDER.md](./DESPLEGAR-EN-RENDER.md)** | Cómo desplegar a producción paso a paso | 15 min |
+| 3 | **[CHANGELOG.md](./CHANGELOG.md)** | Historial de cambios — leer antes de tocar algo, actualizar después de cada cambio | 5 min |
+
+La documentación técnica general del proyecto está en **[CLAUDE.md](../CLAUDE.md)** (raíz del repositorio).
 
 ---
 
-## 🚀 Orden de Lectura Recomendado
+## Arranque rápido
 
-### Para Nuevos Desarrolladores (Día 1-2)
-
-1. ✅ **[00-START-HERE.md](./00-START-HERE.md)** (10 min)
-2. ✅ **[INICIO-AQUI.md](./INICIO-AQUI.md)** (10 min)
-3. ✅ **[DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md)** (40 min) ⭐ **CRÍTICO**
-4. ✅ **[CONSOLIDATION.md](./CONSOLIDATION.md)** (10 min)
-5. ✅ **[CHANGELOG.md](./CHANGELOG.md)** (5 min)
-
-**Total:** ~75 minutos de lectura
-
-### Para Hacer un Cambio
-
-1. ✅ Leer [DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md) → Sección "Áreas Críticas"
-2. ✅ Consultar [CHANGELOG.md](./CHANGELOG.md) → Ver cambios recientes relacionados
-3. ✅ Hacer tu cambio
-4. ✅ **Actualizar [CHANGELOG.md](./CHANGELOG.md)** con tu cambio ← **OBLIGATORIO**
-5. ✅ Ejecutar tests: `pytest`
-6. ✅ Commit y push
-
-### Para Hacer Deploy
-
-1. ✅ Leer [DESPLEGAR-EN-RENDER.md](./DESPLEGAR-EN-RENDER.md)
-2. ✅ Verificar checklist pre-deploy
-3. ✅ Ejecutar tests
-4. ✅ Push a `main` (auto-deploy activo)
-
----
-
-## 📊 Documentación Adicional
-
-### Auditorías y Reportes de Progreso
-
-**Ubicación:** `../auditorias/`
-
-- **[PROGRESO_Y_ROADMAP_8.5_2025-12-05.md](../auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md)** - Estado actual y roadmap
-- **[AUDITORIA_COMPLETA_2025-12-05.md](../auditorias/AUDITORIA_COMPLETA_2025-12-05.md)** - Última auditoría completa
-- **[LIMPIEZA_COMPLETADA_2025-12-05.md](../auditorias/LIMPIEZA_COMPLETADA_2025-12-05.md)** - Optimizaciones realizadas
-
-Ver índice completo en [CONSOLIDATION.md](./CONSOLIDATION.md)
-
----
-
-## ⚠️ Reglas Importantes
-
-### 1. Actualiza el CHANGELOG
-
-**SIEMPRE actualiza [CHANGELOG.md](./CHANGELOG.md) cuando:**
-- ✅ Agregues una nueva funcionalidad
-- ✅ Modifiques una funcionalidad existente
-- ✅ Elimines código obsoleto
-- ✅ Corrijas un bug
-- ✅ Hagas cambios de seguridad
-
-**Sin excepciones.** Es tu responsabilidad mantener la trazabilidad.
-
-### 2. Lee Antes de Tocar
-
-**NO toques código sin leer:**
-- [DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md) - Especialmente la sección "Áreas Críticas"
-
-### 3. Tests Antes de Commit
-
-**SIEMPRE ejecuta:**
 ```bash
-pytest
+# 1. Entorno virtual
+python -m venv venv
+source venv/Scripts/activate      # Windows
+# source venv/bin/activate        # Mac/Linux
+
+# 2. Dependencias
+pip install -r requirements.txt
+
+# 3. Base de datos
+python manage.py migrate
+
+# 4. Superusuario
+python manage.py createsuperuser
+
+# 5. Servidor
+python manage.py runserver
 ```
 
-254/268 tests deben pasar (94.8%). Si rompes tests, arréglalo antes de commit.
+---
 
-### 4. Auto-Deploy Activo
+## Comandos esenciales
 
-**CUIDADO:** Cada push a `main` se despliega automáticamente a producción.
+```bash
+# Tests (deben pasar siempre antes de hacer commit)
+python -m pytest
+python -m pytest --cov=core --cov-report=term-missing
+
+# Verificar sistema
+python manage.py check
+
+# Migraciones
+python manage.py makemigrations
+python manage.py migrate
+
+# Resincronizar permisos de usuarios (tras cambios en roles)
+python manage.py setup_permissions
+
+# Recalcular stats del dashboard
+python manage.py recalcular_stats_empresas
+```
 
 ---
 
-## 🔍 ¿Qué Archivo Necesito?
+## Estado actual
 
-| Necesito... | Ver... |
-|-------------|--------|
-| Empezar en el proyecto | [00-START-HERE.md](./00-START-HERE.md) |
-| Setup inicial | [INICIO-AQUI.md](./INICIO-AQUI.md) |
-| Entender arquitectura | [DEVELOPER-GUIDE.md](./DEVELOPER-GUIDE.md) |
-| Buscar documentación específica | [CONSOLIDATION.md](./CONSOLIDATION.md) |
-| Ver cambios recientes | [CHANGELOG.md](./CHANGELOG.md) |
-| Hacer deploy | [DESPLEGAR-EN-RENDER.md](./DESPLEGAR-EN-RENDER.md) |
-| Usar Claude Code | [CLAUDE.md](./CLAUDE.md) |
-| Estado del proyecto | [../auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md](../auditorias/PROGRESO_Y_ROADMAP_8.5_2025-12-05.md) |
+| Indicador | Valor |
+|-----------|-------|
+| Score auditado | **8.3 / 10** |
+| Tests | **1,804 pasando** — 0 fallando |
+| Cobertura | **70%** |
+| Última auditoría | `../auditorias/AUDITORIA_INTEGRAL_2026-03-15.md` |
+| Versión | 2.0.0 |
 
 ---
 
-## 📞 Soporte
+## Reglas que no se negocian
 
-**Email:** metrologiasam@gmail.com
+1. **Nunca hacer push directo a `main`** — hay auto-deploy activo a producción
+2. **Siempre correr `python -m pytest` antes de commit** — los 1,804 tests deben pasar
+3. **Actualizar CHANGELOG.md** con cada cambio que hagas
+4. **No hardcodear `DEBUG=True`** ni exponer `SECRET_KEY`
+
+---
+
+## Estructura del proyecto
+
+```
+sam-2/
+├── 📚-LEER-PRIMERO-DOCS/     ← ESTÁS AQUÍ
+│   ├── README.md              (este archivo)
+│   ├── DEVELOPER-GUIDE.md     (guía técnica completa)
+│   ├── DESPLEGAR-EN-RENDER.md (guía de deploy)
+│   └── CHANGELOG.md           (historial de cambios)
+│
+├── core/                      ← Código principal
+│   ├── models/                (paquete de modelos — 28 modelos)
+│   │   ├── __init__.py        (re-exporta todo)
+│   │   ├── empresa.py
+│   │   ├── equipment.py
+│   │   ├── activities.py
+│   │   └── ...
+│   ├── views/                 (vistas organizadas por dominio)
+│   ├── constants.py           (todas las constantes centralizadas)
+│   ├── signals.py             (invalidación de caché)
+│   └── ...
+│
+├── tests/                     ← Tests (pytest)
+├── auditorias/                ← Auditorías y reportes históricos
+├── docs/                      ← Documentación técnica adicional
+├── CLAUDE.md                  ← Instrucciones para Claude Code
+└── README.md                  ← Descripción pública del proyecto
+```
+
+---
 
 **Producción:** https://app.sammetrologia.com
-
-**Render Dashboard:** https://dashboard.render.com
-
----
-
-## 📈 Estado del Proyecto
-
-**Puntuación:** 7.8/10 (+0.6 desde Nov 2025)
-
-**Tests:** 254/268 pasando (94.8%)
-
-**Próximo Objetivo:** 8.5/10
-
-Ver detalles en [CONSOLIDATION.md](./CONSOLIDATION.md)
-
----
-
-**Última Actualización:** 5 de Diciembre de 2025
-
-**¡Bienvenido al equipo SAM Metrología!** 🚀
+**Soporte:** metrologiasam@gmail.com

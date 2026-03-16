@@ -23,6 +23,7 @@ markers = [
     "permissions: marks tests for permissions",
     "notifications: marks tests for notification system",
     "multitenancy: marks tests for multi-tenant isolation",
+    "performance: marks tests as performance benchmarks",
 ]
 
 [tool.coverage.run]

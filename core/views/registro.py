@@ -29,17 +29,24 @@ TRIAL_MAX_ATTEMPTS_PER_HOUR = 3
 # =============================================================================
 
 PERMISOS_TECNICO = [
-    'view_equipo',
+    # Equipos
+    'view_equipo', 'add_equipo', 'change_equipo',
+    # Calibraciones + confirmación metrológica e intervalos
     'add_calibracion', 'change_calibracion', 'view_calibracion',
+    'can_view_calibracion', 'can_change_calibracion',
+    # Mantenimientos
     'add_mantenimiento', 'change_mantenimiento', 'view_mantenimiento',
+    # Comprobaciones
     'add_comprobacion', 'change_comprobacion', 'view_comprobacion',
+    # Catálogos (solo lectura)
     'view_proveedor',
     'view_procedimiento',
+    # Préstamos
     'can_view_prestamo', 'can_add_prestamo', 'can_change_prestamo',
 ]
 
 PERMISOS_ADMINISTRADOR = PERMISOS_TECNICO + [
-    'add_equipo', 'change_equipo', 'delete_equipo',
+    'delete_equipo',
     'delete_calibracion', 'delete_mantenimiento', 'delete_comprobacion',
     'add_bajaequipo', 'change_bajaequipo', 'view_bajaequipo', 'delete_bajaequipo',
     'view_empresa', 'change_empresa',

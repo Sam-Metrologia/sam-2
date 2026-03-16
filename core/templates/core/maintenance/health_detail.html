@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Detalle Health Check - SAM{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Verificación de Salud #{{ health_check.id }}</h1>
+  <p>Estado: {{ health_check.overall_status }}</p>
+  <p>Fecha: {{ health_check.checked_at }}</p>
+</div>
+{% endblock %}

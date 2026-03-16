@@ -37,6 +37,7 @@ class EmpresaFactory(DjangoModelFactory):
 
     class Meta:
         model = 'core.Empresa'
+        skip_postgeneration_save = True
 
     nombre = factory.Sequence(lambda n: f'Empresa Test {n}')
     nit = factory.Sequence(lambda n: f'{900000000 + n}-{n % 10}')
@@ -86,6 +87,7 @@ class UserFactory(DjangoModelFactory):
     class Meta:
         model = 'core.CustomUser'
         django_get_or_create = ('username',)
+        skip_postgeneration_save = True
 
     username = factory.Sequence(lambda n: f'user{n}')
     email = factory.LazyAttribute(lambda obj: f'{obj.username}@example.com')
@@ -157,6 +159,7 @@ class EquipoFactory(DjangoModelFactory):
 
     class Meta:
         model = 'core.Equipo'
+        skip_postgeneration_save = True
 
     codigo_interno = factory.Sequence(lambda n: f'EQ-{n:05d}')
     nombre = factory.LazyFunction(lambda: f'{fake.word().title()} {random.choice(["Digital", "Analógico", "Electrónico", "Mecánico"])}')

@@ -72,10 +72,8 @@ class TestCalibracionViews:
         url = reverse('core:añadir_calibracion', args=[other_equipo.pk])
         response = authenticated_client.get(url)
 
-        # Should redirect with error message (actual behavior: core/views/activities.py:28-29)
-        # The view checks multitenancy and redirects to detalle_equipo with error
-        assert response.status_code == 302
-        assert f'/equipos/{other_equipo.pk}/' in response.url
+        # Returns 404 (empresa filter in get_object_or_404 — fetch-then-check fixed)
+        assert response.status_code == 404
 
     def test_editar_calibracion_updates_record(self, authenticated_client, equipo_factory, calibracion_factory):
         """Test editing calibration updates the record."""
@@ -206,10 +204,8 @@ class TestMantenimientoViews:
         url = reverse('core:editar_mantenimiento', args=[other_equipo.pk, other_mantenimiento.pk])
         response = authenticated_client.get(url)
 
-        # Should redirect with error message (actual behavior: core/views/activities.py:285-287)
-        # The view checks multitenancy and redirects to detalle_equipo with error
-        assert response.status_code == 302
-        assert f'/equipos/{other_equipo.pk}/' in response.url
+        # Returns 404 (empresa filter in get_object_or_404 — fetch-then-check fixed)
+        assert response.status_code == 404
 
 
 @pytest.mark.django_db

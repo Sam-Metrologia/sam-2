@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Lista de Tareas - SAM{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Lista de Tareas de Mantenimiento</h1>
+  {% for task in page_obj %}
+  <div>{{ task.task_type }} - {{ task.status }}</div>
+  {% endfor %}
+</div>
+{% endblock %}

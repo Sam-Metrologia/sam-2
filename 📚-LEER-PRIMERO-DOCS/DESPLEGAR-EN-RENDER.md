@@ -56,13 +56,17 @@ Render generará algunas automáticamente, pero DEBES configurar estas manualmen
 1. Ve a **"Environment"** en el menú lateral
 2. Añade las siguientes variables:
 
-#### AWS S3 (Para archivos en producción) - OBLIGATORIO
+#### Cloudflare R2 (Para archivos en producción) - OBLIGATORIO
+
+El proyecto usa **Cloudflare R2** como almacenamiento. Las variables usan el naming de AWS
+porque `django-storages` es compatible con la API S3 de R2.
 
 ```
-AWS_ACCESS_KEY_ID = [Tu Access Key de AWS]
-AWS_SECRET_ACCESS_KEY = [Tu Secret Key de AWS]
-AWS_STORAGE_BUCKET_NAME = [Nombre de tu bucket S3]
-AWS_S3_REGION_NAME = us-east-2 (o tu región)
+AWS_ACCESS_KEY_ID     = [R2 Access Key ID]
+AWS_SECRET_ACCESS_KEY = [R2 Secret Access Key]
+AWS_STORAGE_BUCKET_NAME = [Nombre del bucket R2]
+AWS_S3_ENDPOINT_URL   = https://<account_id>.r2.cloudflarestorage.com
+AWS_S3_REGION_NAME    = auto
 ```
 
 #### Email (Para notificaciones) - OPCIONAL pero recomendado
@@ -195,9 +199,9 @@ Traceback
 
 ### Problema 2: Archivos estáticos no cargan (CSS/JS)
 **Solución**:
-- Verifica variables AWS S3 configuradas
+- Verifica variables de Cloudflare R2 configuradas (`AWS_*` + `AWS_S3_ENDPOINT_URL`)
 - Revisa `collectstatic` en logs de build
-- Confirma permisos del bucket S3
+- Confirma que el bucket R2 tiene acceso público habilitado para estáticos
 
 ### Problema 3: Base de datos no conecta
 **Solución**:
@@ -271,7 +275,7 @@ Dashboard → Tu servicio → Logs
 - ✅ HTTPS habilitado (automático en Render)
 - ✅ `ALLOWED_HOSTS` configurado correctamente
 - ✅ Variables sensibles en Environment (no en código)
-- ✅ Bucket S3 con permisos correctos
+- ✅ Bucket R2 con permisos correctos
 
 ## 📝 Comandos Útiles (Shell de Render)
 
@@ -287,6 +291,13 @@ python manage.py createsuperuser
 
 # Verificar configuración
 python manage.py check --deploy
+
+# ⚠️ IMPORTANTE: Ejecutar tras cambios en permisos de roles (registro.py)
+# Sincroniza los permisos de todos los usuarios existentes en producción
+python manage.py setup_permissions
+
+# Recalcular stats del dashboard (tras cambios en modelos de empresa)
+python manage.py recalcular_stats_empresas
 
 # Limpiar archivos ZIP viejos
 python manage.py cleanup_zip_files --older-than-hours 6

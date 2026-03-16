@@ -182,7 +182,10 @@ def trial_check(view_func):
 
         if request.user.is_authenticated and hasattr(request.user, 'empresa'):
             empresa = request.user.empresa
-            estado_plan = empresa.get_estado_suscripcion_display()
+            if empresa:
+                estado_plan = empresa.get_estado_suscripcion_display()
+            else:
+                estado_plan = None
 
             if empresa and estado_plan in ["Plan Expirado", "Período de Prueba Expirado", "Expirado"]:
                 protected_views = [

@@ -952,9 +952,10 @@ def eliminar_equipo(request, pk):
         return redirect('core:home')
 
     # Vista GET - Confirmación
-    return render(request, 'core/eliminar_equipo.html', {
-        'equipo': equipo,
-        'titulo_pagina': f'Eliminar Equipo: {equipo.codigo_interno}'
+    return render(request, 'core/confirmar_eliminacion.html', {
+        'object_name': f'{equipo.codigo_interno} — {equipo.nombre}',
+        'return_url_name': 'core:detalle_equipo',
+        'return_url_pk': equipo.pk,
     })
 
 

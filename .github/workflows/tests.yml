@@ -169,9 +169,9 @@ jobs:
       - name: 🔒 Verificar dependencias con Safety
         run: |
           pip install safety
-          safety check --json || true
+          safety check --json
 
       - name: 🔒 Verificar vulnerabilidades con Bandit
         run: |
           pip install bandit
-          bandit -r core/ -ll || true
+          bandit -r core/ -ll

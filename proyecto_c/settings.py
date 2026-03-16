@@ -387,7 +387,9 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
         AWS_S3_CUSTOM_DOMAIN = None  # R2 no tiene custom domain por defecto
         AWS_S3_OBJECT_PARAMETERS = {
             'CacheControl': 'max-age=86400',
-            # R2 no soporta ServerSideEncryption de la misma forma
+            # R2 encripta todos los objetos en reposo automáticamente con AES-256.
+            # No requiere parámetro ServerSideEncryption — Cloudflare lo gestiona internamente.
+            # Ref: https://developers.cloudflare.com/r2/reference/data-security/
         }
         AWS_LOCATION = 'media'
         # Para R2, las URLs serán firmadas (querystring auth)
@@ -446,6 +448,9 @@ else:
     WHITENOISE_MAX_AGE = 3600
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Prepara para Django 6.0: URLField usará https por defecto
+FORMS_URLFIELD_ASSUME_HTTPS = True
 
 LOGIN_REDIRECT_URL = 'core:dashboard'
 LOGIN_URL = 'core:login'

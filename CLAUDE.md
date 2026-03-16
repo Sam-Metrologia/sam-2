@@ -10,12 +10,16 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 **Language:** Spanish (Colombia)
 **Version:** 2.0.0
 
-## Current Status (Mar 11, 2026)
+## Current Status (Mar 15, 2026)
 
-- **Tests:** 1,209 passing, 0 failing, 1 skipped
-- **Coverage:** 57.91% (Goal: 70%)
-- **Score:** 7.6/10 (audited)
-- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_CERO_CONFIANZA_2026-02-19.md`
+- **Tests:** 1,804 passing, 1 skipped, 3 xfailed
+- **Coverage:** 70.00% ✓ (Goal alcanzado)
+- **Score:** 8.3/10 (auditado Mar-15-2026)
+- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md`
+- **Bug CORREGIDO:** `eliminar_equipo.html` → usa `confirmar_eliminacion.html` (equipment.py:955)
+- **Decoradores confirmacion.py:** `@monitor_view` + `@trial_check` añadidos a todas las vistas; bug en `trial_check` con `empresa=None` corregido (base.py:185)
+- **SSE R2:** Cloudflare R2 encripta en reposo con AES-256 por defecto (sin configuración adicional). Comentario corregido en settings.py.
+- **Coverage confirmacion.py:** 26% → 58.77% — nuevo archivo `tests/test_views/test_confirmacion_coverage.py` (36 tests)
 - **Dashboard Cache:** Habilitado (5 min, invalidado por signals) + stats pre-computados en Empresa
 - **Dependencies:** Actualizadas 2026-02-19 (32 CVEs corregidos)
 - **Plan Trial/Onboarding/Pagos:** 98% completo (`docs/PLAN_TRIAL_ONBOARDING_PAGOS.md`)
@@ -237,9 +241,10 @@ EMAIL_HOST_PASSWORD, ADMIN_EMAIL
 - `core/models.py`: 4,148 lines (should be split into modules)
 - `core/views/reports.py`: 3,699 lines (has helpers but still large)
 - `core/forms.py`: 1,742 lines (should split by domain)
-- Coverage gaps: comprobacion.py (32%), maintenance.py (32%), confirmacion.py (38%)
+- Coverage gaps: comprobacion.py (32%), maintenance.py (32%), confirmacion.py (58%)
 - ISO 17020 modules missing: complaints, non-conformities, impartiality
 - `core/views_optimized.py`, `core/zip_optimizer.py`, `core/async_zip_improved.py`: Evaluate if still needed
+- **CSP `unsafe-inline`**: 52 bloques `<script>` inline en 51 templates — requiere middleware de nonces + atributo en cada tag. Estimado: 1-2 días. Diferido a próxima auditoría.
 
 ## Backups
 

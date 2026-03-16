@@ -310,3 +310,107 @@ class TestModoTrabajoSeguridad:
         assert response.status_code == 404
         data = response.json()
         assert data['success'] is False
+
+
+# =====================================================================
+# Tests unitarios para core.utils.impersonation
+# =====================================================================
+
+@pytest.mark.django_db
+class TestImpersonationUtils:
+    """Tests unitarios de las funciones en core.utils.impersonation."""
+
+    def _make_mock_request(self, session_data=None):
+        """Crea un mock de request con sesión."""
+        from unittest.mock import MagicMock
+        request = MagicMock()
+        request.session = dict(session_data or {})
+        return request
+
+    def test_is_impersonating_false_cuando_no_hay_clave(self):
+        """is_impersonating retorna False si no hay clave de impersonación."""
+        from core.utils.impersonation import is_impersonating
+        request = self._make_mock_request()
+        assert is_impersonating(request) is False
+
+    def test_get_impersonator_retorna_none_si_no_impersona(self):
+        """get_impersonator retorna None si no está impersonando (línea 33)."""
+        from core.utils.impersonation import get_impersonator
+        request = self._make_mock_request()
+        result = get_impersonator(request)
+        assert result is None
+
+    def test_get_impersonator_retorna_none_si_user_no_existe(self, db):
+        """get_impersonator retorna None si el ID de superusuario ya no existe (líneas 38-39)."""
+        from core.utils.impersonation import get_impersonator, IMPERSONATOR_SESSION_KEY
+        request = self._make_mock_request({IMPERSONATOR_SESSION_KEY: 999999})
+        result = get_impersonator(request)
+        assert result is None
+
+    def test_start_impersonation_falla_con_superusuario_target(self, superuser, usuario_empresa):
+        """start_impersonation retorna False si el target es superusuario (línea 57)."""
+        from core.utils.impersonation import start_impersonation
+        request = self._make_mock_request()
+        request.user = superuser
+        result = start_impersonation(request, superuser)  # target es superusuario
+        assert result is False
+
+    def test_start_impersonation_falla_si_usuario_normal_sin_sesion(self, usuario_empresa, empresa_test):
+        """start_impersonation retorna False si usuario no es superusuario (línea 72)."""
+        from core.utils.impersonation import start_impersonation
+        request = self._make_mock_request()
+        request.user = usuario_empresa  # NO es superusuario
+        # Crear un target válido (no superusuario)
+        target = CustomUser.objects.create_user(
+            username='target_util',
+            email='target@util.com',
+            password='pass123',
+            empresa=empresa_test,
+        )
+        result = start_impersonation(request, target)
+        assert result is False
+
+    def test_stop_impersonation_retorna_false_si_no_impersona(self):
+        """stop_impersonation retorna False si no está impersonando (línea 98)."""
+        from core.utils.impersonation import stop_impersonation
+        request = self._make_mock_request()
+        result = stop_impersonation(request)
+        assert result is False
+
+    def test_stop_impersonation_retorna_false_si_impersonator_no_existe(self, db):
+        """stop_impersonation retorna False si el impersonator ya no existe en BD (líneas 114-117)."""
+        from core.utils.impersonation import stop_impersonation, IMPERSONATOR_SESSION_KEY
+        from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY
+        request = self._make_mock_request({
+            IMPERSONATOR_SESSION_KEY: 999999,  # ID que no existe
+        })
+        result = stop_impersonation(request)
+        assert result is False
+
+    def test_get_default_user_sin_gerente_retorna_admin(self, empresa_test):
+        """get_default_user_for_empresa retorna admin cuando no hay gerente (líneas 163-171)."""
+        from core.utils.impersonation import get_default_user_for_empresa
+        # Crear solo un admin (sin gerente)
+        admin = CustomUser.objects.create_user(
+            username='admin_default',
+            email='admin_default@test.com',
+            password='pass123',
+            empresa=empresa_test,
+            rol_usuario='ADMINISTRADOR',
+        )
+        result = get_default_user_for_empresa(empresa_test)
+        assert result == admin
+
+    def test_get_default_user_sin_gerente_ni_admin_retorna_cualquiera(self, empresa_test):
+        """get_default_user_for_empresa retorna cualquier activo si no hay gerente ni admin (líneas 173-178)."""
+        from core.utils.impersonation import get_default_user_for_empresa
+        # Crear solo un técnico
+        tecnico = CustomUser.objects.create_user(
+            username='tecnico_default',
+            email='tecnico_default@test.com',
+            password='pass123',
+            empresa=empresa_test,
+            rol_usuario='TECNICO',
+        )
+        result = get_default_user_for_empresa(empresa_test)
+        assert result == tecnico

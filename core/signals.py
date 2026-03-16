@@ -5,7 +5,7 @@ import logging
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
-from .models import Equipo, Calibracion, Mantenimiento, Comprobacion, CustomUser, OnboardingProgress
+from .models import Equipo, Calibracion, Mantenimiento, Comprobacion, CustomUser, OnboardingProgress, PrestamoEquipo
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,18 @@ def invalidate_cache_on_comprobacion_change(sender, instance, **kwargs):
             empresa.recalcular_stats_dashboard()
         except Exception as e:
             logger.error(f"Error recalculando stats de empresa '{empresa.nombre}': {e}")
+    else:
+        invalidate_dashboard_cache()
+
+
+@receiver(post_save, sender=PrestamoEquipo)
+@receiver(post_delete, sender=PrestamoEquipo)
+def invalidate_cache_on_prestamo_change(sender, instance, **kwargs):
+    """
+    Invalida el cache del dashboard cuando se crea, modifica o devuelve un préstamo.
+    """
+    if instance.empresa:
+        invalidate_dashboard_cache(instance.empresa.id)
     else:
         invalidate_dashboard_cache()
 

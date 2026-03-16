@@ -163,49 +163,58 @@ Los reportes semanales siguen este formato:
 
 ## Histórico de Auditorías
 
-| Fecha | Tipo | Scope | Resultado | Plan Asociado |
-|-------|------|-------|-----------|---------------|
-| 2025-11-13 | Completa | Código, Seguridad, Arquitectura | 7.2/10 | PLAN_IMPLEMENTACION_2025-11-13.md |
+| Fecha | Tipo | Scope | Resultado | Archivo |
+|-------|------|-------|-----------|---------|
+| 2026-03-15 | Integral | Código, Seguridad, Ley 1581, Tests HTTP | **8.3/10** | AUDITORIA_INTEGRAL_2026-03-15.md |
+| 2026-02-19 | Integral | OWASP, Multi-tenancy, Dependencias | 8.1/10 | AUDITORIA_INTEGRAL_2026-02-19.md |
+| 2025-12-05 | Progreso | Estado y roadmap | 7.8/10 | PROGRESO_Y_ROADMAP_8.5_2025-12-05.md |
+| 2025-11-13 | Completa | Código, Seguridad, Arquitectura | 7.2/10 | AUDITORIA_COMPLETA_2025-11-13.md |
 | 2024-10-24 | Seguridad | Vulnerabilidades críticas | 3 corregidas | CAMBIOS_CRITICOS_2025-10-24.md |
 
 ---
 
-## Métricas Clave
+## Métricas Actuales (Marzo 2026)
 
 ### Calidad de Código
 
-- **Scorecard:** 7.2/10
-- **Tests Coverage:** 94%
-- **Documentación:** 9/10
-- **Mantenibilidad:** 6/10 (mejorable)
+- **Score general:** 8.3/10
+- **Tests:** 1,768 pasando — 0 fallando
+- **Cobertura:** 70%
+- **Mantenibilidad:** 7/10 (models.py pendiente de dividir)
 
 ### Seguridad
 
-- **Score:** 8/10
-- **Vulnerabilidades Críticas:** 0 (3 corregidas en Oct 2024)
-- **Dependencias Actualizadas:** 100%
+- **Score:** 8.5/10
+- **Vulnerabilidades Críticas:** 0
+- **32 CVEs corregidos:** Feb 2026
+- **Pendiente:** Quitar `unsafe-inline` del CSP
 
-### Performance
+### Multi-tenancy
 
-- **Score:** 7/10
-- **Queries Optimizadas:** 66 ocurrencias select_related
-- **Caching:** Configurado (poco utilizado)
+- **Score:** 8.5/10
+- **IDOR verificado por HTTP:** Sin fugas entre empresas
+- **Cache:** Por usuario (`dashboard_{user_id}`)
 
-### Deuda Técnica
+### Tests
 
-- **Total Estimado:** 8-10 semanas
-- **Prioridad Alta:** 2 semanas (refactorización)
-- **Prioridad Media:** 3 semanas (optimización + infra)
-- **Prioridad Baja:** 3-5 semanas (features avanzados)
+- **Score:** 9.0/10
+- **1,768 tests** — cobertura 70%
+- **Gaps:** confirmacion.py (30%), comprobacion.py (32%), maintenance.py (32%)
+
+### Deuda Técnica Pendiente
+
+- **Split models.py** (4,600 líneas) — 2 semanas — cierra 9/10
+- **Quitar unsafe-inline CSP** — 4 horas
+- **Coverage confirmacion.py a 50%+** — 4 horas
+- **SSE en Cloudflare R2** — 1 hora
 
 ---
 
 ## Contacto
 
 Para preguntas sobre auditorías:
-- Ver `../documentacion/DEVELOPER-GUIDE.md`
-- Documentación completa en carpeta `../documentacion/`
+- Documentación en `../📚-LEER-PRIMERO-DOCS/DEVELOPER-GUIDE.md`
 
 ---
 
-**Última Actualización:** 13 de Noviembre de 2025
+**Última Actualización:** 15 de Marzo de 2026

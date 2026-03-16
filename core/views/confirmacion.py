@@ -5,11 +5,13 @@ Integrado con datos reales de la base de datos
 """
 
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 from core.models import Equipo, Calibracion, meses_decimales_a_relativedelta
 from core.decorators_pdf import safe_pdf_response
+from .base import access_check, trial_check
+from core.monitoring import monitor_view
 from datetime import datetime
 import json
 import re
@@ -402,7 +404,10 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
     return context
 
 
+@monitor_view
+@access_check
 @login_required
+@permission_required('core.can_view_calibracion', raise_exception=True)
 def confirmacion_metrologica(request, equipo_id):
     """
     Vista para generar el documento de Confirmación Metrológica
@@ -410,11 +415,10 @@ def confirmacion_metrologica(request, equipo_id):
     Extrae datos del equipo y calibraciones de la BD y los pasa al template
     Si se pasa calibracion_id por GET, usa esa calibración específica
     """
-    equipo = get_object_or_404(Equipo, id=equipo_id)
-
-    # Verificar que el usuario tenga permiso para ver este equipo
-    if request.user.empresa != equipo.empresa and not request.user.is_superuser:
-        return HttpResponse("No tiene permisos para ver este equipo", status=403)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, id=equipo_id)
+    else:
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
 
     # Obtener calibración específica si se pasa por GET, sino la última
     calibracion_id = request.GET.get('calibracion_id')
@@ -436,7 +440,10 @@ def confirmacion_metrologica(request, equipo_id):
     return render(request, 'core/confirmacion_metrologica.html', context)
 
 
+@monitor_view
+@access_check
 @login_required
+@permission_required('core.can_view_calibracion', raise_exception=True)
 def intervalos_calibracion(request, equipo_id):
     """
     Vista para generar el documento de Intervalos de Calibración (Métodos ILAC G-24)
@@ -446,11 +453,10 @@ def intervalos_calibracion(request, equipo_id):
 
     MEJORA: Reutiliza datos de Confirmación Metrológica si existe el PDF
     """
-    equipo = get_object_or_404(Equipo, id=equipo_id)
-
-    # Verificar permisos
-    if request.user.empresa != equipo.empresa and not request.user.is_superuser:
-        return HttpResponse("No tiene permisos para ver este equipo", status=403)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, id=equipo_id)
+    else:
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
 
     # Obtener calibración específica si se pasa por GET
     calibracion_id = request.GET.get('calibracion_id')
@@ -609,10 +615,11 @@ def intervalos_calibracion(request, equipo_id):
                         emp_punto = emp_valor
 
                 punto['emp_punto'] = round(emp_punto, 4)
+                punto['intervalo_punto'] = round(emp_punto / deriva_punto, 1) if deriva_punto > 0 else None
 
                 # Determinar estado basado en cambio
                 if punto['cambio_desviacion'] == punto_max_cambio['cambio_desviacion']:
-                    punto['estado'] = 'MÁXIMO'
+                    punto['estado'] = 'MAYOR CAMBIO'
                     punto['es_maximo'] = True
                 elif punto['cambio_desviacion'] > punto_max_cambio['cambio_desviacion'] * 0.7:
                     punto['estado'] = 'ALTO'
@@ -623,6 +630,16 @@ def intervalos_calibracion(request, equipo_id):
                 else:
                     punto['estado'] = 'BAJO'
                     punto['es_maximo'] = False
+
+            # Marcar el punto con menor I=EMP/Deriva (el limitante real del intervalo)
+            puntos_con_i = [p for p in puntos_coincidentes if p.get('intervalo_punto') is not None]
+            if puntos_con_i:
+                punto_limitante = min(puntos_con_i, key=lambda p: p['intervalo_punto'])
+                for p in puntos_coincidentes:
+                    p['es_limitante'] = (p.get('intervalo_punto') == punto_limitante['intervalo_punto'])
+            else:
+                for p in puntos_coincidentes:
+                    p['es_limitante'] = False
 
             deriva_automatica = {
                 'fecha_anterior': fecha_anterior.strftime('%Y-%m-%d'),
@@ -698,6 +715,7 @@ def intervalos_calibracion(request, equipo_id):
                         break
 
     # ==================== CONTEXTO ====================
+    total_calibraciones = Calibracion.objects.filter(equipo=equipo).count()
     context = {
         'equipo': equipo,
         'cal_actual': cal_actual,
@@ -721,6 +739,7 @@ def intervalos_calibracion(request, equipo_id):
         # NUEVO: Error máximo para Método 1B
         'error_maximo_info': error_maximo_info,
         'puntos_metodo1b': json.dumps(puntos_metodo1b),  # Serializar para JavaScript
+        'total_calibraciones': total_calibraciones,
 
         # Metadatos para el PDF - usar campos específicos de INTERVALOS
         'nombre_empresa': equipo.empresa.nombre,
@@ -734,7 +753,11 @@ def intervalos_calibracion(request, equipo_id):
     return render(request, 'core/intervalos_calibracion.html', context)
 
 
+@monitor_view
+@access_check
 @login_required
+@trial_check
+@permission_required('core.can_change_calibracion', raise_exception=True)
 def generar_pdf_confirmacion(request, equipo_id):
     """
     Genera PDF de la confirmación metrológica Y lo guarda en la calibración específica
@@ -752,11 +775,10 @@ def generar_pdf_confirmacion(request, equipo_id):
     from django.contrib import messages
     import json
 
-    equipo = get_object_or_404(Equipo, id=equipo_id)
-
-    # Verificar permisos
-    if request.user.empresa != equipo.empresa and not request.user.is_superuser:
-        return HttpResponse("No tiene permisos", status=403)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, id=equipo_id)
+    else:
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
 
     # Obtener calibración específica si se pasa por GET, sino la última
     calibracion_id = request.GET.get('calibracion_id')
@@ -965,7 +987,11 @@ def generar_pdf_confirmacion(request, equipo_id):
         }, status=500)
 
 
+@monitor_view
+@access_check
 @login_required
+@trial_check
+@permission_required('core.can_change_calibracion', raise_exception=True)
 @safe_pdf_response
 def generar_pdf_intervalos(request, equipo_id):
     """
@@ -999,16 +1025,14 @@ def generar_pdf_intervalos(request, equipo_id):
     logger.info(f"Method: {request.method}")
     logger.info(f"Content-Type: {request.content_type}")
 
-    equipo = get_object_or_404(Equipo, id=equipo_id)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, id=equipo_id)
+    else:
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
 
     logger.info(f"User.empresa: {request.user.empresa} (ID: {request.user.empresa.id if request.user.empresa else None})")
     logger.info(f"Equipo.empresa: {equipo.empresa} (ID: {equipo.empresa.id if equipo.empresa else None})")
     logger.info(f"User.is_superuser: {request.user.is_superuser}")
-
-    # Verificar permisos
-    if request.user.empresa != equipo.empresa and not request.user.is_superuser:
-        logger.error(f"PERMISO DENEGADO: User empresa {request.user.empresa} != Equipo empresa {equipo.empresa}")
-        return JsonResponse({'success': False, 'message': 'No tiene permisos'}, status=403)
 
     # Obtener calibración específica si se pasa por GET, sino la última
     calibracion_id = request.GET.get('calibracion_id')
@@ -1070,19 +1094,13 @@ def generar_pdf_intervalos(request, equipo_id):
             emp_info['unidad'] = emp_match.group(2) if emp_match.group(2) else ''
             emp_info['texto'] = emp_texto
 
-    # Obtener deriva automática para incluir en PDF si usó Método 2 o 3
+    # Obtener deriva automática para incluir en PDF (siempre que haya datos de confirmación)
     deriva_automatica_pdf = None
-    if datos_intervalos.get('metodo_seleccionado') in ['metodo2', 'metodo3']:
-        # Recalcular deriva automática igual que en la vista de intervalos
-        cal_anterior_pdf = Calibracion.objects.filter(
-            equipo=equipo,
-            fecha_calibracion__lt=calibracion_actual.fecha_calibracion
-        ).order_by('-fecha_calibracion').first()
-
-        if (hasattr(calibracion_actual, 'confirmacion_metrologica_datos') and calibracion_actual.confirmacion_metrologica_datos and
-            cal_anterior_pdf and hasattr(cal_anterior_pdf, 'confirmacion_metrologica_datos') and cal_anterior_pdf.confirmacion_metrologica_datos):
+    if (cal_anterior and
+            hasattr(calibracion_actual, 'confirmacion_metrologica_datos') and calibracion_actual.confirmacion_metrologica_datos and
+            hasattr(cal_anterior, 'confirmacion_metrologica_datos') and cal_anterior.confirmacion_metrologica_datos):
             datos_actual = calibracion_actual.confirmacion_metrologica_datos
-            datos_anterior = cal_anterior_pdf.confirmacion_metrologica_datos
+            datos_anterior = cal_anterior.confirmacion_metrologica_datos
 
             puntos_actual = datos_actual.get('puntos_medicion', [])
             puntos_anterior = datos_anterior.get('puntos_medicion', [])
@@ -1124,7 +1142,7 @@ def generar_pdf_intervalos(request, equipo_id):
             if puntos_coincidentes_pdf:
                 punto_max_cambio_pdf = max(puntos_coincidentes_pdf, key=lambda p: p['cambio_desviacion'])
                 fecha_actual_pdf = calibracion_actual.fecha_calibracion
-                fecha_anterior_pdf = cal_anterior_pdf.fecha_calibracion
+                fecha_anterior_pdf = cal_anterior.fecha_calibracion
                 dias_transcurridos_pdf = (fecha_actual_pdf - fecha_anterior_pdf).days
                 meses_transcurridos_pdf = dias_transcurridos_pdf / 30.44
 
@@ -1132,10 +1150,11 @@ def generar_pdf_intervalos(request, equipo_id):
                 for punto in puntos_coincidentes_pdf:
                     deriva_punto = punto['cambio_desviacion'] / meses_transcurridos_pdf if meses_transcurridos_pdf > 0 else 0
                     punto['deriva_punto'] = round(deriva_punto, 6)
+                    punto['intervalo_punto'] = round(punto['emp_punto'] / deriva_punto, 1) if deriva_punto > 0 else None
 
                     # Estado basado en cambio de desviación
                     if punto['cambio_desviacion'] == punto_max_cambio_pdf['cambio_desviacion']:
-                        punto['estado'] = 'MÁXIMO'
+                        punto['estado'] = 'MAYOR CAMBIO'
                         punto['es_maximo'] = True
                     elif punto['cambio_desviacion'] > punto_max_cambio_pdf['cambio_desviacion'] * 0.7:
                         punto['estado'] = 'ALTO'
@@ -1146,6 +1165,16 @@ def generar_pdf_intervalos(request, equipo_id):
                     else:
                         punto['estado'] = 'BAJO'
                         punto['es_maximo'] = False
+
+                # Marcar el punto limitante (menor I=EMP/Deriva)
+                puntos_con_i = [p for p in puntos_coincidentes_pdf if p.get('intervalo_punto') is not None]
+                if puntos_con_i:
+                    punto_lim = min(puntos_con_i, key=lambda p: p['intervalo_punto'])
+                    for p in puntos_coincidentes_pdf:
+                        p['es_limitante'] = (p.get('intervalo_punto') == punto_lim['intervalo_punto'])
+                else:
+                    for p in puntos_coincidentes_pdf:
+                        p['es_limitante'] = False
 
                 deriva_automatica_pdf = {
                     'puntos_detalle': puntos_coincidentes_pdf,
@@ -1188,6 +1217,7 @@ def generar_pdf_intervalos(request, equipo_id):
 
         # Pasar deriva automática para tabla detallada en PDF
         'deriva_automatica': deriva_automatica_pdf,
+        'total_calibraciones': Calibracion.objects.filter(equipo=equipo).count(),
     }
 
     # Renderizar HTML
@@ -1286,7 +1316,11 @@ def generar_pdf_intervalos(request, equipo_id):
         }, status=500)
 
 
+@monitor_view
+@access_check
 @login_required
+@trial_check
+@permission_required('core.can_change_calibracion', raise_exception=True)
 def guardar_confirmacion(request, equipo_id):
     """
     Guarda los resultados de la confirmación metrológica en la BD
@@ -1296,13 +1330,12 @@ def guardar_confirmacion(request, equipo_id):
     - Opcionalmente crea un nuevo modelo ConfirmacionMetrologica
     """
     if request.method != 'POST':
-        return redirect('confirmacion_metrologica', equipo_id=equipo_id)
+        return redirect('core:confirmacion_metrologica', equipo_id=equipo_id)
 
-    equipo = get_object_or_404(Equipo, id=equipo_id)
-
-    # Verificar permisos
-    if request.user.empresa != equipo.empresa and not request.user.is_superuser:
-        return HttpResponse("No tiene permisos", status=403)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, id=equipo_id)
+    else:
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
 
     # Obtener última calibración
     ultima_cal = Calibracion.objects.filter(equipo=equipo).order_by('-fecha_calibracion').first()
@@ -1318,10 +1351,13 @@ def guardar_confirmacion(request, equipo_id):
     # - Guardar puntos de medición
     # - Generar PDF y guardarlo en ultima_cal.confirmacion_metrologica_pdf
 
-    return redirect('detalle_equipo', equipo_id=equipo_id)
+    return redirect('core:detalle_equipo', pk=equipo_id)
 
 
+@monitor_view
+@access_check
 @login_required
+@trial_check
 def actualizar_formato_empresa(request):
     """
     Actualiza la información del formato (código, versión, fecha) de la empresa.

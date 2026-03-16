@@ -158,15 +158,16 @@
                     <!-- Tabla de puntos coincidentes -->
                     <div class="overflow-x-auto mb-3">
                         <table class="w-full text-xs border-collapse border border-gray-300">
-                            <thead class="bg-gradient-to-r from-gray-600 to-gray-700 text-white">
+                            <thead class="bg-gray-600 text-white">
                                 <tr>
-                                    <th class="border border-gray-300 px-2 py-2">Nominal</th>
-                                    <th class="border border-gray-300 px-2 py-2">Desv. Ant.<br><span class="text-xs opacity-75">({{ deriva_automatica.fecha_anterior }})</span></th>
-                                    <th class="border border-gray-300 px-2 py-2">Desv. Act.<br><span class="text-xs opacity-75">({{ deriva_automatica.fecha_actual }})</span></th>
-                                    <th class="border border-gray-300 px-2 py-2 bg-yellow-600">Cambio</th>
-                                    <th class="border border-gray-300 px-2 py-2 bg-blue-600">EMP punto</th>
-                                    <th class="border border-gray-300 px-2 py-2 bg-orange-600">Deriva/mes</th>
-                                    <th class="border border-gray-300 px-2 py-2 bg-red-600">Estado</th>
+                                    <th class="border border-gray-500 px-2 py-2">Nominal</th>
+                                    <th class="border border-gray-500 px-2 py-2">Desv. Ant.<br><span class="text-xs opacity-75">({{ deriva_automatica.fecha_anterior }})</span></th>
+                                    <th class="border border-gray-500 px-2 py-2">Desv. Act.<br><span class="text-xs opacity-75">({{ deriva_automatica.fecha_actual }})</span></th>
+                                    <th class="border border-gray-500 px-2 py-2">Cambio</th>
+                                    <th class="border border-gray-500 px-2 py-2">EMP punto</th>
+                                    <th class="border border-gray-500 px-2 py-2">Deriva/mes</th>
+                                    <th class="border border-gray-500 px-2 py-2 bg-gray-700">I=EMP/Deriva<br><span class="text-xs opacity-75">(meses)</span></th>
+                                    <th class="border border-gray-500 px-2 py-2">Estado</th>
                                 </tr>
                             </thead>
                             <tbody id="tabla-deriva-puntos" class="bg-white">
@@ -179,17 +180,17 @@
                     <div class="grid grid-cols-4 gap-2 bg-gray-50 p-3 rounded border border-gray-200">
                         <div class="text-center">
                             <p class="text-xs text-gray-600">Periodo Transcurrido</p>
-                            <p class="text-lg font-bold text-green-700">{{ deriva_automatica.meses_transcurridos }}</p>
+                            <p class="text-lg font-bold text-gray-700">{{ deriva_automatica.meses_transcurridos }}</p>
                             <p class="text-xs text-gray-500">meses</p>
                         </div>
                         <div class="text-center">
-                            <p class="text-xs text-gray-600">Cambio Máximo Detectado</p>
-                            <p class="text-lg font-bold text-orange-600">{{ deriva_automatica.cambio_desviacion }}</p>
+                            <p class="text-xs text-gray-600">Mayor Cambio Absoluto</p>
+                            <p class="text-lg font-bold text-amber-600">{{ deriva_automatica.cambio_desviacion }}</p>
                             <p class="text-xs text-gray-500">unidades</p>
                         </div>
                         <div class="text-center">
                             <p class="text-xs text-gray-600">Deriva Calculada</p>
-                            <p class="text-lg font-bold text-red-600">{{ deriva_automatica.deriva_por_mes|floatformat:4 }}</p>
+                            <p class="text-lg font-bold text-gray-700">{{ deriva_automatica.deriva_por_mes|floatformat:4 }}</p>
                             <p class="text-xs text-gray-500">por mes</p>
                         </div>
                         <div class="text-center">
@@ -208,13 +209,33 @@
                         </p>
                         <p class="text-xs text-gray-600 italic">
                             <i class="fas fa-info-circle mr-1"></i>
-                            El intervalo final se calcula como el MÍNIMO de (EMP/Deriva) de todos los puntos.
+                            El intervalo final se determina por el punto con menor I=EMP/Deriva (criterio más restrictivo), no necesariamente el de "Mayor Cambio Absoluto".
                         </p>
                     </div>
 
+                    {% if total_calibraciones %}
+                    <div class="bg-green-50 border-l-4 border-green-600 p-3 mt-2 rounded">
+                        <p class="text-xs font-semibold text-green-900 mb-1">
+                            <i class="fas fa-shield-alt mr-1"></i>Base normativa ILAC G-24:2022 §6.2
+                        </p>
+                        <p class="text-xs text-green-800">
+                            Equipo con <strong>{{ total_calibraciones }}
+                            {% if total_calibraciones == 1 %}calibración{% else %}calibraciones{% endif %}</strong> registradas.
+                            {% if total_calibraciones < 4 %}
+                            Con datos iniciales (2–3 calibraciones), se aplica estimación preliminar de deriva
+                            entre los dos últimos registros — práctica válida según ILAC G-24:2022.
+                            A partir de 4 calibraciones el análisis evolucionará a carta de control estadística completa.
+                            {% else %}
+                            Análisis de carta de control con historial de {{ total_calibraciones }} calibraciones,
+                            conforme a ILAC G-24:2022.
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+
                     <p class="text-xs text-gray-600 mt-2 italic">
                         <i class="fas fa-lightbulb mr-1"></i>
-                        La deriva se calcula usando el punto con mayor cambio absoluto. Puntos comparados con tolerancia del 5%.
+                        "Mayor Cambio Absoluto": punto con mayor variación de desviación entre calibraciones. Puntos comparados con tolerancia del 5%.
                     </p>
                 </div>
                 {% endif %}
@@ -1250,6 +1271,10 @@ function calcularMetodo2() {
 
     // Actualizar resultado
     document.getElementById('resultado-metodo2').textContent = intervalo;
+
+    // Auto-fill campo de decisión final
+    const inputDef = document.getElementById('intervalo-definitivo');
+    if (inputDef) inputDef.value = intervalo;
 }
 
 // ========== MÉTODO 3 - TIEMPO EN USO ==========
@@ -1448,7 +1473,9 @@ function guardarPDF() {
     const formData = new FormData();
     formData.append('datos_intervalos', JSON.stringify(datos));
 
-    fetch("{% url 'core:generar_pdf_intervalos' equipo.pk %}", {
+    const pdfUrl = "{% url 'core:generar_pdf_intervalos' equipo.pk %}" +
+        "{% if cal_actual %}?calibracion_id={{ cal_actual.id }}{% endif %}";
+    fetch(pdfUrl, {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}'
@@ -1539,64 +1566,71 @@ function llenarTablaDerivaDetallada() {
         tbody.innerHTML = '';
         console.log('✅ Llenando tabla con', puntosDetalle.length, 'puntos');
 
-    puntosDetalle.forEach(punto => {
+    puntosDetalle.forEach((punto, idx) => {
         const row = tbody.insertRow();
+        row.id = `deriva-row-${idx}`;
+        const esLimitante = punto.es_limitante === true;
+        const esMayor = punto.es_maximo === true;
 
-        // Clases de color según estado
-        let rowClass = '';
-        let estadoClass = '';
-        if (punto.es_maximo) {
-            rowClass = 'bg-red-50';
-            estadoClass = 'bg-red-100 text-red-800 font-bold';
-        } else if (punto.estado === 'ALTO') {
-            rowClass = 'bg-orange-50';
-            estadoClass = 'bg-orange-100 text-orange-800 font-semibold';
-        } else if (punto.estado === 'MODERADO') {
-            rowClass = 'bg-yellow-50';
-            estadoClass = 'bg-yellow-100 text-yellow-800';
+        // Fila limitante: borde azul izquierdo + fondo azul muy sutil (estilo de la plataforma)
+        if (esLimitante) {
+            row.className = 'bg-blue-50';
+            row.style.borderLeft = '3px solid #3b82f6';
+        } else if (esMayor) {
+            row.className = 'bg-amber-50';
         } else {
-            rowClass = 'bg-gray-50';
-            estadoClass = 'bg-gray-100 text-gray-800';
+            row.className = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
         }
 
-        row.className = rowClass;
-
         // Nominal
-        row.insertCell(0).innerHTML = `<span class="font-semibold">${punto.nominal}</span>`;
+        row.insertCell(0).innerHTML = `<span class="font-semibold text-gray-800">${punto.nominal}</span>`;
         row.cells[0].className = 'border border-gray-300 px-2 py-2 text-center';
 
         // Desviación Anterior
-        row.insertCell(1).innerHTML = punto.desviacion_anterior.toFixed(3);
+        row.insertCell(1).innerHTML = `<span class="text-gray-600">${punto.desviacion_anterior.toFixed(3)}</span>`;
         row.cells[1].className = 'border border-gray-300 px-2 py-2 text-center';
 
         // Desviación Actual
-        row.insertCell(2).innerHTML = punto.desviacion_actual.toFixed(3);
+        row.insertCell(2).innerHTML = `<span class="text-gray-600">${punto.desviacion_actual.toFixed(3)}</span>`;
         row.cells[2].className = 'border border-gray-300 px-2 py-2 text-center';
 
         // Cambio Absoluto
-        row.insertCell(3).innerHTML = `<span class="font-bold text-orange-700">${punto.cambio_desviacion.toFixed(3)}</span>`;
-        row.cells[3].className = 'border border-gray-300 px-2 py-2 text-center bg-yellow-50';
+        row.insertCell(3).innerHTML = `<span class="font-semibold ${esMayor ? 'text-amber-700' : 'text-gray-700'}">${punto.cambio_desviacion.toFixed(3)}</span>`;
+        row.cells[3].className = 'border border-gray-300 px-2 py-2 text-center';
 
         // EMP del punto (EDITABLE)
         const empCell = row.insertCell(4);
         empCell.innerHTML = `<input type="number"
                                      value="${punto.emp_punto.toFixed(3)}"
                                      step="0.001"
-                                     class="w-full px-1 py-1 text-center border-2 border-blue-400 rounded bg-blue-50 font-semibold text-blue-900 hover:bg-blue-100 focus:bg-white focus:border-blue-600"
+                                     class="w-full px-1 py-1 text-center border border-gray-300 rounded text-gray-800 bg-white hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-xs"
                                      oninput="recalcularIntervaloConEMPEditado()"
-                                     data-punto-index="${puntosDetalle.indexOf(punto)}"
-                                     id="emp-punto-${puntosDetalle.indexOf(punto)}">`;
-        empCell.className = 'border border-gray-300 px-1 py-1 text-center bg-blue-50';
+                                     data-punto-index="${idx}"
+                                     id="emp-punto-${idx}">`;
+        empCell.className = 'border border-gray-300 px-1 py-1 text-center';
 
         // Deriva individual
-        const derivaIcon = punto.es_maximo ? '⚠️' : punto.deriva_punto > 0.05 ? '🔴' : punto.deriva_punto > 0.02 ? '🟡' : '🟢';
-        row.insertCell(5).innerHTML = `${derivaIcon} <span class="font-bold">${punto.deriva_punto.toFixed(4)}</span>`;
-        row.cells[5].className = 'border border-gray-300 px-2 py-2 text-center bg-orange-50';
+        row.insertCell(5).innerHTML = `<span class="font-mono text-gray-700">${punto.deriva_punto.toFixed(4)}</span>`;
+        row.cells[5].className = 'border border-gray-300 px-2 py-2 text-center';
+
+        // I=EMP/Deriva
+        const derivaVal = punto.deriva_por_mes || punto.deriva_punto;
+        const intervaloCalc = derivaVal > 0 ? (punto.emp_punto / derivaVal) : null;
+        const intervaloTexto = intervaloCalc !== null ? intervaloCalc.toFixed(1) : '∞';
+        const iHtml = esLimitante
+            ? `<span class="inline-flex items-center gap-1 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded" id="intervalo-punto-${idx}">${intervaloTexto}</span><span class="text-blue-600 text-xs font-semibold ml-1">← define</span>`
+            : `<span class="font-mono text-gray-700" id="intervalo-punto-${idx}">${intervaloTexto}</span>`;
+        row.insertCell(6).innerHTML = iHtml;
+        row.cells[6].className = 'border border-gray-300 px-2 py-2 text-center';
 
         // Estado
-        const estadoIcon = punto.es_maximo ? '⚠️ ' : '';
-        row.insertCell(6).innerHTML = `<span class="${estadoClass} px-2 py-1 rounded text-xs">${estadoIcon}${punto.estado}</span>`;
-        row.cells[6].className = 'border border-gray-300 px-2 py-2 text-center';
+        let estadoBadge;
+        if (esMayor)        estadoBadge = `<span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded">Mayor cambio</span>`;
+        else if (punto.estado === 'ALTO')     estadoBadge = `<span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded">Alto</span>`;
+        else if (punto.estado === 'MODERADO') estadoBadge = `<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded">Moderado</span>`;
+        else                                  estadoBadge = `<span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded">Bajo</span>`;
+        row.insertCell(7).innerHTML = estadoBadge;
+        row.cells[7].className = 'border border-gray-300 px-2 py-2 text-center';
     });
 
     console.log('✅ Tabla de deriva llenada correctamente con', puntosDetalle.length, 'puntos');
@@ -1628,10 +1662,12 @@ function recalcularIntervaloConEMPEditado() {
     let intervaloMinimo = Infinity;
     let puntoLimitante = null;
 
-    puntosDerivaDatos.forEach(punto => {
+    puntosDerivaDatos.forEach((punto, index) => {
         const deriva = punto.deriva_por_mes || punto.deriva_punto;
         if (deriva > 0) {
             const intervalo = punto.emp_punto / deriva;
+            const cellI = document.getElementById(`intervalo-punto-${index}`);
+            if (cellI) cellI.textContent = intervalo.toFixed(1);
             if (intervalo < intervaloMinimo) {
                 intervaloMinimo = intervalo;
                 puntoLimitante = punto;
@@ -1647,6 +1683,10 @@ function recalcularIntervaloConEMPEditado() {
         // Actualizar resultado en pantalla
         document.getElementById('resultado-metodo2').textContent = intervaloFinal;
 
+        // Auto-fill campo de decisión final
+        const inputDefinitivo = document.getElementById('intervalo-definitivo');
+        if (inputDefinitivo) inputDefinitivo.value = intervaloFinal;
+
         if (intervaloMinimo > maxIntervalo) {
             document.getElementById('resultado-metodo2-nota').textContent =
                 `Intervalo calculado (${Math.round(intervaloMinimo)}) excede máximo permitido`;
@@ -1655,6 +1695,38 @@ function recalcularIntervaloConEMPEditado() {
             document.getElementById('resultado-metodo2-nota').textContent =
                 `Punto limitante: ${puntoLimitante.nominal} | EMP=${puntoLimitante.emp_punto.toFixed(3)} / Deriva=${derivaUsada.toFixed(4)} = ${intervaloFinal} meses`;
         }
+
+        // Actualizar resaltado de filas y celdas I tras recálculo
+        puntosDerivaDatos.forEach((p, i) => {
+            const fila = document.getElementById(`deriva-row-${i}`);
+            const celdaI = document.getElementById(`intervalo-punto-${i}`);
+            if (!fila) return;
+            const derivaP = p.deriva_por_mes || p.deriva_punto;
+            const iVal = derivaP > 0 ? p.emp_punto / derivaP : null;
+            const esLim = p === puntoLimitante;
+            const esMayorP = p.es_maximo === true;
+
+            // Actualizar clase de fila
+            if (esLim) {
+                fila.className = 'bg-blue-50';
+                fila.style.borderLeft = '3px solid #3b82f6';
+            } else if (esMayorP) {
+                fila.className = 'bg-amber-50';
+                fila.style.borderLeft = '';
+            } else {
+                fila.className = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                fila.style.borderLeft = '';
+            }
+
+            // Reconstruir celda I
+            const celdaParent = celdaI ? celdaI.parentElement : fila.cells[6];
+            if (celdaParent) {
+                const iTexto = iVal !== null ? iVal.toFixed(1) : '∞';
+                celdaParent.innerHTML = esLim
+                    ? `<span class="inline-flex items-center gap-1 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded" id="intervalo-punto-${i}">${iTexto}</span><span class="text-blue-600 text-xs font-semibold ml-1">← define</span>`
+                    : `<span class="font-mono text-gray-700" id="intervalo-punto-${i}">${iTexto}</span>`;
+            }
+        });
     }
 }
 

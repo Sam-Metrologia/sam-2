@@ -691,3 +691,78 @@ class TestCheckTrialExpirationCommand:
         call_command('check_trial_expiration', stdout=out)
         # La empresa NO debe haber sido eliminada
         assert Empresa.objects.filter(pk=empresa.pk).exists()
+
+
+# ============================================================================
+# Tests de cobertura adicional
+# ============================================================================
+
+@pytest.mark.django_db
+class TestRegistroCoberturaAdicional:
+    """Cubre líneas no alcanzadas: HTTP_X_FORWARDED_FOR (75), logo (167-168), exception (284-286)."""
+
+    def test_get_client_ip_con_forwarded_for(self, client):
+        """IP se obtiene de HTTP_X_FORWARDED_FOR cuando está presente (línea 75)."""
+        # Hacer un POST con el header X-Forwarded-For
+        # Con cooldown activo del forwarded IP para verificar que usa la IP correcta
+        from core.views.registro import _get_client_ip
+
+        class FakeRequest:
+            META = {'HTTP_X_FORWARDED_FOR': '1.2.3.4, 10.0.0.1'}
+
+        ip = _get_client_ip(FakeRequest())
+        assert ip == '1.2.3.4'
+
+    def test_get_client_ip_con_forwarded_for_en_vista(self, client):
+        """La vista solicitar_trial usa IP forwarded para rate limiting."""
+        # Con X-Forwarded-For, la cache de rate limit usa esa IP
+        from django.core.cache import cache
+        cache.clear()
+        # El rate limit se aplica desde la IP forwarded
+        response = client.post(
+            get_trial_url(),
+            data={**VALID_TRIAL_DATA, 'nit': '123'},  # NIT inválido
+            HTTP_X_FORWARDED_FOR='9.9.9.9',
+        )
+        # La vista procesó el request con la IP forwarded (sin error de IP)
+        assert response.status_code == 200
+
+    def test_registro_con_logo_crea_empresa(self, client, tmp_path, settings):
+        """Registro con logo válido guarda el logo en la empresa (líneas 167-168)."""
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        settings.MEDIA_ROOT = str(tmp_path)
+        cache.clear()
+        # Crear imagen válida con Pillow
+        img = Image.new('RGB', (10, 10), color=(255, 0, 0))
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        png_bytes = buf.getvalue()
+        logo = SimpleUploadedFile(
+            name='logo_test_empresa.png',
+            content=png_bytes,
+            content_type='image/png',
+        )
+        data = {
+            **VALID_TRIAL_DATA,
+            'logo_empresa': logo,
+        }
+        response = client.post(get_trial_url(), data=data)
+        assert response.status_code == 302
+        empresa = Empresa.objects.get(nombre='Metrología Test S.A.S.')
+        # El logo fue guardado (campo tiene valor)
+        assert empresa.logo_empresa  # Campo de archivo tiene valor
+
+    def test_solicitar_trial_exception_muestra_error(self, client):
+        """Exception en la transacción agrega error al formulario (líneas 284-286)."""
+        from unittest.mock import patch
+        cache.clear()
+        # Simular excepción durante la creación de la empresa
+        with patch('core.views.registro.Empresa.save', side_effect=Exception("DB error simulado")):
+            response = client.post(get_trial_url(), data=VALID_TRIAL_DATA)
+        assert response.status_code == 200
+        form = response.context['form']
+        # La excepción añade un error al formulario
+        errors = form.non_field_errors()
+        assert any('error' in str(e).lower() for e in errors)

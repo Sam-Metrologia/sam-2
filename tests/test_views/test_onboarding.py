@@ -433,3 +433,29 @@ class TestTourMultiPaginaScripts:
         assert response.status_code == 200
         content = response.content.decode()
         assert 'shepherd.min.js' not in content
+
+
+@pytest.mark.django_db
+class TestMarcarPasoOnboardingExcepcion:
+    """Cubre líneas 22-23: except OnboardingProgress.DoesNotExist en _marcar_paso_onboarding."""
+
+    def test_marcar_paso_cuando_get_falla_con_doesnotexist(self):
+        """Simula race condition: progress existe en user pero no en DB (líneas 22-23)."""
+        from unittest.mock import patch, MagicMock
+        from core.views.onboarding import _marcar_paso_onboarding
+        from core.models import OnboardingProgress
+
+        empresa = _crear_empresa_trial()
+        user = UserFactory(empresa=empresa)
+        # get_or_create por si la señal ya lo creó automáticamente
+        progress, _ = OnboardingProgress.objects.get_or_create(usuario=user)
+
+        # Simular que objects.get lanza DoesNotExist (race condition)
+        with patch.object(
+            OnboardingProgress.objects.__class__,
+            'get',
+            side_effect=OnboardingProgress.DoesNotExist
+        ):
+            # No debe lanzar excepción — el except la silencia
+            _marcar_paso_onboarding(user, 'crear_equipo')
+        # Si llegamos aquí, la excepción fue manejada correctamente

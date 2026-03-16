@@ -60,7 +60,11 @@
 
         /* SECCIONES */
         .section {
-            margin: 10px 0;
+            margin: 8px 0;
+        }
+
+        /* Solo evitar salto dentro de elementos críticos */
+        .decision-box, .metodo-resultado {
             page-break-inside: avoid;
         }
 
@@ -265,7 +269,6 @@
             </td>
             <td class="header-title-cell">
                 <div>INTERVALOS DE CALIBRACIÓN</div>
-                <div style="font-size: 10pt; font-weight: normal; margin-top: 4px;">{{ nombre_empresa }}</div>
             </td>
             <td class="header-info-cell">
                 <p><strong>CÓDIGO:</strong> {{ datos_intervalos.formato.codigo }}</p>
@@ -577,18 +580,23 @@
                     <th style="padding: 4px; color: white;">Cambio</th>
                     <th style="padding: 4px; color: white;">EMP</th>
                     <th style="padding: 4px; color: white;">Deriva/mes</th>
+                    <th style="padding: 4px; color: white; background: #6B46C1;">I=EMP/Deriva<br>(meses)</th>
                     <th style="padding: 4px; color: white;">Estado</th>
                 </tr>
             </thead>
             <tbody>
                 {% for punto in deriva_automatica.puntos_detalle %}
-                <tr style="{% if punto.es_maximo %}background: #E2E8F0;{% elif punto.estado == 'ALTO' %}background: #EDF2F7;{% elif punto.estado == 'MODERADO' %}background: #F7FAFC;{% else %}background: #F7FAFC;{% endif %}">
+                <tr style="{% if punto.es_limitante %}background: #F5F3FF; outline: 2px solid #7C3AED;{% elif punto.es_maximo %}background: #E2E8F0;{% elif punto.estado == 'ALTO' %}background: #EDF2F7;{% elif punto.estado == 'MODERADO' %}background: #F7FAFC;{% else %}background: #F7FAFC;{% endif %}">
                     <td style="text-align: center; font-weight: 700; padding: 4px; color: #2D3748;">{{ punto.nominal }}</td>
                     <td style="text-align: center; padding: 4px; color: #4A5568;">{{ punto.desviacion_anterior }}</td>
                     <td style="text-align: center; padding: 4px; color: #4A5568;">{{ punto.desviacion_actual }}</td>
                     <td style="text-align: center; font-weight: 700; color: #4A5568; padding: 4px;">{{ punto.cambio_desviacion }}</td>
                     <td style="text-align: center; font-weight: 700; color: #2D3748; padding: 4px; background: #E2E8F0;">{{ punto.emp_punto }}</td>
                     <td style="text-align: center; font-weight: 700; color: #2D3748; padding: 4px;">{{ punto.deriva_punto }}</td>
+                    <td style="text-align: center; font-weight: 900; padding: 4px; {% if punto.es_limitante %}background: #7C3AED; color: white;{% else %}color: #553C9A; background: #FAF5FF;{% endif %}">
+                        {% if punto.intervalo_punto %}{{ punto.intervalo_punto }}{% else %}∞{% endif %}
+                        {% if punto.es_limitante %} ◀{% endif %}
+                    </td>
                     <td style="text-align: center; padding: 4px;">
                         <span style="{% if punto.es_maximo %}background: #718096; color: white; font-weight: 900;{% elif punto.estado == 'ALTO' %}background: #A0AEC0; color: white; font-weight: 700;{% elif punto.estado == 'MODERADO' %}background: #CBD5E0; color: #2D3748;{% else %}background: #E2E8F0; color: #4A5568;{% endif %} padding: 2px 6px; border-radius: 3px; font-size: 7pt;">
                             {% if punto.es_maximo %}⚠️ {% endif %}{{ punto.estado }}
@@ -602,7 +610,8 @@
             ℹ️ <strong>Deriva:</strong> (Desv. Actual - Desv. Anterior) / Tiempo Transcurrido.
             <strong>EMP específico por punto:</strong> {% if emp_info.unidad == '%' %}{{ emp_info.valor }}% del valor nominal de cada punto{% else %}{{ emp_info.valor }} {{ emp_info.unidad }} (constante){% endif %}.
             Se identificaron <strong>{{ deriva_automatica.puntos_coincidentes }} puntos coincidentes</strong> con tolerancia del 5% en valor nominal.
-            El punto marcado como <strong>MÁXIMO</strong> (mayor deriva) define el intervalo de calibración calculado.
+            <strong>"MAYOR CAMBIO"</strong>: punto con mayor variación absoluta de desviación.
+            El intervalo final se determina por el punto con menor I=EMP/Deriva (criterio más restrictivo).
         </p>
         {% endif %}
 
@@ -610,6 +619,29 @@
             <strong>Nota:</strong> Si la deriva es cero o el intervalo calculado excede el máximo permitido,
             se utiliza el intervalo máximo establecido por el cliente.
         </p>
+
+        {% if total_calibraciones %}
+        <div style="background: #F0FFF4; border-left: 3px solid #38A169; padding: 7px 10px; margin: 8px 0; font-size: 8pt; border-radius: 3px;">
+            <strong>Base normativa (ILAC G-24:2022 §6.2):</strong>
+            Equipo con {{ total_calibraciones }}
+            {% if total_calibraciones == 1 %}calibración registrada{% else %}calibraciones registradas{% endif %}.
+            {% if total_calibraciones < 4 %}
+            Estimación inicial de deriva entre los dos últimos registros — método válido según ILAC G-24:2022
+            para instrumentos en etapa inicial de historial. La carta de control estadística completa se
+            consolida al alcanzar ≥4 calibraciones.
+            {% else %}
+            Análisis de carta de control con historial de {{ total_calibraciones }} calibraciones (ILAC G-24:2022).
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if deriva_automatica and deriva_automatica.puntos_detalle %}
+        {% for punto in deriva_automatica.puntos_detalle %}{% if punto.es_limitante %}
+        <p style="font-size: 8pt; background: #7C3AED; color: white; padding: 5px 10px; border-radius: 3px; margin: 6px 0; font-weight: 700;">
+            ◀ Punto limitante: nominal={{ punto.nominal }} | EMP={{ punto.emp_punto }} / Deriva={{ punto.deriva_punto }} = <strong>{{ punto.intervalo_punto }} meses</strong>
+        </p>
+        {% endif %}{% endfor %}
+        {% endif %}
 
         <div class="metodo-resultado">
             <div class="label">INTERVALO CALCULADO - MÉTODO 2</div>

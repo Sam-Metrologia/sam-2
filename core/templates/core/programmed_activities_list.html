@@ -62,7 +62,7 @@
                     </div>
 
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                        <a href="{% url 'core:equipo_detail' activity.equipo.id %}" class="hover:text-blue-600">
+                        <a href="{% url 'core:detalle_equipo' pk=activity.equipo.id %}" class="hover:text-blue-600">
                             {{ activity.equipo.nombre }}
                         </a>
                     </h3>
@@ -104,7 +104,7 @@
                     </div>
 
                     <div class="mt-4 pt-4 border-t border-gray-200">
-                        <a href="{% url 'core:equipo_detail' activity.equipo.id %}"
+                        <a href="{% url 'core:detalle_equipo' pk=activity.equipo.id %}"
                            class="text-blue-600 hover:text-blue-800 text-sm font-medium inline-flex items-center">
                             Ver detalles del equipo
                             <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

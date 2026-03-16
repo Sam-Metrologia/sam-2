@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Historial Health Checks - SAM{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Historial de Verificaciones de Salud</h1>
+  {% for check in page_obj %}
+  <div>{{ check.checked_at }} - {{ check.overall_status }}</div>
+  {% endfor %}
+</div>
+{% endblock %}

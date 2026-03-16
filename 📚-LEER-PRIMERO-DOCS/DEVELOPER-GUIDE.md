@@ -31,34 +31,23 @@ auditorias/
 - ✅ Métricas de performance
 - ✅ Listas de TODOs, bugs encontrados
 
-**Antes de iniciar cualquier mejora grande:** Leer `auditorias/AUDITORIA_EXHAUSTIVA_NIVEL_9_2026-01-10.md`
+**Antes de iniciar cualquier mejora grande:** Leer `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md`
 
 ---
 
-### 📚 `documentacion/` - Documentación Técnica
+### 📚 `📚-LEER-PRIMERO-DOCS/` - Documentación para Desarrolladores
 
-**TODA la documentación técnica del proyecto va aquí.**
+Punto de entrada para cualquier desarrollador. Leer en este orden:
 
 ```
-documentacion/
-├── README.md                              # Guía de documentación
-├── DEVELOPER-GUIDE.md                     # Esta guía (copia)
-├── README.md (proyecto)                   # Setup e instalación
-├── DESPLEGAR-EN-RENDER.md                 # Guía de deployment
-├── CLAUDE.md                              # Guía para Claude Code
-├── CHECKLIST_SISTEMA_PAGOS.md             # Checklists
-└── FIX_ZIP_DUPLICADOS.md                  # Fixes documentados
+📚-LEER-PRIMERO-DOCS/
+├── README.md              # Quick start, comandos, estado actual
+├── DEVELOPER-GUIDE.md     # Esta guía (arquitectura, áreas críticas, convenciones)
+├── DESPLEGAR-EN-RENDER.md # Guía de deploy a producción
+└── CHANGELOG.md           # Historial de cambios — leer antes de tocar algo
 ```
 
-**¿Qué documentar aquí?**
-- ✅ Guías de desarrollo y workflow
-- ✅ Documentación de deployment
-- ✅ Guías de instalación y setup
-- ✅ Checklists de procedimientos
-- ✅ Fixes y soluciones documentadas
-- ✅ Documentación de APIs (cuando exista)
-
-**Nota:** Los archivos originales en la raíz del proyecto se mantienen para compatibilidad, pero las copias en `documentacion/` son la fuente de verdad.
+**Regla:** Actualizar `CHANGELOG.md` con cada cambio que hagas antes de hacer commit.
 
 ---
 
@@ -114,7 +103,7 @@ documentacion/
 
 Estas áreas del código tienen impacto directo en funcionalidad crítica de producción:
 
-#### 1. **Modelos Financieros** (`core/models.py`)
+#### 1. **Modelos Financieros** (`core/models/empresa.py`)
 ```python
 # CRITICAL: Usar SIEMPRE Decimal para cálculos financieros
 # ❌ MAL:  return float(self.valor) / 12
@@ -128,7 +117,7 @@ class Empresa(models.Model):
 
 **Bug Histórico**: Uso de `float` causó errores de tipo en panel de decisiones (Nov 2024). Siempre usar `Decimal` en finanzas.
 
-#### 2. **Cálculo de Fechas de Actividades** (`core/models.py`)
+#### 2. **Cálculo de Fechas de Actividades** (`core/models/equipment.py`)
 ```python
 # CRITICAL: Usar nombres correctos de campos
 # ❌ MAL:  self.ima_comprobacion = today
@@ -196,10 +185,10 @@ IS_PRODUCTION = os.getenv('RENDER_EXTERNAL_HOSTNAME') is not None
 │  • 512 MB RAM (Free Tier)                               │
 └─────┬──────────────────────────────────┬────────────────┘
       │                                   │
-      │ DATABASE_URL                      │ AWS SDK
+      │ DATABASE_URL                      │ boto3 (R2-compatible)
       │                                   │
 ┌─────▼─────────────────┐     ┌──────────▼──────────────┐
-│ PostgreSQL 15         │     │  AWS S3 Bucket          │
+│ PostgreSQL 15         │     │  Cloudflare R2          │
 │ (Render Managed)      │     │  • Archivos estáticos   │
 │ • Free tier: 1 GB     │     │  • Uploads de usuarios  │
 └───────────────────────┘     │  • Certificados PDF     │
@@ -223,7 +212,7 @@ IS_PRODUCTION = os.getenv('RENDER_EXTERNAL_HOSTNAME') is not None
 ```
 sam-2/
 ├── 🔴 core/                        # App principal (CRÍTICO)
-│   ├── 🔴 models.py                # Modelos de negocio (PELIGRO: Finanzas y fechas)
+│   ├── 🔴 models/                  # Modelos de negocio — paquete (28 modelos, 12 archivos)
 │   ├── views/
 │   │   ├── 🔴 panel_decisiones.py  # Dashboard financiero (Decimals!)
 │   │   ├── exportar_equipos_zip.py # Sistema de cola ZIP
@@ -381,10 +370,11 @@ python manage.py runserver
 | `SECRET_KEY` | Cualquiera | Generado por Render |
 | `DATABASE_URL` | (SQLite auto) | `postgresql://...` (auto) |
 | `RENDER_EXTERNAL_HOSTNAME` | (no existe) | `app.sammetrologia.com` |
-| `AWS_ACCESS_KEY_ID` | (opcional) | **REQUERIDO** |
-| `AWS_SECRET_ACCESS_KEY` | (opcional) | **REQUERIDO** |
-| `AWS_STORAGE_BUCKET_NAME` | (opcional) | **REQUERIDO** |
-| `AWS_S3_REGION_NAME` | (opcional) | `us-east-2` |
+| `AWS_ACCESS_KEY_ID` | (opcional) | **REQUERIDO** (clave R2) |
+| `AWS_SECRET_ACCESS_KEY` | (opcional) | **REQUERIDO** (secreto R2) |
+| `AWS_STORAGE_BUCKET_NAME` | (opcional) | **REQUERIDO** (bucket R2) |
+| `AWS_S3_REGION_NAME` | (opcional) | `auto` (R2) |
+| `AWS_S3_ENDPOINT_URL` | (no aplica) | **REQUERIDO** (endpoint R2) |
 | `EMAIL_HOST` | (opcional) | `smtp.gmail.com` |
 | `EMAIL_HOST_USER` | (opcional) | `metrologiasam@gmail.com` |
 | `EMAIL_HOST_PASSWORD` | (opcional) | App Password |
@@ -407,11 +397,14 @@ else:
 ### Modificar Modelos
 
 ```bash
-# 1. Edita core/models.py
-# Ejemplo: Agregar campo a Equipo
+# 1. Edita el archivo correspondiente dentro de core/models/
+# Ejemplo: Agregar campo a Equipo → edita core/models/equipment.py
 class Equipo(models.Model):
     # ... campos existentes ...
     nuevo_campo = models.CharField(max_length=100, blank=True)
+
+# Los modelos se re-exportan en core/models/__init__.py
+# No necesitas cambiar ningún import existente
 
 # 2. Crear migración
 python manage.py makemigrations
@@ -431,7 +424,7 @@ python manage.py shell
 >>> e.save()
 
 # 6. Commit y push
-git add core/models.py core/migrations/0XXX_*.py
+git add core/models/equipment.py core/migrations/0XXX_*.py
 git commit -m "Add: nuevo_campo to Equipo model"
 git push origin main  # ⚠️ Deploy a producción
 ```
@@ -543,16 +536,17 @@ git push origin main
 <!-- NO modifiques base.html sin consultar -->
 ```
 
-### Trabajar con Archivos S3
+### Trabajar con Archivos (Cloudflare R2)
 
 ```python
-# El sistema automáticamente usa S3 en producción
+# El sistema usa Cloudflare R2 en producción (compatible con API de S3 via boto3)
+# Las variables de entorno siguen el naming de AWS por compatibilidad con django-storages
 
 # En desarrollo (local storage)
 IS_PRODUCTION = False  # → media/ folder
 
-# En producción (S3)
-IS_PRODUCTION = True   # → AWS S3 bucket
+# En producción (Cloudflare R2)
+IS_PRODUCTION = True   # → R2 bucket via endpoint AWS-compatible
 
 # Para subir archivo en código:
 from django.core.files.storage import default_storage
@@ -565,13 +559,13 @@ def mi_vista_upload(request):
         from core.file_validators import validate_image_file
         validate_image_file(archivo)
 
-        # Guardar (automáticamente va a S3 en prod)
+        # Guardar (automáticamente va a R2 en prod)
         path = default_storage.save(f'uploads/{archivo.name}', archivo)
         url = default_storage.url(path)
 
         # url será:
         # - Desarrollo: /media/uploads/archivo.jpg
-        # - Producción: https://sam-bucket.s3.amazonaws.com/uploads/archivo.jpg
+        # - Producción: https://<account>.r2.cloudflarestorage.com/uploads/archivo.jpg
 
 # Límites configurados en SAM_CONFIG:
 # - MAX_FILE_SIZE_MB = 10
@@ -722,7 +716,7 @@ pytest tests/test_views/test_equipos.py -v
 pytest -m "not slow"
 ```
 
-**Nota**: El proyecto tiene estructura de tests preparada pero puede no tener 100% cobertura. Agrega tests al crear funcionalidades nuevas.
+**Estado actual:** 1,804 tests pasando · Cobertura 70% · Score 8.3/10. Agrega tests al crear funcionalidades nuevas. Corre `python -m pytest` antes de cada commit.
 
 ### Probar Manualmente Antes de Deploy
 

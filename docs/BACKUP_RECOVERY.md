@@ -50,34 +50,43 @@ mgr.list_backups()
 
 ## 📥 Proceso de Recuperación de Backups
 
-### Paso 1: Descargar el Backup desde S3
+### Paso 1: Descargar el Backup desde Cloudflare R2
 
-#### Método A: AWS S3 Console (Interfaz Web)
+#### Método A: Cloudflare R2 Dashboard (Interfaz Web)
 
-1. Ir a [AWS S3 Console](https://s3.console.aws.amazon.com/)
-2. Seleccionar el bucket de SAM
-3. Navegar a `backups/`
+1. Ir a [Cloudflare Dashboard](https://dash.cloudflare.com/) → **R2**
+2. Seleccionar el bucket de backups (nombre configurado en `AWS_BACKUP_BUCKET`)
+3. Navegar a la carpeta `backups/`
 4. Buscar el archivo de backup que necesitas:
    - Los archivos tienen formato: `backup_EmpresaNombre_20241001_143022.zip`
    - La fecha está en formato: AAAAMMDD_HHMMSS
-5. Hacer clic derecho → **Download**
+5. Hacer clic en el archivo → **Download**
 6. Guardar en tu servidor en una ubicación temporal, por ejemplo: `/tmp/backup_recuperacion.zip`
 
-#### Método B: AWS CLI (Línea de Comandos)
+#### Método B: rclone (Recomendado para R2)
 
 ```bash
-# Instalar AWS CLI si no lo tienes
-pip install awscli
+# Instalar rclone si no lo tienes
+# Linux/macOS:
+curl https://rclone.org/install.sh | sudo bash
+# Windows: descargar desde https://rclone.org/downloads/
 
-# Configurar credenciales (primera vez)
-aws configure
-# Ingresar: AWS Access Key ID, Secret Access Key, Region (us-east-2)
+# Configurar rclone para R2 (primera vez)
+rclone config
+# Seleccionar: n (nueva configuración)
+# Name: r2
+# Type: s3
+# Provider: Cloudflare
+# access_key_id: <tu R2_ACCESS_KEY_ID>
+# secret_access_key: <tu R2_SECRET_ACCESS_KEY>
+# endpoint: https://<account_id>.r2.cloudflarestorage.com
+# (el resto dejar en blanco / default)
 
 # Listar backups disponibles
-aws s3 ls s3://tu-bucket-name/backups/
+rclone ls r2:tu-bucket-name/backups/
 
 # Descargar un backup específico
-aws s3 cp s3://tu-bucket-name/backups/backup_MiEmpresa_20241001_143022.zip /tmp/backup_recuperacion.zip
+rclone copy r2:tu-bucket-name/backups/backup_MiEmpresa_20241001_143022.zip /tmp/
 ```
 
 ---
@@ -140,8 +149,8 @@ python manage.py restore_backup /tmp/backup_recuperacion.zip --new-name "Empresa
 Si perdiste TODA la base de datos:
 
 ```bash
-# 1. Descargar todos los backups de S3
-aws s3 sync s3://tu-bucket-name/backups/ /tmp/backups/
+# 1. Descargar todos los backups desde R2
+rclone sync r2:tu-bucket-name/backups/ /tmp/backups/
 
 # 2. Restaurar cada empresa (una por una)
 for backup in /tmp/backups/*.zip; do
@@ -154,8 +163,8 @@ done
 Si una empresa específica tiene datos incorrectos:
 
 ```bash
-# 1. Descargar el backup más reciente de esa empresa
-aws s3 cp s3://tu-bucket-name/backups/backup_MiEmpresa_20241001_143022.zip /tmp/
+# 1. Descargar el backup más reciente de esa empresa desde R2
+rclone copy r2:tu-bucket-name/backups/backup_MiEmpresa_20241001_143022.zip /tmp/
 
 # 2. Restaurar sobrescribiendo
 python manage.py restore_backup /tmp/backup_MiEmpresa_20241001_143022.zip --overwrite --restore-files
@@ -232,25 +241,27 @@ Para verificar/configurar:
 pip install boto3
 ```
 
-### Error: "Unable to locate credentials"
+### Error: "No credentials found" en rclone
 
 ```bash
-# Configurar credenciales AWS
-aws configure
+# Verificar configuración de rclone
+rclone config show r2
+
+# Reconfigurar si es necesario
+rclone config reconnect r2:
 ```
 
-### Error: "An error occurred (AccessDenied)"
+### Error: "Access Denied" al acceder a R2
 
-Verificar que tu usuario IAM tenga permisos S3:
-- `s3:ListBucket`
-- `s3:GetObject`
-- `s3:PutObject`
+Verificar en el **Cloudflare Dashboard → R2 → Manage R2 API Tokens** que el token tenga permisos:
+- **Object Read** (para listar y descargar)
+- **Object Write** (para subir backups)
 
-### Los backups no se suben a S3
+### Los backups no se suben a R2
 
 Verificar en logs:
 ```bash
-cat logs/sam_errors.log | grep -i "s3\|backup"
+cat logs/sam_errors.log | grep -i "r2\|s3\|backup"
 ```
 
 ---
@@ -260,19 +271,20 @@ cat logs/sam_errors.log | grep -i "s3\|backup"
 Si tienes problemas con la recuperación de backups:
 
 1. Revisar logs del sistema: `logs/sam_errors.log`
-2. Verificar credenciales AWS
-3. Comprobar que el bucket S3 existe y es accesible
-4. Contactar al administrador del sistema
+2. Verificar credenciales R2 en variables de entorno (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_ENDPOINT_URL`)
+3. Comprobar que el bucket R2 existe y es accesible desde el Cloudflare Dashboard
+4. Verificar configuración de rclone: `rclone config show r2`
+5. Contactar al administrador del sistema
 
 ---
 
 ## 📝 Notas Importantes
 
 - ✅ Los backups se crean automáticamente cada mes
-- ✅ Se guardan en S3 para seguridad fuera del servidor
+- ✅ Se guardan en Cloudflare R2 para seguridad fuera del servidor
 - ✅ Los backups incluyen TODOS los datos de la empresa
-- ⚠️ Los backups locales se eliminan después de subir a S3 (para ahorrar espacio)
-- ✅ **NUEVO**: Los backups en S3 mayores a 6 meses se eliminan automáticamente
+- ⚠️ Los backups locales se eliminan después de subir a R2 (para ahorrar espacio)
+- ✅ Los backups en R2 mayores a 6 meses se eliminan automáticamente
 - ⚠️ El comando `--overwrite` es DESTRUCTIVO - usar con cuidado
 
 ---
@@ -312,4 +324,4 @@ También disponible desde el panel de **Admin/Sistema → Mantenimiento** con la
 
 ---
 
-**Ultima actualizacion**: Febrero 2026 - Migrado de AWS S3 a Cloudflare R2
+**Ultima actualizacion**: Marzo 2026 - Referencias AWS CLI reemplazadas por rclone para Cloudflare R2

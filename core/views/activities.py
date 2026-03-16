@@ -22,12 +22,10 @@ def añadir_calibracion(request, equipo_pk):
     Añade una nueva calibración a un equipo específico.
     Incluye validación de almacenamiento y manejo de múltiples archivos PDF.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para añadir calibraciones a este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
 
     if request.method == 'POST':
         logger.info(f"=== POST CALIBRACIÓN - Datos recibidos ===")
@@ -107,13 +105,11 @@ def editar_calibracion(request, equipo_pk, pk):
     Edita una calibración existente.
     Permite actualizar datos y archivos asociados.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     calibracion = get_object_or_404(Calibracion, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para editar esta calibración.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
         form = CalibracionForm(request.POST, request.FILES, instance=calibracion, empresa=equipo.empresa)
@@ -152,13 +148,11 @@ def eliminar_calibracion(request, equipo_pk, pk):
     Elimina una calibración después de confirmación.
     Utiliza plantilla genérica de confirmación.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     calibracion = get_object_or_404(Calibracion, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para eliminar esta calibración.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
         try:
@@ -195,12 +189,10 @@ def añadir_mantenimiento(request, equipo_pk):
     Añade un nuevo mantenimiento a un equipo específico.
     Incluye validación de almacenamiento y manejo de archivo PDF.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para añadir mantenimientos a este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
 
     if request.method == 'POST':
         logger.info(f"=== POST MANTENIMIENTO - Datos recibidos ===")
@@ -264,13 +256,11 @@ def editar_mantenimiento(request, equipo_pk, pk):
     Edita un mantenimiento existente.
     Permite actualizar datos y archivo asociado.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para editar este mantenimiento.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
         form = MantenimientoForm(request.POST, request.FILES, instance=mantenimiento, empresa=equipo.empresa)
@@ -311,13 +301,11 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
     Elimina un mantenimiento después de confirmación.
     Utiliza plantilla genérica de confirmación.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para eliminar este mantenimiento.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
         try:
@@ -349,13 +337,11 @@ def detalle_mantenimiento(request, equipo_pk, pk):
     Muestra los detalles de un mantenimiento específico.
     Incluye URL segura para documento PDF.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para ver este mantenimiento.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     # Generar URL segura del documento
     documento_mantenimiento_url = pdf_image_url(mantenimiento.documento_mantenimiento)
@@ -383,12 +369,10 @@ def añadir_comprobacion(request, equipo_pk):
     Añade una nueva comprobación a un equipo específico.
     Incluye validación de almacenamiento y manejo de archivo PDF.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para añadir comprobaciones a este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
 
     if request.method == 'POST':
         logger.info(f"=== POST COMPROBACIÓN - Datos recibidos ===")
@@ -452,13 +436,11 @@ def editar_comprobacion(request, equipo_pk, pk):
     Edita una comprobación existente.
     Permite actualizar datos y archivo asociado.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     comprobacion = get_object_or_404(Comprobacion, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para editar esta comprobación.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
         form = ComprobacionForm(request.POST, request.FILES, instance=comprobacion, empresa=equipo.empresa)
@@ -499,13 +481,11 @@ def eliminar_comprobacion(request, equipo_pk, pk):
     Elimina una comprobación después de confirmación.
     Utiliza plantilla genérica de confirmación.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
     comprobacion = get_object_or_404(Comprobacion, pk=pk, equipo=equipo)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para eliminar esta comprobación.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
 
     if request.method == 'POST':
         try:
@@ -718,12 +698,10 @@ def dar_baja_equipo(request, equipo_pk):
     Da de baja un equipo de forma permanente.
     Crea un registro de BajaEquipo con documentación.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para dar de baja este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo.pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
 
     # Verificar si ya está dado de baja o ya tiene un registro de baja
     if equipo.estado == ESTADO_DE_BAJA:
@@ -803,12 +781,10 @@ def inactivar_equipo(request, equipo_pk):
     Inactiva un equipo temporalmente (cambia estado a 'Inactivo').
     Las próximas fechas se ponen en None hasta reactivación.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para inactivar este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
 
     # Verificar estado actual
     if equipo.estado == ESTADO_INACTIVO:
@@ -847,12 +823,10 @@ def activar_equipo(request, equipo_pk):
     Activa un equipo (cambia estado a 'Activo' desde 'Inactivo' o 'De Baja').
     Recalcula próximas fechas y elimina registro de baja si aplica.
     """
-    equipo = get_object_or_404(Equipo, pk=equipo_pk)
-
-    # Verificar permisos de empresa
-    if not request.user.is_superuser and request.user.empresa != equipo.empresa:
-        messages.error(request, 'No tienes permiso para activar este equipo.')
-        return redirect('core:detalle_equipo', pk=equipo_pk)
+    if request.user.is_superuser:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk)
+    else:
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
 
     # Verificar estado actual
     if equipo.estado == ESTADO_ACTIVO:
