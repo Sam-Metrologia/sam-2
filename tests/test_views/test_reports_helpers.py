@@ -185,7 +185,6 @@ class TestProcessAllRowDates:
         """Test procesamiento de fechas válidas"""
         row_data = {
             'fecha_adquisicion': '2024-01-15',
-            'fecha_version_formato': '2024-02-20',
             'fecha_ultima_calibracion': '2024-03-10',
             'fecha_ultimo_mantenimiento': '2024-04-05',
             'fecha_ultima_comprobacion': '2024-05-01'
@@ -195,7 +194,6 @@ class TestProcessAllRowDates:
 
         assert len(result['errors']) == 0
         assert result['dates']['fecha_adquisicion'] == date(2024, 1, 15)
-        assert result['dates']['fecha_version_formato'] == date(2024, 2, 20)
         assert result['dates']['fecha_ultima_calibracion'] == date(2024, 3, 10)
         assert result['dates']['fecha_ultimo_mantenimiento'] == date(2024, 4, 5)
         assert result['dates']['fecha_ultima_comprobacion'] == date(2024, 5, 1)
@@ -204,7 +202,6 @@ class TestProcessAllRowDates:
         """Test diferentes formatos de fecha"""
         row_data = {
             'fecha_adquisicion': '15/01/2024',  # DD/MM/YYYY
-            'fecha_version_formato': '2024-02-20',  # YYYY-MM-DD
             'fecha_ultima_calibracion': '10-03-2024'  # DD-MM-YYYY
         }
 
@@ -212,14 +209,12 @@ class TestProcessAllRowDates:
 
         assert len(result['errors']) == 0
         assert result['dates']['fecha_adquisicion'] == date(2024, 1, 15)
-        assert result['dates']['fecha_version_formato'] == date(2024, 2, 20)
         assert result['dates']['fecha_ultima_calibracion'] == date(2024, 3, 10)
 
     def test_process_dates_invalid_date(self):
         """Test manejo de fecha inválida"""
         row_data = {
             'fecha_adquisicion': 'fecha-invalida',
-            'fecha_version_formato': '2024-02-20'
         }
 
         result = _process_all_row_dates(row_data, 8)
@@ -227,7 +222,6 @@ class TestProcessAllRowDates:
         assert len(result['errors']) > 0
         assert 'Fila 8' in result['errors'][0]
         assert result['dates']['fecha_adquisicion'] is None
-        assert result['dates']['fecha_version_formato'] == date(2024, 2, 20)
 
     def test_process_dates_empty_data(self):
         """Test sin fechas proporcionadas"""
@@ -237,7 +231,6 @@ class TestProcessAllRowDates:
 
         assert len(result['errors']) == 0
         assert result['dates']['fecha_adquisicion'] is None
-        assert result['dates']['fecha_version_formato'] is None
         assert result['dates']['fecha_ultima_calibracion'] is None
 
 
