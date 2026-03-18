@@ -687,7 +687,7 @@ def _add_template_header(sheet):
     from datetime import datetime
 
     # Título principal
-    sheet.merge_cells('A1:W3')
+    sheet.merge_cells('A1:Z3')
     title_cell = sheet['A1']
     title_cell.value = "PLANTILLA DE IMPORTACIÓN DE EQUIPOS - SAM METROLOGÍA SAS"
     title_cell.font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
@@ -695,7 +695,7 @@ def _add_template_header(sheet):
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Información
-    sheet.merge_cells('A4:W4')
+    sheet.merge_cells('A4:Z4')
     info_cell = sheet['A4']
     info_cell.value = f"Generado el: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Complete SOLO las filas de datos (fila 8 en adelante)"
     info_cell.font = Font(name="Arial", size=11, bold=True, color="1F4E79")
@@ -711,22 +711,24 @@ def _add_template_headers_row(sheet):
     """
     from openpyxl.utils import get_column_letter
 
-    # Headers técnicos (23 columnas: A-W)
+    # Headers técnicos (26 columnas: A-Z)
     headers = [
         "codigo_interno", "nombre", "empresa_nombre", "tipo_equipo", "marca", "modelo",
         "numero_serie", "ubicacion_nombre", "responsable", "estado", "fecha_adquisicion", "proveedor",
         "fecha_ultima_calibracion", "fecha_ultimo_mantenimiento", "fecha_ultima_comprobacion",
         "rango_medida", "resolucion", "error_maximo_permisible", "puntos_calibracion", "observaciones",
-        "frecuencia_calibracion_meses", "frecuencia_mantenimiento_meses", "frecuencia_comprobacion_meses"
+        "frecuencia_calibracion_meses", "frecuencia_mantenimiento_meses", "frecuencia_comprobacion_meses",
+        "proveedor_calibracion", "proveedor_mantenimiento", "proveedor_comprobacion"
     ]
 
-    # Headers legibles (23 columnas: A-W)
+    # Headers legibles (26 columnas: A-Z)
     headers_legibles = [
         "Código Interno*", "Nombre del Equipo*", "Empresa*", "Tipo de Equipo*", "Marca", "Modelo",
-        "Número de Serie", "Ubicación", "Responsable", "Estado*", "Fecha Adquisición", "Proveedor",
+        "Número de Serie", "Ubicación", "Responsable", "Estado*", "Fecha Adquisición", "Proveedor Equipo",
         "Última Calibración", "Último Mantenimiento", "Última Comprobación",
         "Rango de Medida", "Resolución", "Error Máx. Permisible", "Puntos de Calibración", "Observaciones",
-        "Freq. Cal. (meses)", "Freq. Mant. (meses)", "Freq. Comp. (meses)"
+        "Freq. Cal. (meses)", "Freq. Mant. (meses)", "Freq. Comp. (meses)",
+        "Proveedor Calibración", "Proveedor Mantenimiento", "Proveedor Comprobación"
     ]
 
     # Aplicar headers técnicos (fila 6)
@@ -867,6 +869,9 @@ def _add_template_example_row(sheet, request=None):
         "12",                  # U: frecuencia_calibracion_meses
         "6",                   # V: frecuencia_mantenimiento_meses
         "3",                   # W: frecuencia_comprobacion_meses
+        "Laboratorio Nacional de Metrología",  # X: proveedor_calibracion
+        "Servicio Técnico Autorizado",         # Y: proveedor_mantenimiento
+        "Técnico Interno SAM",                 # Z: proveedor_comprobacion
     ]
 
     # Aplicar ejemplo en fila 8
@@ -887,8 +892,8 @@ def _apply_template_formatting(sheet):
     """
     from openpyxl.utils import get_column_letter
 
-    # Ajustar anchos de columna (23 columnas: A-W)
-    anchos = [15, 25, 20, 18, 15, 15, 15, 20, 20, 15, 15, 18, 18, 18, 18, 15, 15, 15, 20, 20, 10, 10, 10]
+    # Ajustar anchos de columna (26 columnas: A-Z)
+    anchos = [15, 25, 20, 18, 15, 15, 15, 20, 20, 15, 15, 18, 18, 18, 18, 15, 15, 15, 20, 20, 10, 10, 10, 25, 25, 25]
     for i, ancho in enumerate(anchos, 1):
         column_letter = get_column_letter(i)
         sheet.column_dimensions[column_letter].width = ancho
@@ -3057,6 +3062,9 @@ def _validate_and_load_excel(excel_file):
             'U': 'frecuencia_calibracion_meses',
             'V': 'frecuencia_mantenimiento_meses',
             'W': 'frecuencia_comprobacion_meses',
+            'X': 'proveedor_calibracion',
+            'Y': 'proveedor_mantenimiento',
+            'Z': 'proveedor_comprobacion',
         }
 
         result['workbook'] = workbook
@@ -3384,49 +3392,55 @@ def _validar_capacidad_plan(sheet, column_mapping, user_empresa):
     }
 
 
-def _crear_actividades_desde_excel(equipo, dates_dict, user):
+def _crear_actividades_desde_excel(equipo, dates_dict, row_data, user):
     """
     Crea registros de Calibracion, Mantenimiento y Comprobacion
     a partir de las fechas de última actividad del Excel.
+    Usa los proveedores específicos por actividad si vienen en el archivo.
     Solo crea si no existe ya un registro para esa fecha en ese equipo.
     """
     from ..models import Calibracion, Mantenimiento, Comprobacion
 
+    proveedor_fallback = equipo.proveedor or 'Importado desde Excel'
+
     fecha_cal = dates_dict.get('fecha_ultima_calibracion')
     if fecha_cal:
         if not Calibracion.objects.filter(equipo=equipo, fecha_calibracion=fecha_cal).exists():
+            nombre_prov = row_data.get('proveedor_calibracion') or proveedor_fallback
             Calibracion.objects.create(
                 equipo=equipo,
                 fecha_calibracion=fecha_cal,
                 resultado='Aprobado',
-                nombre_proveedor=equipo.proveedor or 'Importado desde Excel',
+                nombre_proveedor=nombre_prov,
                 creado_por=user if not user.is_superuser else None,
             )
-            logger.info(f"Calibración creada para {equipo.codigo_interno} ({fecha_cal})")
+            logger.info(f"Calibración creada para {equipo.codigo_interno} ({fecha_cal}) — proveedor: {nombre_prov}")
 
     fecha_mant = dates_dict.get('fecha_ultimo_mantenimiento')
     if fecha_mant:
         if not Mantenimiento.objects.filter(equipo=equipo, fecha_mantenimiento=fecha_mant).exists():
+            nombre_prov = row_data.get('proveedor_mantenimiento') or proveedor_fallback
             Mantenimiento.objects.create(
                 equipo=equipo,
                 fecha_mantenimiento=fecha_mant,
                 tipo_mantenimiento='Preventivo',
-                nombre_proveedor=equipo.proveedor or 'Importado desde Excel',
+                nombre_proveedor=nombre_prov,
                 descripcion='Registro importado desde plantilla Excel',
             )
-            logger.info(f"Mantenimiento creado para {equipo.codigo_interno} ({fecha_mant})")
+            logger.info(f"Mantenimiento creado para {equipo.codigo_interno} ({fecha_mant}) — proveedor: {nombre_prov}")
 
     fecha_comp = dates_dict.get('fecha_ultima_comprobacion')
     if fecha_comp:
         if not Comprobacion.objects.filter(equipo=equipo, fecha_comprobacion=fecha_comp).exists():
+            nombre_prov = row_data.get('proveedor_comprobacion') or proveedor_fallback
             Comprobacion.objects.create(
                 equipo=equipo,
                 fecha_comprobacion=fecha_comp,
                 resultado='Aprobado',
-                nombre_proveedor=equipo.proveedor or 'Importado desde Excel',
+                nombre_proveedor=nombre_prov,
                 creado_por=user if not user.is_superuser else None,
             )
-            logger.info(f"Comprobación creada para {equipo.codigo_interno} ({fecha_comp})")
+            logger.info(f"Comprobación creada para {equipo.codigo_interno} ({fecha_comp}) — proveedor: {nombre_prov}")
 
 
 def _process_excel_import(excel_file, user):
@@ -3545,7 +3559,7 @@ def _process_excel_import(excel_file, user):
                         _calcular_fechas_proximas(equipo)
 
                         # Crear registros de actividad si vienen fechas en el Excel
-                        _crear_actividades_desde_excel(equipo, dates_result['dates'], user)
+                        _crear_actividades_desde_excel(equipo, dates_result['dates'], row_data, user)
 
                         imported_count += 1
                         if es_actualizacion:
