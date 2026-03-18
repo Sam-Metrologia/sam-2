@@ -3401,12 +3401,10 @@ def _crear_actividades_desde_excel(equipo, dates_dict, row_data, user):
     """
     from ..models import Calibracion, Mantenimiento, Comprobacion
 
-    proveedor_fallback = equipo.proveedor or 'Importado desde Excel'
-
     fecha_cal = dates_dict.get('fecha_ultima_calibracion')
     if fecha_cal:
         if not Calibracion.objects.filter(equipo=equipo, fecha_calibracion=fecha_cal).exists():
-            nombre_prov = row_data.get('proveedor_calibracion') or proveedor_fallback
+            nombre_prov = row_data.get('proveedor_calibracion') or None
             Calibracion.objects.create(
                 equipo=equipo,
                 fecha_calibracion=fecha_cal,
@@ -3419,7 +3417,7 @@ def _crear_actividades_desde_excel(equipo, dates_dict, row_data, user):
     fecha_mant = dates_dict.get('fecha_ultimo_mantenimiento')
     if fecha_mant:
         if not Mantenimiento.objects.filter(equipo=equipo, fecha_mantenimiento=fecha_mant).exists():
-            nombre_prov = row_data.get('proveedor_mantenimiento') or proveedor_fallback
+            nombre_prov = row_data.get('proveedor_mantenimiento') or None
             Mantenimiento.objects.create(
                 equipo=equipo,
                 fecha_mantenimiento=fecha_mant,
@@ -3432,7 +3430,7 @@ def _crear_actividades_desde_excel(equipo, dates_dict, row_data, user):
     fecha_comp = dates_dict.get('fecha_ultima_comprobacion')
     if fecha_comp:
         if not Comprobacion.objects.filter(equipo=equipo, fecha_comprobacion=fecha_comp).exists():
-            nombre_prov = row_data.get('proveedor_comprobacion') or proveedor_fallback
+            nombre_prov = row_data.get('proveedor_comprobacion') or None
             Comprobacion.objects.create(
                 equipo=equipo,
                 fecha_comprobacion=fecha_comp,
