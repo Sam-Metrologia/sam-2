@@ -3295,6 +3295,95 @@ def _create_new_equipment(row_data, empresa, dates_dict):
     return equipo
 
 
+def _validar_capacidad_plan(sheet, column_mapping, user_empresa):
+    """
+    Verifica cuántos equipos nuevos tiene el archivo vs los slots disponibles en el plan.
+
+    Returns:
+        dict: {
+            'filas_con_datos': int,
+            'nuevos': int,
+            'actualizaciones': int,
+            'slots_disponibles': int | float('inf'),
+            'limite': int | float('inf'),
+            'actuales': int,
+            'advertencia': str | None,  # Mensaje si hay riesgo de exceder el límite
+            'bloqueo': bool,            # True si no hay ningún slot disponible
+        }
+    """
+    start_row = 8
+    codigos_en_archivo = []
+
+    for row_num in range(start_row, sheet.max_row + 1):
+        codigo_col = [col for col, field in column_mapping.items() if field == 'codigo_interno']
+        if not codigo_col:
+            break
+        val = sheet[f'{codigo_col[0]}{row_num}'].value
+        if val and str(val).strip():
+            codigos_en_archivo.append(str(val).strip())
+
+    filas_con_datos = len(codigos_en_archivo)
+
+    if not user_empresa or filas_con_datos == 0:
+        return {
+            'filas_con_datos': filas_con_datos,
+            'nuevos': 0, 'actualizaciones': 0,
+            'slots_disponibles': float('inf'), 'limite': float('inf'),
+            'actuales': 0, 'advertencia': None, 'bloqueo': False,
+        }
+
+    # Contar cuáles ya existen (serán actualizaciones, no cuentan contra el límite)
+    from ..models import Equipo
+    existentes = set(
+        Equipo.objects.filter(
+            empresa=user_empresa,
+            codigo_interno__in=codigos_en_archivo
+        ).values_list('codigo_interno', flat=True)
+    )
+    actualizaciones = len(existentes)
+    nuevos = filas_con_datos - actualizaciones
+
+    # Obtener límite y equipos actuales
+    limite = user_empresa.get_limite_equipos()
+    actuales = Equipo.objects.filter(empresa=user_empresa).count()
+
+    if limite == float('inf'):
+        slots_disponibles = float('inf')
+        advertencia = None
+        bloqueo = False
+    else:
+        slots_disponibles = max(0, limite - actuales)
+        if slots_disponibles == 0:
+            advertencia = (
+                f"⛔ Tu plan no tiene equipos disponibles. "
+                f"Límite: {limite}, equipos actuales: {actuales}. "
+                f"Solo se procesarán las {actualizaciones} actualizaciones del archivo."
+            )
+            bloqueo = nuevos > 0
+        elif nuevos > slots_disponibles:
+            advertencia = (
+                f"⚠️ El archivo contiene {nuevos} equipos nuevos pero solo tienes "
+                f"{slots_disponibles} slots disponibles (límite: {limite}, actuales: {actuales}). "
+                f"Solo se crearán los primeros {slots_disponibles} equipos nuevos; "
+                f"el resto dará error."
+            )
+            bloqueo = False
+        else:
+            advertencia = None
+            bloqueo = False
+
+    return {
+        'filas_con_datos': filas_con_datos,
+        'nuevos': nuevos,
+        'actualizaciones': actualizaciones,
+        'slots_disponibles': slots_disponibles,
+        'limite': limite,
+        'actuales': actuales,
+        'advertencia': advertencia,
+        'bloqueo': bloqueo,
+    }
+
+
 def _crear_actividades_desde_excel(equipo, dates_dict, user):
     """
     Crea registros de Calibracion, Mantenimiento y Comprobacion
@@ -3380,6 +3469,18 @@ def _process_excel_import(excel_file, user):
         user_empresa = None
         if not user.is_superuser and user.empresa:
             user_empresa = user.empresa
+
+        # Validar capacidad del plan antes de procesar
+        capacidad = _validar_capacidad_plan(sheet, column_mapping, user_empresa)
+        if capacidad['advertencia']:
+            errors.append(capacidad['advertencia'])
+            logger.warning(f"Capacidad plan: {capacidad}")
+
+        logger.info(
+            f"Importación iniciada — Filas con datos: {capacidad['filas_con_datos']} "
+            f"({capacidad['nuevos']} nuevos, {capacidad['actualizaciones']} actualizaciones) | "
+            f"Slots disponibles: {capacidad['slots_disponibles']} de {capacidad['limite']}"
+        )
 
         # Procesar fila por fila fuera de transacción para mejor manejo de errores
         for row_num in range(start_row, sheet.max_row + 1):
