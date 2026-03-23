@@ -196,12 +196,14 @@ def chat_ayuda(request):
                              'Contacta a soporte@sammetrologia.com o al WhatsApp +57 324 799 0534.'
             })
 
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash-8b')
+        from google import genai
+        client = genai.Client(api_key=api_key)
 
         prompt = f"{CONTEXTO_SAM}\n\nPregunta del usuario: {pregunta}"
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+        )
 
         logger.info(
             f"Chat ayuda — usuario: {request.user.username} | "
