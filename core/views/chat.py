@@ -198,7 +198,7 @@ def chat_ayuda(request):
 
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-8b')
 
         prompt = f"{CONTEXTO_SAM}\n\nPregunta del usuario: {pregunta}"
         response = model.generate_content(prompt)
