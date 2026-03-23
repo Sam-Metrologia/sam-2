@@ -156,11 +156,7 @@
             return;
         }
 
-        // Aplicar configuración por defecto
-        const defaults = getChartDefaults();
-
-        Chart.defaults.color = getChartColors().text;
-        Chart.defaults.borderColor = getChartColors().border;
+        applyChartDefaults();
 
         // Escuchar cambios de tema
         document.addEventListener('themeChanged', function(e) {
@@ -168,13 +164,24 @@
         });
     }
 
-    // Inicializar cuando Chart.js esté disponible
+    // Aplicar color por defecto INMEDIATAMENTE (sin esperar) para que los charts
+    // que se crean en DOMContentLoaded ya hereden el color correcto del tema
+    function applyChartDefaults() {
+        if (typeof Chart === 'undefined') return;
+        Chart.defaults.color = getChartColors().text;
+        Chart.defaults.borderColor = getChartColors().border;
+    }
+
+    // Ejecutar ahora mismo (el script se carga con defer, tras parsear HTML)
+    applyChartDefaults();
+
+    // Inicializar listener de cambios de tema
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(initChartTheme, 100);
+            initChartTheme();
         });
     } else {
-        setTimeout(initChartTheme, 100);
+        initChartTheme();
     }
 
     // Exportar configuración para uso global

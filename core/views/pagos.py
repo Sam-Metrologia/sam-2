@@ -311,6 +311,22 @@ def iniciar_pago(request):
     plan = PLANES[plan_key]
     empresa = request.user.empresa
 
+    # Validar que el perfil de empresa tenga los datos mínimos para facturar
+    if not empresa.nit:
+        messages.error(
+            request,
+            'Tu empresa no tiene NIT registrado. Contacta a soporte para actualizar tu perfil.'
+        )
+        return redirect('core:planes')
+
+    if not empresa.correos_facturacion:
+        messages.warning(
+            request,
+            'Necesitas registrar al menos un correo de facturación antes de proceder al pago. '
+            'Lo usaremos para enviarte la factura electrónica.'
+        )
+        return redirect('core:editar_perfil_empresa')
+
     # Activar renovación automática si el cliente marcó el checkbox
     if request.POST.get('renovacion_automatica'):
         if not empresa.renovacion_automatica:

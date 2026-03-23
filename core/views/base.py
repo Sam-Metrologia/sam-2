@@ -55,7 +55,7 @@ from ..forms import (
     BajaEquipoForm, UbicacionForm, ProcedimientoForm, ProveedorForm,
     ExcelUploadForm,
     CustomUserCreationForm, CustomUserChangeForm, UserProfileForm, EmpresaForm, EmpresaFormatoForm,
-    DocumentoForm
+    EmpresaPerfilForm, DocumentoForm
 )
 
 # Importar modelos

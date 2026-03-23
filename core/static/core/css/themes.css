@@ -271,6 +271,74 @@
     background-color: transparent !important;
 }
 
+/* ============================================
+   AMBER / ORANGE — cajas de advertencia
+   ============================================ */
+[data-theme="dark"] .bg-amber-50,
+[data-theme="dark"] .bg-amber-100 {
+    background-color: rgba(251, 191, 36, 0.12) !important;
+}
+[data-theme="dark"] .border-amber-200,
+[data-theme="dark"] .border-amber-300 {
+    border-color: rgba(251, 191, 36, 0.35) !important;
+}
+[data-theme="dark"] .text-amber-800,
+[data-theme="dark"] .text-amber-900 {
+    color: #fcd34d !important;
+}
+[data-theme="dark"] .text-amber-700 {
+    color: #fbbf24 !important;
+}
+[data-theme="dark"] .text-amber-600 {
+    color: #f59e0b !important;
+}
+/* Fondo blanco dentro de caja amber (ej: cuadro de ejemplo) */
+[data-theme="dark"] .bg-amber-50 .bg-white,
+[data-theme="dark"] .bg-amber-100 .bg-white {
+    background-color: rgba(255,255,255,0.07) !important;
+    color: #e5e7eb !important;
+}
+
+/* ============================================
+   ORANGE / RED — banner trial urgente
+   ============================================ */
+[data-theme="dark"] .from-orange-100 { --tw-gradient-from: rgba(255,237,213,0.15) !important; }
+[data-theme="dark"] .to-red-100      { --tw-gradient-to:   rgba(254,226,226,0.10) !important; }
+[data-theme="dark"] .border-orange-400 { border-color: rgba(251,146,60,0.5) !important; }
+[data-theme="dark"] .text-orange-800 { color: #fdba74 !important; }
+[data-theme="dark"] .text-orange-700 { color: #fb923c !important; }
+[data-theme="dark"] .text-orange-500 { color: #f97316 !important; }
+
+/* ============================================
+   BLUE — banner trial normal
+   ============================================ */
+[data-theme="dark"] .from-blue-100 { --tw-gradient-from: rgba(219,234,254,0.12) !important; }
+[data-theme="dark"] .to-blue-200   { --tw-gradient-to:   rgba(191,219,254,0.08) !important; }
+[data-theme="dark"] .bg-blue-200   { background-color: rgba(96,165,250,0.2) !important; }
+[data-theme="dark"] .border-blue-300 { border-color: rgba(96,165,250,0.35) !important; }
+[data-theme="dark"] .text-blue-700  { color: #93c5fd !important; }
+
+/* ============================================
+   GREY — labels y textos de formularios
+   ============================================ */
+[data-theme="dark"] .text-gray-500 { color: #9ca3af !important; }
+[data-theme="dark"] .text-gray-400 { color: #6b7280 !important; }
+[data-theme="dark"] .text-gray-600 { color: #d1d5db !important; }
+
+/* ============================================
+   GREEN — badges éxito
+   ============================================ */
+[data-theme="dark"] .bg-green-50 {
+    background-color: rgba(52, 211, 153, 0.12) !important;
+}
+[data-theme="dark"] .border-green-200 {
+    border-color: rgba(52, 211, 153, 0.35) !important;
+}
+[data-theme="dark"] .text-green-700,
+[data-theme="dark"] .text-green-800 {
+    color: #6ee7b7 !important;
+}
+
 /* Footer */
 [data-theme="dark"] .main-footer {
     background-color: var(--bg-secondary);
@@ -364,6 +432,41 @@
 
     .theme-toggle-icon {
         font-size: 1.25rem;
+    }
+}
+
+/* Toggle de tema inline (dentro del navbar, junto al usuario) */
+.theme-toggle.theme-toggle-navbar {
+    position: static;
+    width: 36px;
+    height: 36px;
+    box-shadow: none;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.theme-toggle.theme-toggle-navbar:hover {
+    transform: none;
+    background: rgba(255,255,255,0.1);
+    box-shadow: none;
+}
+
+.theme-toggle.theme-toggle-navbar .theme-toggle-icon {
+    font-size: 1rem;
+}
+
+[data-theme="dark"] .theme-toggle.theme-toggle-navbar {
+    background: transparent;
+    border-color: rgba(255,255,255,0.15);
+}
+
+@media (max-width: 768px) {
+    .theme-toggle.theme-toggle-navbar {
+        width: 32px;
+        height: 32px;
     }
 }
 

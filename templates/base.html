@@ -22,10 +22,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Sistema de Temas -->
-    <link rel="stylesheet" href="{% static 'core/css/themes.css' %}?v=18.0">
+    <link rel="stylesheet" href="{% static 'core/css/themes.css' %}?v=19.0">
     <link rel="stylesheet" href="{% static 'core/css/responsive.css' %}?v=1.0">
     <script src="{% static 'core/js/theme-toggle.js' %}?v=6.0"></script>
-    <script src="{% static 'core/js/chart-theme.js' %}?v=6.0" defer></script>
+    <script src="{% static 'core/js/chart-theme.js' %}?v=7.0" defer></script>
     <script src="{% static 'core/js/keyboard-shortcuts.js' %}?v=1.0" defer></script>
     <script src="{% static 'core/js/dark-mode-enforcer.js' %}?v=5.0"></script>
 
@@ -311,6 +311,9 @@
         }
         .user-menu {
             position: relative;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
         .user-menu-button {
             display: flex;
@@ -548,6 +551,15 @@
             <a href="{% url 'core:perfil_usuario' %}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition duration-200 ease-in-out mx-2">
                 <i class="fas fa-user-circle mr-3"></i> Mi Perfil
             </a>
+            {% if not user.is_superuser and user.empresa and user.rol_usuario in 'ADMINISTRADOR,GERENCIA' %}
+            <a href="{% url 'core:editar_perfil_empresa' %}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md transition duration-200 ease-in-out mx-2
+                {% if not user.empresa.correos_facturacion %}text-amber-400{% endif %}">
+                <i class="fas fa-building mr-3"></i> Perfil de Empresa
+                {% if not user.empresa.correos_facturacion %}
+                <span class="ml-auto w-2 h-2 bg-amber-400 rounded-full"></span>
+                {% endif %}
+            </a>
+            {% endif %}
             <a href="{% url 'core:logout' %}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-red-700 hover:text-white rounded-md transition duration-200 ease-in-out mt-2 mx-2">
                 <i class="fas fa-sign-out-alt mr-3"></i> Cerrar Sesión
             </a>
@@ -561,12 +573,11 @@
                 <i class="fas fa-bars text-xl"></i>
             </button>
 
-            <!-- Toggle de Tema -->
-            <div class="theme-toggle" title="Cambiar tema">
-                <i class="fas fa-moon theme-toggle-icon"></i>
-            </div>
-
             <div class="user-menu">
+                <!-- Toggle de Tema (interruptor inline) -->
+                <div class="theme-toggle theme-toggle-navbar" title="Cambiar tema">
+                    <i class="fas fa-moon theme-toggle-icon"></i>
+                </div>
                 <button id="user-menu-button" class="user-menu-button">
                     <i class="fas fa-user-circle"></i>
                     <span>{{ user.username }}</span>
@@ -624,6 +635,27 @@
                 </div>
             </div>
         </div>
+
+        {% if user.is_authenticated and not user.is_superuser and user.empresa and not user.empresa.correos_facturacion %}{% if user.rol_usuario == 'ADMINISTRADOR' or user.rol_usuario == 'GERENCIA' %}
+        <div id="banner-perfil-incompleto" class="flex items-center justify-between gap-3 px-4 py-2 text-sm"
+             style="background:#fef3c7;border-bottom:1px solid #fcd34d;color:#92400e;">
+            <span>
+                <i class="fas fa-exclamation-circle mr-1"></i>
+                <strong>Perfil incompleto:</strong>
+                Agrega tus correos de facturación y notificaciones para recibir alertas y poder contratar un plan.
+            </span>
+            <div class="flex items-center gap-3 shrink-0">
+                <a href="{% url 'core:editar_perfil_empresa' %}"
+                   style="background:#d97706;color:white;padding:4px 12px;border-radius:6px;font-weight:600;font-size:0.8rem;white-space:nowrap;">
+                    Completar perfil
+                </a>
+                <button onclick="document.getElementById('banner-perfil-incompleto').style.display='none'"
+                        style="color:#92400e;opacity:0.6;background:none;border:none;cursor:pointer;font-size:1rem;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        {% endif %}{% endif %}
 
         <main class="flex-grow p-4 md:p-6 lg:p-8"> {# Añadido flex-grow y padding responsivo #}
             {% block content %}
@@ -1244,6 +1276,135 @@
     {% block extra_js %}{% endblock %}
 
     {% if user.is_authenticated %}
+    <!-- ═══════════════════════════════════════════════
+         CHAT DE SOPORTE CON IA (Gemini)
+         ═══════════════════════════════════════════ -->
+    <div id="sam-chat-widget" style="position:fixed;bottom:90px;right:24px;z-index:9500;font-family:'Inter',sans-serif;">
+
+        <!-- Burbuja de apertura -->
+        <button id="sam-chat-toggle" onclick="samChatToggle()"
+            title="Asistente SAM — ¿Cómo puedo ayudarte?"
+            style="display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#0A2463,#1e40af);color:#fff;border:none;border-radius:50px;padding:12px 18px;cursor:pointer;box-shadow:0 4px 16px rgba(10,36,99,.45);font-size:.85rem;font-weight:700;transition:transform .2s,box-shadow .2s;"
+            onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 6px 24px rgba(10,36,99,.6)'"
+            onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(10,36,99,.45)'">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            Asistente SAM
+        </button>
+
+        <!-- Ventana del chat -->
+        <div id="sam-chat-box" style="display:none;position:absolute;bottom:60px;right:0;width:340px;background:var(--bg-secondary,#fff);border:1px solid var(--border-color,#e5e7eb);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);overflow:hidden;flex-direction:column;">
+
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#0A2463,#1e40af);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <div>
+                        <div style="font-weight:700;font-size:.9rem;">Asistente SAM</div>
+                        <div style="font-size:.72rem;opacity:.8;">Respondo dudas sobre la plataforma</div>
+                    </div>
+                </div>
+                <button onclick="samChatToggle()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:1rem;">✕</button>
+            </div>
+
+            <!-- Mensajes -->
+            <div id="sam-chat-messages" style="height:280px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;">
+                <div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:10px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">
+                    👋 Hola <strong>{{ user.first_name|default:user.username }}</strong>. Soy el asistente de SAM Metrología.<br><br>
+                    Pregúntame sobre cómo usar la plataforma: permisos, funciones, reportes, usuarios, planes, etc.
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div style="padding:10px 12px;border-top:1px solid var(--border-color,#e5e7eb);display:flex;gap:8px;align-items:center;">
+                <input id="sam-chat-input" type="text" maxlength="600"
+                    placeholder="Escribe tu pregunta..."
+                    onkeydown="if(event.key==='Enter')samChatEnviar()"
+                    style="flex:1;border:1px solid var(--border-color,#e5e7eb);border-radius:8px;padding:8px 12px;font-size:.83rem;background:var(--bg-primary,#f9fafb);color:var(--text-primary,#111827);outline:none;">
+                <button onclick="samChatEnviar()" id="sam-chat-btn"
+                    style="background:#0A2463;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:.83rem;font-weight:600;white-space:nowrap;transition:background .2s;"
+                    onmouseover="this.style.background='#1e40af'"
+                    onmouseout="this.style.background='#0A2463'">
+                    Enviar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function samChatToggle() {
+        const box = document.getElementById('sam-chat-box');
+        const isOpen = box.style.display === 'flex';
+        box.style.display = isOpen ? 'none' : 'flex';
+        box.style.flexDirection = 'column';
+        if (!isOpen) document.getElementById('sam-chat-input').focus();
+    }
+
+    function samChatEnviar() {
+        const input = document.getElementById('sam-chat-input');
+        const pregunta = input.value.trim();
+        if (!pregunta) return;
+
+        const messages = document.getElementById('sam-chat-messages');
+        const btn = document.getElementById('sam-chat-btn');
+
+        // Mensaje del usuario
+        messages.innerHTML += `
+            <div style="align-self:flex-end;background:#0A2463;color:#fff;border-radius:12px 12px 4px 12px;padding:9px 13px;font-size:.83rem;max-width:85%;line-height:1.5;">
+                ${samEscapar(pregunta)}
+            </div>`;
+        messages.scrollTop = messages.scrollHeight;
+        input.value = '';
+
+        // Indicador "escribiendo..."
+        const loadingId = 'sam-loading-' + Date.now();
+        messages.innerHTML += `
+            <div id="${loadingId}" style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-secondary,#6b7280);max-width:60%;">
+                <em>Escribiendo...</em>
+            </div>`;
+        messages.scrollTop = messages.scrollHeight;
+
+        btn.disabled = true;
+        btn.textContent = '...';
+
+        fetch('{% url "core:chat_ayuda" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ pregunta: pregunta })
+        })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById(loadingId)?.remove();
+            const texto = data.respuesta || data.error || 'No pude responder. Intenta de nuevo.';
+            messages.innerHTML += `
+                <div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">
+                    ${samEscapar(texto)}
+                </div>`;
+            messages.scrollTop = messages.scrollHeight;
+        })
+        .catch(() => {
+            document.getElementById(loadingId)?.remove();
+            messages.innerHTML += `
+                <div style="background:#fee2e2;border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:#b91c1c;max-width:90%;">
+                    Error de conexión. Intenta de nuevo.
+                </div>`;
+            messages.scrollTop = messages.scrollHeight;
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Enviar';
+        });
+    }
+
+    function samEscapar(texto) {
+        return texto
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+    }
+    </script>
+
     <!-- Botón flotante de soporte WhatsApp -->
     <a href="https://wa.me/573247990534?text=Hola%2C%20necesito%20ayuda%20con%20SAM%20Metrolog%C3%ADa"
        target="_blank" rel="noopener noreferrer"

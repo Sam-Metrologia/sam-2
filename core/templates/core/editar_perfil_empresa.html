@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Perfil de Empresa - SAM Metrología{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-6">
+
+    <h1 class="text-2xl font-bold text-gray-800 mb-1">Perfil de Empresa</h1>
+    <p class="text-gray-500 text-sm mb-6">
+        <i class="fas fa-building mr-1"></i>
+        <strong>{{ empresa.nombre }}</strong> &mdash; NIT: {{ empresa.nit|default:"—" }}
+    </p>
+
+    {% if campos_faltantes %}
+    <div class="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6 text-sm text-amber-800">
+        <p class="font-semibold mb-1">
+            <i class="fas fa-exclamation-circle mr-1"></i>
+            Completa tu perfil para aprovechar al máximo la plataforma
+        </p>
+        <ul class="list-disc list-inside space-y-1 ml-2">
+            {% for campo in campos_faltantes %}
+                <li>Falta: <strong>{{ campo }}</strong></li>
+            {% endfor %}
+        </ul>
+        {% if 'correos de facturación' in campos_faltantes %}
+        <p class="mt-2 text-amber-700">
+            <i class="fas fa-info-circle mr-1"></i>
+            Los correos de facturación son obligatorios para contratar un plan.
+        </p>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 text-sm text-green-700">
+        <i class="fas fa-check-circle mr-1"></i> Perfil completo — tu empresa está lista.
+    </div>
+    {% endif %}
+
+    <!-- Mensajes Django -->
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="px-4 py-3 rounded-md mb-2 text-sm
+            {% if message.tags == 'success' %}bg-green-50 border border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700
+            {% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" novalidate
+          class="bg-white rounded-lg shadow p-6 space-y-5">
+        {% csrf_token %}
+
+        <!-- Teléfono -->
+        <div>
+            <label for="id_telefono" class="block text-sm font-semibold text-gray-700 mb-1">
+                Teléfono <span class="font-normal text-gray-400">(opcional)</span>
+            </label>
+            {{ form.telefono }}
+            {% if form.telefono.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ form.telefono.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Dirección -->
+        <div>
+            <label for="id_direccion" class="block text-sm font-semibold text-gray-700 mb-1">
+                Dirección <span class="font-normal text-gray-400">(opcional)</span>
+            </label>
+            {{ form.direccion }}
+            {% if form.direccion.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ form.direccion.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Correos facturación -->
+        <div>
+            <label for="id_correos_facturacion" class="block text-sm font-semibold text-gray-700 mb-1">
+                Correos de Facturación
+                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                    Requerido para pagar
+                </span>
+            </label>
+            {{ form.correos_facturacion }}
+            <p class="text-gray-400 text-xs mt-1">{{ form.correos_facturacion.help_text }}</p>
+            {% if form.correos_facturacion.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ form.correos_facturacion.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Correos notificaciones -->
+        <div>
+            <label for="id_correos_notificaciones" class="block text-sm font-semibold text-gray-700 mb-1">
+                Correos de Notificaciones
+            </label>
+            {{ form.correos_notificaciones }}
+            <p class="text-gray-400 text-xs mt-1">{{ form.correos_notificaciones.help_text }}</p>
+            {% if form.correos_notificaciones.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ form.correos_notificaciones.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Logo -->
+        <div>
+            <label for="id_logo_empresa" class="block text-sm font-semibold text-gray-700 mb-1">
+                Logo de la Empresa
+            </label>
+            {% if empresa.logo_empresa %}
+            <div class="mb-2">
+                <img src="{{ empresa.logo_empresa.url }}" alt="Logo actual" class="h-14 object-contain border border-gray-200 rounded p-1">
+                <p class="text-xs text-gray-400 mt-1">Logo actual — sube uno nuevo para reemplazarlo.</p>
+            </div>
+            {% endif %}
+            {{ form.logo_empresa }}
+            <p class="text-gray-400 text-xs mt-1">{{ form.logo_empresa.help_text }}</p>
+            {% if form.logo_empresa.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ form.logo_empresa.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-md transition duration-200">
+                Guardar cambios
+            </button>
+            <a href="{% url 'core:dashboard' %}" class="text-gray-500 hover:text-gray-700 text-sm">Cancelar</a>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

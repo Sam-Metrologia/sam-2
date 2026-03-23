@@ -25,8 +25,8 @@
                 {{ form.website }}
             </div>
 
-            <!-- Datos de la Empresa -->
-            <div class="mb-6">
+            <!-- Datos obligatorios -->
+            <div class="mb-4">
                 <h3 class="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">
                     <i class="fas fa-building mr-2 text-blue-600"></i>Datos de la Empresa
                 </h3>
@@ -45,7 +45,7 @@
                             <p class="text-red-500 text-xs mt-1">{{ form.nit.errors.0 }}</p>
                         {% endif %}
                     </div>
-                    <div>
+                    <div class="md:col-span-2">
                         <label for="id_email_empresa" class="block text-gray-700 text-sm font-bold mb-1">{{ form.email_empresa.label }} *</label>
                         {{ form.email_empresa }}
                         {% if form.email_empresa.help_text %}
@@ -55,52 +55,74 @@
                             <p class="text-red-500 text-xs mt-1">{{ form.email_empresa.errors.0 }}</p>
                         {% endif %}
                     </div>
-                    <div>
-                        <label for="id_telefono" class="block text-gray-700 text-sm font-bold mb-1">{{ form.telefono.label }}</label>
-                        {{ form.telefono }}
-                        {% if form.telefono.errors %}
-                            <p class="text-red-500 text-xs mt-1">{{ form.telefono.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-                    <div class="md:col-span-2">
-                        <label for="id_direccion" class="block text-gray-700 text-sm font-bold mb-1">{{ form.direccion.label }}</label>
-                        {{ form.direccion }}
-                        {% if form.direccion.help_text %}
-                            <p class="text-gray-400 text-xs mt-1">{{ form.direccion.help_text }}</p>
-                        {% endif %}
-                        {% if form.direccion.errors %}
-                            <p class="text-red-500 text-xs mt-1">{{ form.direccion.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-                    <div>
-                        <label for="id_correos_facturacion" class="block text-gray-700 text-sm font-bold mb-1">{{ form.correos_facturacion.label }}</label>
-                        {{ form.correos_facturacion }}
-                        {% if form.correos_facturacion.help_text %}
-                            <p class="text-gray-400 text-xs mt-1">{{ form.correos_facturacion.help_text }}</p>
-                        {% endif %}
-                        {% if form.correos_facturacion.errors %}
-                            <p class="text-red-500 text-xs mt-1">{{ form.correos_facturacion.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-                    <div>
-                        <label for="id_correos_notificaciones" class="block text-gray-700 text-sm font-bold mb-1">{{ form.correos_notificaciones.label }}</label>
-                        {{ form.correos_notificaciones }}
-                        {% if form.correos_notificaciones.help_text %}
-                            <p class="text-gray-400 text-xs mt-1">{{ form.correos_notificaciones.help_text }}</p>
-                        {% endif %}
-                        {% if form.correos_notificaciones.errors %}
-                            <p class="text-red-500 text-xs mt-1">{{ form.correos_notificaciones.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-                    <div class="md:col-span-2">
-                        <label for="id_logo_empresa" class="block text-gray-700 text-sm font-bold mb-1">{{ form.logo_empresa.label }}</label>
-                        {{ form.logo_empresa }}
-                        {% if form.logo_empresa.help_text %}
-                            <p class="text-gray-400 text-xs mt-1">{{ form.logo_empresa.help_text }}</p>
-                        {% endif %}
-                        {% if form.logo_empresa.errors %}
-                            <p class="text-red-500 text-xs mt-1">{{ form.logo_empresa.errors.0 }}</p>
-                        {% endif %}
+                </div>
+                <p class="text-xs text-gray-400 mt-2">* Campos obligatorios</p>
+            </div>
+
+            <!-- Datos adicionales (opcionales) -->
+            <div class="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <button type="button" id="toggle-opcional" onclick="toggleOpcional()"
+                    class="w-full flex items-center justify-between text-sm font-semibold text-gray-600 mb-1 focus:outline-none">
+                    <span><i class="fas fa-plus-circle mr-2 text-gray-400"></i>Información adicional <span class="font-normal text-gray-400">(opcional — puedes completarla después desde tu perfil)</span></span>
+                    <i id="toggle-icon" class="fas fa-chevron-down text-gray-400 transition-transform duration-200"></i>
+                </button>
+
+                <div id="campos-opcionales" class="hidden mt-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="id_telefono" class="block text-gray-700 text-sm font-bold mb-1">
+                                {{ form.telefono.label }} <span class="font-normal text-gray-400 text-xs">(opcional)</span>
+                            </label>
+                            {{ form.telefono }}
+                            {% if form.telefono.errors %}
+                                <p class="text-red-500 text-xs mt-1">{{ form.telefono.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label for="id_correos_facturacion" class="block text-gray-700 text-sm font-bold mb-1">
+                                {{ form.correos_facturacion.label }} <span class="font-normal text-gray-400 text-xs">(opcional)</span>
+                            </label>
+                            {{ form.correos_facturacion }}
+                            {% if form.correos_facturacion.help_text %}
+                                <p class="text-gray-400 text-xs mt-1">{{ form.correos_facturacion.help_text }}</p>
+                            {% endif %}
+                            {% if form.correos_facturacion.errors %}
+                                <p class="text-red-500 text-xs mt-1">{{ form.correos_facturacion.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label for="id_correos_notificaciones" class="block text-gray-700 text-sm font-bold mb-1">
+                                {{ form.correos_notificaciones.label }} <span class="font-normal text-gray-400 text-xs">(opcional)</span>
+                            </label>
+                            {{ form.correos_notificaciones }}
+                            {% if form.correos_notificaciones.help_text %}
+                                <p class="text-gray-400 text-xs mt-1">{{ form.correos_notificaciones.help_text }}</p>
+                            {% endif %}
+                            {% if form.correos_notificaciones.errors %}
+                                <p class="text-red-500 text-xs mt-1">{{ form.correos_notificaciones.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label for="id_direccion" class="block text-gray-700 text-sm font-bold mb-1">
+                                {{ form.direccion.label }} <span class="font-normal text-gray-400 text-xs">(opcional)</span>
+                            </label>
+                            {{ form.direccion }}
+                            {% if form.direccion.errors %}
+                                <p class="text-red-500 text-xs mt-1">{{ form.direccion.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="id_logo_empresa" class="block text-gray-700 text-sm font-bold mb-1">
+                                {{ form.logo_empresa.label }} <span class="font-normal text-gray-400 text-xs">(opcional — recomendado para que tus formatos y certificados salgan con tu logo)</span>
+                            </label>
+                            {{ form.logo_empresa }}
+                            {% if form.logo_empresa.help_text %}
+                                <p class="text-gray-400 text-xs mt-1">{{ form.logo_empresa.help_text }}</p>
+                            {% endif %}
+                            {% if form.logo_empresa.errors %}
+                                <p class="text-red-500 text-xs mt-1">{{ form.logo_empresa.errors.0 }}</p>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -131,4 +153,23 @@
         </form>
     </div>
 </div>
+<script>
+function toggleOpcional() {
+    var campos = document.getElementById('campos-opcionales');
+    var icon = document.getElementById('toggle-icon');
+    if (campos.classList.contains('hidden')) {
+        campos.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        campos.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var erroresOpcionales = document.querySelectorAll('#campos-opcionales .text-red-500');
+    if (erroresOpcionales.length > 0) {
+        toggleOpcional();
+    }
+});
+</script>
 {% endblock %}

@@ -44,6 +44,7 @@ class EmpresaFactory(DjangoModelFactory):
     email = factory.LazyAttribute(lambda obj: f'contacto@{obj.nombre.lower().replace(" ", "")}.com')
     telefono = factory.LazyFunction(lambda: fake.phone_number()[:20])
     direccion = factory.LazyFunction(lambda: fake.address()[:200])
+    correos_facturacion = factory.LazyAttribute(lambda obj: f'facturacion@{obj.nombre.lower().replace(" ", "")}.com')
 
     # Plan settings (using actual field names)
     limite_equipos_empresa = factory.LazyFunction(lambda: random.choice([10, 25, 50, 100, 500]))

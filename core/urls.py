@@ -56,6 +56,12 @@ urlpatterns = [
     # Perfil de usuario
     path('perfil/', views.perfil_usuario, name='perfil_usuario'),
 
+    # Perfil de empresa (auto-edición por Admin/Gerencia)
+    path('empresa/perfil/', views.editar_perfil_empresa, name='editar_perfil_empresa'),
+
+    # Chat de soporte con IA
+    path('chat/ayuda/', views.chat_ayuda, name='chat_ayuda'),
+
     # Dashboard
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard-gerencia/', views.dashboard_gerencia, name='dashboard_gerencia'),

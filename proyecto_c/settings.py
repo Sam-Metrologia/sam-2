@@ -597,6 +597,9 @@ RATE_LIMIT_CONFIG = {
 # Obtener credenciales desde variables de entorno (nunca hardcodear)
 # Sandbox (desarrollo): obtener en https://dashboard.wompi.co → modo prueba
 # Producción: obtener en https://dashboard.wompi.co → modo producción
+# Gemini API (chatbot de soporte) — obtener en https://aistudio.google.com/apikey
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
 WOMPI_PUBLIC_KEY = os.environ.get('WOMPI_PUBLIC_KEY', '')
 WOMPI_PRIVATE_KEY = os.environ.get('WOMPI_PRIVATE_KEY', '')
 WOMPI_EVENTS_SECRET = os.environ.get('WOMPI_EVENTS_SECRET', '')

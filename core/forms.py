@@ -202,6 +202,39 @@ class UserProfileForm(forms.ModelForm):
         return email
 
 
+class EmpresaPerfilForm(forms.ModelForm):
+    """
+    Formulario de perfil de empresa editable por ADMINISTRADOR y GERENCIA.
+    Solo incluye campos operativos (no NIT, nombre ni configuración de plan).
+    """
+    class Meta:
+        model = Empresa
+        fields = ['telefono', 'direccion', 'correos_facturacion', 'correos_notificaciones', 'logo_empresa']
+        widgets = {
+            'telefono': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '+57 300 000 0000'}),
+            'direccion': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Calle 123 # 45-67, Bogotá'}),
+            'correos_facturacion': forms.Textarea(attrs={
+                'class': 'form-input', 'rows': 2,
+                'placeholder': 'facturacion@empresa.com, contabilidad@empresa.com'
+            }),
+            'correos_notificaciones': forms.Textarea(attrs={
+                'class': 'form-input', 'rows': 2,
+                'placeholder': 'tecnico@empresa.com, supervisor@empresa.com'
+            }),
+            'logo_empresa': ClearableFileInput(attrs={'class': 'form-input-file'}),
+        }
+        labels = {
+            'correos_facturacion': 'Correos de Facturación',
+            'correos_notificaciones': 'Correos de Notificaciones',
+            'logo_empresa': 'Logo de la Empresa',
+        }
+        help_texts = {
+            'correos_facturacion': 'Separa varios correos con coma. Se usarán para enviarte facturas al contratar un plan.',
+            'correos_notificaciones': 'Separa varios correos con coma. Recibirán alertas de vencimientos de equipos.',
+            'logo_empresa': 'Se mostrará en tus formatos PDF (confirmaciones metrológicas, informes, etc.).',
+        }
+
+
 class EmpresaForm(forms.ModelForm):
     fecha_inicio_plan = forms.DateField(
         label="Fecha Inicio Plan",

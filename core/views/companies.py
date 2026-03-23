@@ -694,6 +694,70 @@ def eliminar_ubicacion(request, pk):
 
 
 # =============================================================================
+# SELF-SERVICE: EDITAR PERFIL DE EMPRESA (Admin / Gerencia)
+# =============================================================================
+
+@monitor_view
+@access_check
+@login_required
+def editar_perfil_empresa(request):
+    """
+    Permite a ADMINISTRADOR y GERENCIA editar los datos operativos de su empresa:
+    teléfono, dirección, correos de facturación, correos de notificaciones y logo.
+    No expone NIT, nombre ni configuración de plan (solo superusuarios pueden tocar eso).
+    """
+    if request.user.is_superuser:
+        # Superusuario usa la vista completa editar_empresa
+        messages.info(request, 'Como superusuario usa la vista de administración.')
+        if request.user.empresa:
+            return redirect('core:editar_empresa', pk=request.user.empresa.pk)
+        return redirect('core:listar_empresas')
+
+    empresa = request.user.empresa
+    if not empresa:
+        messages.error(request, 'No tienes una empresa asociada.')
+        return redirect('core:dashboard')
+
+    if request.user.rol_usuario not in ['ADMINISTRADOR', 'GERENCIA']:
+        messages.error(request, 'Solo usuarios con rol Administrador o Gerencia pueden editar el perfil de la empresa.')
+        return redirect('core:dashboard')
+
+    if request.method == 'POST':
+        form = EmpresaPerfilForm(request.POST, request.FILES, instance=empresa)
+        if form.is_valid():
+            empresa_actualizada = form.save(commit=False)
+            # Procesar logo si se subió uno nuevo
+            if 'logo_empresa' in request.FILES:
+                _process_company_logo(empresa_actualizada, request.FILES['logo_empresa'])
+            empresa_actualizada.save()
+            messages.success(request, 'Perfil de empresa actualizado exitosamente.')
+            logger.info(f"Perfil empresa actualizado: {empresa.nombre} por {request.user.username}")
+            return redirect('core:editar_perfil_empresa')
+        else:
+            messages.error(request, 'Revisa los datos ingresados.')
+    else:
+        form = EmpresaPerfilForm(instance=empresa)
+
+    # Determinar qué campos faltan (para mostrar progreso)
+    campos_faltantes = []
+    if not empresa.correos_facturacion:
+        campos_faltantes.append('correos de facturación')
+    if not empresa.correos_notificaciones:
+        campos_faltantes.append('correos de notificaciones')
+    if not empresa.logo_empresa:
+        campos_faltantes.append('logo')
+    if not empresa.telefono:
+        campos_faltantes.append('teléfono')
+
+    return render(request, 'core/editar_perfil_empresa.html', {
+        'form': form,
+        'empresa': empresa,
+        'campos_faltantes': campos_faltantes,
+        'titulo_pagina': 'Perfil de Empresa',
+    })
+
+
+# =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
 
