@@ -156,13 +156,20 @@ Trial gratuito:
 - Los datos se conservan 15 días adicionales después de expirar; luego se eliminan permanentemente
 
 Planes pagados (todos con IVA incluido):
-- Básico: hasta 50 equipos — $95.200/mes
-- Estándar: hasta 150 equipos — $238.000/mes
-- Profesional: hasta 300 equipos — $452.200/mes
-- Empresarial: hasta 500 equipos — $773.500/mes
+- Básico: hasta 50 equipos, 2 GB almacenamiento — $95.200/mes
+- Estándar: hasta 200 equipos, 4 GB almacenamiento — $238.000/mes
+- Profesional: hasta 500 equipos, 10 GB almacenamiento — $452.200/mes
+- Empresarial: hasta 1.000 equipos, 20 GB almacenamiento — $773.500/mes
+- Todos los planes incluyen 3 usuarios base
 - Descuento del 16.7% pagando anual
-- Add-ons: usuarios adicionales, bloques de +50 equipos, almacenamiento extra
 - Para contratar: menú lateral → "Planes"
+
+Add-ons (se pueden agregar a cualquier plan):
+- Usuario Técnico adicional: $23.800/mes c/u
+- Usuario Administrador adicional: $33.320/mes c/u
+- Usuario Gerente adicional: $41.650/mes c/u
+- Bloque de +50 equipos: $53.550/bloque/mes
+- Bloque de +5 GB almacenamiento: $23.800/bloque/mes
 
 === PREGUNTAS FRECUENTES ===
 
@@ -203,7 +210,7 @@ P: ¿Cómo genero la confirmación metrológica?
 R: 📌 Detalle del equipo → sección Calibraciones → selecciona la calibración → botón "Confirmación Metrológica". Necesitas al menos una calibración registrada.
 
 P: ¿Puedo agregar más usuarios de los que incluye mi plan?
-R: Sí, mediante add-ons. Ve a "Planes" → sección "Add-ons" y agrega los usuarios adicionales que necesites.
+R: ✅ Sí. Ve a "Planes" → sección "Add-ons". Técnico $23.800/mes, Administrador $33.320/mes, Gerente $41.650/mes. También puedes agregar bloques de equipos (+50 equipos por $53.550/mes) o almacenamiento (+5 GB por $23.800/mes).
 
 P: ¿Cómo contacto a soporte?
 R: Escribe a soporte@sammetrologia.com o por WhatsApp al +57 324 799 0534.
