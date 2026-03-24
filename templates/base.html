@@ -1308,10 +1308,6 @@
 
             <!-- Mensajes -->
             <div id="sam-chat-messages" style="height:280px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;">
-                <div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:10px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">
-                    👋 Hola <strong>{{ user.first_name|default:user.username }}</strong>. Soy el asistente de SAM Metrología.<br><br>
-                    Pregúntame sobre cómo usar la plataforma: permisos, funciones, reportes, usuarios, planes, etc.
-                </div>
             </div>
 
             <!-- Input -->
@@ -1331,12 +1327,45 @@
     </div>
 
     <script>
+    const SAM_CHAT_KEY = 'sam_chat_{{ user.id }}';
+    const SAM_CHAT_OPEN_KEY = 'sam_chat_open_{{ user.id }}';
+    const SAM_CHAT_WELCOME = '👋 Hola <strong>{{ user.first_name|default:user.username }}</strong>. Soy el asistente de SAM Metrología.<br><br>Pregúntame sobre cómo usar la plataforma: permisos, funciones, reportes, usuarios, planes, etc.';
+
+    function samChatGuardar(historial) {
+        try { localStorage.setItem(SAM_CHAT_KEY, JSON.stringify(historial.slice(-30))); } catch(e) {}
+    }
+
+    function samChatCargar() {
+        try { return JSON.parse(localStorage.getItem(SAM_CHAT_KEY) || '[]'); } catch(e) { return []; }
+    }
+
+    function samChatRenderizar(historial) {
+        const messages = document.getElementById('sam-chat-messages');
+        messages.innerHTML = '';
+        if (!historial.length) {
+            messages.innerHTML = `<div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:10px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">${SAM_CHAT_WELCOME}</div>`;
+            return;
+        }
+        historial.forEach(m => {
+            if (m.tipo === 'usuario') {
+                messages.innerHTML += `<div style="align-self:flex-end;background:#0A2463;color:#fff;border-radius:12px 12px 4px 12px;padding:9px 13px;font-size:.83rem;max-width:85%;line-height:1.5;">${samEscapar(m.texto)}</div>`;
+            } else {
+                messages.innerHTML += `<div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">${samEscapar(m.texto)}</div>`;
+            }
+        });
+        messages.scrollTop = messages.scrollHeight;
+    }
+
     function samChatToggle() {
         const box = document.getElementById('sam-chat-box');
         const isOpen = box.style.display === 'flex';
         box.style.display = isOpen ? 'none' : 'flex';
         box.style.flexDirection = 'column';
-        if (!isOpen) document.getElementById('sam-chat-input').focus();
+        try { localStorage.setItem(SAM_CHAT_OPEN_KEY, isOpen ? '0' : '1'); } catch(e) {}
+        if (!isOpen) {
+            document.getElementById('sam-chat-input').focus();
+            document.getElementById('sam-chat-messages').scrollTop = 99999;
+        }
     }
 
     function samChatEnviar() {
@@ -1346,56 +1375,40 @@
 
         const messages = document.getElementById('sam-chat-messages');
         const btn = document.getElementById('sam-chat-btn');
+        const historial = samChatCargar();
 
-        // Mensaje del usuario
-        messages.innerHTML += `
-            <div style="align-self:flex-end;background:#0A2463;color:#fff;border-radius:12px 12px 4px 12px;padding:9px 13px;font-size:.83rem;max-width:85%;line-height:1.5;">
-                ${samEscapar(pregunta)}
-            </div>`;
+        historial.push({ tipo: 'usuario', texto: pregunta });
+        samChatGuardar(historial);
+        messages.innerHTML += `<div style="align-self:flex-end;background:#0A2463;color:#fff;border-radius:12px 12px 4px 12px;padding:9px 13px;font-size:.83rem;max-width:85%;line-height:1.5;">${samEscapar(pregunta)}</div>`;
         messages.scrollTop = messages.scrollHeight;
         input.value = '';
 
-        // Indicador "escribiendo..."
         const loadingId = 'sam-loading-' + Date.now();
-        messages.innerHTML += `
-            <div id="${loadingId}" style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-secondary,#6b7280);max-width:60%;">
-                <em>Escribiendo...</em>
-            </div>`;
+        messages.innerHTML += `<div id="${loadingId}" style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-secondary,#6b7280);max-width:60%;"><em>Escribiendo...</em></div>`;
         messages.scrollTop = messages.scrollHeight;
-
         btn.disabled = true;
         btn.textContent = '...';
 
         fetch('{% url "core:chat_ayuda" %}', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
             body: JSON.stringify({ pregunta: pregunta })
         })
         .then(r => r.json())
         .then(data => {
             document.getElementById(loadingId)?.remove();
             const texto = data.respuesta || data.error || 'No pude responder. Intenta de nuevo.';
-            messages.innerHTML += `
-                <div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">
-                    ${samEscapar(texto)}
-                </div>`;
+            historial.push({ tipo: 'bot', texto: texto });
+            samChatGuardar(historial);
+            messages.innerHTML += `<div style="background:var(--accent-subtle,#eff6ff);border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:var(--text-primary,#111827);max-width:90%;line-height:1.5;">${samEscapar(texto)}</div>`;
             messages.scrollTop = messages.scrollHeight;
         })
         .catch(() => {
             document.getElementById(loadingId)?.remove();
-            messages.innerHTML += `
-                <div style="background:#fee2e2;border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:#b91c1c;max-width:90%;">
-                    Error de conexión. Intenta de nuevo.
-                </div>`;
+            messages.innerHTML += `<div style="background:#fee2e2;border-radius:12px 12px 12px 4px;padding:9px 13px;font-size:.83rem;color:#b91c1c;max-width:90%;">Error de conexión. Intenta de nuevo.</div>`;
             messages.scrollTop = messages.scrollHeight;
         })
-        .finally(() => {
-            btn.disabled = false;
-            btn.textContent = 'Enviar';
-        });
+        .finally(() => { btn.disabled = false; btn.textContent = 'Enviar'; });
     }
 
     function samEscapar(texto) {
@@ -1403,6 +1416,18 @@
             .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
             .replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
     }
+
+    // Restaurar historial y estado al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        samChatRenderizar(samChatCargar());
+        try {
+            if (localStorage.getItem(SAM_CHAT_OPEN_KEY) === '1') {
+                const box = document.getElementById('sam-chat-box');
+                box.style.display = 'flex';
+                box.style.flexDirection = 'column';
+            }
+        } catch(e) {}
+    });
     </script>
 
     <!-- Botón flotante de soporte WhatsApp -->
