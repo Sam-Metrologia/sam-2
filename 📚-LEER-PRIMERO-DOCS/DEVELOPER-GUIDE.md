@@ -219,18 +219,22 @@ sam-2/
 │   │   ├── equipos.py              # CRUD equipos
 │   │   ├── calibraciones.py        # Gestión calibraciones
 │   │   └── ...
+│   ├── views/
+│   │   ├── chat.py                 # 🤖 Chatbot IA "Señor SAM" (Gemini)
+│   │   └── companies.py            # CRUD empresas + editar_perfil_empresa
 │   ├── services.py                 # Lógica de negocio
 │   ├── file_validators.py          # Validación de uploads
 │   ├── storage_validators.py       # Límites de storage
-│   └── forms.py                    # Formularios
+│   └── forms.py                    # Formularios (incl. EmpresaPerfilForm)
 │
 ├── 🔴 proyecto_c/                  # Configuración Django (CRÍTICO)
 │   ├── 🔴 settings.py              # Settings con detección de entorno
 │   ├── urls.py
 │   └── wsgi.py
 │
-├── templates/                      # Templates globales
+├── templates/                      # Templates globales (base.html incluye widget Señor SAM)
 ├── static/                         # Assets frontend
+│   └── core/images/senor_sam.svg   # Avatar del chatbot IA
 ├── media/                          # Uploads locales (solo dev)
 ├── logs/                           # Logs de aplicación
 │   ├── sam_info.log               # Logs generales
@@ -378,6 +382,7 @@ python manage.py runserver
 | `EMAIL_HOST` | (opcional) | `smtp.gmail.com` |
 | `EMAIL_HOST_USER` | (opcional) | `metrologiasam@gmail.com` |
 | `EMAIL_HOST_PASSWORD` | (opcional) | App Password |
+| `GEMINI_API_KEY` | `.env` local | **REQUERIDO** para chatbot IA |
 
 **Detección Automática de Ambiente**:
 ```python
@@ -960,6 +965,63 @@ curl https://app.sammetrologia.com/
 curl https://app.sammetrologia.com/health/
 # → {"status": "ok", "database": "connected"}
 ```
+
+---
+
+## 🤖 Chatbot IA "Señor SAM"
+
+Asistente de soporte integrado en la plataforma como burbuja flotante (esquina inferior derecha, encima del botón de WhatsApp).
+
+### Arquitectura
+
+```
+Usuario escribe pregunta
+    ↓
+base.html (JS) → POST /core/chat/ayuda/ con { pregunta, historial[-6] }
+    ↓
+core/views/chat.py → construye prompt: CONTEXTO_SAM + historial + pregunta
+    ↓
+Google Gemini 2.5 Flash API (generativelanguage.googleapis.com/v1beta)
+    ↓
+JsonResponse { respuesta: "..." }
+    ↓
+base.html muestra burbuja del bot + guarda en localStorage
+```
+
+### Archivos clave
+
+| Archivo | Propósito |
+|---------|-----------|
+| `core/views/chat.py` | Vista + constante `CONTEXTO_SAM` |
+| `core/static/core/images/senor_sam.svg` | Avatar del asistente |
+| `templates/base.html` | Widget completo (JS + HTML) |
+| `tests/test_views/test_chat.py` | 8 tests |
+
+### Enseñarle nuevas cosas al chatbot
+
+El chatbot **no aprende solo** — Gemini es sin memoria persistente. Para mejorar sus respuestas hay que actualizar la constante `CONTEXTO_SAM` en `core/views/chat.py`. Agregar secciones cuando:
+- Un usuario pregunta algo que SAM no supo responder
+- Se agrega una funcionalidad nueva a la plataforma
+- Se detecta que SAM usa terminología incorrecta
+
+### Persistencia del historial
+
+- Se guarda en `localStorage` del navegador, clave `sam_chat_{user_id}`
+- Máximo 30 mensajes almacenados (los más viejos se descartan)
+- Se borra automáticamente al hacer logout
+- El estado abierto/cerrado también persiste: `sam_chat_open_{user_id}`
+
+### Variable de entorno requerida
+
+```
+GEMINI_API_KEY=AIza...   # Obtener en aistudio.google.com
+```
+
+Si no está configurada, el chat muestra un mensaje de fallback dirigiendo a soporte. La plataforma no falla.
+
+### Costo estimado (Gemini 2.5 Flash)
+
+~3.500 tokens por pregunta (contexto + historial + pregunta). A $0.15/millón de tokens de entrada → **~$0.0005 por pregunta**. Para 1.000 preguntas al mes ≈ $0.50.
 
 ---
 

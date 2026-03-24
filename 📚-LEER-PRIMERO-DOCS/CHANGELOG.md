@@ -43,6 +43,37 @@
 
 ---
 
+## [2026-03-23] - Chatbot IA "Señor SAM", Perfil Empresa, Modo Oscuro y UX
+
+### Agregado
+- **Chatbot IA "Señor SAM"** (`core/views/chat.py`): asistente de soporte integrado como burbuja flotante en la plataforma. Usa Google Gemini 2.5 Flash. El contexto del sistema (`CONTEXTO_SAM`) documenta roles, módulos, flujos y preguntas frecuentes de la plataforma. Requiere variable de entorno `GEMINI_API_KEY`.
+  - Historial de conversación persiste en `localStorage` por usuario (clave `sam_chat_{user_id}`)
+  - Se envían los últimos 6 mensajes a Gemini para mantener contexto dentro de la sesión
+  - El historial se borra automáticamente al cerrar sesión
+  - Avatar personalizado SVG "Señor SAM" en `core/static/core/images/senor_sam.svg`
+  - URL: `POST /core/chat/ayuda/` → `core:chat_ayuda`
+  - Tests: `tests/test_views/test_chat.py` (8 tests)
+- **Vista `editar_perfil_empresa`** (`core/views/companies.py`): permite a Admin/Gerencia completar teléfono, dirección, correos de facturación, correos de notificaciones y logo sin entrar al panel de superusuario. Template: `core/templates/core/editar_perfil_empresa.html`.
+- **Validación en pagos**: `iniciar_pago()` bloquea si la empresa no tiene `correos_facturacion` y redirige a completar perfil.
+- **Banner "perfil incompleto"** en `base.html`: visible solo para Admin/Gerencia cuando falta `correos_facturacion`.
+- **Enlace "Perfil de Empresa"** en sidebar (solo Admin/Gerencia) con indicador ámbar si hay campos faltantes.
+- **Formulario trial simplificado**: 3 campos requeridos (nombre, NIT, email) + sección colapsable con campos opcionales.
+- **CTA en `trial_exitoso.html`**: bloque ámbar motivando a completar perfil (logo, correos).
+- **Paquete `google-genai`** en `requirements.txt` (reemplaza `google-generativeai` que usaba API v1beta sin soporte).
+
+### Modificado
+- **Toggle modo oscuro**: movido de burbuja flotante fija a inline junto al username en el navbar. CSS: clase `.theme-toggle-navbar` en `themes.css`.
+- **`themes.css`**: reglas dark mode para clases Tailwind amber, orange, blue, green que no tenían override.
+- **`chart-theme.js`**: fix timing — `applyChartDefaults()` se llama inmediatamente al cargar, no con `setTimeout`. Resuelve colores incorrectos en gráficas al cargar la página en modo oscuro.
+- **`dashboard.html`**: fix títulos de gráficas de torta invisibles en modo oscuro (override de gradiente con colores más claros `#60a5fa → #a78bfa`).
+- **`manage.py`**: re-habilitado `python-dotenv` para cargar `.env` en desarrollo.
+- **`tests/factories.py`**: `EmpresaFactory` ahora genera `correos_facturacion` por defecto (necesario para tests de pagos que requieren validación).
+
+### Seguridad
+- Validación de perfil antes de redirigir a pasarela de pago (Wompi): empresa debe tener NIT y correos de facturación.
+
+---
+
 ## [2026-03-16] - Refactoring de Modelos, Permisos y Correcciones
 
 ### Modificado
