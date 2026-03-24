@@ -10,9 +10,9 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 **Language:** Spanish (Colombia)
 **Version:** 2.0.0
 
-## Current Status (Mar 15, 2026)
+## Current Status (Mar 23, 2026)
 
-- **Tests:** 1,804 passing, 1 skipped, 3 xfailed
+- **Tests:** 1,806 passing, 1 skipped, 3 xfailed (+8 nuevos: test_chat.py)
 - **Coverage:** 70.00% ✓ (Goal alcanzado)
 - **Score:** 8.3/10 (auditado Mar-15-2026)
 - **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md`
@@ -24,6 +24,9 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 - **Dependencies:** Actualizadas 2026-02-19 (32 CVEs corregidos)
 - **Plan Trial/Onboarding/Pagos:** 98% completo (`docs/PLAN_TRIAL_ONBOARDING_PAGOS.md`)
 - **Dashboard Pre-computado:** Opcion E implementada — stats guardados en Empresa, cron diario 2am
+- **Chatbot IA "Señor SAM":** Gemini 2.5 Flash integrado como burbuja flotante (`core/views/chat.py`). Contexto en `CONTEXTO_SAM`. Historial persiste en localStorage por usuario; se borra al cerrar sesión. Requiere `GEMINI_API_KEY` en entorno.
+- **Perfil Empresa + Onboarding:** Vista `editar_perfil_empresa` para Admin/Gerencia. Validación en pagos requiere `correos_facturacion`. Banner en dashboard si perfil incompleto.
+- **UX:** Toggle modo oscuro en navbar (junto al username). Formulario trial simplificado (3 campos requeridos + sección colapsable).
 
 ## Project Structure
 
@@ -60,6 +63,7 @@ sam-2/
       maintenance.py         # Maintenance views
       admin.py               # Admin views
       scheduled_tasks_api.py # API for scheduled tasks
+      chat.py                # Chatbot IA "Señor SAM" (Gemini 2.5 Flash)
       terminos.py            # Terms & conditions
     services.py              # Business logic services
     services_new.py          # Optimized services (cache, file upload)
@@ -233,7 +237,7 @@ AWS_STORAGE_BUCKET_NAME, AWS_S3_REGION_NAME, RENDER_EXTERNAL_HOSTNAME
 ### Optional
 ```
 DEBUG_VALUE, REDIS_URL, EMAIL_HOST, EMAIL_HOST_USER,
-EMAIL_HOST_PASSWORD, ADMIN_EMAIL
+EMAIL_HOST_PASSWORD, ADMIN_EMAIL, GEMINI_API_KEY
 ```
 
 ## Known Technical Debt

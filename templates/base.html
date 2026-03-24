@@ -560,7 +560,7 @@
                 {% endif %}
             </a>
             {% endif %}
-            <a href="{% url 'core:logout' %}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-red-700 hover:text-white rounded-md transition duration-200 ease-in-out mt-2 mx-2">
+            <a href="{% url 'core:logout' %}" onclick="try{localStorage.removeItem('sam_chat_{{ user.id }}');localStorage.removeItem('sam_chat_open_{{ user.id }}');}catch(e){}" class="flex items-center py-2 px-4 text-gray-300 hover:bg-red-700 hover:text-white rounded-md transition duration-200 ease-in-out mt-2 mx-2">
                 <i class="fas fa-sign-out-alt mr-3"></i> Cerrar Sesión
             </a>
         </div>
@@ -586,7 +586,7 @@
                 <div id="user-dropdown" class="user-dropdown">
                     <a href="{% url 'core:perfil_usuario' %}">Mi Perfil</a>
                     <a href="{% url 'core:password_change' %}">Cambiar Contraseña</a>
-                    <a href="{% url 'core:logout' %}">Cerrar Sesión</a>
+                    <a href="{% url 'core:logout' %}" onclick="try{localStorage.removeItem('sam_chat_{{ user.id }}');localStorage.removeItem('sam_chat_open_{{ user.id }}');}catch(e){}">Cerrar Sesión</a>
                 </div>
             </div>
         </div>
