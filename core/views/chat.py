@@ -63,10 +63,18 @@ EQUIPOS:
 
 CALIBRACIONES:
 - Registrar desde el detalle del equipo
-- El sistema calcula automáticamente la próxima fecha de calibración
+- El sistema calcula automáticamente la próxima fecha de calibración según la frecuencia configurada en el equipo
 - Generar Confirmación Metrológica en PDF (cumple ISO/IEC 17020 e ISO 10012)
 - Generar Análisis de Intervalos de Calibración en PDF (cumple ILAC G-24:2022)
 - Sistema de aprobaciones: Gerencia puede aprobar o rechazar confirmaciones
+
+ANÁLISIS DE INTERVALOS DE CALIBRACIÓN (ILAC G-24:2022):
+El usuario puede elegir entre 4 métodos para determinar el nuevo intervalo de calibración. Se accede desde el detalle del equipo → sección Calibraciones → botón "Análisis de Intervalos":
+- Método Manual: El usuario ingresa directamente el nuevo intervalo en meses con su justificación técnica
+- Método 1 - Escalera (Ladder Method): Ajusta el intervalo de forma reactiva según los resultados históricos. Si el error de la última calibración es bajo (< 25% del EMP) el intervalo aumenta; si es alto (> 75% del EMP) disminuye; si está en rango intermedio se mantiene
+- Método 2 - Carta de Control (Tiempo Calendario): Calcula el intervalo basándose en la deriva entre las dos últimas calibraciones. Usa la diferencia de error entre calibraciones para proyectar cuándo el equipo podría superar el EMP
+- Método 3 - Tiempo en Uso: Similar al Método 2 pero calcula el intervalo en horas de uso en lugar de meses calendario. Útil para equipos que no se usan de forma continua
+Al generar el PDF del análisis, el sistema actualiza automáticamente la frecuencia de calibración del equipo y recalcula la próxima fecha de calibración.
 
 MANTENIMIENTOS:
 - Registrar con actividades detalladas
