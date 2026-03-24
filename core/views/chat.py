@@ -223,6 +223,7 @@ def chat_ayuda(request):
     try:
         data = json.loads(request.body)
         pregunta = data.get('pregunta', '').strip()
+        historial = data.get('historial', [])  # últimos mensajes de la conversación
 
         if not pregunta:
             return JsonResponse({'error': 'Pregunta vacía.'}, status=400)
@@ -240,7 +241,17 @@ def chat_ayuda(request):
         from google import genai
         client = genai.Client(api_key=api_key)
 
-        prompt = f"{CONTEXTO_SAM}\n\nPregunta del usuario: {pregunta}"
+        # Construir prompt con historial reciente (últimos 6 mensajes = 3 intercambios)
+        historial_texto = ''
+        for msg in historial[-6:]:
+            rol = 'Usuario' if msg.get('tipo') == 'usuario' else 'SAM'
+            historial_texto += f"\n{rol}: {msg.get('texto', '')[:300]}"
+
+        if historial_texto:
+            prompt = f"{CONTEXTO_SAM}\n\n=== CONVERSACIÓN RECIENTE ==={historial_texto}\n\nUsuario: {pregunta}"
+        else:
+            prompt = f"{CONTEXTO_SAM}\n\nUsuario: {pregunta}"
+
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,

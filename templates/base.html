@@ -1283,12 +1283,12 @@
 
         <!-- Burbuja de apertura -->
         <button id="sam-chat-toggle" onclick="samChatToggle()"
-            title="Asistente SAM — ¿Cómo puedo ayudarte?"
+            title="SAM — ¿Cómo puedo ayudarte?"
             style="display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#0A2463,#1e40af);color:#fff;border:none;border-radius:50px;padding:12px 18px;cursor:pointer;box-shadow:0 4px 16px rgba(10,36,99,.45);font-size:.85rem;font-weight:700;transition:transform .2s,box-shadow .2s;"
             onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 6px 24px rgba(10,36,99,.6)'"
             onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(10,36,99,.45)'">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Asistente SAM
+            SAM
         </button>
 
         <!-- Ventana del chat -->
@@ -1299,8 +1299,8 @@
                 <div style="display:flex;align-items:center;gap:10px;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     <div>
-                        <div style="font-weight:700;font-size:.9rem;">Asistente SAM</div>
-                        <div style="font-size:.72rem;opacity:.8;">Respondo dudas sobre la plataforma</div>
+                        <div style="font-weight:700;font-size:.9rem;">SAM</div>
+                        <div style="font-size:.72rem;opacity:.8;">Tu asistente de SAM Metrología</div>
                     </div>
                 </div>
                 <button onclick="samChatToggle()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:1rem;">✕</button>
@@ -1329,7 +1329,7 @@
     <script>
     const SAM_CHAT_KEY = 'sam_chat_{{ user.id }}';
     const SAM_CHAT_OPEN_KEY = 'sam_chat_open_{{ user.id }}';
-    const SAM_CHAT_WELCOME = '👋 Hola <strong>{{ user.first_name|default:user.username }}</strong>. Soy el asistente de SAM Metrología.<br><br>Pregúntame sobre cómo usar la plataforma: permisos, funciones, reportes, usuarios, planes, etc.';
+    const SAM_CHAT_WELCOME = '👋 Hola <strong>{{ user.first_name|default:user.username }}</strong>. Soy <strong>SAM</strong>, tu asistente de SAM Metrología.<br><br>Pregúntame sobre cómo usar la plataforma: permisos, funciones, reportes, usuarios, planes, etc.';
 
     function samChatGuardar(historial) {
         try { localStorage.setItem(SAM_CHAT_KEY, JSON.stringify(historial.slice(-30))); } catch(e) {}
@@ -1392,7 +1392,7 @@
         fetch('{% url "core:chat_ayuda" %}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ pregunta: pregunta })
+            body: JSON.stringify({ pregunta: pregunta, historial: historial.slice(-6) })
         })
         .then(r => r.json())
         .then(data => {
