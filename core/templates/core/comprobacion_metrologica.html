@@ -261,14 +261,15 @@
             <table class="tabla-comprobacion">
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Nombre del Equipo</th>
-                        <th style="width: 25%;">Marca</th>
-                        <th style="width: 25%;">Modelo</th>
-                        <th style="width: 25%;">Certificado de Calibración</th>
+                        <th style="width: 24%;">Nombre del Equipo</th>
+                        <th style="width: 24%;">Marca</th>
+                        <th style="width: 24%;">Modelo</th>
+                        <th style="width: 24%;">Certificado de Calibración</th>
+                        <th style="width: 4%;"></th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr>
+                <tbody id="equipos-ref-tbody">
+                    <tr id="equipo-ref-fila-0">
                         <td>
                             <input type="text" id="equipo-ref-nombre" placeholder="Ej: Calibrador Multiparámetro"
                                    class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
@@ -285,9 +286,16 @@
                             <input type="text" id="equipo-ref-certificado" placeholder="Ej: CAL-2024-001"
                                    class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
                         </td>
+                        <td></td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+        <div class="mt-3">
+            <button type="button" id="btn-agregar-equipo-ref"
+                    class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors">
+                <i class="fas fa-plus"></i> Agregar equipo de referencia
+            </button>
         </div>
     </div>
 
@@ -890,11 +898,24 @@ async function generarPDF() {
         unidad_equipo: document.getElementById('unidad-equipo').value,
         puntos_medicion: puntos,
         fecha: new Date().toISOString(),
-        // Equipo de referencia
+        // Equipo de referencia (fila principal + filas adicionales)
         equipo_ref_nombre: document.getElementById('equipo-ref-nombre').value || '',
         equipo_ref_marca: document.getElementById('equipo-ref-marca').value || '',
         equipo_ref_modelo: document.getElementById('equipo-ref-modelo').value || '',
         equipo_ref_certificado: document.getElementById('equipo-ref-certificado').value || '',
+        equipos_ref_adicionales: (function() {
+            const adicionales = [];
+            document.querySelectorAll('#equipos-ref-tbody tr[data-adicional]').forEach(function(fila) {
+                const inputs = fila.querySelectorAll('input');
+                adicionales.push({
+                    nombre: inputs[0] ? inputs[0].value || '' : '',
+                    marca: inputs[1] ? inputs[1].value || '' : '',
+                    modelo: inputs[2] ? inputs[2].value || '' : '',
+                    certificado: inputs[3] ? inputs[3].value || '' : ''
+                });
+            });
+            return adicionales;
+        })(),
         // Formato del documento (código, versión, fecha)
         formato_codigo: document.getElementById('formato-codigo').value || '',
         formato_version: document.getElementById('formato-version').value || '',
@@ -1075,8 +1096,41 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// ========== EQUIPOS DE REFERENCIA ADICIONALES ==========
+let contadorFilasRef = 1;
+
+function agregarFilaRef(datos) {
+    const tbody = document.getElementById('equipos-ref-tbody');
+    const idx = contadorFilasRef++;
+    const fila = document.createElement('tr');
+    fila.setAttribute('data-adicional', idx);
+    fila.innerHTML = `
+        <td><input type="text" placeholder="Ej: Calibrador Multiparámetro"
+                   value="${datos && datos.nombre ? datos.nombre : ''}"
+                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></td>
+        <td><input type="text" placeholder="Ej: Fluke"
+                   value="${datos && datos.marca ? datos.marca : ''}"
+                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></td>
+        <td><input type="text" placeholder="Ej: 5500A"
+                   value="${datos && datos.modelo ? datos.modelo : ''}"
+                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></td>
+        <td><input type="text" placeholder="Ej: CAL-2024-001"
+                   value="${datos && datos.certificado ? datos.certificado : ''}"
+                   class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></td>
+        <td class="text-center">
+            <button type="button" onclick="this.closest('tr').remove()"
+                    class="text-red-500 hover:text-red-700 transition-colors" title="Eliminar fila">
+                <i class="fas fa-times"></i>
+            </button>
+        </td>`;
+    tbody.appendChild(fila);
+}
+
 // ========== INICIALIZACIÓN ==========
 window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-agregar-equipo-ref').addEventListener('click', function() {
+        agregarFilaRef(null);
+    });
     if (datosExistentes && datosExistentes.puntos_medicion && datosExistentes.puntos_medicion.length > 0) {
         // Cargar datos existentes
         const datos = datosExistentes;
@@ -1113,6 +1167,12 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (datos.equipo_ref_certificado) {
             document.getElementById('equipo-ref-certificado').value = datos.equipo_ref_certificado;
+        }
+        // Restaurar filas adicionales de referencia
+        if (datos.equipos_ref_adicionales && datos.equipos_ref_adicionales.length > 0) {
+            datos.equipos_ref_adicionales.forEach(function(eq) {
+                agregarFilaRef(eq);
+            });
         }
     } else {
         // Siempre agregar 5 filas vacías por defecto si no hay datos existentes

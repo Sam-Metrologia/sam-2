@@ -199,6 +199,8 @@ def guardar_comprobacion_json(request, equipo_id):
         comprobacion.equipo_referencia_marca = datos.get('equipo_ref_marca', '')
         comprobacion.equipo_referencia_modelo = datos.get('equipo_ref_modelo', '')
         comprobacion.equipo_referencia_certificado = datos.get('equipo_ref_certificado', '')
+        adicionales = datos.get('equipos_ref_adicionales', [])
+        comprobacion.equipos_referencia_adicionales = adicionales if isinstance(adicionales, list) else []
 
         # Guardar formato de COMPROBACIÓN en la empresa (aplica a todos los equipos de la empresa)
         if 'formato_codigo' in datos or 'formato_version' in datos or 'formato_fecha' in datos:

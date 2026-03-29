@@ -402,6 +402,14 @@
                     <td>{{ comprobacion.equipo_referencia_modelo|default:datos_comprobacion.equipo_ref_modelo|default:"N/A" }}</td>
                     <td>{{ comprobacion.equipo_referencia_certificado|default:datos_comprobacion.equipo_ref_certificado|default:"N/A" }}</td>
                 </tr>
+                {% for eq in comprobacion.equipos_referencia_adicionales %}
+                <tr>
+                    <td>{{ eq.nombre|default:"N/A" }}</td>
+                    <td>{{ eq.marca|default:"N/A" }}</td>
+                    <td>{{ eq.modelo|default:"N/A" }}</td>
+                    <td>{{ eq.certificado|default:"N/A" }}</td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>

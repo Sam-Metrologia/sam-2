@@ -403,6 +403,12 @@ class Comprobacion(models.Model):
         verbose_name="Equipo de Referencia - Certificado de Calibración",
         help_text="Número de certificado de calibración del equipo de referencia"
     )
+    equipos_referencia_adicionales = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Equipos de Referencia Adicionales",
+        help_text="Lista de equipos de referencia adicionales (nombre, marca, modelo, certificado)"
+    )
 
     # Sistema de Aprobación
     creado_por = models.ForeignKey(
