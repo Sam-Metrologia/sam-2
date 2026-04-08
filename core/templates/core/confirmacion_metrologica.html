@@ -559,8 +559,8 @@
         // Mostrar EMP absoluto calculado
         cells[6].textContent = empAbsoluto.toFixed(3);
 
-        // Calcular error ABSOLUTO (siempre en unidades del equipo)
-        const error = parseFloat((nominal - lectura).toFixed(3));
+        // Calcular error (signo correcto: lectura - nominal, según convención metrológica)
+        const error = parseFloat((lectura - nominal).toFixed(3));
         const errorMasU = parseFloat((error + incertidumbre).toFixed(3));
         const errorMenosU = parseFloat((error - incertidumbre).toFixed(3));
 

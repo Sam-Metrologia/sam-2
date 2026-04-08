@@ -894,11 +894,14 @@ def generar_pdf_confirmacion(request, equipo_id):
                 emp_absoluto_punto = punto.get('emp_absoluto')
 
                 # Guardar punto procesado con todos los datos
+                lectura_punto = safe_float(punto.get('lectura', 0), 0)
+                factor_correccion = (nominal / lectura_punto) if lectura_punto != 0 else 0
                 punto_procesado = {
                     'nominal': nominal,
-                    'lectura': safe_float(punto.get('lectura', 0), 0),
+                    'lectura': lectura_punto,
                     'incertidumbre': safe_float(punto.get('incertidumbre', 0), 0),
                     'error': error,
+                    'factor_correccion': factor_correccion,
                     'error_mas_u': safe_float(punto.get('error_mas_u', 0), 0),
                     'error_menos_u': safe_float(punto.get('error_menos_u', 0), 0),
                     'conformidad': punto.get('conformidad', 'Pendiente'),

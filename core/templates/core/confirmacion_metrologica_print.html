@@ -167,14 +167,22 @@
         }
 
         /* TABLA DE MEDICIONES */
+        .medicion-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
         .medicion-table th {
-            font-size: 8pt;
-            padding: 6px 3px;
+            font-size: 7.5pt;
+            padding: 5px 2px;
+            word-wrap: break-word;
         }
 
         .medicion-table td {
             text-align: center;
-            font-size: 8.5pt;
+            font-size: 7.5pt;
+            padding: 5px 2px;
+            word-wrap: break-word;
         }
 
         /* ESTADOS DE CONFORMIDAD */
@@ -487,18 +495,18 @@
         <table class="medicion-table">
             <thead>
                 <tr>
-                    <th style="width: 4%;">#</th>
-                    <th style="width: 10%;">Nominal<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 10%;">Lectura<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 9%;">Incert. (U)<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 8%; background-color: #fff3cd;">EMP<br>Valor</th>
-                    <th style="width: 7%; background-color: #fff3cd;">EMP<br>Tipo</th>
+                    <th style="width: 3%;">#</th>
+                    <th style="width: 9%;">Nominal<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Lectura<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%;">Incert. (U)<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 7%; background-color: #fff3cd;">EMP<br>Valor</th>
+                    <th style="width: 6%; background-color: #fff3cd;">EMP<br>Tipo</th>
                     <th style="width: 9%; background-color: #ffc107;">EMP Abs<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 9%;">Error<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 9%; background-color: #e0e7ff;">FC<br>(adimensional)</th>
-                    <th style="width: 9%;">Error + U<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 9%;">Error - U<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 10%;">Conformidad</th>
+                    <th style="width: 8%;">Error<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 10%; background-color: #e0e7ff;">FC<br>(adimensional)</th>
+                    <th style="width: 8%;">Error + U<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%;">Error - U<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Conformidad</th>
                 </tr>
             </thead>
             <tbody>
@@ -513,7 +521,7 @@
                     <td style="background-color: #fff9e6;">{{ punto.emp_tipo|default:"-" }}</td>
                     <td style="background-color: #fff3cd; font-weight: bold;">{{ punto.emp_absoluto|floatformat:3|default:"-" }}</td>
                     <td>{{ punto.error|floatformat:3|default:"-" }}</td>
-                    <td style="background-color: #eff6ff; font-weight: bold;">{{ punto.factor_correccion|floatformat:6|default:"-" }}</td>
+                    <td style="background-color: #eff6ff; font-weight: bold;">{{ punto.factor_correccion|floatformat:4|default:"-" }}</td>
                     <td>{{ punto.error_mas_u|floatformat:3|default:"-" }}</td>
                     <td>{{ punto.error_menos_u|floatformat:3|default:"-" }}</td>
                     <td class="{% if punto.conformidad == 'Cumple' %}cumple{% elif punto.conformidad == 'No Cumple' %}no-cumple{% elif punto.conformidad == 'Condicionado' %}condicional{% endif %}">
