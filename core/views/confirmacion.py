@@ -92,8 +92,18 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
         else:
             emp_es_porcentaje = (emp_unidad == '%')
 
-        # Crear figura
-        fig, ax = plt.subplots(figsize=(10, 6))
+        # Crear figura — tamaño dinámico según cantidad de puntos
+        n_puntos = len(puntos_validos)
+        ancho_fig = max(12, n_puntos * 0.9)
+        markersize = max(4, 9 - max(0, n_puntos - 8))
+        fig, ax = plt.subplots(figsize=(ancho_fig, 6))
+
+        # Detectar si conviene escala log en X (rango > 100x)
+        nominales_positivos = [n for n in nominales if n > 0]
+        usar_log_x = (len(nominales_positivos) > 1 and
+                      max(nominales_positivos) / min(nominales_positivos) > 100)
+        if usar_log_x:
+            ax.set_xscale('log')
 
         if emp_es_porcentaje:
             # NORMALIZAR: Dividir medido / nominal para que quede cerca de 1
@@ -104,8 +114,8 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
 
             # Dibujar línea normalizada con barras de incertidumbre
             ax.errorbar(nominales, valores_normalizados, yerr=incertidumbres_norm,
-                       fmt='o-', color='#3b82f6', linewidth=2, markersize=8,
-                       ecolor='#60a5fa', elinewidth=2, capsize=5, capthick=2,
+                       fmt='o-', color='#3b82f6', linewidth=2, markersize=markersize,
+                       ecolor='#60a5fa', elinewidth=2, capsize=4, capthick=2,
                        label='Valor Normalizado (Medido/Nominal) ± Incertidumbre')
 
             # NUEVO: Dibujar líneas EMP escalonadas o globales
@@ -150,8 +160,8 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
         else:
             # EMP en unidades absolutas - gráfica tradicional
             ax.errorbar(nominales, errores, yerr=incertidumbres,
-                       fmt='o-', color='#3b82f6', linewidth=2, markersize=8,
-                       ecolor='#60a5fa', elinewidth=2, capsize=5, capthick=2,
+                       fmt='o-', color='#3b82f6', linewidth=2, markersize=markersize,
+                       ecolor='#60a5fa', elinewidth=2, capsize=4, capthick=2,
                        label='Error ± Incertidumbre')
 
             # NUEVO: Dibujar líneas EMP escalonadas o globales
@@ -354,6 +364,7 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         'numero_certificado': datos_confirmacion.get('numero_certificado', ultima_calibracion.numero_certificado if ultima_calibracion else 'N/A') if datos_confirmacion else (ultima_calibracion.numero_certificado if ultima_calibracion else 'N/A'),
         'emp': datos_confirmacion.get('emp', emp_info['valor']) if datos_confirmacion else emp_info['valor'],
         'emp_unidad': datos_confirmacion.get('emp_unidad', emp_info['unidad']) if datos_confirmacion else emp_info['unidad'],
+        'emp_texto': equipo.error_maximo_permisible or f"{emp_info['valor']} {emp_info['unidad']}",
         'unidad_equipo': datos_confirmacion.get('unidad_equipo', emp_info['unidad']) if datos_confirmacion else emp_info['unidad'],
         'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U') if datos_confirmacion else 'guard_band_U',
         'puntos_medicion': puntos_medicion,
@@ -880,13 +891,13 @@ def generar_pdf_confirmacion(request, equipo_id):
             puntos_procesados = []
 
             for punto in puntos:
-                # Calcular desviación absoluta del punto
+                # Calcular desviación del punto (con signo para análisis de deriva)
                 nominal = safe_float(punto.get('nominal', 0), 0)
                 error = safe_float(punto.get('error', 0), 0)
-                desviacion_abs = abs(error)
+                desviacion_abs = error  # conserva el signo para análisis de drift
 
-                if desviacion_abs > desviacion_maxima:
-                    desviacion_maxima = desviacion_abs
+                if abs(desviacion_abs) > desviacion_maxima:
+                    desviacion_maxima = abs(desviacion_abs)
 
                 # NUEVO: Incluir datos de EMP por punto
                 emp_valor_punto = punto.get('emp_valor')
@@ -1221,6 +1232,7 @@ def generar_pdf_intervalos(request, equipo_id):
         # Pasar deriva automática para tabla detallada en PDF
         'deriva_automatica': deriva_automatica_pdf,
         'total_calibraciones': Calibracion.objects.filter(equipo=equipo).count(),
+        'emp_texto': equipo.error_maximo_permisible or f"{emp_info['valor']} {emp_info['unidad']}",
     }
 
     # Renderizar HTML

@@ -285,7 +285,6 @@
             </td>
             <td class="header-title-cell">
                 <div>CONFIRMACIÓN METROLÓGICA</div>
-                <div style="font-size: 10pt; font-weight: normal; margin-top: 4px;">{{ nombre_empresa }}</div>
             </td>
             <td class="header-info-cell">
                 <p><strong>CÓDIGO:</strong> {{ datos_confirmacion.formato.codigo }}</p>
@@ -360,7 +359,7 @@
         <div class="info-grid">
             <div class="info-item">
                 <strong>ERROR MÁXIMO PERMISIBLE (EMP)</strong>
-                <div class="info-value">{{ datos_confirmacion.emp }} {{ datos_confirmacion.emp_unidad }}</div>
+                <div class="info-value">{{ datos_confirmacion.emp_texto|default:datos_confirmacion.emp }}</div>
             </div>
             <div class="info-item">
                 <strong>UNIDAD DE MEDIDA</strong>
