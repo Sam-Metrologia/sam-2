@@ -325,6 +325,19 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
     for punto in ultima_cal['puntos']:
         emp_por_nominal[punto['nominal']] = punto.get('emp_absoluto', 0)
 
+    def _get_emp(nominal):
+        """Busca EMP para un nominal con tolerancia 5% para manejar diferencias de precisión."""
+        if nominal in emp_por_nominal:
+            return emp_por_nominal[nominal]
+        if nominal != 0:
+            for n, emp in emp_por_nominal.items():
+                if abs(n - nominal) / abs(nominal) <= 0.05:
+                    return emp
+        # Fallback: nominal más cercano
+        if emp_por_nominal:
+            return emp_por_nominal[min(emp_por_nominal.keys(), key=lambda n: abs(n - nominal))]
+        return 0
+
     # Calcular rangos para ejes usando PORCENTAJE del nominal
     # Esto permite que puntos con diferentes nominales se vean bien
     todos_errores_porcentaje = []
@@ -395,7 +408,7 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
     # Límites EMP (del último registro) - convertir a porcentaje
     for i, nominal in enumerate(nominales_unicos):
         x = escala_x(i)
-        emp = emp_por_nominal.get(nominal, 0)
+        emp = _get_emp(nominal)
 
         # Convertir EMP a porcentaje del nominal
         if nominal != 0:
@@ -411,8 +424,8 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
 
         if i < len(nominales_unicos) - 1:
             x_next = escala_x(i + 1)
-            emp_next = emp_por_nominal.get(nominales_unicos[i + 1], emp)
             nominal_next = nominales_unicos[i + 1]
+            emp_next = _get_emp(nominal_next)
 
             if nominal_next != 0:
                 emp_next_pct = (emp_next / abs(nominal_next)) * 100
@@ -539,6 +552,18 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
     for punto in ultima_comp['puntos']:
         emp_por_nominal[punto['nominal']] = punto.get('emp_absoluto', 0)
 
+    def _get_emp_comp(nominal):
+        """Busca EMP para un nominal con tolerancia 5%."""
+        if nominal in emp_por_nominal:
+            return emp_por_nominal[nominal]
+        if nominal != 0:
+            for n, emp in emp_por_nominal.items():
+                if abs(n - nominal) / abs(nominal) <= 0.05:
+                    return emp
+        if emp_por_nominal:
+            return emp_por_nominal[min(emp_por_nominal.keys(), key=lambda n: abs(n - nominal))]
+        return 0
+
     # Calcular rangos usando PORCENTAJE del nominal
     todos_errores_porcentaje = []
     for comp in comprobaciones_con_datos:
@@ -606,7 +631,7 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
     # Límites EMP - convertir a porcentaje
     for i, nominal in enumerate(nominales_unicos):
         x = escala_x(i)
-        emp = emp_por_nominal.get(nominal, 0)
+        emp = _get_emp_comp(nominal)
 
         # Convertir a porcentaje
         if nominal != 0:
@@ -621,8 +646,8 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
 
         if i < len(nominales_unicos) - 1:
             x_next = escala_x(i + 1)
-            emp_next = emp_por_nominal.get(nominales_unicos[i + 1], emp)
             nominal_next = nominales_unicos[i + 1]
+            emp_next = _get_emp_comp(nominal_next)
 
             if nominal_next != 0:
                 emp_next_pct = (emp_next / abs(nominal_next)) * 100
