@@ -319,27 +319,57 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
     if len(nominales_unicos) == 0:
         return None
 
-    # Obtener EMPs del último registro (calibración más reciente)
-    ultima_cal = calibraciones_con_datos[0]
-    emp_por_nominal = {}
-    for punto in ultima_cal['puntos']:
-        emp_por_nominal[punto['nominal']] = punto.get('emp_absoluto', 0)
+    # ── Recolectar configuraciones EMP únicas de TODAS las calibraciones ──────
+    # Si el EMP cambia entre calibraciones (ej: 10% → 20%), se dibujan dos
+    # juegos de líneas rojas. Si son iguales (dentro de 5%), se dibuja uno solo.
 
-    def _get_emp(nominal):
-        """Busca EMP para un nominal con tolerancia 5% para manejar diferencias de precisión."""
-        if nominal in emp_por_nominal:
-            return emp_por_nominal[nominal]
+    def _lookup_emp(nominal, emp_dict, tol=0.05):
+        """Busca EMP con tolerancia en nominal para manejar diferencias de precisión."""
+        if nominal in emp_dict:
+            return emp_dict[nominal]
         if nominal != 0:
-            for n, emp in emp_por_nominal.items():
-                if abs(n - nominal) / abs(nominal) <= 0.05:
-                    return emp
-        # Fallback: nominal más cercano
-        if emp_por_nominal:
-            return emp_por_nominal[min(emp_por_nominal.keys(), key=lambda n: abs(n - nominal))]
+            for n, e in emp_dict.items():
+                if abs(n - nominal) / abs(nominal) <= tol:
+                    return e
+        if emp_dict:
+            return emp_dict[min(emp_dict.keys(), key=lambda n: abs(n - nominal))]
         return 0
 
+    def _emp_configs_iguales(d1, d2, nominales, tol_emp=0.05):
+        """True si dos dicts EMP producen el mismo % EMP (dentro de tol_emp relativo)."""
+        muestra = [n for n in nominales if n != 0][:6]
+        for n in muestra:
+            e1 = _lookup_emp(n, d1)
+            e2 = _lookup_emp(n, d2)
+            emp1_pct = e1 / abs(n)
+            emp2_pct = e2 / abs(n)
+            ref = max(abs(emp1_pct), abs(emp2_pct))
+            if ref > 0 and abs(emp1_pct - emp2_pct) / ref > tol_emp:
+                return False
+        return True
+
+    # Recolectar EMPs únicos de todas las calibraciones
+    emp_configs_unicos = []  # lista de dicts {nominal: emp_abs}
+    for cal in calibraciones_con_datos:
+        emp_cal = {p['nominal']: p.get('emp_absoluto', 0) for p in cal['puntos']}
+        if not emp_cal:
+            continue
+        ya_existe = any(
+            _emp_configs_iguales(emp_cal, existing, nominales_unicos)
+            for existing in emp_configs_unicos
+        )
+        if not ya_existe:
+            emp_configs_unicos.append(emp_cal)
+
+    # Estilos para cada configuración EMP (distintos si hay más de una)
+    # dash_array, stroke_width, opacity
+    emp_estilos = [
+        ('5,5',  2.0, 0.9),
+        ('10,4', 1.5, 0.7),
+        ('3,6',  1.5, 0.6),
+    ]
+
     # Calcular rangos para ejes usando PORCENTAJE del nominal
-    # Esto permite que puntos con diferentes nominales se vean bien
     todos_errores_porcentaje = []
     for cal in calibraciones_con_datos:
         for punto in cal['puntos']:
@@ -350,14 +380,14 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
             else:
                 todos_errores_porcentaje.append(punto.get('error', 0))
 
-    # También incluir EMPs como porcentaje
+    # Incluir TODOS los EMPs únicos para calcular el rango del eje Y
     emps_porcentaje = []
-    for nominal, emp in emp_por_nominal.items():
-        if nominal != 0:
-            emp_porcentaje = (emp / abs(nominal)) * 100
-            emps_porcentaje.append(emp_porcentaje)
-        else:
-            emps_porcentaje.append(emp)
+    for emp_cfg in emp_configs_unicos:
+        for nominal, emp in emp_cfg.items():
+            if nominal != 0:
+                emps_porcentaje.append((emp / abs(nominal)) * 100)
+            else:
+                emps_porcentaje.append(emp)
 
     if len(todos_errores_porcentaje) == 0:
         return None
@@ -405,39 +435,32 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
     y0 = escala_y(0)
     svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
 
-    # Límites EMP (del último registro) - convertir a porcentaje
-    for i, nominal in enumerate(nominales_unicos):
-        x = escala_x(i)
-        emp = _get_emp(nominal)
+    # ── Dibujar líneas EMP — una por cada configuración única ────────────────
+    # EMP constante entre calibraciones → 1 línea. EMP cambia → 2 líneas.
+    for cfg_idx, emp_cfg in enumerate(emp_configs_unicos):
+        dash, sw, op = emp_estilos[cfg_idx % len(emp_estilos)]
+        for i, nominal in enumerate(nominales_unicos):
+            x = escala_x(i)
+            emp = _lookup_emp(nominal, emp_cfg)
+            emp_pct = (emp / abs(nominal)) * 100 if nominal != 0 else emp
 
-        # Convertir EMP a porcentaje del nominal
-        if nominal != 0:
-            emp_pct = (emp / abs(nominal)) * 100
-        else:
-            emp_pct = emp
+            y_sup = escala_y(emp_pct)
+            y_inf = escala_y(-emp_pct)
 
-        y_sup = escala_y(emp_pct)
-        y_inf = escala_y(-emp_pct)
+            # Líneas verticales punteadas (indicadores)
+            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.25"/>')
 
-        # Líneas verticales de límites
-        svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.3"/>')
+            if i < len(nominales_unicos) - 1:
+                x_next = escala_x(i + 1)
+                nominal_next = nominales_unicos[i + 1]
+                emp_next = _lookup_emp(nominal_next, emp_cfg)
+                emp_next_pct = (emp_next / abs(nominal_next)) * 100 if nominal_next != 0 else emp_next
 
-        if i < len(nominales_unicos) - 1:
-            x_next = escala_x(i + 1)
-            nominal_next = nominales_unicos[i + 1]
-            emp_next = _get_emp(nominal_next)
+                y_sup_next = escala_y(emp_next_pct)
+                y_inf_next = escala_y(-emp_next_pct)
 
-            if nominal_next != 0:
-                emp_next_pct = (emp_next / abs(nominal_next)) * 100
-            else:
-                emp_next_pct = emp_next
-
-            y_sup_next = escala_y(emp_next_pct)
-            y_inf_next = escala_y(-emp_next_pct)
-
-            # Líneas horizontales conectando límites
-            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
-            svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
+                svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
+                svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
 
     # Dibujar líneas y puntos de cada calibración
     for idx_cal, cal in enumerate(calibraciones_con_datos):
@@ -546,23 +569,37 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
     if len(nominales_unicos) == 0:
         return None
 
-    # EMPs del último registro
-    ultima_comp = comprobaciones_con_datos[0]
-    emp_por_nominal = {}
-    for punto in ultima_comp['puntos']:
-        emp_por_nominal[punto['nominal']] = punto.get('emp_absoluto', 0)
-
-    def _get_emp_comp(nominal):
-        """Busca EMP para un nominal con tolerancia 5%."""
-        if nominal in emp_por_nominal:
-            return emp_por_nominal[nominal]
+    # ── Configuraciones EMP únicas (misma lógica que confirmaciones) ─────────
+    def _lookup_emp_c(nominal, emp_dict, tol=0.05):
+        if nominal in emp_dict:
+            return emp_dict[nominal]
         if nominal != 0:
-            for n, emp in emp_por_nominal.items():
-                if abs(n - nominal) / abs(nominal) <= 0.05:
-                    return emp
-        if emp_por_nominal:
-            return emp_por_nominal[min(emp_por_nominal.keys(), key=lambda n: abs(n - nominal))]
+            for n, e in emp_dict.items():
+                if abs(n - nominal) / abs(nominal) <= tol:
+                    return e
+        if emp_dict:
+            return emp_dict[min(emp_dict.keys(), key=lambda n: abs(n - nominal))]
         return 0
+
+    def _configs_iguales_c(d1, d2, nominales, tol=0.05):
+        muestra = [n for n in nominales if n != 0][:6]
+        for n in muestra:
+            e1 = _lookup_emp_c(n, d1)
+            e2 = _lookup_emp_c(n, d2)
+            ref = max(abs(e1), abs(e2))
+            if ref > 0 and abs(e1 - e2) / ref > tol:
+                return False
+        return True
+
+    emp_configs_unicos_c = []
+    for comp in comprobaciones_con_datos:
+        emp_comp = {p['nominal']: p.get('emp_absoluto', 0) for p in comp['puntos']}
+        if not emp_comp:
+            continue
+        if not any(_configs_iguales_c(emp_comp, ex, nominales_unicos) for ex in emp_configs_unicos_c):
+            emp_configs_unicos_c.append(emp_comp)
+
+    emp_estilos_c = [('5,5', 2.0, 0.9), ('10,4', 1.5, 0.7), ('3,6', 1.5, 0.6)]
 
     # Calcular rangos usando PORCENTAJE del nominal
     todos_errores_porcentaje = []
@@ -575,14 +612,13 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
             else:
                 todos_errores_porcentaje.append(punto.get('error', 0))
 
-    # EMPs como porcentaje
     emps_porcentaje = []
-    for nominal, emp in emp_por_nominal.items():
-        if nominal != 0:
-            emp_porcentaje = (emp / abs(nominal)) * 100
-            emps_porcentaje.append(emp_porcentaje)
-        else:
-            emps_porcentaje.append(emp)
+    for emp_cfg in emp_configs_unicos_c:
+        for nominal, emp in emp_cfg.items():
+            if nominal != 0:
+                emps_porcentaje.append((emp / abs(nominal)) * 100)
+            else:
+                emps_porcentaje.append(emp)
 
     if len(todos_errores_porcentaje) == 0:
         return None
@@ -628,37 +664,30 @@ def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
     y0 = escala_y(0)
     svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
 
-    # Límites EMP - convertir a porcentaje
-    for i, nominal in enumerate(nominales_unicos):
-        x = escala_x(i)
-        emp = _get_emp_comp(nominal)
+    # ── Dibujar líneas EMP — una por cada configuración única ────────────────
+    for cfg_idx, emp_cfg in enumerate(emp_configs_unicos_c):
+        dash, sw, op = emp_estilos_c[cfg_idx % len(emp_estilos_c)]
+        for i, nominal in enumerate(nominales_unicos):
+            x = escala_x(i)
+            emp = _lookup_emp_c(nominal, emp_cfg)
+            emp_pct = (emp / abs(nominal)) * 100 if nominal != 0 else emp
 
-        # Convertir a porcentaje
-        if nominal != 0:
-            emp_pct = (emp / abs(nominal)) * 100
-        else:
-            emp_pct = emp
+            y_sup = escala_y(emp_pct)
+            y_inf = escala_y(-emp_pct)
 
-        y_sup = escala_y(emp_pct)
-        y_inf = escala_y(-emp_pct)
+            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.25"/>')
 
-        svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.3"/>')
+            if i < len(nominales_unicos) - 1:
+                x_next = escala_x(i + 1)
+                nominal_next = nominales_unicos[i + 1]
+                emp_next = _lookup_emp_c(nominal_next, emp_cfg)
+                emp_next_pct = (emp_next / abs(nominal_next)) * 100 if nominal_next != 0 else emp_next
 
-        if i < len(nominales_unicos) - 1:
-            x_next = escala_x(i + 1)
-            nominal_next = nominales_unicos[i + 1]
-            emp_next = _get_emp_comp(nominal_next)
+                y_sup_next = escala_y(emp_next_pct)
+                y_inf_next = escala_y(-emp_next_pct)
 
-            if nominal_next != 0:
-                emp_next_pct = (emp_next / abs(nominal_next)) * 100
-            else:
-                emp_next_pct = emp_next
-
-            y_sup_next = escala_y(emp_next_pct)
-            y_inf_next = escala_y(-emp_next_pct)
-
-            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
-            svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,5"/>')
+                svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
+                svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
 
     # Líneas y puntos de cada comprobación
     for idx_comp, comp in enumerate(comprobaciones_con_datos):
