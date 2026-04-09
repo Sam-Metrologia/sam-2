@@ -232,12 +232,23 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         equipo=equipo
     ).order_by('-fecha_calibracion')  # Sin límite, todas
 
+    # ==================== DATOS PREVIOS GUARDADOS (para pre-llenar el form) ====================
+    datos_guardados = None
+    if (not datos_confirmacion and
+            ultima_calibracion and
+            hasattr(ultima_calibracion, 'confirmacion_metrologica_datos') and
+            ultima_calibracion.confirmacion_metrologica_datos):
+        datos_guardados = ultima_calibracion.confirmacion_metrologica_datos
+
     # ==================== PARSEAR PUNTOS DE CALIBRACIÓN ====================
     puntos_medicion = []
 
     if datos_confirmacion and 'puntos_medicion' in datos_confirmacion:
         # Si vienen datos del POST, usarlos
         puntos_medicion = datos_confirmacion['puntos_medicion']
+    elif datos_guardados and datos_guardados.get('puntos_medicion'):
+        # Si hay datos previos guardados (sin POST), pre-llenar con mediciones completas
+        puntos_medicion = datos_guardados['puntos_medicion']
     elif equipo.puntos_calibracion:
         # Sino, parsear desde el equipo
         puntos_texto = equipo.puntos_calibracion.replace('\n', ',').replace(';', ',')
@@ -410,6 +421,13 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
 
         # Estructura completa para el template de impresión
         'datos_confirmacion': datos_confirmacion_template,
+
+        # Pre-llenado del formulario con datos previos guardados
+        'datos_previos_json': json.dumps(datos_guardados) if datos_guardados else 'null',
+        'confirmacion_estado': (ultima_calibracion.confirmacion_estado_aprobacion
+                                if ultima_calibracion else None),
+        'razon_rechazo': (ultima_calibracion.confirmacion_observaciones_rechazo
+                          if ultima_calibracion else None),
     }
 
     return context

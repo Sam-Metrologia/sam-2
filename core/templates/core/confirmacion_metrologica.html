@@ -108,6 +108,36 @@
         </div>
     </div>
 
+    <!-- Banner de estado de la confirmación anterior -->
+    {% if confirmacion_estado == 'rechazado' %}
+    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg flex items-start gap-3">
+        <i class="fas fa-times-circle text-red-500 text-xl mt-0.5 flex-shrink-0"></i>
+        <div>
+            <p class="font-semibold text-red-800">Confirmación rechazada — puedes ajustar y regenerar</p>
+            {% if razon_rechazo %}
+            <p class="text-sm text-red-700 mt-1"><strong>Motivo:</strong> {{ razon_rechazo }}</p>
+            {% endif %}
+            <p class="text-xs text-red-600 mt-2">Los datos de la confirmación anterior se han cargado automáticamente. Modifica solo lo necesario y haz clic en <strong>Guardar PDF</strong>.</p>
+        </div>
+    </div>
+    {% elif confirmacion_estado == 'pendiente' %}
+    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded-lg flex items-start gap-3">
+        <i class="fas fa-clock text-yellow-500 text-xl mt-0.5 flex-shrink-0"></i>
+        <div>
+            <p class="font-semibold text-yellow-800">Confirmación pendiente de aprobación</p>
+            <p class="text-xs text-yellow-700 mt-1">Los datos anteriores se han cargado. Si necesitas hacer ajustes antes de la aprobación, puedes regenerar el PDF.</p>
+        </div>
+    </div>
+    {% elif confirmacion_estado == 'aprobado' %}
+    <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-lg flex items-start gap-3">
+        <i class="fas fa-check-circle text-green-500 text-xl mt-0.5 flex-shrink-0"></i>
+        <div>
+            <p class="font-semibold text-green-800">Confirmación aprobada</p>
+            <p class="text-xs text-green-700 mt-1">Se han cargado los datos aprobados. Generar un nuevo PDF creará una nueva revisión pendiente de aprobación.</p>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Objetivo -->
     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
         <p class="text-sm text-gray-700">
@@ -411,6 +441,61 @@
 
     // Variable global con puntos de medición desde Django
     const puntosMedicionDjango = {{ puntos_medicion_json|safe|default:'[]' }};
+
+    // Datos previos guardados (confirmación anterior — para pre-llenar el formulario)
+    const datosPrevios = {{ datos_previos_json|safe }};
+
+    // Pre-llenar formulario con datos previos si existen
+    function _preLlenarFormulario() {
+        if (!datosPrevios) return;
+
+        // Laboratorio, fechas, número certificado
+        const lab = document.getElementById('laboratorio');
+        if (lab && datosPrevios.laboratorio) lab.value = datosPrevios.laboratorio;
+
+        const fechaCert = document.getElementById('fecha-certificado');
+        if (fechaCert && datosPrevios.fecha_certificado) fechaCert.value = datosPrevios.fecha_certificado;
+
+        const numCert = document.getElementById('numero-certificado');
+        if (numCert && datosPrevios.numero_certificado) numCert.value = datosPrevios.numero_certificado;
+
+        // EMP global y unidad del equipo
+        const empField = document.getElementById('emp');
+        if (empField && (datosPrevios.emp || datosPrevios.emp_valor))
+            empField.value = datosPrevios.emp || datosPrevios.emp_valor;
+
+        const empUnidad = document.getElementById('emp-unidad');
+        if (empUnidad && datosPrevios.emp_unidad) empUnidad.value = datosPrevios.emp_unidad;
+
+        const unidadEquipo = document.getElementById('unidad-equipo');
+        if (unidadEquipo && datosPrevios.unidad_equipo) {
+            unidadEquipo.value = datosPrevios.unidad_equipo;
+            if (typeof actualizarEncabezadosTabla === 'function') actualizarEncabezadosTabla();
+        }
+
+        // Regla de decisión
+        const regla = document.getElementById('regla-decision');
+        if (regla && datosPrevios.regla_decision) regla.value = datosPrevios.regla_decision;
+
+        // Decisión (radio button)
+        const decision = (datosPrevios.conclusion && datosPrevios.conclusion.decision
+            ? datosPrevios.conclusion.decision
+            : datosPrevios.decision || 'APTO'
+        ).toLowerCase().replace(/\s+/g, '-');
+        const radioDecision = document.querySelector(`input[name="decision"][value="${decision}"]`);
+        if (radioDecision) radioDecision.checked = true;
+
+        // Observaciones
+        const obs = document.getElementById('observaciones');
+        if (obs && datosPrevios.conclusion && datosPrevios.conclusion.observaciones)
+            obs.value = datosPrevios.conclusion.observaciones;
+
+        // Recalcular tabla después de que los inputs estén en el DOM
+        setTimeout(() => {
+            if (typeof recalcularTodasFilas === 'function') recalcularTodasFilas();
+            if (typeof dibujarGraficoHistoricoDebounced === 'function') dibujarGraficoHistoricoDebounced();
+        }, 300);
+    }
 
     // DATOS REALES DE EJEMPLO (en implementación final vendrán de la base de datos Django)
     const datosIniciales = puntosMedicionDjango.length > 0 ? puntosMedicionDjango : [
@@ -1335,6 +1420,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         inicializarTabla();
+        _preLlenarFormulario(); // Pre-llenar con datos previos si existen
         setupKeyboardNavigation(); // Activar navegación con flechas
         actualizarEncabezadosTabla(); // Actualizar unidades en tabla
         sincronizarDatosCertificado(); // Sincronizar certificado
