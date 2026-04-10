@@ -10,12 +10,13 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 **Language:** Spanish (Colombia)
 **Version:** 2.0.0
 
-## Current Status (Mar 23, 2026)
+## Current Status (Apr 09, 2026)
 
-- **Tests:** 1,806 passing, 1 skipped, 3 xfailed (+8 nuevos: test_chat.py)
+- **Tests:** 1,847 passing, 1 skipped, 3 xfailed (+37 nuevos: test_multi_magnitud.py)
 - **Coverage:** 70.00% ✓ (Goal alcanzado)
 - **Score:** 8.3/10 (auditado Mar-15-2026)
 - **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md`
+- **Multi-magnitud (2026-04-09):** Confirmaciones y comprobaciones soportan múltiples variables (tabs). Datos guardados en formato v2 `{magnitudes: [{nombre, unidad, puntos_medicion}]}`. Compatibilidad backward con v1 (`puntos_medicion` en raíz). PDF muestra tabla+gráfica por variable. Gráficas históricas (detalle equipo + hoja de vida) normalizadas por EMP (±1 = límite), una gráfica por variable.
 - **Bug CORREGIDO:** `eliminar_equipo.html` → usa `confirmar_eliminacion.html` (equipment.py:955)
 - **Decoradores confirmacion.py:** `@monitor_view` + `@trial_check` añadidos a todas las vistas; bug en `trial_check` con `empresa=None` corregido (base.py:185)
 - **SSE R2:** Cloudflare R2 encripta en reposo con AES-256 por defecto (sin configuración adicional). Comentario corregido en settings.py.
