@@ -369,69 +369,78 @@ class TestGraficasConfirmacionStrategic:
         """Test generación completa de gráfica de confirmaciones."""
         from core.views.equipment import _generar_grafica_hist_confirmaciones
 
-        # Datos completos de múltiples calibraciones
+        # Formato v2: lista de calibraciones con 'magnitudes'
         calibraciones = [
             {
                 'fecha': date.today(),
-                'puntos': [
+                'magnitudes': [{'nombre': 'Tensión', 'puntos': [
                     {'nominal': 100, 'error': 0.5, 'incertidumbre': 0.2, 'emp_absoluto': 1.0},
                     {'nominal': 200, 'error': 0.8, 'incertidumbre': 0.3, 'emp_absoluto': 1.5},
-                    {'nominal': 500, 'error': 1.2, 'incertidumbre': 0.5, 'emp_absoluto': 2.0}
-                ]
+                    {'nominal': 500, 'error': 1.2, 'incertidumbre': 0.5, 'emp_absoluto': 2.0},
+                ]}]
             },
             {
                 'fecha': date.today() - timedelta(days=180),
-                'puntos': [
+                'magnitudes': [{'nombre': 'Tensión', 'puntos': [
                     {'nominal': 100, 'error': 0.6, 'incertidumbre': 0.25, 'emp_absoluto': 1.0},
-                    {'nominal': 200, 'error': 0.9, 'incertidumbre': 0.35, 'emp_absoluto': 1.5}
-                ]
-            }
+                    {'nominal': 200, 'error': 0.9, 'incertidumbre': 0.35, 'emp_absoluto': 1.5},
+                ]}]
+            },
         ]
 
         result = _generar_grafica_hist_confirmaciones(calibraciones)
 
+        # Retorna dict {nombre_variable: svg_string}
         assert result is not None
-        assert '<svg' in result
-        assert 'width="700"' in result
-        assert 'height="400"' in result
+        assert isinstance(result, dict)
+        assert len(result) > 0
+        first_svg = list(result.values())[0]
+        assert '<svg' in first_svg
+        assert 'width="760"' in first_svg
 
     def test_generar_grafica_comprobaciones_flujo_completo(self):
         """Test generación completa de gráfica de comprobaciones."""
         from core.views.equipment import _generar_grafica_hist_comprobaciones
 
+        # Formato v2: lista de comprobaciones con 'magnitudes'
         comprobaciones = [
             {
                 'fecha': date.today(),
-                'puntos': [
+                'magnitudes': [{'nombre': '', 'puntos': [
                     {'nominal': 50, 'error': 0.3, 'emp_absoluto': 0.5},
                     {'nominal': 100, 'error': 0.5, 'emp_absoluto': 1.0},
-                    {'nominal': 200, 'error': 0.8, 'emp_absoluto': 1.5}
-                ]
-            }
+                    {'nominal': 200, 'error': 0.8, 'emp_absoluto': 1.5},
+                ]}]
+            },
         ]
 
         result = _generar_grafica_hist_comprobaciones(comprobaciones)
 
+        # Retorna dict {nombre_variable: svg_string}
         assert result is not None
-        assert '<svg' in result
+        assert isinstance(result, dict)
+        assert len(result) > 0
+        first_svg = list(result.values())[0]
+        assert '<svg' in first_svg
 
     def test_grafica_con_nominal_cero(self):
-        """Test gráfica maneja nominal=0 correctamente."""
+        """Test gráfica maneja nominal=0 correctamente (formato v2)."""
         from core.views.equipment import _generar_grafica_hist_confirmaciones
 
         calibraciones = [
             {
                 'fecha': date.today(),
-                'puntos': [
+                'magnitudes': [{'nombre': '', 'puntos': [
                     {'nominal': 0, 'error': 0.1, 'incertidumbre': 0.05, 'emp_absoluto': 0.2},
-                    {'nominal': 100, 'error': 0.5, 'incertidumbre': 0.2, 'emp_absoluto': 1.0}
-                ]
-            }
+                    {'nominal': 100, 'error': 0.5, 'incertidumbre': 0.2, 'emp_absoluto': 1.0},
+                ]}]
+            },
         ]
 
         result = _generar_grafica_hist_confirmaciones(calibraciones)
 
-        assert result is not None or result is None  # Puede manejar o rechazar nominal=0
+        # Puede retornar dict o None si todos los nominales son 0
+        assert result is None or isinstance(result, dict)
 
 
 @pytest.mark.django_db

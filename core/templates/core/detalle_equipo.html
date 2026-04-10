@@ -593,14 +593,21 @@
                         Confirmaciones Metrológicas
                     </h3>
                     {% if grafica_hist_confirmaciones %}
-                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 overflow-x-auto">
+                        {% for nombre_var, svg_var in grafica_hist_confirmaciones.items %}
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 overflow-x-auto {% if not forloop.last %}mb-4{% endif %}">
+                            {% if nombre_var %}
+                            <p class="text-sm font-semibold text-blue-700 mb-2">
+                                <i class="fas fa-chart-line mr-1"></i> Variable: {{ nombre_var }}
+                            </p>
+                            {% endif %}
                             <div class="min-w-full" style="min-width: 400px;">
-                                {{ grafica_hist_confirmaciones|safe }}
+                                {{ svg_var|safe }}
                             </div>
                         </div>
+                        {% endfor %}
                         <div class="mt-3 text-xs text-gray-600 bg-blue-50 p-2 rounded border-l-4 border-blue-500">
                             <i class="fas fa-info-circle mr-1"></i>
-                            <strong>Nota:</strong> Últimas 5 confirmaciones. Las barras (±) representan incertidumbre.
+                            <strong>Nota:</strong> Últimas 5 confirmaciones. Eje Y normalizado por EMP (±1 = en el límite). Barras = incertidumbre.
                         </div>
                     {% elif mensaje_confirmaciones %}
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
@@ -617,14 +624,19 @@
                         Comprobaciones Metrológicas
                     </h3>
                     {% if grafica_hist_comprobaciones %}
-                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 overflow-x-auto">
+                        {% for nombre_var, svg_var in grafica_hist_comprobaciones.items %}
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 overflow-x-auto {% if not forloop.last %}mb-4{% endif %}">
+                            {% if nombre_var %}
+                            <p class="text-sm font-semibold text-green-700 mb-2">Variable: {{ nombre_var }}</p>
+                            {% endif %}
                             <div class="min-w-full" style="min-width: 400px;">
-                                {{ grafica_hist_comprobaciones|safe }}
+                                {{ svg_var|safe }}
                             </div>
                         </div>
+                        {% endfor %}
                         <div class="mt-3 text-xs text-gray-600 bg-green-50 p-2 rounded border-l-4 border-green-500">
                             <i class="fas fa-info-circle mr-1"></i>
-                            <strong>Nota:</strong> Últimas 5 comprobaciones. Límites EMP del registro más reciente.
+                            <strong>Nota:</strong> Últimas 5 comprobaciones. Normalizado por EMP — ±1 = en el límite.
                         </div>
                     {% elif mensaje_comprobaciones %}
                         <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">

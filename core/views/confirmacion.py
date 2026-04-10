@@ -48,176 +48,106 @@ def safe_float(value, default=0.0):
 
 def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad_equipo):
     """
-    Genera una gráfica de confirmación metrológica usando matplotlib
-    ACTUALIZADO: Usa EMPs por punto si están disponibles en los datos
-
-    Returns:
-        str: Imagen en base64 para incluir en HTML
+    Genera gráfica de confirmación metrológica normalizada por EMP.
+    Y = error / EMP_absoluto  →  límites siempre en ±1, sin efecto embudo.
     """
     try:
-        # Filtrar puntos válidos: deben tener nominal y (error O lectura)
-        # Si tienen lectura pero no error, calcularemos el error
         puntos_validos = [p for p in puntos_medicion
                          if p.get('nominal') and (p.get('error') is not None or p.get('lectura') is not None)]
-
         if not puntos_validos:
             return None
 
-        # Extraer datos y calcular error si no existe
         nominales = [safe_float(p.get('nominal', 0), 0) for p in puntos_validos]
 
-        # Calcular errores: usar error si existe, sino calcular de lectura - nominal
+        # Calcular error por punto
         errores = []
         for p in puntos_validos:
             if p.get('error') is not None:
-                errores.append(safe_float(p.get('error', 0), 0))
-            elif p.get('lectura') is not None:
-                nominal = safe_float(p.get('nominal', 0), 0)
-                lectura = safe_float(p.get('lectura', 0), 0)
-                error = lectura - nominal
-                errores.append(error)
+                errores.append(safe_float(p['error'], 0))
             else:
-                errores.append(0)
+                errores.append(safe_float(p.get('lectura', 0), 0) - safe_float(p['nominal'], 0))
 
-        # Calcular medidos: medido = nominal + error
-        medidos = [n + e for n, e in zip(nominales, errores)]
         incertidumbres = [safe_float(p.get('incertidumbre', 0), 0) for p in puntos_validos]
 
-        # NUEVO: Verificar si hay EMPs por punto
-        tiene_emp_por_punto = all(p.get('emp_absoluto') is not None for p in puntos_validos)
+        # Calcular EMP absoluto por punto (unifica % y abs)
+        emps_abs = []
+        for i, p in enumerate(puntos_validos):
+            if p.get('emp_absoluto') is not None and safe_float(p['emp_absoluto'], 0) != 0:
+                emps_abs.append(safe_float(p['emp_absoluto'], 0))
+            else:
+                # Calcular desde emp_valor global
+                n = nominales[i]
+                if emp_unidad == '%':
+                    emps_abs.append(abs(n) * (emp_valor / 100) if n != 0 else emp_valor)
+                else:
+                    emps_abs.append(emp_valor if emp_valor != 0 else 1)
 
-        # Determinar si EMP es porcentaje (del primer punto o global)
-        if tiene_emp_por_punto and puntos_validos[0].get('emp_tipo'):
-            emp_es_porcentaje = (puntos_validos[0].get('emp_tipo') == '%')
-        else:
-            emp_es_porcentaje = (emp_unidad == '%')
+        # Normalizar: Y = error / EMP_abs  (±1 = en el límite)
+        y_norm = [e / ea if ea != 0 else 0 for e, ea in zip(errores, emps_abs)]
+        u_norm = [u / ea if ea != 0 else 0 for u, ea in zip(incertidumbres, emps_abs)]
 
-        # Crear figura — tamaño dinámico según cantidad de puntos
+        # Detectar si EMP varía entre puntos
+        emp_variable = max(emps_abs) / min(emps_abs) > 1.05 if min(emps_abs) > 0 else False
+
         n_puntos = len(puntos_validos)
         ancho_fig = max(12, n_puntos * 0.9)
         markersize = max(4, 9 - max(0, n_puntos - 8))
         fig, ax = plt.subplots(figsize=(ancho_fig, 6))
 
-        # Detectar si conviene escala log en X (rango > 100x)
-        nominales_positivos = [n for n in nominales if n > 0]
-        usar_log_x = (len(nominales_positivos) > 1 and
-                      max(nominales_positivos) / min(nominales_positivos) > 100)
-        if usar_log_x:
+        # Escala log en X si el rango nominal supera 100x
+        nominales_pos = [n for n in nominales if n > 0]
+        if len(nominales_pos) > 1 and max(nominales_pos) / min(nominales_pos) > 100:
             ax.set_xscale('log')
 
-        if emp_es_porcentaje:
-            # NORMALIZAR: Dividir medido / nominal para que quede cerca de 1
-            valores_normalizados = [m / n if n != 0 else 1 for m, n in zip(medidos, nominales)]
+        # Puntos con barras de incertidumbre normalizadas
+        ax.errorbar(nominales, y_norm, yerr=u_norm,
+                   fmt='o-', color='#3b82f6', linewidth=2, markersize=markersize,
+                   ecolor='#60a5fa', elinewidth=2, capsize=4, capthick=2,
+                   label='Error normalizado (Error/EMP) ± Incertidumbre')
 
-            # Normalizar incertidumbres también
-            incertidumbres_norm = [inc / n if n != 0 else 0 for inc, n in zip(incertidumbres, nominales)]
-
-            # Dibujar línea normalizada con barras de incertidumbre
-            ax.errorbar(nominales, valores_normalizados, yerr=incertidumbres_norm,
-                       fmt='o-', color='#3b82f6', linewidth=2, markersize=markersize,
-                       ecolor='#60a5fa', elinewidth=2, capsize=4, capthick=2,
-                       label='Valor Normalizado (Medido/Nominal) ± Incertidumbre')
-
-            # NUEVO: Dibujar líneas EMP escalonadas o globales
-            if tiene_emp_por_punto:
-                # EMPs por punto - líneas escalonadas
-                emps_normalizados_sup = []
-                emps_normalizados_inf = []
-
-                for i, p in enumerate(puntos_validos):
-                    emp_abs = safe_float(p.get('emp_absoluto', 0), 0)
-                    nominal = nominales[i]
-                    if nominal != 0:
-                        emp_norm = emp_abs / nominal
-                    else:
-                        emp_norm = 0
-                    emps_normalizados_sup.append(1 + emp_norm)
-                    emps_normalizados_inf.append(1 - emp_norm)
-
-                # Dibujar líneas escalonadas
-                ax.step(nominales, emps_normalizados_sup, where='mid', color='r',
-                       linestyle='--', linewidth=2, label='Límite Superior EMP (variable)')
-                ax.step(nominales, emps_normalizados_inf, where='mid', color='r',
-                       linestyle='--', linewidth=2, label='Límite Inferior EMP (variable)')
-            else:
-                # EMP global - líneas horizontales tradicionales
-                emp_decimal = emp_valor / 100
-                ax.axhline(y=1 + emp_decimal, color='r', linestyle='--', linewidth=2,
-                          label=f'Límite Superior +{emp_valor}%')
-                ax.axhline(y=1 - emp_decimal, color='r', linestyle='--', linewidth=2,
-                          label=f'Límite Inferior -{emp_valor}%')
-
-            # Línea de referencia en 1 (valor ideal normalizado)
-            ax.axhline(y=1, color='black', linestyle='-', linewidth=1, alpha=0.3)
-
-            # Etiquetas
-            ax.set_xlabel(f'Valor Nominal ({unidad_equipo})', fontsize=12, fontweight='bold')
-            ax.set_ylabel('Valor Normalizado (Medido/Nominal)', fontsize=12, fontweight='bold')
-            titulo = 'Gráfica de Comportamiento Histórico - Confirmación Metrológica (Normalizada)'
-            if tiene_emp_por_punto:
-                titulo += ' - EMPs Variables'
-            ax.set_title(titulo, fontsize=14, fontweight='bold', pad=20)
+        # Límites EMP: siempre ±1
+        if emp_variable:
+            # EMP diferente por punto → líneas escalonadas en ±1 con anotación del valor real
+            ax.step(nominales, [1.0] * n_puntos, where='mid',
+                   color='r', linestyle='--', linewidth=2, label='Límite EMP (variable)')
+            ax.step(nominales, [-1.0] * n_puntos, where='mid',
+                   color='r', linestyle='--', linewidth=2)
+            # Anotar el EMP real de cada punto
+            for i, (n, ea) in enumerate(zip(nominales, emps_abs)):
+                emp_tipo = puntos_validos[i].get('emp_tipo', emp_unidad)
+                label_emp = f'{ea:.3g} {emp_tipo}'
+                ax.annotate(label_emp, xy=(n, 1.0), xytext=(0, 6),
+                           textcoords='offset points', ha='center',
+                           fontsize=7, color='darkred')
         else:
-            # EMP en unidades absolutas - gráfica tradicional
-            ax.errorbar(nominales, errores, yerr=incertidumbres,
-                       fmt='o-', color='#3b82f6', linewidth=2, markersize=markersize,
-                       ecolor='#60a5fa', elinewidth=2, capsize=4, capthick=2,
-                       label='Error ± Incertidumbre')
+            ax.axhline(y=1.0, color='r', linestyle='--', linewidth=2, label='+EMP')
+            ax.axhline(y=-1.0, color='r', linestyle='--', linewidth=2, label='−EMP')
 
-            # NUEVO: Dibujar líneas EMP escalonadas o globales
-            if tiene_emp_por_punto:
-                # EMPs por punto - líneas escalonadas
-                emps_absolutos = [safe_float(p.get('emp_absoluto', 0), 0) for p in puntos_validos]
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.3)
 
-                # Dibujar líneas escalonadas
-                ax.step(nominales, emps_absolutos, where='mid', color='r',
-                       linestyle='--', linewidth=2, label='Límite EMP+ (variable)')
-                ax.step(nominales, [-e for e in emps_absolutos], where='mid', color='r',
-                       linestyle='--', linewidth=2, label='Límite EMP- (variable)')
-            else:
-                # EMP global - líneas horizontales tradicionales
-                ax.axhline(y=emp_valor, color='r', linestyle='--', linewidth=2,
-                          label=f'Límite EMP +{emp_valor} {emp_unidad}')
-                ax.axhline(y=-emp_valor, color='r', linestyle='--', linewidth=2,
-                          label=f'Límite EMP -{emp_valor} {emp_unidad}')
+        # Zona de conformidad sombreada
+        ax.axhspan(-1.0, 1.0, alpha=0.04, color='green')
 
-            # Línea de referencia en cero
-            ax.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.3)
+        ax.set_xlabel(f'Valor Nominal ({unidad_equipo})', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Error normalizado  (Error / EMP)', fontsize=12, fontweight='bold')
+        ax.set_title('Confirmación Metrológica — Error normalizado por EMP  (±1 = límite)',
+                    fontsize=13, fontweight='bold', pad=20)
 
-            # Etiquetas
-            ax.set_xlabel(f'Valor Nominal ({unidad_equipo})', fontsize=12, fontweight='bold')
-            ax.set_ylabel(f'Error ({unidad_equipo})', fontsize=12, fontweight='bold')
-            titulo = 'Gráfica de Comportamiento Histórico - Confirmación Metrológica'
-            if tiene_emp_por_punto:
-                titulo += ' - EMPs Variables'
-            ax.set_title(titulo, fontsize=14, fontweight='bold', pad=20)
-
-        # Leyenda - Colocarla fuera de la gráfica (debajo)
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
                  ncol=3, fontsize=9, framealpha=0.95, edgecolor='gray')
-
-        # Grid
         ax.grid(True, alpha=0.3, linestyle='--')
-
-        # Ajustar layout con espacio para la leyenda
         plt.tight_layout()
         plt.subplots_adjust(bottom=0.15)
 
-        # Guardar en buffer
         buffer = BytesIO()
         plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
         buffer.seek(0)
-
-        # Convertir a base64
         image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
         plt.close(fig)
-
         return f'data:image/png;base64,{image_base64}'
 
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error generando gráfica: {str(e)}")
+        logger.error(f"Error generando gráfica confirmacion: {str(e)}")
         return None
 
 
@@ -355,6 +285,46 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         except:
             formato_fecha_formateada = str(formato_fecha)
 
+    # Preparar magnitudes para el template de impresión (soporte v1 y v2)
+    def _emp_resumen(mag_dict):
+        """Genera un resumen legible del EMP basado en los valores reales de la tabla."""
+        puntos = mag_dict.get('puntos_medicion', [])
+        vistos = []
+        seen = set()
+        for p in puntos:
+            v = p.get('emp_valor', '')
+            t = p.get('emp_tipo', '%')
+            if v and v != 0:
+                label = f"{v} {t if t == '%' else 'Abs'}"
+                if label not in seen:
+                    seen.add(label)
+                    vistos.append(label)
+        if vistos:
+            return ' / '.join(vistos)
+        # Fallback: usar el emp del tab si no hay filas con EMP
+        emp_val = mag_dict.get('emp', '')
+        emp_uni = mag_dict.get('emp_unidad', '%')
+        return f"{emp_val} {emp_uni}" if emp_val else '—'
+
+    if datos_confirmacion and 'magnitudes' in datos_confirmacion:
+        magnitudes_template = datos_confirmacion['magnitudes']
+    elif datos_guardados and datos_guardados.get('magnitudes'):
+        magnitudes_template = datos_guardados['magnitudes']
+    else:
+        # v1: envolver puntos_medicion como única magnitud
+        magnitudes_template = [{
+            'nombre': '',
+            'unidad': (datos_confirmacion.get('unidad_equipo') if datos_confirmacion else None) or emp_info['unidad'],
+            'emp': (datos_confirmacion.get('emp') if datos_confirmacion else None) or emp_info['valor'],
+            'emp_unidad': (datos_confirmacion.get('emp_unidad') if datos_confirmacion else None) or emp_info['unidad'],
+            'puntos_medicion': puntos_medicion,
+            'resultado': None,
+        }]
+
+    # Agregar resumen de EMP real (desde las filas) a cada magnitud
+    for mag in magnitudes_template:
+        mag['emp_resumen'] = _emp_resumen(mag)
+
     # Preparar estructura datos_confirmacion para el template de impresión
     datos_confirmacion_template = {
         'formato': {
@@ -379,6 +349,7 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         'unidad_equipo': datos_confirmacion.get('unidad_equipo', emp_info['unidad']) if datos_confirmacion else emp_info['unidad'],
         'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U') if datos_confirmacion else 'guard_band_U',
         'puntos_medicion': puntos_medicion,
+        'magnitudes': magnitudes_template,
         'conclusion': datos_confirmacion.get('conclusion', {
             'decision': 'Pendiente',
             'observaciones': '',
@@ -876,17 +847,40 @@ def generar_pdf_confirmacion(request, equipo_id):
     # Preparar contexto (igual que confirmacion_metrologica pero con datos del POST)
     context = _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_confirmacion)
 
-    # ============ GENERAR GRÁFICA CON MATPLOTLIB ============
-    if datos_confirmacion and 'puntos_medicion' in datos_confirmacion:
+    # ============ GENERAR GRÁFICA(S) CON MATPLOTLIB ============
+    es_v2 = datos_confirmacion and 'magnitudes' in datos_confirmacion
+    if es_v2:
+        # v2: una gráfica por magnitud; la incrustamos en cada magnitud del template
+        mags_template = context['datos_confirmacion'].get('magnitudes', [])
+        graficas = []
+        for i, mag in enumerate(datos_confirmacion['magnitudes']):
+            puntos_mag = mag.get('puntos_medicion', [])
+            emp_valor_mag = safe_float(mag.get('emp', 0), 0)
+            emp_unidad_mag = mag.get('emp_unidad', '%')
+            unidad_mag = mag.get('unidad', datos_confirmacion.get('unidad_equipo', ''))
+            g = _generar_grafica_confirmacion(puntos_mag, emp_valor_mag, emp_unidad_mag, unidad_mag)
+            graficas.append(g)
+            # Embeber gráfica en la magnitud del template para acceso fácil
+            if i < len(mags_template):
+                mags_template[i]['grafica'] = g
+        context['graficas'] = graficas
+        context['grafica_imagen'] = graficas[0] if graficas else None  # compatibilidad v1
+    elif datos_confirmacion and 'puntos_medicion' in datos_confirmacion:
+        # v1: una sola gráfica
         puntos = datos_confirmacion['puntos_medicion']
         emp_valor = safe_float(datos_confirmacion.get('emp') or context['datos_confirmacion']['emp'], 0)
         emp_unidad = datos_confirmacion.get('emp_unidad', context['datos_confirmacion']['emp_unidad'])
         unidad_equipo = datos_confirmacion.get('unidad_equipo', context['datos_confirmacion']['unidad_equipo'])
-
         grafica_base64 = _generar_grafica_confirmacion(puntos, emp_valor, emp_unidad, unidad_equipo)
         context['grafica_imagen'] = grafica_base64
+        context['graficas'] = [grafica_base64]
+        # Embeber en la única magnitud del template
+        mags_template = context['datos_confirmacion'].get('magnitudes', [])
+        if mags_template:
+            mags_template[0]['grafica'] = grafica_base64
     else:
         context['grafica_imagen'] = None
+        context['graficas'] = []
 
     # Renderizar HTML
     html_string = render_to_string('core/confirmacion_metrologica_print.html', context)
@@ -901,31 +895,19 @@ def generar_pdf_confirmacion(request, equipo_id):
         pdf_file = html_pdf.write_pdf(font_config=font_config)
 
         # ============ GUARDAR DATOS JSON PARA CÁLCULO DE DERIVA ============
-        # Guardamos los datos de confirmación para usarlos en intervalos de calibración
-        if datos_confirmacion and 'puntos_medicion' in datos_confirmacion:
-            # Calcular desviación máxima absoluta (para deriva)
-            puntos = datos_confirmacion['puntos_medicion']
+        def _procesar_puntos(puntos):
+            """Normaliza y procesa una lista de puntos de medición."""
             desviacion_maxima = 0
             puntos_procesados = []
-
             for punto in puntos:
-                # Calcular desviación del punto (con signo para análisis de deriva)
                 nominal = safe_float(punto.get('nominal', 0), 0)
                 error = safe_float(punto.get('error', 0), 0)
-                desviacion_abs = error  # conserva el signo para análisis de drift
-
+                desviacion_abs = error
                 if abs(desviacion_abs) > desviacion_maxima:
                     desviacion_maxima = abs(desviacion_abs)
-
-                # NUEVO: Incluir datos de EMP por punto
-                emp_valor_punto = punto.get('emp_valor')
-                emp_tipo_punto = punto.get('emp_tipo')
-                emp_absoluto_punto = punto.get('emp_absoluto')
-
-                # Guardar punto procesado con todos los datos
                 lectura_punto = safe_float(punto.get('lectura', 0), 0)
                 factor_correccion = (nominal / lectura_punto) if lectura_punto != 0 else 0
-                punto_procesado = {
+                p = {
                     'nominal': nominal,
                     'lectura': lectura_punto,
                     'incertidumbre': safe_float(punto.get('incertidumbre', 0), 0),
@@ -934,39 +916,75 @@ def generar_pdf_confirmacion(request, equipo_id):
                     'error_mas_u': safe_float(punto.get('error_mas_u', 0), 0),
                     'error_menos_u': safe_float(punto.get('error_menos_u', 0), 0),
                     'conformidad': punto.get('conformidad', 'Pendiente'),
-                    'desviacion_abs': desviacion_abs
+                    'desviacion_abs': desviacion_abs,
                 }
+                if punto.get('emp_valor') is not None:
+                    p['emp_valor'] = safe_float(punto['emp_valor'], 0)
+                if punto.get('emp_tipo') is not None:
+                    p['emp_tipo'] = punto['emp_tipo']
+                if punto.get('emp_absoluto') is not None:
+                    p['emp_absoluto'] = safe_float(punto['emp_absoluto'], 0)
+                puntos_procesados.append(p)
+            return puntos_procesados, desviacion_maxima
 
-                # Agregar EMPs solo si existen
-                if emp_valor_punto is not None:
-                    punto_procesado['emp_valor'] = safe_float(emp_valor_punto, 0)
-                if emp_tipo_punto is not None:
-                    punto_procesado['emp_tipo'] = emp_tipo_punto
-                if emp_absoluto_punto is not None:
-                    punto_procesado['emp_absoluto'] = safe_float(emp_absoluto_punto, 0)
+        campos_comunes = {
+            'fecha_confirmacion': datetime.now().strftime('%Y-%m-%d'),
+            'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U'),
+            'decision': datos_confirmacion.get('conclusion', {}).get('decision', 'Pendiente'),
+            'responsable': datos_confirmacion.get('conclusion', {}).get('responsable', request.user.get_full_name() or request.user.username),
+            'laboratorio': datos_confirmacion.get('laboratorio', ''),
+            'fecha_certificado': datos_confirmacion.get('fecha_certificado', ''),
+            'numero_certificado': datos_confirmacion.get('numero_certificado', ''),
+            'conclusion': datos_confirmacion.get('conclusion', {
+                'decision': 'Pendiente',
+                'observaciones': '',
+                'responsable': request.user.get_full_name() or request.user.username
+            }),
+        }
 
-                puntos_procesados.append(punto_procesado)
-
-            # Guardar en campo JSON
+        if datos_confirmacion and 'magnitudes' in datos_confirmacion:
+            # ── Formato v2: múltiples magnitudes ──
+            magnitudes_procesadas = []
+            desviacion_maxima_global = 0
+            for mag in datos_confirmacion['magnitudes']:
+                puntos_mag, desv_mag = _procesar_puntos(mag.get('puntos_medicion', []))
+                if desv_mag > desviacion_maxima_global:
+                    desviacion_maxima_global = desv_mag
+                magnitudes_procesadas.append({
+                    'nombre': mag.get('nombre', ''),
+                    'unidad': mag.get('unidad', ''),
+                    'emp': safe_float(mag.get('emp', 0), 0),
+                    'emp_unidad': mag.get('emp_unidad', '%'),
+                    'puntos_medicion': puntos_mag,
+                    'resultado': 'APTO' if all(
+                        p.get('conformidad', '') in ('Cumple', 'CUMPLE') for p in puntos_mag
+                    ) else 'NO APTO',
+                })
+            # Primera magnitud como referencia legacy (usada por intervalos de calibración)
+            primera = magnitudes_procesadas[0] if magnitudes_procesadas else {}
             ultima_calibracion.confirmacion_metrologica_datos = {
-                'fecha_confirmacion': datetime.now().strftime('%Y-%m-%d'),
+                **campos_comunes,
+                'version': 2,
+                'magnitudes': magnitudes_procesadas,
+                'desviacion_maxima': desviacion_maxima_global,
+                # Campos legacy (primera magnitud) para compatibilidad con intervalos de calibración
+                'puntos_medicion': primera.get('puntos_medicion', []),
+                'emp_valor': primera.get('emp', 0),
+                'emp': primera.get('emp', 0),
+                'emp_unidad': primera.get('emp_unidad', '%'),
+                'unidad_equipo': primera.get('unidad', datos_confirmacion.get('unidad_equipo', '')),
+            }
+        elif datos_confirmacion and 'puntos_medicion' in datos_confirmacion:
+            # ── Formato v1: magnitud única ──
+            puntos_procesados, desviacion_maxima = _procesar_puntos(datos_confirmacion['puntos_medicion'])
+            ultima_calibracion.confirmacion_metrologica_datos = {
+                **campos_comunes,
                 'puntos_medicion': puntos_procesados,
                 'desviacion_maxima': desviacion_maxima,
                 'emp_valor': safe_float(datos_confirmacion.get('emp', 0), 0),
                 'emp': safe_float(datos_confirmacion.get('emp', 0), 0),
                 'emp_unidad': datos_confirmacion.get('emp_unidad', '%'),
                 'unidad_equipo': datos_confirmacion.get('unidad_equipo', ''),
-                'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U'),
-                'decision': datos_confirmacion.get('conclusion', {}).get('decision', 'Pendiente'),
-                'responsable': datos_confirmacion.get('conclusion', {}).get('responsable', request.user.get_full_name() or request.user.username),
-                'laboratorio': datos_confirmacion.get('laboratorio', ''),
-                'fecha_certificado': datos_confirmacion.get('fecha_certificado', ''),
-                'numero_certificado': datos_confirmacion.get('numero_certificado', ''),
-                'conclusion': datos_confirmacion.get('conclusion', {
-                    'decision': 'Pendiente',
-                    'observaciones': '',
-                    'responsable': request.user.get_full_name() or request.user.username
-                }),
             }
 
         # GUARDAR EN BD - Campo confirmacion_metrologica_pdf de Calibracion

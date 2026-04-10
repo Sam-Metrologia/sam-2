@@ -359,11 +359,31 @@
         <div class="info-grid">
             <div class="info-item">
                 <strong>ERROR MÁXIMO PERMISIBLE (EMP)</strong>
-                <div class="info-value">{{ datos_confirmacion.emp_texto|default:datos_confirmacion.emp }}</div>
+                {% if datos_confirmacion.magnitudes|length > 1 %}
+                    {% for mag in datos_confirmacion.magnitudes %}
+                    <div class="info-value" style="font-size: 8pt;">
+                        <strong>{{ forloop.counter }}. {% if mag.nombre %}{{ mag.nombre }}{% else %}Variable {{ forloop.counter }}{% endif %}:</strong>
+                        {{ mag.emp_resumen }}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    {% with mag=datos_confirmacion.magnitudes.0 %}
+                        <div class="info-value">{{ mag.emp_resumen|default:datos_confirmacion.emp_texto|default:datos_confirmacion.emp }}</div>
+                    {% endwith %}
+                {% endif %}
             </div>
             <div class="info-item">
                 <strong>UNIDAD DE MEDIDA</strong>
-                <div class="info-value">{{ datos_confirmacion.unidad_equipo }}</div>
+                {% if datos_confirmacion.magnitudes|length > 1 %}
+                    {% for mag in datos_confirmacion.magnitudes %}
+                    <div class="info-value" style="font-size: 8pt;">
+                        <strong>{{ forloop.counter }}. {% if mag.nombre %}{{ mag.nombre }}{% else %}Variable {{ forloop.counter }}{% endif %}:</strong>
+                        {{ mag.unidad }}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="info-value">{{ datos_confirmacion.unidad_equipo }}</div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -491,25 +511,35 @@
             {% endif %}
         </div>
 
+        {% for mag in datos_confirmacion.magnitudes %}
+        {% if datos_confirmacion.magnitudes|length > 1 %}
+        <h3 style="margin: 14px 0 6px; font-size: 9.5pt; color: #1a5490; border-bottom: 1px solid #1a5490; padding-bottom: 3px;">
+            Variable {{ forloop.counter }}: {{ mag.nombre|default:"Sin nombre" }}
+            {% if mag.resultado %}
+            — <span style="color: {% if mag.resultado == 'APTO' %}#065f46{% else %}#991b1b{% endif %}; font-weight: bold;">{{ mag.resultado }}</span>
+            {% endif %}
+        </h3>
+        {% endif %}
+
         <table class="medicion-table">
             <thead>
                 <tr>
                     <th style="width: 3%;">#</th>
-                    <th style="width: 9%;">Nominal<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 9%;">Lectura<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 8%;">Incert. (U)<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Nominal<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%;">Lectura<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%;">Incert. (U)<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
                     <th style="width: 7%; background-color: #fff3cd;">EMP<br>Valor</th>
                     <th style="width: 6%; background-color: #fff3cd;">EMP<br>Tipo</th>
-                    <th style="width: 9%; background-color: #ffc107;">EMP Abs<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 8%;">Error<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 9%; background-color: #ffc107;">EMP Abs<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%;">Error<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
                     <th style="width: 10%; background-color: #e0e7ff;">FC<br>(adimensional)</th>
-                    <th style="width: 8%;">Error + U<br>({{ datos_confirmacion.unidad_equipo }})</th>
-                    <th style="width: 8%;">Error - U<br>({{ datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%;">Error + U<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
+                    <th style="width: 8%;">Error - U<br>({{ mag.unidad|default:datos_confirmacion.unidad_equipo }})</th>
                     <th style="width: 9%;">Conformidad</th>
                 </tr>
             </thead>
             <tbody>
-                {% for punto in datos_confirmacion.puntos_medicion %}
+                {% for punto in mag.puntos_medicion %}
                 {% if punto.nominal %}
                 <tr>
                     <td>{{ forloop.counter }}</td>
@@ -531,20 +561,18 @@
                 {% endfor %}
             </tbody>
         </table>
-    </div>
 
-    <!-- ==================== SECCIÓN 3.1: GRÁFICA DE COMPORTAMIENTO ==================== -->
-    {% if grafica_imagen %}
-    <div class="section" style="page-break-before: auto;">
-        <h2 class="section-title">3.1. GRÁFICA DE COMPORTAMIENTO METROLÓGICO</h2>
-        <div style="text-align: center; margin: 15px 0; padding: 10px; background: white; border: 2px solid #1a5490; border-radius: 4px;">
-            <img src="{{ grafica_imagen }}" alt="Gráfica de Comportamiento Histórico" style="max-width: 100%; height: auto;">
+        {% if mag.grafica %}
+        <div style="text-align: center; margin: 10px 0 16px; padding: 8px; background: white; border: 1.5px solid #1a5490; border-radius: 4px; page-break-inside: avoid;">
+            <p style="font-size: 8pt; font-weight: bold; color: #1a5490; margin-bottom: 4px;">
+                Gráfica de Comportamiento{% if mag.nombre %} — {{ mag.nombre }}{% endif %}
+            </p>
+            <img src="{{ mag.grafica }}" alt="Gráfica {{ mag.nombre }}" style="max-width: 100%; height: auto;">
         </div>
-        <p style="text-align: center; font-size: 8pt; color: #6c757d; font-style: italic;">
-            Gráfica generada automáticamente mostrando errores de medición con barras de incertidumbre (±U) y límites EMP
-        </p>
+        {% endif %}
+
+        {% endfor %}
     </div>
-    {% endif %}
 
     <!-- ==================== SECCIÓN 4: CONCLUSIÓN Y DECISIÓN ==================== -->
     <div class="section">

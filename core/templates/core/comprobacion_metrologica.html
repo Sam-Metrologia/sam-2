@@ -238,10 +238,8 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Comprobación</label>
                 <input type="date" id="fecha-comprobacion" value="{% now 'Y-m-d' %}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Unidad del Equipo</label>
-                <input type="text" id="unidad-equipo" value="{{ unidad_equipo }}" placeholder="mm, µm, psi, °C, etc." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" onchange="actualizarEncabezadosTabla()">
-            </div>
+            <!-- Campo oculto: unidad (manejada por variable en la tabla) -->
+            <input type="hidden" id="unidad-equipo" value="{{ unidad_equipo }}">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
                 <input type="text" id="responsable" value="{{ user.get_full_name|default:user.username }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white">
@@ -305,6 +303,37 @@
             <i class="fas fa-clipboard-check text-blue-600 mr-3"></i>
             3. PUNTOS DE MEDICIÓN Y CONFORMIDAD
         </h2>
+
+        <!-- ══ PESTAÑAS DE VARIABLES ══ -->
+        <div class="mb-4 no-print" id="magnitudes-container">
+            <div class="flex items-center gap-2 border-b-2 border-green-200 pb-0">
+                <div id="magnitudes-tabs" class="flex gap-1 flex-wrap items-end"></div>
+                <button onclick="agregarMagnitud()" title="Agregar variable de medición"
+                        class="mb-0 px-3 py-1.5 bg-green-600 text-white rounded-t text-xs font-bold hover:bg-green-700 transition ml-1">
+                    <i class="fas fa-plus mr-1"></i>Variable
+                </button>
+            </div>
+            <!-- Campos del tab activo -->
+            <div class="grid grid-cols-3 gap-3 mt-0 p-3 bg-green-50 border border-green-200 border-t-0 rounded-b-lg">
+                <div>
+                    <label class="block text-xs font-semibold text-green-800 mb-1">Nombre de la variable</label>
+                    <input id="mag-nombre" type="text" placeholder="Ej: Temperatura, Corriente..."
+                           class="w-full px-2 py-1.5 border border-green-300 rounded text-sm focus:ring-2 focus:ring-green-500"
+                           onchange="guardarCamposMagActual()">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-green-800 mb-1">Unidad de medida</label>
+                    <input id="mag-unidad" type="text" placeholder="°C, A, V, lx..."
+                           class="w-full px-2 py-1.5 border border-green-300 rounded text-sm focus:ring-2 focus:ring-green-500"
+                           onchange="guardarCamposMagActual(); sincronizarUnidadTabla()">
+                </div>
+                <div class="flex items-end">
+                    <div id="mag-resultado-badge" class="w-full px-3 py-1.5 rounded text-sm font-bold text-center bg-gray-100 text-gray-500">
+                        — Sin datos —
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="overflow-x-auto">
             <table class="tabla-comprobacion" id="tabla-medicion">
@@ -574,8 +603,9 @@ function actualizarResumen() {
     document.getElementById('puntos-no-conformes').textContent = noConformes;
     document.getElementById('total-puntos').textContent = filas.length;
 
-    // Actualizar gráfica
+    // Actualizar gráfica y badge del tab activo
     dibujarGrafico();
+    if (typeof actualizarResultadoBadge === 'function') actualizarResultadoBadge();
 }
 
 // ========== GRÁFICA ==========
@@ -599,47 +629,37 @@ function dibujarGrafico() {
         return;
     }
 
-    // Extraer datos de las filas
-    const datos = filas.map((fila, index) => {
+    // Extraer datos de las filas y normalizar por EMP (Y = error/EMP_abs)
+    const datosRaw = filas.map((fila, index) => {
         const nominal = parseFloat(fila.querySelector('.nominal').value) || 0;
         const lectura = parseFloat(fila.querySelector('.lectura').value) || 0;
         const empAbsoluto = parseFloat(fila.children[5].textContent) || 0;
         const error = parseFloat(fila.children[6].textContent) || 0;
         const conformidad = fila.querySelector('.conformidad').textContent;
-
-        return {
-            index: index + 1,
-            nominal,
-            lectura,
-            empAbsoluto,
-            error,
-            conforme: conformidad === 'CONFORME'
-        };
+        return { index: index + 1, nominal, lectura, empAbsoluto, error, conforme: conformidad === 'CONFORME' };
     }).filter(d => d.nominal !== 0 || d.lectura !== 0);
 
-    if (datos.length === 0) {
-        ctx.fillStyle = '#999';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
+    if (datosRaw.length === 0) {
+        ctx.fillStyle = '#999'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
         ctx.fillText('Ingrese valores para ver la gráfica', canvas.width / 2, canvas.height / 2);
         return;
     }
 
+    // Normalizar: yNorm = error / empAbsoluto  (±1 = en el límite EMP)
+    const datos = datosRaw.map(d => ({
+        ...d,
+        yNorm: d.empAbsoluto !== 0 ? d.error / d.empAbsoluto : 0
+    }));
+
     // Configuración del canvas
-    const margen = {top: 40, right: 80, bottom: 60, left: 80};
+    const margen = {top: 50, right: 80, bottom: 60, left: 80};
     const ancho = canvas.width - margen.left - margen.right;
     const alto = canvas.height - margen.top - margen.bottom;
 
-    // Calcular rango de datos
-    const errores = datos.map(d => d.error);
-    const emps = datos.map(d => d.empAbsoluto);
-    const maxError = Math.max(...errores, ...emps);
-    const minError = Math.min(...errores, ...emps.map(e => -e));
-    const rangoError = maxError - minError;
-    const padding = rangoError * 0.15;
-
-    const yMax = maxError + padding;
-    const yMin = minError - padding;
+    // Rango Y: siempre incluye ±1 (límite EMP) con un poco de margen
+    const yVals = datos.map(d => d.yNorm);
+    const yMax = Math.max(...yVals, 1.0) + 0.15;
+    const yMin = Math.min(...yVals, -1.0) - 0.15;
 
     // Funciones de escala
     const escalaY = (valor) => {
@@ -647,142 +667,93 @@ function dibujarGrafico() {
     };
 
     const escalaX = (index, total) => {
-        return margen.left + ((index - 1) / (total - 1)) * ancho;
+        return margen.left + ((index - 1) / Math.max(total - 1, 1)) * ancho;
     };
 
-    // Dibujar título
-    ctx.fillStyle = '#333';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Errores de Medición vs Límites EMP', canvas.width / 2, 20);
+    // Título
+    ctx.fillStyle = '#333'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('Errores normalizados por EMP  (±1 = límite)', canvas.width / 2, 20);
+    ctx.font = '10px Arial'; ctx.fillStyle = '#666';
+    ctx.fillText('Verde = dentro del EMP', canvas.width / 2, 36);
 
-    // Dibujar ejes
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 2;
+    // Zona verde (dentro del EMP)
+    ctx.fillStyle = 'rgba(16,185,129,0.08)';
+    ctx.fillRect(margen.left, escalaY(1.0), ancho, escalaY(-1.0) - escalaY(1.0));
+
+    // Ejes
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(margen.left, margen.top);
     ctx.lineTo(margen.left, margen.top + alto);
     ctx.lineTo(margen.left + ancho, margen.top + alto);
     ctx.stroke();
 
-    // Dibujar línea de cero
-    const y0 = escalaY(0);
-    ctx.strokeStyle = '#999';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    ctx.moveTo(margen.left, y0);
-    ctx.lineTo(margen.left + ancho, y0);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Dibujar límites EMP (líneas rojas discontinuas escalonadas)
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-
-    // Límite superior (+EMP)
-    ctx.beginPath();
-    for (let i = 0; i < datos.length; i++) {
-        const x = escalaX(datos[i].index, datos.length);
-        const y = escalaY(datos[i].empAbsoluto);
-
-        if (i === 0) {
-            ctx.moveTo(margen.left, y);
-            ctx.lineTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-
-        if (i < datos.length - 1) {
-            const xNext = escalaX(datos[i + 1].index, datos.length);
-            ctx.lineTo(xNext, y);
-        }
-    }
-    ctx.lineTo(margen.left + ancho, escalaY(datos[datos.length - 1].empAbsoluto));
-    ctx.stroke();
-
-    // Límite inferior (-EMP)
-    ctx.beginPath();
-    for (let i = 0; i < datos.length; i++) {
-        const x = escalaX(datos[i].index, datos.length);
-        const y = escalaY(-datos[i].empAbsoluto);
-
-        if (i === 0) {
-            ctx.moveTo(margen.left, y);
-            ctx.lineTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-
-        if (i < datos.length - 1) {
-            const xNext = escalaX(datos[i + 1].index, datos.length);
-            ctx.lineTo(xNext, y);
-        }
-    }
-    ctx.lineTo(margen.left + ancho, escalaY(-datos[datos.length - 1].empAbsoluto));
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Dibujar puntos de error
-    datos.forEach((d, i) => {
-        const x = escalaX(d.index, datos.length);
-        const y = escalaY(d.error);
-
-        // Punto
-        ctx.fillStyle = d.conforme ? '#3b82f6' : '#ef4444';
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Borde blanco
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    });
-
-    // Etiquetas eje X
-    ctx.fillStyle = '#666';
-    ctx.font = '11px Arial';
-    ctx.textAlign = 'center';
-    datos.forEach((d, i) => {
-        if (i % Math.ceil(datos.length / 10) === 0 || i === datos.length - 1) {
-            const x = escalaX(d.index, datos.length);
-            ctx.fillText(`P${d.index}`, x, margen.top + alto + 20);
-        }
-    });
-
-    // Etiqueta eje X
-    ctx.font = 'bold 12px Arial';
-    ctx.fillText('Punto de Medición', canvas.width / 2, canvas.height - 15);
-
-    // Etiquetas eje Y
-    ctx.textAlign = 'right';
-    ctx.font = '10px Arial';
+    // Cuadrícula y ticks Y
+    ctx.font = '10px Arial'; ctx.textAlign = 'right';
     const numTicks = 6;
     for (let i = 0; i <= numTicks; i++) {
-        const valor = yMin + (yMax - yMin) * (i / numTicks);
-        const y = escalaY(valor);
-        ctx.fillText(valor.toFixed(3), margen.left - 10, y + 3);
+        const val = yMin + (yMax - yMin) * (i / numTicks);
+        const y = escalaY(val);
+        ctx.strokeStyle = '#e5e5e5'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(margen.left, y); ctx.lineTo(margen.left + ancho, y); ctx.stroke();
+        ctx.fillStyle = '#666';
+        ctx.fillText(val.toFixed(2), margen.left - 6, y + 3);
+    }
 
-        // Línea de cuadrícula
-        ctx.strokeStyle = '#e5e5e5';
-        ctx.lineWidth = 1;
+    // Línea cero
+    const y0 = escalaY(0);
+    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(margen.left, y0); ctx.lineTo(margen.left + ancho, y0); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Límites ±1 (EMP)
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+    [1.0, -1.0].forEach(lim => {
+        const yLim = escalaY(lim);
+        ctx.beginPath(); ctx.moveTo(margen.left, yLim); ctx.lineTo(margen.left + ancho, yLim); ctx.stroke();
+        ctx.fillStyle = '#ef4444'; ctx.font = '10px Arial'; ctx.textAlign = 'left';
+        ctx.fillText(lim > 0 ? '+EMP' : '−EMP', margen.left + ancho + 4, yLim + 4);
+    });
+    ctx.setLineDash([]);
+
+    // Puntos normalizados
+    ctx.textAlign = 'center';
+    datos.forEach((d, i) => {
+        const x = escalaX(d.index, datos.length);
+        const y = escalaY(d.yNorm);
+        ctx.fillStyle = d.conforme ? '#3b82f6' : '#ef4444';
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    });
+
+    // Línea conectando puntos
+    if (datos.length > 1) {
+        ctx.strokeStyle = 'rgba(59,130,246,0.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(margen.left, y);
-        ctx.lineTo(margen.left + ancho, y);
+        datos.forEach((d, i) => {
+            const x = escalaX(d.index, datos.length);
+            const y = escalaY(d.yNorm);
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
         ctx.stroke();
     }
+
+    // Etiquetas eje X
+    ctx.fillStyle = '#666'; ctx.font = '11px Arial'; ctx.textAlign = 'center';
+    datos.forEach((d, i) => {
+        if (i % Math.ceil(datos.length / 10) === 0 || i === datos.length - 1) {
+            ctx.fillText(`P${d.index}`, escalaX(d.index, datos.length), margen.top + alto + 18);
+        }
+    });
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText('Punto de Medición', canvas.width / 2, canvas.height - 8);
 
     // Etiqueta eje Y
     ctx.save();
     ctx.translate(15, canvas.height / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#333';
-    const unidad = document.getElementById('unidad-equipo').value || 'mm';
-    ctx.fillText(`Error (${unidad})`, 0, 0);
+    ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = '#333';
+    ctx.fillText('Error / EMP', 0, 0);
     ctx.restore();
 
     // Leyenda
@@ -868,37 +839,213 @@ function cargarDatosCalibracion() {
     alert(`${puntosImportados} puntos importados exitosamente.\n\nComplete las LECTURAS de cada punto para la comprobación.`);
 }
 
+// ══════════════════════════════════════════════════════════════
+// MANEJO DE VARIABLES (TABS / MAGNITUDES)
+// ══════════════════════════════════════════════════════════════
+
+let magnitudesData = [];
+let magActiva = 0;
+
+/** Lee las filas actuales del tbody y devuelve array de puntos */
+function obtenerPuntosActuales() {
+    const tbody = document.getElementById('tbody-medicion');
+    return Array.from(tbody.children).map(fila => ({
+        nominal: parseFloat(fila.querySelector('.nominal').value) || 0,
+        lectura: parseFloat(fila.querySelector('.lectura').value) || 0,
+        emp_valor: parseFloat(fila.querySelector('.emp-valor').value) || 0,
+        emp_tipo: fila.querySelector('.emp-tipo').value,
+        emp_absoluto: parseFloat(fila.children[5].textContent) || 0,
+        error: parseFloat(fila.children[6].textContent) || 0,
+        limite_superior: parseFloat(fila.children[7].textContent) || 0,
+        limite_inferior: parseFloat(fila.children[8].textContent) || 0,
+        conformidad: fila.children[9].textContent.trim()
+    }));
+}
+
+/** Guarda el estado actual de la tabla + campos en magnitudesData[magActiva] */
+function guardarTabActual() {
+    if (!magnitudesData[magActiva]) return;
+    magnitudesData[magActiva].puntos = obtenerPuntosActuales();
+    magnitudesData[magActiva].nombre = document.getElementById('mag-nombre').value;
+    magnitudesData[magActiva].unidad = document.getElementById('mag-unidad').value;
+}
+
+/** Solo guarda los campos (sin puntos), útil en onchange */
+function guardarCamposMagActual() {
+    if (!magnitudesData[magActiva]) return;
+    magnitudesData[magActiva].nombre = document.getElementById('mag-nombre').value;
+    magnitudesData[magActiva].unidad = document.getElementById('mag-unidad').value;
+    renderizarTabs();
+}
+
+/** Sincroniza la unidad del tab activo con los encabezados de la tabla */
+function sincronizarUnidadTabla() {
+    const unidad = document.getElementById('mag-unidad').value || '';
+    ['th-nominal','th-lectura','th-emp-abs','th-error','th-lim-sup','th-lim-inf'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = `(${unidad})`;
+    });
+}
+
+/** Actualiza el badge de resultado del tab activo */
+function actualizarResultadoBadge() {
+    const badge = document.getElementById('mag-resultado-badge');
+    if (!badge) return;
+    const puntos = obtenerPuntosActuales();
+    if (puntos.length === 0) {
+        badge.className = 'w-full px-3 py-1.5 rounded text-sm font-bold text-center bg-gray-100 text-gray-500';
+        badge.textContent = '— Sin datos —';
+        return;
+    }
+    const cumple = puntos.every(p => p.conformidad === 'Cumple' || p.conformidad === 'CUMPLE');
+    const noCumple = puntos.some(p => p.conformidad === 'No Cumple' || p.conformidad === 'NO CUMPLE');
+    if (cumple) {
+        badge.className = 'w-full px-3 py-1.5 rounded text-sm font-bold text-center bg-green-100 text-green-800';
+        badge.textContent = '✓ CONFORME';
+    } else if (noCumple) {
+        badge.className = 'w-full px-3 py-1.5 rounded text-sm font-bold text-center bg-red-100 text-red-800';
+        badge.textContent = '✗ NO CONFORME';
+    } else {
+        badge.className = 'w-full px-3 py-1.5 rounded text-sm font-bold text-center bg-yellow-100 text-yellow-800';
+        badge.textContent = '⚠ REVISAR';
+    }
+}
+
+/** Carga en el DOM los datos del tab idx */
+function cargarTab(idx) {
+    magActiva = idx;
+    const mag = magnitudesData[idx];
+
+    document.getElementById('mag-nombre').value = mag.nombre || '';
+    document.getElementById('mag-unidad').value = mag.unidad || '';
+    sincronizarUnidadTabla();
+
+    // Limpiar tabla y cargar puntos
+    const tbody = document.getElementById('tbody-medicion');
+    tbody.innerHTML = '';
+    (mag.puntos || []).forEach(p => {
+        agregarFila();
+        const fila = tbody.lastElementChild;
+        fila.querySelector('.nominal').value = p.nominal || 0;
+        // Cargar lectura si existe (sino 0)
+        const lecturaInput = fila.querySelector('.lectura');
+        if (lecturaInput) lecturaInput.value = p.lectura || 0;
+        if (p.emp_valor !== undefined) {
+            fila.querySelector('.emp-valor').value = p.emp_valor;
+            fila.querySelector('.emp-tipo').value = p.emp_tipo || 'abs';
+        } else {
+            fila.querySelector('.emp-valor').value = p.emp || p.emp_absoluto || 0;
+            fila.querySelector('.emp-tipo').value = 'abs';
+        }
+        calcularFila(fila.querySelector('.nominal'));
+    });
+    if (tbody.children.length === 0) {
+        for (let i = 0; i < 5; i++) agregarFila();
+    }
+
+    actualizarResultadoBadge();
+    renderizarTabs();
+}
+
+/** Renderiza los botones de tabs */
+function renderizarTabs() {
+    const container = document.getElementById('magnitudes-tabs');
+    container.innerHTML = '';
+    magnitudesData.forEach((m, i) => {
+        const label = m.nombre || `Variable ${i + 1}`;
+        const activa = (i === magActiva);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `px-3 py-1.5 text-xs font-semibold rounded-t border-t border-l border-r transition ${
+            activa
+            ? 'bg-white border-green-400 text-green-700 -mb-px z-10'
+            : 'bg-green-100 border-green-200 text-green-500 hover:bg-green-200'
+        }`;
+        btn.innerHTML = label;
+        if (magnitudesData.length > 1) {
+            const x = document.createElement('span');
+            x.innerHTML = ` <span class="ml-1 opacity-60 hover:opacity-100 cursor-pointer" onclick="event.stopPropagation();eliminarMagnitud(${i})">✕</span>`;
+            btn.appendChild(x.firstChild);
+        }
+        btn.addEventListener('click', () => {
+            guardarTabActual();
+            cargarTab(i);
+        });
+        container.appendChild(btn);
+    });
+}
+
+/** Agrega una nueva variable/magnitud */
+function agregarMagnitud() {
+    guardarTabActual();
+    const unidadDefault = document.getElementById('unidad-equipo') ? document.getElementById('unidad-equipo').value : '';
+    magnitudesData.push({ nombre: '', unidad: unidadDefault, puntos: [] });
+    cargarTab(magnitudesData.length - 1);
+}
+
+/** Elimina una variable (mínimo 1) */
+function eliminarMagnitud(idx) {
+    if (magnitudesData.length <= 1) return;
+    if (!confirm(`¿Eliminar la variable "${magnitudesData[idx].nombre || 'Variable ' + (idx+1)}"?`)) return;
+    magnitudesData.splice(idx, 1);
+    cargarTab(Math.min(idx, magnitudesData.length - 1));
+}
+
+/** Inicializa magnitudesData desde datos de Django (soporta v1 y v2) */
+function inicializarMagnitudes() {
+    const unidadDefault = document.getElementById('unidad-equipo') ? document.getElementById('unidad-equipo').value : '';
+    const prevMagnitudes = (datosExistentes && datosExistentes.magnitudes) ? datosExistentes.magnitudes : null;
+
+    if (prevMagnitudes && prevMagnitudes.length > 0) {
+        // Formato v2
+        magnitudesData = prevMagnitudes.map(m => ({
+            nombre: m.nombre || '',
+            unidad: m.unidad || unidadDefault,
+            puntos: m.puntos_medicion || []
+        }));
+    } else {
+        // Formato v1 o sin datos: una sola magnitud con los puntos existentes
+        magnitudesData = [{
+            nombre: '',
+            unidad: unidadDefault,
+            puntos: (datosExistentes && datosExistentes.puntos_medicion) ? datosExistentes.puntos_medicion : []
+        }];
+    }
+
+    cargarTab(0);
+}
+
 // ========== GUARDAR Y PDF ==========
 
 async function generarPDF() {
-    const tbody = document.getElementById('tbody-medicion');
-    const filas = Array.from(tbody.children);
+    guardarTabActual();
 
-    if (filas.length === 0) {
+    // Verificar que haya al menos un punto en alguna variable
+    const hayPuntos = magnitudesData.some(m => m.puntos && m.puntos.length > 0);
+    if (!hayPuntos) {
         alert('Agregue al menos un punto de medición.');
         return;
     }
 
-    const puntos = filas.map(fila => {
-        return {
-            nominal: parseFloat(fila.querySelector('.nominal').value) || 0,
-            lectura: parseFloat(fila.querySelector('.lectura').value) || 0,
-            emp_valor: parseFloat(fila.querySelector('.emp-valor').value) || 0,
-            emp_tipo: fila.querySelector('.emp-tipo').value,
-            emp_absoluto: parseFloat(fila.children[5].textContent) || 0,
-            error: parseFloat(fila.children[6].textContent) || 0,
-            limite_superior: parseFloat(fila.children[7].textContent) || 0,
-            limite_inferior: parseFloat(fila.children[8].textContent) || 0,
-            conformidad: fila.children[9].textContent
-        };
-    });
+    // Construir magnitudes v2
+    const magnitudesV2 = magnitudesData.map(m => ({
+        nombre: m.nombre || '',
+        unidad: m.unidad || '',
+        puntos_medicion: m.puntos || []
+    }));
+
+    // Legacy: puntos de la primera variable (para PDF actual que espera puntos_medicion en raíz)
+    const puntosLegacy = magnitudesData[0] ? magnitudesData[0].puntos : [];
 
     const datos = {
         comprobacion_id: comprobacionId,
-        unidad_equipo: document.getElementById('unidad-equipo').value,
-        puntos_medicion: puntos,
+        version: 2,
+        magnitudes: magnitudesV2,
+        // Campos legacy para compatibilidad con PDF existente
+        unidad_equipo: (magnitudesData[0] && magnitudesData[0].unidad) || document.getElementById('unidad-equipo').value,
+        puntos_medicion: puntosLegacy,
         fecha: new Date().toISOString(),
-        // Equipo de referencia (fila principal + filas adicionales)
+        // Equipo de referencia
         equipo_ref_nombre: document.getElementById('equipo-ref-nombre').value || '',
         equipo_ref_marca: document.getElementById('equipo-ref-marca').value || '',
         equipo_ref_modelo: document.getElementById('equipo-ref-modelo').value || '',
@@ -916,7 +1063,7 @@ async function generarPDF() {
             });
             return adicionales;
         })(),
-        // Formato del documento (código, versión, fecha)
+        // Formato del documento
         formato_codigo: document.getElementById('formato-codigo').value || '',
         formato_version: document.getElementById('formato-version').value || '',
         formato_fecha: document.getElementById('formato-fecha').value || '',
@@ -1131,53 +1278,19 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-agregar-equipo-ref').addEventListener('click', function() {
         agregarFilaRef(null);
     });
-    if (datosExistentes && datosExistentes.puntos_medicion && datosExistentes.puntos_medicion.length > 0) {
-        // Cargar datos existentes
+
+    // Inicializar tabs (soporta v1 y v2)
+    inicializarMagnitudes();
+
+    // Cargar datos del equipo de referencia si existen
+    if (datosExistentes) {
         const datos = datosExistentes;
-        datos.puntos_medicion.forEach(punto => {
-            agregarFila();
-            const tbody = document.getElementById('tbody-medicion');
-            const ultimaFila = tbody.lastElementChild;
-
-            ultimaFila.querySelector('.nominal').value = punto.nominal;
-            ultimaFila.querySelector('.lectura').value = punto.lectura;
-
-            // Compatibilidad con datos antiguos (emp/tolerancia) y nuevos (emp_valor/emp_tipo)
-            if (punto.emp_valor !== undefined) {
-                ultimaFila.querySelector('.emp-valor').value = punto.emp_valor;
-                ultimaFila.querySelector('.emp-tipo').value = punto.emp_tipo || 'abs';
-            } else {
-                // Datos antiguos: convertir emp/tolerancia a nuevo formato
-                ultimaFila.querySelector('.emp-valor').value = punto.emp || punto.tolerancia || 0;
-                ultimaFila.querySelector('.emp-tipo').value = 'abs';
-            }
-
-            calcularFila(ultimaFila.querySelector('.nominal'));
-        });
-
-        // Cargar datos del equipo de referencia si existen
-        if (datos.equipo_ref_nombre) {
-            document.getElementById('equipo-ref-nombre').value = datos.equipo_ref_nombre;
-        }
-        if (datos.equipo_ref_marca) {
-            document.getElementById('equipo-ref-marca').value = datos.equipo_ref_marca;
-        }
-        if (datos.equipo_ref_modelo) {
-            document.getElementById('equipo-ref-modelo').value = datos.equipo_ref_modelo;
-        }
-        if (datos.equipo_ref_certificado) {
-            document.getElementById('equipo-ref-certificado').value = datos.equipo_ref_certificado;
-        }
-        // Restaurar filas adicionales de referencia
+        if (datos.equipo_ref_nombre) document.getElementById('equipo-ref-nombre').value = datos.equipo_ref_nombre;
+        if (datos.equipo_ref_marca) document.getElementById('equipo-ref-marca').value = datos.equipo_ref_marca;
+        if (datos.equipo_ref_modelo) document.getElementById('equipo-ref-modelo').value = datos.equipo_ref_modelo;
+        if (datos.equipo_ref_certificado) document.getElementById('equipo-ref-certificado').value = datos.equipo_ref_certificado;
         if (datos.equipos_ref_adicionales && datos.equipos_ref_adicionales.length > 0) {
-            datos.equipos_ref_adicionales.forEach(function(eq) {
-                agregarFilaRef(eq);
-            });
-        }
-    } else {
-        // Siempre agregar 5 filas vacías por defecto si no hay datos existentes
-        for (let i = 0; i < 5; i++) {
-            agregarFila();
+            datos.equipos_ref_adicionales.forEach(function(eq) { agregarFilaRef(eq); });
         }
     }
 });

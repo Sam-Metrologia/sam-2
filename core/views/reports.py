@@ -1505,49 +1505,70 @@ def _get_hoja_vida_activities(equipo):
     return calibraciones, mantenimientos, comprobaciones
 
 
+def _make_svg_compact(svg_string, new_width=650, new_height=340):
+    """Reduce el tamaño de un SVG añadiendo viewBox para que escale correctamente en PDF."""
+    import re
+    m = re.search(r'<svg width="(\d+)" height="(\d+)"', svg_string)
+    if not m:
+        return svg_string
+    orig_w, orig_h = m.group(1), m.group(2)
+    replacement = (f'<svg width="{new_width}" height="{new_height}" '
+                   f'viewBox="0 0 {orig_w} {orig_h}" preserveAspectRatio="xMidYMid meet"')
+    return re.sub(r'<svg width="\d+" height="\d+"', replacement, svg_string, count=1)
+
+
 def _generate_hoja_vida_charts(calibraciones, comprobaciones):
     """
     Helper: Genera gráficas históricas para hoja de vida.
-
-    Args:
-        calibraciones: QuerySet de calibraciones
-        comprobaciones: QuerySet de comprobaciones
-
-    Returns:
-        tuple: (grafica_hist_confirmaciones, grafica_hist_comprobaciones)
+    Retorna dicts {nombre_variable: svg_compacto} para confirmaciones y comprobaciones.
+    Soporta v1 (puntos_medicion) y v2 (magnitudes).
     """
     from core.views.equipment import _generar_grafica_hist_confirmaciones, _generar_grafica_hist_comprobaciones
 
-    # Obtener últimas 5 confirmaciones con datos JSON
+    # ── Confirmaciones (v1 y v2) ──────────────────────────────────────────────
     calibraciones_con_datos = []
     for cal in calibraciones[:5]:
-        if (hasattr(cal, 'confirmacion_metrologica_datos') and
-            cal.confirmacion_metrologica_datos and
-            cal.confirmacion_metrologica_datos.get('puntos_medicion')):
+        datos = getattr(cal, 'confirmacion_metrologica_datos', None)
+        if not datos:
+            continue
+        if datos.get('magnitudes'):  # v2
+            mags = [{'nombre': m.get('nombre', ''), 'puntos': m.get('puntos_medicion', [])}
+                    for m in datos['magnitudes'] if m.get('puntos_medicion')]
+            if mags:
+                calibraciones_con_datos.append({'fecha': cal.fecha_calibracion, 'magnitudes': mags})
+        elif datos.get('puntos_medicion'):  # v1
             calibraciones_con_datos.append({
                 'fecha': cal.fecha_calibracion,
-                'puntos': cal.confirmacion_metrologica_datos['puntos_medicion']
+                'magnitudes': [{'nombre': '', 'puntos': datos['puntos_medicion']}]
             })
 
-    # Obtener últimas 5 comprobaciones con datos JSON
+    # ── Comprobaciones (v1 y v2) ──────────────────────────────────────────────
     comprobaciones_con_datos = []
     for comp in comprobaciones[:5]:
-        if (hasattr(comp, 'datos_comprobacion') and
-            comp.datos_comprobacion and
-            comp.datos_comprobacion.get('puntos_medicion')):
+        datos = getattr(comp, 'datos_comprobacion', None) or {}
+        if datos.get('magnitudes'):  # v2
+            mags = [{'nombre': m.get('nombre', ''), 'puntos': m.get('puntos_medicion', [])}
+                    for m in datos['magnitudes'] if m.get('puntos_medicion')]
+            if mags:
+                comprobaciones_con_datos.append({'fecha': comp.fecha_comprobacion, 'magnitudes': mags})
+        elif datos.get('puntos_medicion'):  # v1
             comprobaciones_con_datos.append({
                 'fecha': comp.fecha_comprobacion,
-                'puntos': comp.datos_comprobacion['puntos_medicion']
+                'magnitudes': [{'nombre': '', 'puntos': datos['puntos_medicion']}]
             })
 
-    # Generar gráficas SVG
+    # ── Generar y reducir tamaño ──────────────────────────────────────────────
     grafica_hist_confirmaciones = None
-    if len(calibraciones_con_datos) > 0:
-        grafica_hist_confirmaciones = _generar_grafica_hist_confirmaciones(calibraciones_con_datos)
+    if calibraciones_con_datos:
+        raw = _generar_grafica_hist_confirmaciones(calibraciones_con_datos)
+        if raw:
+            grafica_hist_confirmaciones = {k: _make_svg_compact(v) for k, v in raw.items()}
 
     grafica_hist_comprobaciones = None
-    if len(comprobaciones_con_datos) > 0:
-        grafica_hist_comprobaciones = _generar_grafica_hist_comprobaciones(comprobaciones_con_datos)
+    if comprobaciones_con_datos:
+        raw = _generar_grafica_hist_comprobaciones(comprobaciones_con_datos)
+        if raw:
+            grafica_hist_comprobaciones = {k: _make_svg_compact(v) for k, v in raw.items()}
 
     return grafica_hist_confirmaciones, grafica_hist_comprobaciones
 

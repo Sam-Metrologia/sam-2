@@ -292,253 +292,282 @@ def añadir_equipo(request):
     return render(request, 'core/añadir_equipo.html', context)
 
 
-def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
+def _generar_una_grafica_hist_confirmacion(variable_nombre, calibraciones_variable):
     """
-    Genera gráfica SVG histórica de confirmaciones metrológicas.
-    Muestra múltiples calibraciones (hasta 5) con sus puntos y límites EMP.
-    Incluye barras de incertidumbre (±) en cada punto.
+    Genera un SVG para UNA variable a través de múltiples calibraciones.
+    Normaliza por EMP: Y = error/EMP_abs  →  ±1 = en el límite.
+    calibraciones_variable: [{'fecha': date, 'puntos': [...]}]
     """
-    if not calibraciones_con_datos or len(calibraciones_con_datos) == 0:
-        return None
-
-    # Colores para cada calibración
     colores = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
-
-    width, height = 700, 400
-    margin = {'top': 50, 'right': 20, 'bottom': 70, 'left': 70}
+    width, height = 760, 400
+    margin = {'top': 50, 'right': 70, 'bottom': 70, 'left': 70}
     plot_width = width - margin['left'] - margin['right']
     plot_height = height - margin['top'] - margin['bottom']
 
-    # Extraer todos los puntos nominales únicos de todas las calibraciones
-    nominales_unicos = set()
-    for cal in calibraciones_con_datos:
-        for punto in cal['puntos']:
-            nominales_unicos.add(punto['nominal'])
-    nominales_unicos = sorted(list(nominales_unicos))
-
-    if len(nominales_unicos) == 0:
+    # Nominales únicos de todas las calibraciones de esta variable
+    nominales_unicos = sorted({p['nominal'] for cal in calibraciones_variable for p in cal['puntos'] if p.get('nominal')})
+    if not nominales_unicos:
         return None
 
-    # ── Recolectar configuraciones EMP únicas de TODAS las calibraciones ──────
-    # Si el EMP cambia entre calibraciones (ej: 10% → 20%), se dibujan dos
-    # juegos de líneas rojas. Si son iguales (dentro de 5%), se dibuja uno solo.
+    # Para cada punto calcular Y = error / emp_absoluto (con fallback a error/nominal)
+    def y_normalizado(punto):
+        error = punto.get('error', 0) or 0
+        emp_abs = punto.get('emp_absoluto')
+        nominal = punto.get('nominal', 1) or 1
+        if emp_abs and emp_abs != 0:
+            return error / emp_abs
+        # fallback: normalizar por nominal (%)
+        return (error / abs(nominal)) if nominal != 0 else 0
 
-    def _lookup_emp(nominal, emp_dict, tol=0.05):
-        """Busca EMP con tolerancia en nominal para manejar diferencias de precisión."""
-        if nominal in emp_dict:
-            return emp_dict[nominal]
-        if nominal != 0:
-            for n, e in emp_dict.items():
-                if abs(n - nominal) / abs(nominal) <= tol:
-                    return e
-        if emp_dict:
-            return emp_dict[min(emp_dict.keys(), key=lambda n: abs(n - nominal))]
-        return 0
+    def u_normalizado(punto):
+        u = punto.get('incertidumbre', 0) or 0
+        emp_abs = punto.get('emp_absoluto')
+        nominal = punto.get('nominal', 1) or 1
+        if emp_abs and emp_abs != 0:
+            return u / emp_abs
+        return (u / abs(nominal)) if nominal != 0 else 0
 
-    def _emp_configs_iguales(d1, d2, nominales, tol_emp=0.05):
-        """True si dos dicts EMP producen el mismo % EMP (dentro de tol_emp relativo)."""
-        muestra = [n for n in nominales if n != 0][:6]
-        for n in muestra:
-            e1 = _lookup_emp(n, d1)
-            e2 = _lookup_emp(n, d2)
-            emp1_pct = e1 / abs(n)
-            emp2_pct = e2 / abs(n)
-            ref = max(abs(emp1_pct), abs(emp2_pct))
-            if ref > 0 and abs(emp1_pct - emp2_pct) / ref > tol_emp:
-                return False
-        return True
-
-    # Recolectar EMPs únicos de todas las calibraciones
-    emp_configs_unicos = []  # lista de dicts {nominal: emp_abs}
-    for cal in calibraciones_con_datos:
-        emp_cal = {p['nominal']: p.get('emp_absoluto', 0) for p in cal['puntos']}
-        if not emp_cal:
-            continue
-        ya_existe = any(
-            _emp_configs_iguales(emp_cal, existing, nominales_unicos)
-            for existing in emp_configs_unicos
-        )
-        if not ya_existe:
-            emp_configs_unicos.append(emp_cal)
-
-    # Estilos para cada configuración EMP (distintos si hay más de una)
-    # dash_array, stroke_width, opacity
-    emp_estilos = [
-        ('5,5',  2.0, 0.9),
-        ('10,4', 1.5, 0.7),
-        ('3,6',  1.5, 0.6),
-    ]
-
-    # Calcular rangos para ejes usando PORCENTAJE del nominal
-    todos_errores_porcentaje = []
-    for cal in calibraciones_con_datos:
-        for punto in cal['puntos']:
-            nominal = punto['nominal']
-            if nominal != 0:
-                error_porcentaje = (punto.get('error', 0) / abs(nominal)) * 100
-                todos_errores_porcentaje.append(error_porcentaje)
-            else:
-                todos_errores_porcentaje.append(punto.get('error', 0))
-
-    # Incluir TODOS los EMPs únicos para calcular el rango del eje Y
-    emps_porcentaje = []
-    for emp_cfg in emp_configs_unicos:
-        for nominal, emp in emp_cfg.items():
-            if nominal != 0:
-                emps_porcentaje.append((emp / abs(nominal)) * 100)
-            else:
-                emps_porcentaje.append(emp)
-
-    if len(todos_errores_porcentaje) == 0:
+    # Calcular rangos del eje Y incluyendo ±1 (límite EMP)
+    todos_y = [y_normalizado(p) for cal in calibraciones_variable for p in cal['puntos'] if p.get('nominal')]
+    todos_u = [u_normalizado(p) for cal in calibraciones_variable for p in cal['puntos'] if p.get('nominal')]
+    if not todos_y:
         return None
 
-    max_error_pct = max(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
-    min_error_pct = min(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
-    rango = max_error_pct - min_error_pct
-    padding = rango * 0.20
-
-    y_max = max_error_pct + padding
-    y_min = min_error_pct - padding
-
-    # Guardia: evita división por cero cuando todos los errores son iguales
+    y_max = max(max(todos_y), 1.0) + 0.15
+    y_min = min(min(todos_y), -1.0) - 0.15
     if y_max == y_min:
-        y_max += 0.001
-        y_min -= 0.001
+        y_max += 0.01; y_min -= 0.01
 
-    def escala_y(valor):
-        return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height
+    def escala_y(v):
+        return margin['top'] + plot_height - ((v - y_min) / (y_max - y_min)) * plot_height
 
-    def escala_x(index):
+    def escala_x(idx):
         if len(nominales_unicos) == 1:
             return margin['left'] + plot_width / 2
-        return margin['left'] + (index / (len(nominales_unicos) - 1)) * plot_width
+        return margin['left'] + (idx / (len(nominales_unicos) - 1)) * plot_width
 
-    # Comenzar SVG
+    cx = width / 2
     svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    titulo = f'Historial — {variable_nombre}' if variable_nombre else f'Historial de Confirmaciones ({len(calibraciones_variable)} registros)'
+    svg.append(f'<text x="{cx}" y="25" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#2D3748">{titulo}</text>')
+    svg.append(f'<text x="{cx}" y="40" text-anchor="middle" font-family="Arial" font-size="9" fill="#6B7280">Normalizado por EMP — ±1 = en el límite</text>')
 
-    # Título
-    svg.append(f'<text x="{width/2}" y="25" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#2D3748">Historial de Confirmaciones Metrológicas (Últimas {len(calibraciones_con_datos)})</text>')
-
-    # Cuadrícula y ejes Y
-    num_ticks = 6
-    for i in range(num_ticks + 1):
-        valor = y_min + (y_max - y_min) * (i / num_ticks)
-        y = escala_y(valor)
-        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"] + plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
-        svg.append(f'<text x="{margin["left"] - 5}" y="{y + 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#6B7280">{valor:.3f}</text>')
+    # Cuadrícula
+    for i in range(7):
+        v = y_min + (y_max - y_min) * (i / 6)
+        y = escala_y(v)
+        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"]+plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
+        svg.append(f'<text x="{margin["left"]-5}" y="{y+4}" text-anchor="end" font-family="Arial" font-size="9" fill="#6B7280">{v:.2f}</text>')
 
     # Ejes
-    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
-    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + plot_height}" x2="{margin["left"] + plot_width}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"]+plot_height}" stroke="#374151" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]+plot_height}" x2="{margin["left"]+plot_width}" y2="{margin["top"]+plot_height}" stroke="#374151" stroke-width="2"/>')
 
-    # Línea de cero
+    # Zona verde (dentro del EMP)
+    y1_emp = escala_y(1.0); y_m1_emp = escala_y(-1.0)
+    svg.append(f'<rect x="{margin["left"]}" y="{y1_emp}" width="{plot_width}" height="{y_m1_emp - y1_emp}" fill="#d1fae5" opacity="0.3"/>')
+
+    # Líneas ±1 (límites EMP) — visibles y gruesas
+    x_left = margin['left']
+    x_right = margin['left'] + plot_width
+    x_label = x_right + 5
+    svg.append(f'<line x1="{x_left}" y1="{y1_emp}" x2="{x_right}" y2="{y1_emp}" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7,4"/>')
+    svg.append(f'<line x1="{x_left}" y1="{y_m1_emp}" x2="{x_right}" y2="{y_m1_emp}" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7,4"/>')
+    svg.append(f'<text x="{x_label}" y="{y1_emp-3}" font-family="Arial" font-size="10" font-weight="bold" fill="#dc2626">+EMP</text>')
+    svg.append(f'<text x="{x_label}" y="{y1_emp+11}" font-family="Arial" font-size="9" fill="#dc2626">(+1)</text>')
+    svg.append(f'<text x="{x_label}" y="{y_m1_emp-3}" font-family="Arial" font-size="10" font-weight="bold" fill="#dc2626">−EMP</text>')
+    svg.append(f'<text x="{x_label}" y="{y_m1_emp+11}" font-family="Arial" font-size="9" fill="#dc2626">(−1)</text>')
+
+    # Línea cero
     y0 = escala_y(0)
-    svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"]+plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
 
-    # ── Dibujar líneas EMP — una por cada configuración única ────────────────
-    # EMP constante entre calibraciones → 1 línea. EMP cambia → 2 líneas.
-    for cfg_idx, emp_cfg in enumerate(emp_configs_unicos):
-        dash, sw, op = emp_estilos[cfg_idx % len(emp_estilos)]
-        for i, nominal in enumerate(nominales_unicos):
-            x = escala_x(i)
-            emp = _lookup_emp(nominal, emp_cfg)
-            emp_pct = (emp / abs(nominal)) * 100 if nominal != 0 else emp
-
-            y_sup = escala_y(emp_pct)
-            y_inf = escala_y(-emp_pct)
-
-            # Líneas verticales punteadas (indicadores)
-            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.25"/>')
-
-            if i < len(nominales_unicos) - 1:
-                x_next = escala_x(i + 1)
-                nominal_next = nominales_unicos[i + 1]
-                emp_next = _lookup_emp(nominal_next, emp_cfg)
-                emp_next_pct = (emp_next / abs(nominal_next)) * 100 if nominal_next != 0 else emp_next
-
-                y_sup_next = escala_y(emp_next_pct)
-                y_inf_next = escala_y(-emp_next_pct)
-
-                svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
-                svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
-
-    # Dibujar líneas y puntos de cada calibración
-    for idx_cal, cal in enumerate(calibraciones_con_datos):
+    # Curva por cada calibración
+    for idx_cal, cal in enumerate(calibraciones_variable):
         color = colores[idx_cal % len(colores)]
+        puntos_por_nominal = {p['nominal']: p for p in cal['puntos'] if p.get('nominal')}
 
-        # Organizar puntos por nominal
-        puntos_por_nominal = {p['nominal']: p for p in cal['puntos']}
-
-        # Dibujar línea conectando puntos
-        path_points = []
-        for i, nominal in enumerate(nominales_unicos):
-            if nominal in puntos_por_nominal:
-                punto = puntos_por_nominal[nominal]
+        path_pts = []
+        for i, nom in enumerate(nominales_unicos):
+            if nom in puntos_por_nominal:
+                p = puntos_por_nominal[nom]
                 x = escala_x(i)
-
-                # Convertir error a porcentaje del nominal
-                error = punto.get('error', 0)
-                if nominal != 0:
-                    error_pct = (error / abs(nominal)) * 100
-                else:
-                    error_pct = error
-
-                y = escala_y(error_pct)
-                path_points.append(f"{x},{y}")
-
-        if len(path_points) > 1:
-            svg.append(f'<polyline points="{" ".join(path_points)}" fill="none" stroke="{color}" stroke-width="2" opacity="0.7"/>')
-
-        # Dibujar puntos con barras de incertidumbre
-        for i, nominal in enumerate(nominales_unicos):
-            if nominal in puntos_por_nominal:
-                punto = puntos_por_nominal[nominal]
-                x = escala_x(i)
-                error = punto.get('error', 0)
-                incertidumbre = punto.get('incertidumbre', 0)
-
-                # Convertir error e incertidumbre a porcentaje del nominal
-                if nominal != 0:
-                    error_pct = (error / abs(nominal)) * 100
-                    incertidumbre_pct = (incertidumbre / abs(nominal)) * 100
-                else:
-                    error_pct = error
-                    incertidumbre_pct = incertidumbre
-
-                y = escala_y(error_pct)
-                y_sup_inc = escala_y(error_pct + incertidumbre_pct)
-                y_inf_inc = escala_y(error_pct - incertidumbre_pct)
+                y = escala_y(y_normalizado(p))
+                path_pts.append(f'{x},{y}')
 
                 # Barra de incertidumbre
-                if incertidumbre_pct > 0:
-                    svg.append(f'<line x1="{x}" y1="{y_inf_inc}" x2="{x}" y2="{y_sup_inc}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
-                    svg.append(f'<line x1="{x-3}" y1="{y_sup_inc}" x2="{x+3}" y2="{y_sup_inc}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
-                    svg.append(f'<line x1="{x-3}" y1="{y_inf_inc}" x2="{x+3}" y2="{y_inf_inc}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
-
-                # Punto
+                u = u_normalizado(p)
+                if u > 0:
+                    y_sup = escala_y(y_normalizado(p) + u)
+                    y_inf = escala_y(y_normalizado(p) - u)
+                    svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x}" y2="{y_sup}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
+                    svg.append(f'<line x1="{x-3}" y1="{y_sup}" x2="{x+3}" y2="{y_sup}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
+                    svg.append(f'<line x1="{x-3}" y1="{y_inf}" x2="{x+3}" y2="{y_inf}" stroke="{color}" stroke-width="1.5" opacity="0.5"/>')
                 svg.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="white" stroke-width="2"/>')
 
+        if len(path_pts) > 1:
+            svg.append(f'<polyline points="{" ".join(path_pts)}" fill="none" stroke="{color}" stroke-width="2" opacity="0.8"/>')
+
     # Etiquetas eje X
-    for i, nominal in enumerate(nominales_unicos):
+    for i, nom in enumerate(nominales_unicos):
         if i % max(1, len(nominales_unicos) // 8) == 0 or i == len(nominales_unicos) - 1:
             x = escala_x(i)
-            svg.append(f'<text x="{x}" y="{margin["top"] + plot_height + 20}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">{nominal:.2f}</text>')
+            svg.append(f'<text x="{x}" y="{margin["top"]+plot_height+15}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">{nom:.3g}</text>')
 
-    svg.append(f'<text x="{width/2}" y="{height - 15}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151">Valor Nominal</text>')
-    svg.append(f'<text x="20" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151" transform="rotate(-90 20 {height/2})">Error (%)</text>')
+    svg.append(f'<text x="{cx}" y="{height-20}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#374151">Valor Nominal</text>')
+    svg.append(f'<text x="15" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#374151" transform="rotate(-90 15 {height/2})">Error / EMP</text>')
 
-    # Leyenda debajo de la gráfica (horizontal)
-    leyenda_y = height - 5
-    leyenda_x_start = margin['left']
-    svg.append(f'<text x="{leyenda_x_start}" y="{leyenda_y}" font-family="Arial" font-size="9" font-weight="bold" fill="#374151">Calibraciones:</text>')
-
-    x_offset = leyenda_x_start + 70
-    for idx_cal, cal in enumerate(calibraciones_con_datos):
+    # Leyenda
+    x_off = margin['left']
+    svg.append(f'<text x="{x_off}" y="{height-5}" font-family="Arial" font-size="9" font-weight="bold" fill="#374151">Calibraciones: </text>')
+    x_off += 75
+    for idx_cal, cal in enumerate(calibraciones_variable):
         color = colores[idx_cal % len(colores)]
-        svg.append(f'<circle cx="{x_offset}" cy="{leyenda_y - 3}" r="3" fill="{color}"/>')
         fecha_str = cal['fecha'].strftime('%d/%m/%Y') if hasattr(cal['fecha'], 'strftime') else str(cal['fecha'])
-        svg.append(f'<text x="{x_offset + 8}" y="{leyenda_y}" font-family="Arial" font-size="8" fill="#4B5563">{fecha_str}</text>')
-        x_offset += 90
+        svg.append(f'<circle cx="{x_off}" cy="{height-8}" r="3" fill="{color}"/>')
+        svg.append(f'<text x="{x_off+7}" y="{height-5}" font-family="Arial" font-size="8" fill="#4B5563">{fecha_str}</text>')
+        x_off += 95
+
+    svg.append('</svg>')
+    return ''.join(svg)
+
+
+def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
+    """
+    Genera un SVG por cada variable encontrada en el historial.
+    Retorna dict {nombre_variable: svg_string}.
+    calibraciones_con_datos: [{'fecha': date, 'magnitudes': [{'nombre': str, 'puntos': [...]}]}]
+    """
+    if not calibraciones_con_datos:
+        return None
+
+    # Agrupar calibraciones por nombre de variable
+    variables = {}  # {nombre: [{'fecha': date, 'puntos': [...]}]}
+    for cal in calibraciones_con_datos:
+        for mag in cal.get('magnitudes', []):
+            nombre = mag.get('nombre', '') or ''
+            if nombre not in variables:
+                variables[nombre] = []
+            variables[nombre].append({'fecha': cal['fecha'], 'puntos': mag.get('puntos', [])})
+
+    if not variables:
+        return None
+
+    # Generar un SVG por variable
+    resultado = {}
+    for nombre, cals in variables.items():
+        svg = _generar_una_grafica_hist_confirmacion(nombre, cals)
+        if svg:
+            resultado[nombre] = svg
+
+    return resultado if resultado else None
+
+
+def _generar_una_grafica_hist_comprobacion(variable_nombre, comprobaciones_variable):
+    """
+    Genera un SVG para UNA variable a través de múltiples comprobaciones.
+    Normaliza por EMP: Y = error/EMP_abs  →  ±1 = en el límite.
+    comprobaciones_variable: [{'fecha': date, 'puntos': [...]}]
+    """
+    colores = ['#06b6d4', '#84cc16', '#f97316', '#a855f7', '#ec4899']
+    width, height = 760, 400
+    margin = {'top': 50, 'right': 70, 'bottom': 70, 'left': 70}
+    plot_width = width - margin['left'] - margin['right']
+    plot_height = height - margin['top'] - margin['bottom']
+
+    nominales_unicos = sorted({p['nominal'] for comp in comprobaciones_variable for p in comp['puntos'] if p.get('nominal')})
+    if not nominales_unicos:
+        return None
+
+    def y_normalizado(punto):
+        error = punto.get('error', 0) or 0
+        emp_abs = punto.get('emp_absoluto')
+        nominal = punto.get('nominal', 1) or 1
+        if emp_abs and emp_abs != 0:
+            return error / emp_abs
+        return (error / abs(nominal)) if nominal != 0 else 0
+
+    todos_y = [y_normalizado(p) for comp in comprobaciones_variable for p in comp['puntos'] if p.get('nominal')]
+    if not todos_y:
+        return None
+
+    y_max = max(max(todos_y), 1.0) + 0.15
+    y_min = min(min(todos_y), -1.0) - 0.15
+    if y_max == y_min:
+        y_max += 0.01; y_min -= 0.01
+
+    def escala_y(v):
+        return margin['top'] + plot_height - ((v - y_min) / (y_max - y_min)) * plot_height
+
+    def escala_x(idx):
+        if len(nominales_unicos) == 1:
+            return margin['left'] + plot_width / 2
+        return margin['left'] + (idx / (len(nominales_unicos) - 1)) * plot_width
+
+    cx = width / 2
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    titulo = f'Historial — {variable_nombre}' if variable_nombre else f'Historial de Comprobaciones ({len(comprobaciones_variable)} registros)'
+    svg.append(f'<text x="{cx}" y="25" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#2D3748">{titulo}</text>')
+    svg.append(f'<text x="{cx}" y="40" text-anchor="middle" font-family="Arial" font-size="9" fill="#6B7280">Normalizado por EMP — ±1 = en el límite</text>')
+
+    for i in range(7):
+        v = y_min + (y_max - y_min) * (i / 6)
+        y = escala_y(v)
+        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"]+plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
+        svg.append(f'<text x="{margin["left"]-5}" y="{y+4}" text-anchor="end" font-family="Arial" font-size="9" fill="#6B7280">{v:.2f}</text>')
+
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"]+plot_height}" stroke="#374151" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]+plot_height}" x2="{margin["left"]+plot_width}" y2="{margin["top"]+plot_height}" stroke="#374151" stroke-width="2"/>')
+
+    y1_emp = escala_y(1.0); y_m1_emp = escala_y(-1.0)
+    svg.append(f'<rect x="{margin["left"]}" y="{y1_emp}" width="{plot_width}" height="{y_m1_emp - y1_emp}" fill="#d1fae5" opacity="0.3"/>')
+
+    x_left = margin['left']
+    x_right = margin['left'] + plot_width
+    x_label = x_right + 5
+    svg.append(f'<line x1="{x_left}" y1="{y1_emp}" x2="{x_right}" y2="{y1_emp}" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7,4"/>')
+    svg.append(f'<line x1="{x_left}" y1="{y_m1_emp}" x2="{x_right}" y2="{y_m1_emp}" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7,4"/>')
+    svg.append(f'<text x="{x_label}" y="{y1_emp-3}" font-family="Arial" font-size="10" font-weight="bold" fill="#dc2626">+EMP</text>')
+    svg.append(f'<text x="{x_label}" y="{y1_emp+11}" font-family="Arial" font-size="9" fill="#dc2626">(+1)</text>')
+    svg.append(f'<text x="{x_label}" y="{y_m1_emp-3}" font-family="Arial" font-size="10" font-weight="bold" fill="#dc2626">−EMP</text>')
+    svg.append(f'<text x="{x_label}" y="{y_m1_emp+11}" font-family="Arial" font-size="9" fill="#dc2626">(−1)</text>')
+
+    y0 = escala_y(0)
+    svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"]+plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
+
+    for idx_comp, comp in enumerate(comprobaciones_variable):
+        color = colores[idx_comp % len(colores)]
+        puntos_por_nominal = {p['nominal']: p for p in comp['puntos'] if p.get('nominal')}
+
+        path_pts = []
+        for i, nom in enumerate(nominales_unicos):
+            if nom in puntos_por_nominal:
+                p = puntos_por_nominal[nom]
+                x = escala_x(i)
+                y = escala_y(y_normalizado(p))
+                path_pts.append(f'{x},{y}')
+                svg.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="white" stroke-width="2"/>')
+
+        if len(path_pts) > 1:
+            svg.append(f'<polyline points="{" ".join(path_pts)}" fill="none" stroke="{color}" stroke-width="2" opacity="0.8"/>')
+
+    for i, nom in enumerate(nominales_unicos):
+        if i % max(1, len(nominales_unicos) // 8) == 0 or i == len(nominales_unicos) - 1:
+            x = escala_x(i)
+            svg.append(f'<text x="{x}" y="{margin["top"]+plot_height+15}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">{nom:.3g}</text>')
+
+    svg.append(f'<text x="{cx}" y="{height-20}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#374151">Valor Nominal</text>')
+    svg.append(f'<text x="15" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#374151" transform="rotate(-90 15 {height/2})">Error / EMP</text>')
+
+    x_off = margin['left']
+    svg.append(f'<text x="{x_off}" y="{height-5}" font-family="Arial" font-size="9" font-weight="bold" fill="#374151">Comprobaciones: </text>')
+    x_off += 90
+    for idx_comp, comp in enumerate(comprobaciones_variable):
+        color = colores[idx_comp % len(colores)]
+        fecha_str = comp['fecha'].strftime('%d/%m/%Y') if hasattr(comp['fecha'], 'strftime') else str(comp['fecha'])
+        svg.append(f'<circle cx="{x_off}" cy="{height-8}" r="3" fill="{color}"/>')
+        svg.append(f'<text x="{x_off+7}" y="{height-5}" font-family="Arial" font-size="8" fill="#4B5563">{fecha_str}</text>')
+        x_off += 95
 
     svg.append('</svg>')
     return ''.join(svg)
@@ -546,212 +575,31 @@ def _generar_grafica_hist_confirmaciones(calibraciones_con_datos):
 
 def _generar_grafica_hist_comprobaciones(comprobaciones_con_datos):
     """
-    Genera gráfica SVG histórica de comprobaciones.
-    Similar a confirmaciones pero sin barras de incertidumbre.
+    Genera un SVG por cada variable encontrada en el historial de comprobaciones.
+    Retorna dict {nombre_variable: svg_string}.
+    comprobaciones_con_datos: [{'fecha': date, 'magnitudes': [{'nombre': str, 'puntos': [...]}]}]
     """
     if not comprobaciones_con_datos or len(comprobaciones_con_datos) == 0:
         return None
 
-    colores = ['#06b6d4', '#84cc16', '#f97316', '#a855f7', '#ec4899']
-
-    width, height = 700, 400
-    margin = {'top': 50, 'right': 20, 'bottom': 70, 'left': 70}
-    plot_width = width - margin['left'] - margin['right']
-    plot_height = height - margin['top'] - margin['bottom']
-
-    # Extraer nominales únicos
-    nominales_unicos = set()
+    variables = {}
     for comp in comprobaciones_con_datos:
-        for punto in comp['puntos']:
-            nominales_unicos.add(punto['nominal'])
-    nominales_unicos = sorted(list(nominales_unicos))
+        for mag in comp.get('magnitudes', []):
+            nombre = mag.get('nombre', '') or ''
+            if nombre not in variables:
+                variables[nombre] = []
+            variables[nombre].append({'fecha': comp['fecha'], 'puntos': mag.get('puntos', [])})
 
-    if len(nominales_unicos) == 0:
+    if not variables:
         return None
 
-    # ── Configuraciones EMP únicas (misma lógica que confirmaciones) ─────────
-    def _lookup_emp_c(nominal, emp_dict, tol=0.05):
-        if nominal in emp_dict:
-            return emp_dict[nominal]
-        if nominal != 0:
-            for n, e in emp_dict.items():
-                if abs(n - nominal) / abs(nominal) <= tol:
-                    return e
-        if emp_dict:
-            return emp_dict[min(emp_dict.keys(), key=lambda n: abs(n - nominal))]
-        return 0
+    resultado = {}
+    for nombre, comps in variables.items():
+        svg = _generar_una_grafica_hist_comprobacion(nombre, comps)
+        if svg:
+            resultado[nombre] = svg
 
-    def _configs_iguales_c(d1, d2, nominales, tol=0.05):
-        muestra = [n for n in nominales if n != 0][:6]
-        for n in muestra:
-            e1 = _lookup_emp_c(n, d1)
-            e2 = _lookup_emp_c(n, d2)
-            ref = max(abs(e1), abs(e2))
-            if ref > 0 and abs(e1 - e2) / ref > tol:
-                return False
-        return True
-
-    emp_configs_unicos_c = []
-    for comp in comprobaciones_con_datos:
-        emp_comp = {p['nominal']: p.get('emp_absoluto', 0) for p in comp['puntos']}
-        if not emp_comp:
-            continue
-        if not any(_configs_iguales_c(emp_comp, ex, nominales_unicos) for ex in emp_configs_unicos_c):
-            emp_configs_unicos_c.append(emp_comp)
-
-    emp_estilos_c = [('5,5', 2.0, 0.9), ('10,4', 1.5, 0.7), ('3,6', 1.5, 0.6)]
-
-    # Calcular rangos usando PORCENTAJE del nominal
-    todos_errores_porcentaje = []
-    for comp in comprobaciones_con_datos:
-        for punto in comp['puntos']:
-            nominal = punto['nominal']
-            if nominal != 0:
-                error_porcentaje = (punto.get('error', 0) / abs(nominal)) * 100
-                todos_errores_porcentaje.append(error_porcentaje)
-            else:
-                todos_errores_porcentaje.append(punto.get('error', 0))
-
-    emps_porcentaje = []
-    for emp_cfg in emp_configs_unicos_c:
-        for nominal, emp in emp_cfg.items():
-            if nominal != 0:
-                emps_porcentaje.append((emp / abs(nominal)) * 100)
-            else:
-                emps_porcentaje.append(emp)
-
-    if len(todos_errores_porcentaje) == 0:
-        return None
-
-    max_error_pct = max(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
-    min_error_pct = min(todos_errores_porcentaje + emps_porcentaje + [-v for v in emps_porcentaje])
-    rango = max_error_pct - min_error_pct
-    padding = rango * 0.20
-
-    y_max = max_error_pct + padding
-    y_min = min_error_pct - padding
-
-    # Guardia: evita división por cero cuando todos los errores son iguales
-    if y_max == y_min:
-        y_max += 0.001
-        y_min -= 0.001
-
-    def escala_y(valor):
-        return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height
-
-    def escala_x(index):
-        if len(nominales_unicos) == 1:
-            return margin['left'] + plot_width / 2
-        return margin['left'] + (index / (len(nominales_unicos) - 1)) * plot_width
-
-    # SVG
-    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
-    svg.append(f'<text x="{width/2}" y="25" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#2D3748">Historial de Comprobaciones (Últimas {len(comprobaciones_con_datos)})</text>')
-
-    # Cuadrícula
-    num_ticks = 6
-    for i in range(num_ticks + 1):
-        valor = y_min + (y_max - y_min) * (i / num_ticks)
-        y = escala_y(valor)
-        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"] + plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
-        svg.append(f'<text x="{margin["left"] - 5}" y="{y + 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#6B7280">{valor:.3f}</text>')
-
-    # Ejes
-    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
-    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + plot_height}" x2="{margin["left"] + plot_width}" y2="{margin["top"] + plot_height}" stroke="#374151" stroke-width="2"/>')
-
-    # Línea cero
-    y0 = escala_y(0)
-    svg.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
-
-    # ── Dibujar líneas EMP — una por cada configuración única ────────────────
-    for cfg_idx, emp_cfg in enumerate(emp_configs_unicos_c):
-        dash, sw, op = emp_estilos_c[cfg_idx % len(emp_estilos_c)]
-        for i, nominal in enumerate(nominales_unicos):
-            x = escala_x(i)
-            emp = _lookup_emp_c(nominal, emp_cfg)
-            emp_pct = (emp / abs(nominal)) * 100 if nominal != 0 else emp
-
-            y_sup = escala_y(emp_pct)
-            y_inf = escala_y(-emp_pct)
-
-            svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x}" y2="{y_inf}" stroke="#dc2626" stroke-width="1" opacity="0.25"/>')
-
-            if i < len(nominales_unicos) - 1:
-                x_next = escala_x(i + 1)
-                nominal_next = nominales_unicos[i + 1]
-                emp_next = _lookup_emp_c(nominal_next, emp_cfg)
-                emp_next_pct = (emp_next / abs(nominal_next)) * 100 if nominal_next != 0 else emp_next
-
-                y_sup_next = escala_y(emp_next_pct)
-                y_inf_next = escala_y(-emp_next_pct)
-
-                svg.append(f'<line x1="{x}" y1="{y_sup}" x2="{x_next}" y2="{y_sup_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
-                svg.append(f'<line x1="{x}" y1="{y_inf}" x2="{x_next}" y2="{y_inf_next}" stroke="#dc2626" stroke-width="{sw}" stroke-dasharray="{dash}" opacity="{op}"/>')
-
-    # Líneas y puntos de cada comprobación
-    for idx_comp, comp in enumerate(comprobaciones_con_datos):
-        color = colores[idx_comp % len(colores)]
-        puntos_por_nominal = {p['nominal']: p for p in comp['puntos']}
-
-        path_points = []
-        for i, nominal in enumerate(nominales_unicos):
-            if nominal in puntos_por_nominal:
-                punto = puntos_por_nominal[nominal]
-                x = escala_x(i)
-
-                # Convertir error a porcentaje
-                error = punto.get('error', 0)
-                if nominal != 0:
-                    error_pct = (error / abs(nominal)) * 100
-                else:
-                    error_pct = error
-
-                y = escala_y(error_pct)
-                path_points.append(f"{x},{y}")
-
-        if len(path_points) > 1:
-            svg.append(f'<polyline points="{" ".join(path_points)}" fill="none" stroke="{color}" stroke-width="2" opacity="0.7"/>')
-
-        for i, nominal in enumerate(nominales_unicos):
-            if nominal in puntos_por_nominal:
-                punto = puntos_por_nominal[nominal]
-                x = escala_x(i)
-                error = punto.get('error', 0)
-
-                # Convertir error a porcentaje
-                if nominal != 0:
-                    error_pct = (error / abs(nominal)) * 100
-                else:
-                    error_pct = error
-
-                y = escala_y(error_pct)
-                svg.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="white" stroke-width="2"/>')
-
-    # Etiquetas
-    for i, nominal in enumerate(nominales_unicos):
-        if i % max(1, len(nominales_unicos) // 8) == 0 or i == len(nominales_unicos) - 1:
-            x = escala_x(i)
-            svg.append(f'<text x="{x}" y="{margin["top"] + plot_height + 20}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">{nominal:.2f}</text>')
-
-    svg.append(f'<text x="{width/2}" y="{height - 15}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151">Valor Nominal</text>')
-    svg.append(f'<text x="20" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#374151" transform="rotate(-90 20 {height/2})">Error (%)</text>')
-
-    # Leyenda debajo de la gráfica (horizontal)
-    leyenda_y = height - 5
-    leyenda_x_start = margin['left']
-    svg.append(f'<text x="{leyenda_x_start}" y="{leyenda_y}" font-family="Arial" font-size="9" font-weight="bold" fill="#374151">Comprobaciones:</text>')
-
-    x_offset = leyenda_x_start + 85
-    for idx_comp, comp in enumerate(comprobaciones_con_datos):
-        color = colores[idx_comp % len(colores)]
-        svg.append(f'<circle cx="{x_offset}" cy="{leyenda_y - 3}" r="3" fill="{color}"/>')
-        fecha_str = comp['fecha'].strftime('%d/%m/%Y') if hasattr(comp['fecha'], 'strftime') else str(comp['fecha'])
-        svg.append(f'<text x="{x_offset + 8}" y="{leyenda_y}" font-family="Arial" font-size="8" fill="#4B5563">{fecha_str}</text>')
-        x_offset += 90
-
-    svg.append('</svg>')
-    return ''.join(svg)
+    return resultado if resultado else None
 
 
 @access_check
@@ -825,22 +673,40 @@ def detalle_equipo(request, pk):
         pass
 
     # ========== GRÁFICAS HISTÓRICAS ==========
-    # Obtener últimas 5 confirmaciones con datos JSON
+    # Obtener últimas 5 confirmaciones con datos JSON (soporta v1 y v2)
     calibraciones_con_datos = []
     for cal in equipo.calibraciones.all()[:5]:
-        if hasattr(cal, 'confirmacion_metrologica_datos') and cal.confirmacion_metrologica_datos and cal.confirmacion_metrologica_datos.get('puntos_medicion'):
+        datos = getattr(cal, 'confirmacion_metrologica_datos', None)
+        if not datos:
+            continue
+        if datos.get('magnitudes'):  # formato v2 (multi-variable)
+            mags = [
+                {'nombre': m.get('nombre', ''), 'puntos': m.get('puntos_medicion', [])}
+                for m in datos['magnitudes'] if m.get('puntos_medicion')
+            ]
+            if mags:
+                calibraciones_con_datos.append({'fecha': cal.fecha_calibracion, 'magnitudes': mags})
+        elif datos.get('puntos_medicion'):  # formato v1 (una variable)
             calibraciones_con_datos.append({
                 'fecha': cal.fecha_calibracion,
-                'puntos': cal.confirmacion_metrologica_datos['puntos_medicion']
+                'magnitudes': [{'nombre': '', 'puntos': datos['puntos_medicion']}]
             })
 
-    # Obtener últimas 5 comprobaciones con datos JSON
+    # Obtener últimas 5 comprobaciones con datos JSON (soporta v1 y v2)
     comprobaciones_con_datos = []
     for comp in equipo.comprobaciones.all()[:5]:
-        if hasattr(comp, 'datos_comprobacion') and comp.datos_comprobacion and comp.datos_comprobacion.get('puntos_medicion'):
+        datos = getattr(comp, 'datos_comprobacion', None) or {}
+        if datos.get('magnitudes'):  # formato v2 (multi-variable)
+            mags = [
+                {'nombre': m.get('nombre', ''), 'puntos': m.get('puntos_medicion', [])}
+                for m in datos['magnitudes'] if m.get('puntos_medicion')
+            ]
+            if mags:
+                comprobaciones_con_datos.append({'fecha': comp.fecha_comprobacion, 'magnitudes': mags})
+        elif datos.get('puntos_medicion'):  # formato v1 (una variable)
             comprobaciones_con_datos.append({
                 'fecha': comp.fecha_comprobacion,
-                'puntos': comp.datos_comprobacion['puntos_medicion']
+                'magnitudes': [{'nombre': '', 'puntos': datos['puntos_medicion']}]
             })
 
     # Generar gráficas SVG
