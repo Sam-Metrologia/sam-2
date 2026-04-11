@@ -301,7 +301,7 @@
             {% for comp in comprobaciones %}
             <tr>
                 <td>{{ comp.fecha_comprobacion|date:"Y-m-d"|default:"N/A" }}</td>
-                <td>{{ comp.consecutivo_texto|default:comp.consecutivo|default:"—" }}</td>
+                <td>{% if comp.datos_comprobacion %}{{ comp.consecutivo_texto|default:"—" }}{% else %}—{% endif %}</td>
                 <td>{{ comp.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ comp.responsable|default:"N/A" }}</td>
                 <td>{{ comp.resultado|default:"N/A" }}</td>
