@@ -278,107 +278,102 @@ def guardar_comprobacion_json(request, equipo_id):
 
 def generar_grafica_svg_comprobacion(puntos, unidad='mm'):
     """
-    Genera una gráfica SVG de errores vs límites EMP para comprobación.
+    Genera una gráfica SVG normalizada por EMP: Y = error/EMP → ±1 = en el límite.
+    Elimina el efecto embudo al usar una escala unificada.
     """
     if not puntos or len(puntos) == 0:
         return '<svg width="700" height="350"><text x="350" y="175" text-anchor="middle" fill="#999">No hay datos para mostrar</text></svg>'
 
     # Dimensiones
-    width, height = 700, 350
-    margin = {'top': 30, 'right': 60, 'bottom': 50, 'left': 70}
+    width, height = 700, 380
+    margin = {'top': 45, 'right': 75, 'bottom': 60, 'left': 65}
     plot_width = width - margin['left'] - margin['right']
     plot_height = height - margin['top'] - margin['bottom']
 
-    # Extraer datos
-    errores = [safe_float(p.get('error', 0), 0) for p in puntos]
-    emps = [safe_float(p.get('emp_absoluto', 0), 0) for p in puntos]
+    def _y_norm(p):
+        error = safe_float(p.get('error', 0), 0)
+        emp = safe_float(p.get('emp_absoluto', 0), 0)
+        if emp and emp != 0:
+            return error / emp
+        nominal = safe_float(p.get('nominal', 1), 1) or 1
+        return error / abs(nominal)
 
-    # Calcular escalas
-    max_error = max(max(errores), max(emps))
-    min_error = min(min(errores), -max(emps))
-    rango = max_error - min_error
-    padding = rango * 0.15
+    todos_y = [_y_norm(p) for p in puntos]
 
-    y_max = max_error + padding
-    y_min = min_error - padding
+    # Rango: siempre mostrar ±1 completo con 30% de margen extra
+    y_max = max(max(todos_y), 1.0) + 0.30
+    y_min = min(min(todos_y), -1.0) - 0.30
+    if y_max == y_min:
+        y_max += 0.01; y_min -= 0.01
 
-    def escala_y(valor):
-        return margin['top'] + plot_height - ((valor - y_min) / (y_max - y_min)) * plot_height
+    def escala_y(v):
+        return margin['top'] + plot_height - ((v - y_min) / (y_max - y_min)) * plot_height
 
     def escala_x(index):
         if len(puntos) == 1:
             return margin['left'] + plot_width / 2
         return margin['left'] + (index / (len(puntos) - 1)) * plot_width
 
-    # Comenzar SVG
-    svg_parts = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    cx = width / 2
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
 
     # Título
-    svg_parts.append(f'<text x="{width/2}" y="18" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#2D3748">Errores de Medición vs Límites EMP</text>')
+    svg.append(f'<text x="{cx}" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#2D3748">Errores de Medición vs EMP</text>')
+    svg.append(f'<text x="{cx}" y="35" text-anchor="middle" font-family="Arial" font-size="9" fill="#6B7280">Normalizado por EMP — ±1 = en el límite</text>')
 
     # Cuadrícula
-    num_ticks = 6
-    for i in range(num_ticks + 1):
-        valor = y_min + (y_max - y_min) * (i / num_ticks)
-        y = escala_y(valor)
-        svg_parts.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"] + plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
-        svg_parts.append(f'<text x="{margin["left"] - 5}" y="{y + 3}" text-anchor="end" font-family="Arial" font-size="8" fill="#4B5563">{valor:.3f}</text>')
+    for i in range(7):
+        v = y_min + (y_max - y_min) * (i / 6)
+        y = escala_y(v)
+        svg.append(f'<line x1="{margin["left"]}" y1="{y}" x2="{margin["left"]+plot_width}" y2="{y}" stroke="#E5E7EB" stroke-width="1"/>')
+        svg.append(f'<text x="{margin["left"]-5}" y="{y+4}" text-anchor="end" font-family="Arial" font-size="8" fill="#6B7280">{v:.2f}</text>')
 
     # Ejes
-    svg_parts.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + plot_height}" stroke="#2D3748" stroke-width="2"/>')
-    svg_parts.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + plot_height}" x2="{margin["left"] + plot_width}" y2="{margin["top"] + plot_height}" stroke="#2D3748" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"]+plot_height}" stroke="#2D3748" stroke-width="2"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]+plot_height}" x2="{margin["left"]+plot_width}" y2="{margin["top"]+plot_height}" stroke="#2D3748" stroke-width="2"/>')
 
-    # Línea de cero
+    # Zona verde (dentro de EMP)
+    y_p1 = escala_y(1.0); y_m1 = escala_y(-1.0)
+    svg.append(f'<rect x="{margin["left"]}" y="{y_p1}" width="{plot_width}" height="{y_m1 - y_p1}" fill="#d1fae5" opacity="0.35"/>')
+
+    # Líneas ±1 (límites EMP)
+    x_left = margin['left']
+    x_right = margin['left'] + plot_width
+    x_label = x_right + 5
+    svg.append(f'<line x1="{x_left}" y1="{y_p1}" x2="{x_right}" y2="{y_p1}" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4"/>')
+    svg.append(f'<line x1="{x_left}" y1="{y_m1}" x2="{x_right}" y2="{y_m1}" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4"/>')
+    svg.append(f'<text x="{x_label}" y="{y_p1-3}" font-family="Arial" font-size="9" font-weight="bold" fill="#dc2626">+EMP</text>')
+    svg.append(f'<text x="{x_label}" y="{y_p1+10}" font-family="Arial" font-size="8" fill="#dc2626">(+1)</text>')
+    svg.append(f'<text x="{x_label}" y="{y_m1-3}" font-family="Arial" font-size="9" font-weight="bold" fill="#dc2626">−EMP</text>')
+    svg.append(f'<text x="{x_label}" y="{y_m1+10}" font-family="Arial" font-size="8" fill="#dc2626">(−1)</text>')
+
+    # Línea cero
     y0 = escala_y(0)
-    svg_parts.append(f'<line x1="{margin["left"]}" y1="{y0}" x2="{margin["left"] + plot_width}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
+    svg.append(f'<line x1="{x_left}" y1="{y0}" x2="{x_right}" y2="{y0}" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="3,3"/>')
 
-    # Límites EMP (líneas rojas escalonadas)
-    # Límite superior
-    path_sup = f'M {margin["left"]} {escala_y(emps[0])}'
-    for i in range(len(puntos)):
-        x = escala_x(i)
-        y = escala_y(emps[i])
-        path_sup += f' L {x} {y}'
-        if i < len(puntos) - 1:
-            x_next = escala_x(i + 1)
-            path_sup += f' L {x_next} {y}'
-    path_sup += f' L {margin["left"] + plot_width} {escala_y(emps[-1])}'
-    svg_parts.append(f'<path d="{path_sup}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5" fill="none"/>')
-
-    # Límite inferior
-    path_inf = f'M {margin["left"]} {escala_y(-emps[0])}'
-    for i in range(len(puntos)):
-        x = escala_x(i)
-        y = escala_y(-emps[i])
-        path_inf += f' L {x} {y}'
-        if i < len(puntos) - 1:
-            x_next = escala_x(i + 1)
-            path_inf += f' L {x_next} {y}'
-    path_inf += f' L {margin["left"] + plot_width} {escala_y(-emps[-1])}'
-    svg_parts.append(f'<path d="{path_inf}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5" fill="none"/>')
-
-    # Puntos de error
+    # Puntos de error normalizados
+    path_pts = []
     for i, punto in enumerate(puntos):
         x = escala_x(i)
-        y = escala_y(errores[i])
-        color = '#3b82f6' if punto.get('conformidad') == 'CONFORME' else '#ef4444'
-        svg_parts.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="#fff" stroke-width="2"/>')
+        y = escala_y(todos_y[i])
+        path_pts.append(f'{x},{y}')
+        color = '#16a34a' if punto.get('conformidad') == 'CONFORME' else '#dc2626'
+        svg.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{color}" stroke="white" stroke-width="2"/>')
+
+    if len(path_pts) > 1:
+        svg.append(f'<polyline points="{" ".join(path_pts)}" fill="none" stroke="#059669" stroke-width="1.5" opacity="0.6"/>')
 
     # Etiquetas eje X
     for i in range(len(puntos)):
         if i % max(1, len(puntos) // 10) == 0 or i == len(puntos) - 1:
             x = escala_x(i)
-            svg_parts.append(f'<text x="{x}" y="{margin["top"] + plot_height + 15}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">P{i+1}</text>')
+            svg.append(f'<text x="{x}" y="{margin["top"]+plot_height+14}" text-anchor="middle" font-family="Arial" font-size="9" fill="#4B5563">P{i+1}</text>')
 
-    # Etiqueta eje X
-    svg_parts.append(f'<text x="{width/2}" y="{height - 10}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#2D3748">Punto de Medición</text>')
+    svg.append(f'<text x="{cx}" y="{height-10}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#2D3748">Punto de Medición</text>')
+    svg.append(f'<text x="15" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#2D3748" transform="rotate(-90 15 {height/2})">Error / EMP</text>')
 
-    # Etiqueta eje Y (rotada)
-    svg_parts.append(f'<text x="15" y="{height/2}" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#2D3748" transform="rotate(-90 15 {height/2})">Error ({unidad})</text>')
-
-    svg_parts.append('</svg>')
-
-    return ''.join(svg_parts)
+    svg.append('</svg>')
+    return ''.join(svg)
 
 
 @login_required

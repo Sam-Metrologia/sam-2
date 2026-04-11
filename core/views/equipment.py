@@ -333,8 +333,8 @@ def _generar_una_grafica_hist_confirmacion(variable_nombre, calibraciones_variab
     if not todos_y:
         return None
 
-    y_max = max(max(todos_y), 1.0) + 0.15
-    y_min = min(min(todos_y), -1.0) - 0.15
+    y_max = max(max(todos_y), 1.0) + 0.30
+    y_min = min(min(todos_y), -1.0) - 0.30
     if y_max == y_min:
         y_max += 0.01; y_min -= 0.01
 
@@ -491,8 +491,8 @@ def _generar_una_grafica_hist_comprobacion(variable_nombre, comprobaciones_varia
     if not todos_y:
         return None
 
-    y_max = max(max(todos_y), 1.0) + 0.15
-    y_min = min(min(todos_y), -1.0) - 0.15
+    y_max = max(max(todos_y), 1.0) + 0.30
+    y_min = min(min(todos_y), -1.0) - 0.30
     if y_max == y_min:
         y_max += 0.01; y_min -= 0.01
 
