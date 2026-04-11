@@ -683,15 +683,46 @@ def aprobar_comprobacion(request, comprobacion_id):
 
                 equipo = comprobacion.equipo
 
-                # Calcular estadísticas
-                puntos = datos_comprobacion.get('puntos_medicion', [])
-                puntos_conformes = sum(1 for p in puntos if p.get('conformidad') == 'CONFORME')
-                puntos_no_conformes = sum(1 for p in puntos if p.get('conformidad') == 'NO CONFORME')
-                total_puntos = len(puntos)
+                # Detectar v2 (multi-variable) o v1 (una variable)
+                magnitudes_v2 = datos_comprobacion.get('magnitudes', [])
+                magnitudes_template = None
 
-                # Generar gráfica
-                unidad = datos_comprobacion.get('unidad_equipo', 'mm')
-                grafica_svg = generar_grafica_svg_comprobacion(puntos, unidad)
+                if magnitudes_v2:
+                    # v2: calcular stats y gráfica por cada variable
+                    magnitudes_template = []
+                    total_conformes_global = 0
+                    total_no_conformes_global = 0
+                    total_puntos_global = 0
+                    for mag in magnitudes_v2:
+                        pts = mag.get('puntos_medicion', [])
+                        conf = sum(1 for p in pts if p.get('conformidad') == 'CONFORME')
+                        no_conf = sum(1 for p in pts if p.get('conformidad') == 'NO CONFORME')
+                        unidad_mag = mag.get('unidad', '') or datos_comprobacion.get('unidad_equipo', 'mm')
+                        magnitudes_template.append({
+                            'nombre': mag.get('nombre', ''),
+                            'unidad': unidad_mag,
+                            'puntos': pts,
+                            'conformes': conf,
+                            'no_conformes': no_conf,
+                            'total': len(pts),
+                            'grafica_svg': generar_grafica_svg_comprobacion(pts, unidad_mag),
+                        })
+                        total_conformes_global += conf
+                        total_no_conformes_global += no_conf
+                        total_puntos_global += len(pts)
+                    puntos_conformes = total_conformes_global
+                    puntos_no_conformes = total_no_conformes_global
+                    total_puntos = total_puntos_global
+                    puntos = magnitudes_v2[0].get('puntos_medicion', []) if magnitudes_v2 else []
+                    grafica_svg = magnitudes_template[0]['grafica_svg'] if magnitudes_template else ''
+                else:
+                    # v1: una sola variable
+                    puntos = datos_comprobacion.get('puntos_medicion', [])
+                    puntos_conformes = sum(1 for p in puntos if p.get('conformidad') == 'CONFORME')
+                    puntos_no_conformes = sum(1 for p in puntos if p.get('conformidad') == 'NO CONFORME')
+                    total_puntos = len(puntos)
+                    unidad = datos_comprobacion.get('unidad_equipo', 'mm')
+                    grafica_svg = generar_grafica_svg_comprobacion(puntos, unidad)
 
                 # Logo de empresa
                 logo_empresa_url = None
@@ -713,6 +744,7 @@ def aprobar_comprobacion(request, comprobacion_id):
                     'puntos_no_conformes': puntos_no_conformes,
                     'total_puntos': total_puntos,
                     'grafica_svg': grafica_svg,
+                    'magnitudes_template': magnitudes_template,
                 }
 
                 # Renderizar y generar PDF
