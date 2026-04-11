@@ -255,7 +255,7 @@
         <tbody>
             {% for cal in calibraciones %}
             <tr>
-                <td>{{ cal.fecha_calibracion|date:"Y-m"|default:"N/A" }}</td>
+                <td>{{ cal.fecha_calibracion|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{{ cal.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ cal.resultado|default:"N/A" }}</td>
                 <td>{{ cal.numero_certificado|default:"N/A" }}</td>
@@ -275,7 +275,7 @@
         <tbody>
             {% for m in mantenimientos %}
             <tr>
-                <td>{{ m.fecha_mantenimiento|date:"Y-m"|default:"N/A" }}</td>
+                <td>{{ m.fecha_mantenimiento|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{{ m.get_tipo_mantenimiento_display|default:"N/A" }}</td>
                 <td>{{ m.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ m.responsable|default:"N/A" }}</td>
@@ -295,17 +295,17 @@
     {% if comprobaciones %}
     <table>
         <thead>
-            <tr><th>Fecha</th><th>Proveedor</th><th>Responsable</th><th>Resultado</th><th>Observaciones</th><th>Documento</th></tr>
+            <tr><th>Fecha</th><th>Consecutivo</th><th>Proveedor</th><th>Responsable</th><th>Resultado</th><th>Observaciones</th></tr>
         </thead>
         <tbody>
             {% for comp in comprobaciones %}
             <tr>
-                <td>{{ comp.fecha_comprobacion|date:"Y-m"|default:"N/A" }}</td>
+                <td>{{ comp.fecha_comprobacion|date:"Y-m-d"|default:"N/A" }}</td>
+                <td>{{ comp.consecutivo_texto|default:comp.consecutivo|default:"—" }}</td>
                 <td>{{ comp.nombre_proveedor|default:"N/A" }}</td>
                 <td>{{ comp.responsable|default:"N/A" }}</td>
                 <td>{{ comp.resultado|default:"N/A" }}</td>
                 <td>{{ comp.observaciones|default:"N/A" }}</td>
-                <td>{% if comp.documento_comprobacion_url %}<a href="{{ comp.documento_comprobacion_url }}">Ver</a>{% else %}N/A{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
