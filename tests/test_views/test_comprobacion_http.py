@@ -115,15 +115,15 @@ class TestGenerarGraficaSvgComprobacion:
         svg = generar_grafica_svg_comprobacion(puntos, unidad='mm')
         assert '<svg' in svg
         assert '</svg>' in svg
-        # Color azul para conforme
-        assert '#3b82f6' in svg
+        # Color verde para conforme
+        assert '#16a34a' in svg
 
     def test_un_solo_punto_no_conforme(self):
         puntos = [{'nominal': 50, 'error': 0.010, 'emp_absoluto': 0.005, 'conformidad': 'NO CONFORME'}]
         svg = generar_grafica_svg_comprobacion(puntos, unidad='g')
         assert '<svg' in svg
         # Color rojo para no conforme
-        assert '#ef4444' in svg
+        assert '#dc2626' in svg
 
     def test_multiples_puntos_genera_svg_valido(self):
         puntos = [
@@ -148,8 +148,8 @@ class TestGenerarGraficaSvgComprobacion:
         svg = generar_grafica_svg_comprobacion(puntos)
         assert '<svg' in svg
         # Debe tener ambos colores (conforme y no conforme)
-        assert '#3b82f6' in svg
-        assert '#ef4444' in svg
+        assert '#16a34a' in svg
+        assert '#dc2626' in svg
 
     def test_puntos_con_error_cero(self):
         puntos = [

@@ -319,7 +319,8 @@ def generar_grafica_svg_comprobacion(puntos, unidad='mm'):
 
     # Título
     svg.append(f'<text x="{cx}" y="20" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#2D3748">Errores de Medición vs EMP</text>')
-    svg.append(f'<text x="{cx}" y="35" text-anchor="middle" font-family="Arial" font-size="9" fill="#6B7280">Normalizado por EMP — ±1 = en el límite</text>')
+    unidad_label = f' · Unidad: {unidad}' if unidad else ''
+    svg.append(f'<text x="{cx}" y="35" text-anchor="middle" font-family="Arial" font-size="9" fill="#6B7280">Normalizado por EMP — ±1 = en el límite{unidad_label}</text>')
 
     # Cuadrícula
     for i in range(7):
