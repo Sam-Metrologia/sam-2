@@ -608,10 +608,58 @@
         </p>
         {% endif %}
 
-        <!-- Tabla detallada de deriva por punto (si existe deriva automática) -->
-        {% if deriva_automatica and deriva_automatica.puntos_detalle %}
+        <!-- Tablas detalladas de deriva por punto -->
+        {% if derivas_por_variable %}
+        <!-- Múltiples variables: tabla por cada una -->
         <p style="font-size: 9pt; font-weight: 700; color: #4A5568; margin: 15px 0 8px 0;">
-            ANÁLISIS DETALLADO DE DERIVA POR PUNTO DE MEDICIÓN{% if derivas_por_variable %} — {{ deriva_automatica.nombre|default:"Variable principal" }}{% endif %}:
+            ANÁLISIS DETALLADO DE DERIVA POR VARIABLE:
+        </p>
+        {% for var in derivas_por_variable %}
+        <div style="margin-bottom: 12px; border: 1px solid #CBD5E0; border-radius: 4px; overflow: hidden;">
+            <div style="background: {% if var.es_mas_restrictiva %}#7F1D1D{% else %}#4A5568{% endif %}; color: white; padding: 5px 10px; font-size: 8.5pt; font-weight: 700; display: flex; justify-content: space-between;">
+                <span>{{ var.nombre|default:"Variable" }}{% if var.unidad %} ({{ var.unidad }}){% endif %}</span>
+                <span>Deriva: {{ var.deriva_por_mes }} / mes · I = {% if var.intervalo_limitante %}{{ var.intervalo_limitante }} meses{% else %}∞{% endif %}{% if var.es_mas_restrictiva %} — MÁS RESTRICTIVA ◀{% endif %}</span>
+            </div>
+            <table style="font-size: 7.5pt; margin: 0; width: 100%;">
+                <thead>
+                    <tr style="background: #E2E8F0;">
+                        <th style="padding: 3px 5px; color: #2D3748;">Nominal</th>
+                        <th style="padding: 3px 5px; color: #2D3748;">Desv. Ant.<br><span style="font-weight: normal; font-size: 6.5pt;">({{ var.fecha_anterior }})</span></th>
+                        <th style="padding: 3px 5px; color: #2D3748;">Desv. Act.<br><span style="font-weight: normal; font-size: 6.5pt;">({{ var.fecha_actual }})</span></th>
+                        <th style="padding: 3px 5px; color: #2D3748;">Cambio</th>
+                        <th style="padding: 3px 5px; color: #2D3748;">EMP</th>
+                        <th style="padding: 3px 5px; color: #2D3748;">Deriva/mes</th>
+                        <th style="padding: 3px 5px; color: #1D4ED8; background: #EFF6FF;">I=EMP/Deriva<br><span style="font-weight: normal; font-size: 6.5pt;">(meses)</span></th>
+                        <th style="padding: 3px 5px; color: #2D3748;">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for punto in var.puntos_detalle %}
+                    <tr style="{% if punto.es_limitante %}background: #EFF6FF;{% elif punto.es_maximo %}background: #E2E8F0;{% else %}background: #F8FAFC;{% endif %} border-top: 1px solid #E2E8F0;">
+                        <td style="text-align: center; font-weight: 700; padding: 3px 5px;">{{ punto.nominal }}</td>
+                        <td style="text-align: center; padding: 3px 5px; color: #4A5568;">{{ punto.desviacion_anterior }}</td>
+                        <td style="text-align: center; padding: 3px 5px; color: #4A5568;">{{ punto.desviacion_actual }}</td>
+                        <td style="text-align: center; font-weight: 700; padding: 3px 5px;">{{ punto.cambio_desviacion }}</td>
+                        <td style="text-align: center; padding: 3px 5px; background: #E2E8F0;">{{ punto.emp_punto }}</td>
+                        <td style="text-align: center; padding: 3px 5px;">{{ punto.deriva_punto }}</td>
+                        <td style="text-align: center; font-weight: 900; padding: 3px 5px; {% if punto.es_limitante %}background: #2563EB; color: white;{% else %}color: #1E40AF; background: #EFF6FF;{% endif %}">
+                            {% if punto.intervalo_punto %}{{ punto.intervalo_punto }}{% else %}∞{% endif %}{% if punto.es_limitante %} ◀{% endif %}
+                        </td>
+                        <td style="text-align: center; padding: 3px 5px;">
+                            <span style="{% if punto.es_maximo %}background: #718096; color: white;{% elif punto.estado == 'ALTO' %}background: #A0AEC0; color: white;{% elif punto.estado == 'MODERADO' %}background: #CBD5E0; color: #2D3748;{% else %}background: #E2E8F0; color: #4A5568;{% endif %} padding: 1px 5px; border-radius: 2px; font-size: 6.5pt; font-weight: 700;">
+                                {{ punto.estado }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+        {% elif deriva_automatica and deriva_automatica.puntos_detalle %}
+        <!-- Una sola variable (v1) -->
+        <p style="font-size: 9pt; font-weight: 700; color: #4A5568; margin: 15px 0 8px 0;">
+            ANÁLISIS DETALLADO DE DERIVA POR PUNTO DE MEDICIÓN:
         </p>
         <table style="font-size: 8pt; margin-bottom: 10px;">
             <thead>
@@ -628,7 +676,7 @@
             </thead>
             <tbody>
                 {% for punto in deriva_automatica.puntos_detalle %}
-                <tr style="{% if punto.es_limitante %}background: #EFF6FF; outline: 2px solid #2563EB;{% elif punto.es_maximo %}background: #E2E8F0;{% elif punto.estado == 'ALTO' %}background: #EDF2F7;{% elif punto.estado == 'MODERADO' %}background: #F7FAFC;{% else %}background: #F7FAFC;{% endif %}">
+                <tr style="{% if punto.es_limitante %}background: #EFF6FF;{% elif punto.es_maximo %}background: #E2E8F0;{% elif punto.estado == 'ALTO' %}background: #EDF2F7;{% elif punto.estado == 'MODERADO' %}background: #F7FAFC;{% else %}background: #F7FAFC;{% endif %}">
                     <td style="text-align: center; font-weight: 700; padding: 4px; color: #2D3748;">{{ punto.nominal }}</td>
                     <td style="text-align: center; padding: 4px; color: #4A5568;">{{ punto.desviacion_anterior }}</td>
                     <td style="text-align: center; padding: 4px; color: #4A5568;">{{ punto.desviacion_actual }}</td>
@@ -641,19 +689,21 @@
                     </td>
                     <td style="text-align: center; padding: 4px;">
                         <span style="{% if punto.es_maximo %}background: #718096; color: white; font-weight: 900;{% elif punto.estado == 'ALTO' %}background: #A0AEC0; color: white; font-weight: 700;{% elif punto.estado == 'MODERADO' %}background: #CBD5E0; color: #2D3748;{% else %}background: #E2E8F0; color: #4A5568;{% endif %} padding: 2px 6px; border-radius: 3px; font-size: 7pt;">
-                            {% if punto.es_maximo %}⚠️ {% endif %}{{ punto.estado }}
+                            {% if punto.es_maximo %}⚠ {% endif %}{{ punto.estado }}
                         </span>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% endif %}
+
+        {% if deriva_automatica and deriva_automatica.puntos_detalle %}
         <p style="font-size: 7.5pt; color: #6c757d; font-style: italic; margin-bottom: 10px;">
-            ℹ️ <strong>Deriva:</strong> (Desv. Actual - Desv. Anterior) / Tiempo Transcurrido.
-            <strong>EMP específico por punto:</strong> {% if emp_info.unidad == '%' %}{{ emp_info.valor }}% del valor nominal de cada punto{% else %}{{ emp_info.valor }} {{ emp_info.unidad }} (constante){% endif %}.
-            Se identificaron <strong>{{ deriva_automatica.puntos_coincidentes }} puntos coincidentes</strong> con tolerancia del 5% en valor nominal.
-            <strong>"MAYOR CAMBIO"</strong>: punto con mayor variación absoluta de desviación.
-            El intervalo final se determina por el punto con menor I=EMP/Deriva (criterio más restrictivo).
+            Deriva: (Desv. Actual - Desv. Anterior) / Tiempo Transcurrido.
+            EMP especifico por punto: {% if emp_info.unidad == '%' %}{{ emp_info.valor }}% del valor nominal{% else %}{{ emp_info.valor }} {{ emp_info.unidad }} (constante){% endif %}.
+            Puntos coincidentes con tolerancia 5% en nominal. "MAYOR CAMBIO": punto con mayor variacion absoluta.
+            Intervalo final = punto con menor I=EMP/Deriva (criterio mas restrictivo).
         </p>
         {% endif %}
 
@@ -677,10 +727,18 @@
         </div>
         {% endif %}
 
-        {% if deriva_automatica and deriva_automatica.puntos_detalle %}
+        {% if derivas_por_variable %}
+        {% for var in derivas_por_variable %}{% if var.es_mas_restrictiva %}
+        {% for punto in var.puntos_detalle %}{% if punto.es_limitante %}
+        <p style="font-size: 8pt; background: #2563EB; color: white; padding: 5px 10px; border-radius: 3px; margin: 6px 0; font-weight: 700;">
+            Punto limitante ({{ var.nombre|default:"Variable principal" }}): nominal={{ punto.nominal }} | EMP={{ punto.emp_punto }} / Deriva={{ punto.deriva_punto }} = <strong>{{ punto.intervalo_punto }} meses</strong>
+        </p>
+        {% endif %}{% endfor %}
+        {% endif %}{% endfor %}
+        {% elif deriva_automatica and deriva_automatica.puntos_detalle %}
         {% for punto in deriva_automatica.puntos_detalle %}{% if punto.es_limitante %}
         <p style="font-size: 8pt; background: #2563EB; color: white; padding: 5px 10px; border-radius: 3px; margin: 6px 0; font-weight: 700;">
-            ◀ Punto limitante: nominal={{ punto.nominal }} | EMP={{ punto.emp_punto }} / Deriva={{ punto.deriva_punto }} = <strong>{{ punto.intervalo_punto }} meses</strong>
+            Punto limitante: nominal={{ punto.nominal }} | EMP={{ punto.emp_punto }} / Deriva={{ punto.deriva_punto }} = <strong>{{ punto.intervalo_punto }} meses</strong>
         </p>
         {% endif %}{% endfor %}
         {% endif %}

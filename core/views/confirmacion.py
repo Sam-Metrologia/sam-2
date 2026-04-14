@@ -1246,7 +1246,7 @@ def generar_pdf_intervalos(request, equipo_id):
     # Primero intentar usar el campo _display que preserva el formato original
     if equipo.empresa.intervalos_fecha_formato_display:
         formato_fecha_formateada_int = equipo.empresa.intervalos_fecha_formato_display
-        datos_intervalos['formato']['fecha'] = formato_fecha_formateada_int
+        datos_intervalos.setdefault('formato', {})['fecha'] = formato_fecha_formateada_int
     elif datos_intervalos.get('formato', {}).get('fecha'):
         # Usar el valor existente sin forzar formato
         formato_fecha_formateada_int = datos_intervalos['formato']['fecha']

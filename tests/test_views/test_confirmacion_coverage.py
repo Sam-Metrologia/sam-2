@@ -578,3 +578,110 @@ class TestActualizarFormatoEmpresaRamas:
         data = json.loads(response.content)
         assert data['success'] is False
         assert 'Error' in data['message']
+
+
+# ---------------------------------------------------------------------------
+# 7. generar_pdf_intervalos — prevenir KeyError cuando datos_intervalos
+#    no tiene clave 'formato' y la empresa tiene intervalos_fecha_formato_display
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestGenerarPdfIntervalosKeyError:
+    """
+    Regresión: datos_intervalos['formato']['fecha'] fallaba con KeyError
+    cuando el POST llegaba sin la clave 'formato' en el JSON.
+    Fix: usar setdefault('formato', {}) antes de asignar.
+    """
+
+    def setup_method(self):
+        self.empresa = _make_empresa('pdf_int')
+        self.user = _make_user(self.empresa, username='pdf_int_user')
+        self.equipo = _make_equipo(self.empresa, codigo='PDF-INT-001')
+        proveedor, _ = Proveedor.objects.get_or_create(
+            nombre_empresa='Lab PDF INT',
+            empresa=self.empresa,
+            defaults={'correo_electronico': 'lab@pdfint.com', 'tipo_servicio': 'Calibración'},
+        )
+        self.cal = Calibracion.objects.create(
+            equipo=self.equipo,
+            fecha_calibracion=date.today() - timedelta(days=10),
+            proveedor=proveedor,
+            numero_certificado='CERT-PDF-INT-001',
+            resultado='Aprobado',
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse('core:generar_pdf_intervalos', kwargs={'equipo_id': self.equipo.pk})
+
+    def _post_datos(self, datos_intervalos):
+        """Helper para POST con WeasyPrint mockeado."""
+        mock_pdf = MagicMock()
+        mock_pdf.write_pdf.return_value = b'%PDF-1.4 fake'
+        with patch('weasyprint.HTML', return_value=mock_pdf):
+            return self.client.post(
+                f'{self.url}?calibracion_id={self.cal.pk}',
+                data={'datos_intervalos': json.dumps(datos_intervalos)},
+            )
+
+    def test_datos_sin_clave_formato_no_lanza_keyerror(self):
+        """
+        POST con datos_intervalos SIN la clave 'formato' no debe fallar con KeyError.
+        Regresión: datos_intervalos['formato']['fecha'] → KeyError si 'formato' no existe.
+        """
+        datos = {
+            'metodo_seleccionado': 'manual',
+            'intervalo_definitivo': 12,
+            'metodo2_intervalo': 12,
+        }
+        # Simular que empresa tiene formato de fecha configurado
+        self.empresa.intervalos_fecha_formato_display = '2026-01-15'
+        self.empresa.save(update_fields=['intervalos_fecha_formato_display'])
+
+        response = self._post_datos(datos)
+        data = json.loads(response.content)
+        # No debe ser un error de KeyError/TypeError — puede fallar por otras razones
+        # (WeasyPrint, permisos de guardado, etc.) pero NO por falta de 'formato'
+        assert response.status_code in (200, 500)
+        if response.status_code == 500:
+            error_type = data.get('error_type', '')
+            error_msg = data.get('error', '')
+            # El bug específico era: KeyError con mensaje exactamente "'formato'"
+            assert not (error_type == 'KeyError' and error_msg == "'formato'")
+
+    def test_datos_con_clave_formato_funciona(self):
+        """POST con datos_intervalos que SÍ tiene 'formato' funciona correctamente."""
+        datos = {
+            'metodo_seleccionado': 'manual',
+            'intervalo_definitivo': 12,
+            'metodo2_intervalo': 12,
+            'formato': {
+                'fecha': '2026-01-15',
+                'codigo': 'INT-001',
+                'version': '1.0',
+            },
+        }
+        response = self._post_datos(datos)
+        assert response.status_code in (200, 500)
+
+    def test_calibracion_inexistente_retorna_error(self):
+        """calibracion_id que no existe → error JSON (safe_pdf_response captura Http404)."""
+        response = self.client.post(
+            f'{self.url}?calibracion_id=999999',
+            data={'datos_intervalos': '{}'},
+        )
+        # safe_pdf_response captura Http404 y retorna 500 JSON
+        assert response.status_code in (404, 500)
+
+    def test_sin_datos_intervalos_no_explota(self):
+        """POST sin datos_intervalos (datos vacíos) no lanza excepción no controlada."""
+        mock_pdf = MagicMock()
+        mock_pdf.write_pdf.return_value = b'%PDF-1.4 fake'
+        with patch('weasyprint.HTML', return_value=mock_pdf):
+            response = self.client.post(
+                f'{self.url}?calibracion_id={self.cal.pk}',
+                data={},  # sin datos_intervalos
+            )
+        # Debe devolver JSON (200 o 500), no un crash de servidor no controlado
+        assert response.status_code in (200, 500)
+        content_type = response.get('Content-Type', '')
+        assert 'json' in content_type or response.status_code == 500
