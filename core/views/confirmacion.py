@@ -440,6 +440,108 @@ def confirmacion_metrologica(request, equipo_id):
     return render(request, 'core/confirmacion_metrologica.html', context)
 
 
+def _calcular_deriva_variable(puntos_actual, puntos_anterior, emp_info, fecha_actual, fecha_anterior):
+    """
+    Calcula la deriva para UNA variable (lista de puntos de calibración actual vs anterior).
+    Retorna dict con puntos_detalle como lista Python, o None si no hay puntos coincidentes.
+    """
+    if not puntos_actual or not puntos_anterior:
+        return None
+    dias = (fecha_actual - fecha_anterior).days
+    meses = dias / 30.44
+    if meses <= 0:
+        return None
+
+    emp_valor = emp_info['valor']
+    emp_unidad = emp_info['unidad']
+
+    puntos_coincidentes = []
+    for p_actual in puntos_actual:
+        nominal_actual = p_actual.get('nominal')
+        if nominal_actual is None:
+            continue
+        mejor_match, mejor_dif = None, float('inf')
+        for p_anterior in puntos_anterior:
+            nominal_anterior = p_anterior.get('nominal')
+            if nominal_anterior is None:
+                continue
+            dif_abs = abs(nominal_actual - nominal_anterior)
+            dif_rel = dif_abs / abs(nominal_actual) if nominal_actual != 0 else dif_abs
+            if dif_rel < mejor_dif and dif_rel <= 0.05:
+                mejor_match = p_anterior
+                mejor_dif = dif_rel
+        if mejor_match:
+            puntos_coincidentes.append({
+                'nominal': nominal_actual,
+                'desviacion_actual': p_actual.get('desviacion_abs', 0),
+                'desviacion_anterior': mejor_match.get('desviacion_abs', 0),
+                'cambio_desviacion': abs(p_actual.get('desviacion_abs', 0) - mejor_match.get('desviacion_abs', 0)),
+            })
+
+    if not puntos_coincidentes:
+        return None
+
+    punto_max_cambio = max(puntos_coincidentes, key=lambda p: p['cambio_desviacion'])
+
+    for punto in puntos_coincidentes:
+        nominal = punto['nominal']
+        emp_pv = next((p.get('emp_valor') for p in puntos_actual
+                       if p.get('nominal') is not None and
+                       (abs(p['nominal'] - nominal) / abs(nominal) <= 0.05 if nominal != 0 else abs(p['nominal'] - nominal) < 1e-9)),
+                      None)
+        emp_pt = next((p.get('emp_tipo') for p in puntos_actual
+                       if p.get('nominal') is not None and
+                       (abs(p['nominal'] - nominal) / abs(nominal) <= 0.05 if nominal != 0 else abs(p['nominal'] - nominal) < 1e-9)),
+                      None)
+        if emp_pv is not None and emp_pt is not None:
+            emp_punto = nominal * (emp_pv / 100) if emp_pt == '%' else emp_pv
+        elif emp_unidad == '%':
+            emp_punto = nominal * (emp_valor / 100)
+        else:
+            emp_punto = emp_valor
+
+        punto['emp_punto'] = round(emp_punto, 4)
+        deriva_p = punto['cambio_desviacion'] / meses
+        punto['deriva_punto'] = round(deriva_p, 6)
+        punto['intervalo_punto'] = round(emp_punto / deriva_p, 1) if deriva_p > 0 else None
+
+        cambio = punto['cambio_desviacion']
+        max_cambio = punto_max_cambio['cambio_desviacion']
+        if cambio == max_cambio:
+            punto['estado'] = 'MAYOR CAMBIO'; punto['es_maximo'] = True
+        elif cambio > max_cambio * 0.7:
+            punto['estado'] = 'ALTO'; punto['es_maximo'] = False
+        elif cambio > max_cambio * 0.3:
+            punto['estado'] = 'MODERADO'; punto['es_maximo'] = False
+        else:
+            punto['estado'] = 'BAJO'; punto['es_maximo'] = False
+
+    puntos_con_i = [p for p in puntos_coincidentes if p.get('intervalo_punto') is not None]
+    if puntos_con_i:
+        punto_lim = min(puntos_con_i, key=lambda p: p['intervalo_punto'])
+        for p in puntos_coincidentes:
+            p['es_limitante'] = (p.get('intervalo_punto') == punto_lim['intervalo_punto'])
+        intervalo_limitante = punto_lim['intervalo_punto']
+    else:
+        for p in puntos_coincidentes:
+            p['es_limitante'] = False
+        intervalo_limitante = None
+
+    return {
+        'fecha_anterior': fecha_anterior.strftime('%Y-%m-%d'),
+        'fecha_actual': fecha_actual.strftime('%Y-%m-%d'),
+        'meses_transcurridos': round(meses, 2),
+        'desviacion_anterior': punto_max_cambio['desviacion_anterior'],
+        'desviacion_actual': punto_max_cambio['desviacion_actual'],
+        'cambio_desviacion': punto_max_cambio['cambio_desviacion'],
+        'deriva_por_mes': round(punto_max_cambio['cambio_desviacion'] / meses, 6),
+        'puntos_coincidentes': len(puntos_coincidentes),
+        'nominal_referencia': punto_max_cambio['nominal'],
+        'puntos_detalle': puntos_coincidentes,   # lista Python
+        'intervalo_limitante': intervalo_limitante,
+    }
+
+
 @monitor_view
 @access_check
 @login_required
@@ -518,140 +620,60 @@ def intervalos_calibracion(request, equipo_id):
         datos_confirmacion_anterior = cal_anterior.confirmacion_metrologica_datos
 
     # Calcular deriva automáticamente si tenemos ambas confirmaciones
+    derivas_por_variable = []   # resumen por variable para el template
     if datos_confirmacion_actual and datos_confirmacion_anterior:
-        # Comparar puntos de calibración con tolerancia 5%
-        puntos_actual = datos_confirmacion_actual.get('puntos_medicion', [])
-        puntos_anterior = datos_confirmacion_anterior.get('puntos_medicion', [])
+        # Detectar v2 (multi-variable) o v1 (una variable)
+        mags_act = datos_confirmacion_actual.get('magnitudes', [])
+        mags_ant = datos_confirmacion_anterior.get('magnitudes', [])
 
+        if mags_act and mags_ant:
+            # v2: iterar sobre cada variable
+            for mag_act in mags_act:
+                nombre_var = mag_act.get('nombre', '') or ''
+                unidad_var = mag_act.get('unidad', '') or ''
+                pts_act = mag_act.get('puntos_medicion', [])
+                # Buscar variable coincidente en la anterior por nombre; si no, usar la primera
+                mag_ant = next((m for m in mags_ant if (m.get('nombre') or '') == nombre_var),
+                               mags_ant[0] if mags_ant else None)
+                pts_ant = mag_ant.get('puntos_medicion', []) if mag_ant else []
+                resultado = _calcular_deriva_variable(
+                    pts_act, pts_ant, emp_info,
+                    cal_actual.fecha_calibracion, cal_anterior.fecha_calibracion
+                )
+                if resultado:
+                    resultado['nombre'] = nombre_var
+                    resultado['unidad'] = unidad_var
+                    resultado['es_mas_restrictiva'] = False
+                    derivas_por_variable.append(resultado)
+        else:
+            # v1: una sola variable
+            pts_act = datos_confirmacion_actual.get('puntos_medicion', [])
+            pts_ant = datos_confirmacion_anterior.get('puntos_medicion', [])
+            resultado = _calcular_deriva_variable(
+                pts_act, pts_ant, emp_info,
+                cal_actual.fecha_calibracion, cal_anterior.fecha_calibracion
+            )
+            if resultado:
+                resultado['nombre'] = ''
+                resultado['unidad'] = ''
+                resultado['es_mas_restrictiva'] = False
+                derivas_por_variable.append(resultado)
 
-        puntos_coincidentes = []
-        for idx_actual, p_actual in enumerate(puntos_actual):
-            nominal_actual = p_actual['nominal']
+        # La variable más restrictiva = menor intervalo limitante
+        vars_con_i = [v for v in derivas_por_variable if v.get('intervalo_limitante') is not None]
+        if vars_con_i:
+            var_rest = min(vars_con_i, key=lambda v: v['intervalo_limitante'])
+        elif derivas_por_variable:
+            var_rest = derivas_por_variable[0]
+        else:
+            var_rest = None
 
-            # Buscar punto coincidente en calibración anterior (tolerancia 5%)
-            mejor_match = None
-            mejor_diferencia = float('inf')
-
-            for idx_anterior, p_anterior in enumerate(puntos_anterior):
-                nominal_anterior = p_anterior['nominal']
-
-                # Calcular diferencia absoluta y relativa
-                diferencia_absoluta = abs(nominal_actual - nominal_anterior)
-                if nominal_actual != 0:
-                    diferencia_relativa = diferencia_absoluta / abs(nominal_actual)
-                else:
-                    diferencia_relativa = diferencia_absoluta
-
-                # Usar tolerancia más estricta: debe ser casi exacto
-                if diferencia_relativa < mejor_diferencia and diferencia_relativa <= 0.05:
-                    mejor_match = (idx_anterior, p_anterior)
-                    mejor_diferencia = diferencia_relativa
-
-            if mejor_match:
-                idx_anterior, p_anterior = mejor_match
-
-                # Punto coincidente encontrado
-                puntos_coincidentes.append({
-                    'nominal': nominal_actual,
-                    'desviacion_actual': p_actual['desviacion_abs'],
-                    'desviacion_anterior': p_anterior['desviacion_abs'],
-                    'cambio_desviacion': abs(p_actual['desviacion_abs'] - p_anterior['desviacion_abs'])
-                })
-
-        # Calcular deriva basándose en el punto con mayor cambio
-        if puntos_coincidentes:
-            punto_max_cambio = max(puntos_coincidentes, key=lambda p: p['cambio_desviacion'])
-
-            # Calcular tiempo transcurrido en meses
-            fecha_actual = cal_actual.fecha_calibracion
-            fecha_anterior = cal_anterior.fecha_calibracion
-            dias_transcurridos = (fecha_actual - fecha_anterior).days
-            meses_transcurridos = dias_transcurridos / 30.44  # Promedio dias por mes
-
-            # Calcular deriva (cambio por mes)
-            if meses_transcurridos > 0:
-                deriva_por_mes = punto_max_cambio['cambio_desviacion'] / meses_transcurridos
-            else:
-                deriva_por_mes = 0
-
-            # Obtener EMP para calcular EMP especifico de cada punto
-            emp_valor = emp_info['valor']
-            emp_unidad = emp_info['unidad']
-
-            # Calcular deriva individual y EMP especifico para cada punto
-            for idx_punto, punto in enumerate(puntos_coincidentes):
-                # Deriva de este punto específico (cambio / tiempo)
-                if meses_transcurridos > 0:
-                    deriva_punto = punto['cambio_desviacion'] / meses_transcurridos
-                else:
-                    deriva_punto = 0
-
-                punto['deriva_punto'] = round(deriva_punto, 6)
-
-                # NUEVO: Buscar EMP especifico de este punto en datos_confirmacion_actual
-                nominal_punto = punto['nominal']
-                emp_punto_encontrado = None
-                emp_tipo_encontrado = None
-
-                for p_actual in puntos_actual:
-                    if abs(p_actual['nominal'] - nominal_punto) / nominal_punto <= 0.05 if nominal_punto != 0 else False:
-                        # Encontramos el punto, extraer su EMP
-                        emp_punto_encontrado = p_actual.get('emp_valor')
-                        emp_tipo_encontrado = p_actual.get('emp_tipo')
-                        break
-
-                # Calcular EMP especifico de este punto
-                if emp_punto_encontrado is not None and emp_tipo_encontrado is not None:
-                    # Usar EMP del punto guardado en confirmacion
-                    if emp_tipo_encontrado == '%':
-                        emp_punto = nominal_punto * (emp_punto_encontrado / 100)
-                    else:  # 'abs'
-                        emp_punto = emp_punto_encontrado
-                else:
-                    # Fallback: usar EMP global del equipo (compatibilidad con datos antiguos)
-                    if emp_unidad == '%':
-                        emp_punto = nominal_punto * (emp_valor / 100)
-                    else:
-                        emp_punto = emp_valor
-
-                punto['emp_punto'] = round(emp_punto, 4)
-                punto['intervalo_punto'] = round(emp_punto / deriva_punto, 1) if deriva_punto > 0 else None
-
-                # Determinar estado basado en cambio
-                if punto['cambio_desviacion'] == punto_max_cambio['cambio_desviacion']:
-                    punto['estado'] = 'MAYOR CAMBIO'
-                    punto['es_maximo'] = True
-                elif punto['cambio_desviacion'] > punto_max_cambio['cambio_desviacion'] * 0.7:
-                    punto['estado'] = 'ALTO'
-                    punto['es_maximo'] = False
-                elif punto['cambio_desviacion'] > punto_max_cambio['cambio_desviacion'] * 0.3:
-                    punto['estado'] = 'MODERADO'
-                    punto['es_maximo'] = False
-                else:
-                    punto['estado'] = 'BAJO'
-                    punto['es_maximo'] = False
-
-            # Marcar el punto con menor I=EMP/Deriva (el limitante real del intervalo)
-            puntos_con_i = [p for p in puntos_coincidentes if p.get('intervalo_punto') is not None]
-            if puntos_con_i:
-                punto_limitante = min(puntos_con_i, key=lambda p: p['intervalo_punto'])
-                for p in puntos_coincidentes:
-                    p['es_limitante'] = (p.get('intervalo_punto') == punto_limitante['intervalo_punto'])
-            else:
-                for p in puntos_coincidentes:
-                    p['es_limitante'] = False
-
+        if var_rest:
+            var_rest['es_mas_restrictiva'] = True
+            # deriva_automatica mantiene el mismo formato (puntos_detalle como JSON string para JS)
             deriva_automatica = {
-                'fecha_anterior': fecha_anterior.strftime('%Y-%m-%d'),
-                'fecha_actual': fecha_actual.strftime('%Y-%m-%d'),
-                'meses_transcurridos': round(meses_transcurridos, 2),
-                'desviacion_anterior': punto_max_cambio['desviacion_anterior'],
-                'desviacion_actual': punto_max_cambio['desviacion_actual'],
-                'cambio_desviacion': punto_max_cambio['cambio_desviacion'],
-                'deriva_por_mes': deriva_por_mes,
-                'puntos_coincidentes': len(puntos_coincidentes),
-                'nominal_referencia': punto_max_cambio['nominal'],
-                'puntos_detalle': json.dumps(puntos_coincidentes)  # Serializar a JSON string para el template
+                **var_rest,
+                'puntos_detalle': json.dumps(var_rest['puntos_detalle']),
             }
 
     # ==================== CALCULAR ERROR MÁXIMO PARA MÉTODO 1B ====================
@@ -659,7 +681,12 @@ def intervalos_calibracion(request, equipo_id):
     puntos_metodo1b = []  # NUEVO: Lista de todos los puntos para tabla editable
 
     if datos_confirmacion_actual:
-        puntos = datos_confirmacion_actual.get('puntos_medicion', [])
+        # Soportar v2: agregar puntos de todas las variables
+        mags_1b = datos_confirmacion_actual.get('magnitudes', [])
+        if mags_1b:
+            puntos = [p for m in mags_1b for p in m.get('puntos_medicion', [])]
+        else:
+            puntos = datos_confirmacion_actual.get('puntos_medicion', [])
         if puntos:
             # NUEVO: Buscar el punto con el porcentaje de EMP más alto (error/EMP)
             # Esto identifica el punto más crítico
@@ -735,6 +762,8 @@ def intervalos_calibracion(request, equipo_id):
         'datos_confirmacion_actual': datos_confirmacion_actual,
         'datos_confirmacion_anterior': datos_confirmacion_anterior,
         'deriva_automatica': deriva_automatica,
+        # Tabla resumen por variable (solo cuando hay múltiples variables)
+        'derivas_por_variable': derivas_por_variable if len(derivas_por_variable) > 1 else [],
 
         # NUEVO: Error máximo para Método 1B
         'error_maximo_info': error_maximo_info,
@@ -1146,90 +1175,60 @@ def generar_pdf_intervalos(request, equipo_id):
 
     # Obtener deriva automática para incluir en PDF (siempre que haya datos de confirmación)
     deriva_automatica_pdf = None
+    derivas_por_variable_pdf = []
     if (cal_anterior and
             hasattr(calibracion_actual, 'confirmacion_metrologica_datos') and calibracion_actual.confirmacion_metrologica_datos and
             hasattr(cal_anterior, 'confirmacion_metrologica_datos') and cal_anterior.confirmacion_metrologica_datos):
-            datos_actual = calibracion_actual.confirmacion_metrologica_datos
-            datos_anterior = cal_anterior.confirmacion_metrologica_datos
+        datos_actual_pdf = calibracion_actual.confirmacion_metrologica_datos
+        datos_anterior_pdf = cal_anterior.confirmacion_metrologica_datos
 
-            puntos_actual = datos_actual.get('puntos_medicion', [])
-            puntos_anterior = datos_anterior.get('puntos_medicion', [])
+        mags_act_pdf = datos_actual_pdf.get('magnitudes', [])
+        mags_ant_pdf = datos_anterior_pdf.get('magnitudes', [])
 
-            puntos_coincidentes_pdf = []
-            for p_actual in puntos_actual:
-                nominal_actual = p_actual['nominal']
-                for p_anterior in puntos_anterior:
-                    nominal_anterior = p_anterior['nominal']
-                    diferencia_porcentual = abs(nominal_actual - nominal_anterior) / nominal_actual if nominal_actual != 0 else 0
+        if mags_act_pdf and mags_ant_pdf:
+            for mag_act in mags_act_pdf:
+                nombre_var = mag_act.get('nombre', '') or ''
+                unidad_var = mag_act.get('unidad', '') or ''
+                pts_act = mag_act.get('puntos_medicion', [])
+                mag_ant = next((m for m in mags_ant_pdf if (m.get('nombre') or '') == nombre_var),
+                               mags_ant_pdf[0] if mags_ant_pdf else None)
+                pts_ant = mag_ant.get('puntos_medicion', []) if mag_ant else []
+                resultado = _calcular_deriva_variable(
+                    pts_act, pts_ant, emp_info,
+                    calibracion_actual.fecha_calibracion, cal_anterior.fecha_calibracion
+                )
+                if resultado:
+                    resultado['nombre'] = nombre_var
+                    resultado['unidad'] = unidad_var
+                    resultado['es_mas_restrictiva'] = False
+                    derivas_por_variable_pdf.append(resultado)
+        else:
+            pts_act = datos_actual_pdf.get('puntos_medicion', [])
+            pts_ant = datos_anterior_pdf.get('puntos_medicion', [])
+            resultado = _calcular_deriva_variable(
+                pts_act, pts_ant, emp_info,
+                calibracion_actual.fecha_calibracion, cal_anterior.fecha_calibracion
+            )
+            if resultado:
+                resultado['nombre'] = ''
+                resultado['unidad'] = ''
+                resultado['es_mas_restrictiva'] = False
+                derivas_por_variable_pdf.append(resultado)
 
-                    if diferencia_porcentual <= 0.05:
-                        # Calcular EMP específico de este punto
-                        emp_punto_encontrado = p_actual.get('emp_valor')
-                        emp_tipo_encontrado = p_actual.get('emp_tipo')
+        vars_con_i_pdf = [v for v in derivas_por_variable_pdf if v.get('intervalo_limitante') is not None]
+        if vars_con_i_pdf:
+            var_rest_pdf = min(vars_con_i_pdf, key=lambda v: v['intervalo_limitante'])
+        elif derivas_por_variable_pdf:
+            var_rest_pdf = derivas_por_variable_pdf[0]
+        else:
+            var_rest_pdf = None
 
-                        if emp_punto_encontrado is not None and emp_tipo_encontrado is not None:
-                            # Usar EMP del punto guardado en confirmación
-                            if emp_tipo_encontrado == '%':
-                                emp_punto = nominal_actual * (emp_punto_encontrado / 100)
-                            else:  # 'abs'
-                                emp_punto = emp_punto_encontrado
-                        else:
-                            # Fallback: usar EMP global del equipo
-                            if emp_info['unidad'] == '%':
-                                emp_punto = nominal_actual * (emp_info['valor'] / 100)
-                            else:
-                                emp_punto = emp_info['valor']
-
-                        puntos_coincidentes_pdf.append({
-                            'nominal': nominal_actual,
-                            'desviacion_actual': p_actual['desviacion_abs'],
-                            'desviacion_anterior': p_anterior['desviacion_abs'],
-                            'cambio_desviacion': abs(p_actual['desviacion_abs'] - p_anterior['desviacion_abs']),
-                            'emp_punto': round(emp_punto, 4)
-                        })
-                        break
-
-            if puntos_coincidentes_pdf:
-                punto_max_cambio_pdf = max(puntos_coincidentes_pdf, key=lambda p: p['cambio_desviacion'])
-                fecha_actual_pdf = calibracion_actual.fecha_calibracion
-                fecha_anterior_pdf = cal_anterior.fecha_calibracion
-                dias_transcurridos_pdf = (fecha_actual_pdf - fecha_anterior_pdf).days
-                meses_transcurridos_pdf = dias_transcurridos_pdf / 30.44
-
-                # Calcular deriva individual para cada punto (EMP ya se calculó antes por punto)
-                for punto in puntos_coincidentes_pdf:
-                    deriva_punto = punto['cambio_desviacion'] / meses_transcurridos_pdf if meses_transcurridos_pdf > 0 else 0
-                    punto['deriva_punto'] = round(deriva_punto, 6)
-                    punto['intervalo_punto'] = round(punto['emp_punto'] / deriva_punto, 1) if deriva_punto > 0 else None
-
-                    # Estado basado en cambio de desviación
-                    if punto['cambio_desviacion'] == punto_max_cambio_pdf['cambio_desviacion']:
-                        punto['estado'] = 'MAYOR CAMBIO'
-                        punto['es_maximo'] = True
-                    elif punto['cambio_desviacion'] > punto_max_cambio_pdf['cambio_desviacion'] * 0.7:
-                        punto['estado'] = 'ALTO'
-                        punto['es_maximo'] = False
-                    elif punto['cambio_desviacion'] > punto_max_cambio_pdf['cambio_desviacion'] * 0.3:
-                        punto['estado'] = 'MODERADO'
-                        punto['es_maximo'] = False
-                    else:
-                        punto['estado'] = 'BAJO'
-                        punto['es_maximo'] = False
-
-                # Marcar el punto limitante (menor I=EMP/Deriva)
-                puntos_con_i = [p for p in puntos_coincidentes_pdf if p.get('intervalo_punto') is not None]
-                if puntos_con_i:
-                    punto_lim = min(puntos_con_i, key=lambda p: p['intervalo_punto'])
-                    for p in puntos_coincidentes_pdf:
-                        p['es_limitante'] = (p.get('intervalo_punto') == punto_lim['intervalo_punto'])
-                else:
-                    for p in puntos_coincidentes_pdf:
-                        p['es_limitante'] = False
-
-                deriva_automatica_pdf = {
-                    'puntos_detalle': puntos_coincidentes_pdf,
-                    'puntos_coincidentes': len(puntos_coincidentes_pdf)
-                }
+        if var_rest_pdf:
+            var_rest_pdf['es_mas_restrictiva'] = True
+            deriva_automatica_pdf = {
+                **var_rest_pdf,
+                'puntos_detalle': var_rest_pdf['puntos_detalle'],  # lista para el template PDF
+            }
 
     # Obtener logo de empresa de forma segura
     logo_empresa_url = None
@@ -1267,6 +1266,7 @@ def generar_pdf_intervalos(request, equipo_id):
 
         # Pasar deriva automática para tabla detallada en PDF
         'deriva_automatica': deriva_automatica_pdf,
+        'derivas_por_variable': derivas_por_variable_pdf if len(derivas_por_variable_pdf) > 1 else [],
         'total_calibraciones': Calibracion.objects.filter(equipo=equipo).count(),
         'emp_texto': equipo.error_maximo_permisible or f"{emp_info['valor']} {emp_info['unidad']}",
     }

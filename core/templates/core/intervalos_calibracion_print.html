@@ -566,10 +566,52 @@
             </tbody>
         </table>
 
+        <!-- Tabla resumen por variable (solo cuando hay múltiples variables) -->
+        {% if derivas_por_variable %}
+        <p style="font-size: 9pt; font-weight: 700; color: #4A5568; margin: 15px 0 6px 0;">
+            ANÁLISIS DE DERIVA POR VARIABLE:
+        </p>
+        <table style="font-size: 8pt; margin-bottom: 10px; width: 100%;">
+            <thead>
+                <tr style="background: #4338CA; color: white;">
+                    <th style="padding: 4px 6px; text-align: left;">Variable</th>
+                    <th style="padding: 4px 6px; text-align: center;">Unidad</th>
+                    <th style="padding: 4px 6px; text-align: center;">Puntos</th>
+                    <th style="padding: 4px 6px; text-align: center;">Deriva/mes</th>
+                    <th style="padding: 4px 6px; text-align: center;">I=EMP/Deriva (meses)</th>
+                    <th style="padding: 4px 6px; text-align: center;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for var in derivas_por_variable %}
+                <tr style="{% if var.es_mas_restrictiva %}background: #FEF9C3; font-weight: 700;{% else %}background: #F8FAFC;{% endif %} border-bottom: 1px solid #E2E8F0;">
+                    <td style="padding: 4px 6px;">{{ var.nombre|default:"Sin nombre" }}</td>
+                    <td style="padding: 4px 6px; text-align: center;">{{ var.unidad|default:"—" }}</td>
+                    <td style="padding: 4px 6px; text-align: center;">{{ var.puntos_coincidentes }}</td>
+                    <td style="padding: 4px 6px; text-align: center;">{{ var.deriva_por_mes }}</td>
+                    <td style="padding: 4px 6px; text-align: center; font-weight: 900; {% if var.es_mas_restrictiva %}color: #DC2626;{% else %}color: #1D4ED8;{% endif %}">
+                        {% if var.intervalo_limitante %}{{ var.intervalo_limitante }}{% else %}∞{% endif %}
+                    </td>
+                    <td style="padding: 4px 6px; text-align: center;">
+                        {% if var.es_mas_restrictiva %}
+                        <span style="background: #DC2626; color: white; padding: 1px 6px; border-radius: 3px; font-size: 7pt;">MÁS RESTRICTIVA ◀</span>
+                        {% else %}
+                        <span style="background: #E2E8F0; color: #4A5568; padding: 1px 6px; border-radius: 3px; font-size: 7pt;">Menos restrictiva</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p style="font-size: 7.5pt; color: #6B7280; font-style: italic; margin-bottom: 10px;">
+            La tabla detallada a continuación corresponde a la variable más restrictiva (menor I=EMP/Deriva).
+        </p>
+        {% endif %}
+
         <!-- Tabla detallada de deriva por punto (si existe deriva automática) -->
         {% if deriva_automatica and deriva_automatica.puntos_detalle %}
         <p style="font-size: 9pt; font-weight: 700; color: #4A5568; margin: 15px 0 8px 0;">
-            ANÁLISIS DETALLADO DE DERIVA POR PUNTO DE MEDICIÓN:
+            ANÁLISIS DETALLADO DE DERIVA POR PUNTO DE MEDICIÓN{% if derivas_por_variable %} — {{ deriva_automatica.nombre|default:"Variable principal" }}{% endif %}:
         </p>
         <table style="font-size: 8pt; margin-bottom: 10px;">
             <thead>

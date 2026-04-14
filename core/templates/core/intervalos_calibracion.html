@@ -155,6 +155,50 @@
                         📊 Análisis Detallado de Deriva ({{ deriva_automatica.puntos_coincidentes }} puntos coincidentes)
                     </h4>
 
+                    <!-- Resumen por variable (solo cuando hay múltiples variables) -->
+                    {% if derivas_por_variable %}
+                    <div class="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <p class="text-xs font-bold text-indigo-800 mb-2">
+                            Análisis por Variable — El sistema usa automáticamente la variable más restrictiva (menor intervalo):
+                        </p>
+                        <table class="w-full text-xs border-collapse">
+                            <thead class="bg-indigo-700 text-white">
+                                <tr>
+                                    <th class="px-3 py-1 text-left">Variable</th>
+                                    <th class="px-3 py-1 text-center">Unidad</th>
+                                    <th class="px-3 py-1 text-center">Puntos</th>
+                                    <th class="px-3 py-1 text-center">Deriva/mes</th>
+                                    <th class="px-3 py-1 text-center">I=EMP/Deriva (meses)</th>
+                                    <th class="px-3 py-1 text-center">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for var in derivas_por_variable %}
+                                <tr class="{% if var.es_mas_restrictiva %}bg-yellow-50 font-semibold{% else %}bg-white{% endif %} border-b border-indigo-100">
+                                    <td class="px-3 py-1">{{ var.nombre|default:"Sin nombre" }}</td>
+                                    <td class="px-3 py-1 text-center">{{ var.unidad|default:"—" }}</td>
+                                    <td class="px-3 py-1 text-center">{{ var.puntos_coincidentes }}</td>
+                                    <td class="px-3 py-1 text-center">{{ var.deriva_por_mes|floatformat:4 }}</td>
+                                    <td class="px-3 py-1 text-center font-bold {% if var.es_mas_restrictiva %}text-red-700{% else %}text-blue-700{% endif %}">
+                                        {% if var.intervalo_limitante %}{{ var.intervalo_limitante }}{% else %}∞{% endif %}
+                                    </td>
+                                    <td class="px-3 py-1 text-center">
+                                        {% if var.es_mas_restrictiva %}
+                                        <span class="bg-red-600 text-white text-xs px-2 py-0.5 rounded font-bold">MÁS RESTRICTIVA ◀</span>
+                                        {% else %}
+                                        <span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded">Menos restrictiva</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p class="text-xs text-indigo-600 mt-2 italic">
+                            La tabla detallada y los métodos a continuación corresponden a la variable más restrictiva.
+                        </p>
+                    </div>
+                    {% endif %}
+
                     <!-- Tabla de puntos coincidentes -->
                     <div class="overflow-x-auto mb-3">
                         <table class="w-full text-xs border-collapse border border-gray-300">
