@@ -307,6 +307,9 @@ def dashboard_prestamos(request):
         prestatarios[nombre]['cantidad_equipos'] += 1
         if prestamo.esta_vencido:
             prestatarios[nombre]['equipos_vencidos'] += 1
+        # pk de referencia para editar/devolver grupo (primer préstamo del grupo)
+        if 'pk_ref' not in prestatarios[nombre]:
+            prestatarios[nombre]['pk_ref'] = prestamo.pk
 
     # Estadísticas generales
     total_prestamos_activos = prestamos_activos.count()
@@ -388,6 +391,124 @@ def historial_equipo(request, equipo_id):
         'titulo_pagina': f'Historial de Préstamos - {equipo.codigo_interno}',
     }
     return render(request, 'core/prestamos/historial.html', context)
+
+
+@access_check
+@login_required
+@permission_required('core.can_change_prestamo', raise_exception=True)
+def editar_grupo_prestamos(request, prestamo_pk):
+    """
+    Edita los datos del prestatario y la fecha de devolución para TODOS los préstamos
+    activos del mismo prestatario. Se identifica el grupo por el nombre del prestatario
+    de un préstamo de referencia.
+    """
+    referencia = get_object_or_404(
+        PrestamoEquipo.objects.select_related('equipo', 'empresa'),
+        pk=prestamo_pk
+    )
+
+    if not request.user.is_superuser and referencia.empresa != request.user.empresa:
+        return HttpResponseForbidden("No tienes permiso para modificar estos préstamos.")
+
+    # Todos los préstamos activos del mismo prestatario en la misma empresa
+    prestamos_grupo = PrestamoEquipo.objects.filter(
+        empresa=referencia.empresa,
+        nombre_prestatario=referencia.nombre_prestatario,
+        estado_prestamo__in=[PRESTAMO_ACTIVO, PRESTAMO_VENCIDO],
+    ).select_related('equipo').order_by('fecha_prestamo')
+
+    if request.method == 'POST':
+        form = EditarPrestamoForm(request.POST, instance=referencia)
+        if form.is_valid():
+            datos = form.cleaned_data
+            prestamos_grupo.update(
+                nombre_prestatario=datos['nombre_prestatario'],
+                cedula_prestatario=datos.get('cedula_prestatario', ''),
+                cargo_prestatario=datos.get('cargo_prestatario', ''),
+                email_prestatario=datos.get('email_prestatario', ''),
+                telefono_prestatario=datos.get('telefono_prestatario', ''),
+                fecha_devolucion_programada=datos.get('fecha_devolucion_programada'),
+                observaciones_prestamo=datos.get('observaciones_prestamo', ''),
+            )
+            messages.success(
+                request,
+                f'Datos actualizados para {datos["nombre_prestatario"]} '
+                f'({prestamos_grupo.count()} equipo(s)).'
+            )
+            return redirect('core:dashboard_prestamos')
+        else:
+            messages.error(request, 'Por favor corrige los errores en el formulario.')
+    else:
+        form = EditarPrestamoForm(instance=referencia)
+
+    context = {
+        'form': form,
+        'referencia': referencia,
+        'prestamos_grupo': prestamos_grupo,
+        'titulo_pagina': f'Editar grupo — {referencia.nombre_prestatario}',
+    }
+    return render(request, 'core/prestamos/editar_grupo.html', context)
+
+
+@access_check
+@login_required
+@permission_required('core.can_change_prestamo', raise_exception=True)
+def devolver_todos(request, prestamo_pk):
+    """
+    Devuelve TODOS los equipos activos de un prestatario en un solo paso.
+    Se usa un estado/observación general para todos.
+    """
+    referencia = get_object_or_404(
+        PrestamoEquipo.objects.select_related('equipo', 'empresa'),
+        pk=prestamo_pk
+    )
+
+    if not request.user.is_superuser and referencia.empresa != request.user.empresa:
+        return HttpResponseForbidden("No tienes permiso para modificar estos préstamos.")
+
+    prestamos_grupo = PrestamoEquipo.objects.filter(
+        empresa=referencia.empresa,
+        nombre_prestatario=referencia.nombre_prestatario,
+        estado_prestamo=PRESTAMO_ACTIVO,
+    ).select_related('equipo')
+
+    if not prestamos_grupo.exists():
+        messages.warning(request, 'No hay préstamos activos para este prestatario.')
+        return redirect('core:dashboard_prestamos')
+
+    if request.method == 'POST':
+        condicion = request.POST.get('condicion', 'Bueno')
+        observaciones = request.POST.get('observaciones', '').strip()
+
+        verificacion = {
+            'fecha_verificacion': timezone.now().isoformat(),
+            'verificado_por': request.user.get_full_name() or request.user.username,
+            'condicion_equipo': condicion,
+            'verificacion_funcional': 'Conforme',
+            'observaciones': observaciones,
+        }
+
+        count = 0
+        for prestamo in prestamos_grupo:
+            prestamo.devolver(
+                user=request.user,
+                verificacion_entrada_datos=verificacion,
+                observaciones=observaciones,
+            )
+            count += 1
+
+        messages.success(
+            request,
+            f'{count} equipo(s) de {referencia.nombre_prestatario} devueltos correctamente.'
+        )
+        return redirect('core:dashboard_prestamos')
+
+    context = {
+        'referencia': referencia,
+        'prestamos_grupo': prestamos_grupo,
+        'titulo_pagina': f'Devolver todos — {referencia.nombre_prestatario}',
+    }
+    return render(request, 'core/prestamos/devolver_todos.html', context)
 
 
 @access_check

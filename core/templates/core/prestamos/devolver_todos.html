@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-lg">
+    <div class="mb-6">
+        <a href="{% url 'core:dashboard_prestamos' %}" class="text-blue-600 hover:text-blue-800">
+            ← Volver al dashboard
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <div class="border-b pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">Devolver todos los equipos</h1>
+            <p class="text-gray-500 mt-1 text-sm">
+                Prestatario: <span class="font-semibold text-gray-700">{{ referencia.nombre_prestatario }}</span>
+            </p>
+        </div>
+
+        <!-- Equipos a devolver -->
+        <div class="bg-green-50 rounded-lg p-4 mb-6">
+            <p class="text-sm font-semibold text-green-700 mb-2">
+                Se devolverán {{ prestamos_grupo.count }} equipo(s):
+            </p>
+            <ul class="space-y-1">
+                {% for p in prestamos_grupo %}
+                <li class="text-sm text-green-800 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+                    <span class="font-medium">{{ p.equipo.codigo_interno }}</span> — {{ p.equipo.nombre }}
+                    {% if p.esta_vencido %}
+                    <span class="text-xs text-red-600 font-semibold">(vencido)</span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Condición de los equipos al regresar
+                </label>
+                <select name="condicion"
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-400 focus:border-green-400">
+                    <option value="Bueno">Bueno</option>
+                    <option value="Regular">Regular</option>
+                    <option value="Malo">Malo</option>
+                </select>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Observaciones <span class="text-gray-400 font-normal text-xs">(opcional)</span>
+                </label>
+                <textarea name="observaciones" rows="3"
+                          class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-400 focus:border-green-400"
+                          placeholder="Ej: Todos los equipos en buen estado, sin novedades..."></textarea>
+            </div>
+
+            <p class="text-xs text-gray-400 mb-4">
+                Para devoluciones con verificación detallada por equipo, usa el botón "Devolver" individual desde el detalle de cada préstamo.
+            </p>
+
+            <div class="flex gap-3 justify-end pt-4 border-t">
+                <a href="{% url 'core:dashboard_prestamos' %}"
+                   class="px-6 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition font-medium">
+                    Confirmar devolución
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
