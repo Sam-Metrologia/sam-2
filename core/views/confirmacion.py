@@ -96,8 +96,18 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
 
         # Escala log en X si el rango nominal supera 100x
         nominales_pos = [n for n in nominales if n > 0]
-        if len(nominales_pos) > 1 and max(nominales_pos) / min(nominales_pos) > 100:
+        usar_log = len(nominales_pos) > 1 and max(nominales_pos) / min(nominales_pos) > 100
+        if usar_log:
             ax.set_xscale('log')
+            import math
+            log_min = math.log10(min(nominales_pos))
+            log_max = math.log10(max(nominales_pos))
+            pad = (log_max - log_min) * 0.06
+            ax.set_xlim(10 ** (log_min - pad), 10 ** (log_max + pad))
+        elif nominales:
+            span = max(nominales) - min(nominales)
+            margin = span * 0.06 if span > 0 else abs(nominales[0]) * 0.5 or 1
+            ax.set_xlim(min(nominales) - margin, max(nominales) + margin)
 
         # Puntos con barras de incertidumbre normalizadas
         ax.errorbar(nominales, y_norm, yerr=u_norm,
