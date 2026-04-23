@@ -131,16 +131,18 @@
                         </span>
                     </td>
                     <td class="px-6 py-4 text-sm">
-                        <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
-                           class="text-blue-600 hover:text-blue-900 mr-3">
-                            Ver
-                        </a>
-                        {% if prestamo.estado_prestamo == 'ACTIVO' and perms.core.can_change_prestamo %}
-                        <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
-                           class="text-green-600 hover:text-green-900">
-                            Devolver
-                        </a>
-                        {% endif %}
+                        <div class="flex items-center gap-3">
+                            <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
+                               class="text-blue-600 hover:text-blue-900">Ver</a>
+                            {% if prestamo.estado_prestamo == 'ACTIVO' and perms.core.can_change_prestamo %}
+                            <a href="{% url 'core:editar_prestamo' prestamo.pk %}"
+                               class="text-blue-500 hover:text-blue-700">Editar</a>
+                            <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
+                               class="text-green-600 hover:text-green-900">Devolver</a>
+                            <a href="{% url 'core:cancelar_prestamo' prestamo.pk %}"
+                               class="text-yellow-600 hover:text-yellow-900">Cancelar</a>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% empty %}

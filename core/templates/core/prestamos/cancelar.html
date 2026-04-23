@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-lg">
+    <div class="mb-6">
+        <a href="{% url 'core:detalle_prestamo' prestamo.pk %}" class="text-blue-600 hover:text-blue-800">
+            ← Volver al detalle
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <div class="border-b pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">Cancelar Préstamo</h1>
+            <p class="text-gray-500 mt-1">
+                Equipo: <span class="font-semibold text-gray-700">{{ prestamo.equipo.codigo_interno }} — {{ prestamo.equipo.nombre }}</span>
+            </p>
+        </div>
+
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+            <p class="text-yellow-800 font-medium">Esta acción no se puede deshacer.</p>
+            <p class="text-yellow-700 text-sm mt-1">
+                El préstamo quedará marcado como <strong>Cancelado</strong> y el equipo volverá a estar disponible.
+            </p>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Motivo de cancelación <span class="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <textarea name="motivo" rows="3"
+                          class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                          placeholder="Ej: Error en el registro, equipo no fue prestado..."></textarea>
+            </div>
+
+            <div class="flex gap-3 justify-end pt-4 border-t">
+                <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
+                   class="px-6 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition">
+                    Volver
+                </a>
+                <button type="submit"
+                        class="px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition font-medium">
+                    Confirmar cancelación
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

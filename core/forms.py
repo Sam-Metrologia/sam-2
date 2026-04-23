@@ -1502,6 +1502,36 @@ class PrestamoEquipoForm(forms.ModelForm):
         }
 
 
+class EditarPrestamoForm(forms.ModelForm):
+    """Formulario para editar datos de un préstamo activo (sin cambiar el equipo)."""
+
+    class Meta:
+        model = PrestamoEquipo
+        fields = [
+            'nombre_prestatario', 'cedula_prestatario', 'cargo_prestatario',
+            'email_prestatario', 'telefono_prestatario',
+            'fecha_devolucion_programada', 'observaciones_prestamo',
+        ]
+        widgets = {
+            'nombre_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Nombre completo'}),
+            'cedula_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Cédula (opcional)'}),
+            'cargo_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Cargo (opcional)'}),
+            'email_prestatario': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'email@ejemplo.com'}),
+            'telefono_prestatario': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '+57 300 123 4567'}),
+            'fecha_devolucion_programada': forms.DateInput(attrs={'type': 'date', 'class': 'form-input'}),
+            'observaciones_prestamo': forms.Textarea(attrs={'rows': 3, 'class': 'form-textarea', 'placeholder': 'Observaciones del préstamo...'}),
+        }
+        labels = {
+            'nombre_prestatario': 'Nombre del Prestatario',
+            'cedula_prestatario': 'Cédula',
+            'cargo_prestatario': 'Cargo',
+            'email_prestatario': 'Email',
+            'telefono_prestatario': 'Teléfono',
+            'fecha_devolucion_programada': 'Fecha de Devolución Programada',
+            'observaciones_prestamo': 'Observaciones',
+        }
+
+
 class VerificacionFuncionalForm(forms.Form):
     """
     Formulario para registrar verificación funcional de un equipo

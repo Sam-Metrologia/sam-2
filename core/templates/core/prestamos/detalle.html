@@ -11,10 +11,20 @@
         </a>
 
         {% if prestamo.estado_prestamo == 'ACTIVO' and perms.core.can_change_prestamo %}
-        <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
-           class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition">
-            Devolver Equipo
-        </a>
+        <div class="flex gap-2">
+            <a href="{% url 'core:editar_prestamo' prestamo.pk %}"
+               class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                Editar
+            </a>
+            <a href="{% url 'core:devolver_equipo' prestamo.pk %}"
+               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+                Devolver Equipo
+            </a>
+            <a href="{% url 'core:cancelar_prestamo' prestamo.pk %}"
+               class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 transition">
+                Cancelar Préstamo
+            </a>
+        </div>
         {% endif %}
     </div>
 

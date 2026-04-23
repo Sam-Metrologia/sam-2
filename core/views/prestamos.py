@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.http import HttpResponseForbidden
 
 from ..models import PrestamoEquipo, AgrupacionPrestamo, Equipo
-from ..forms import PrestamoEquipoForm, DevolucionEquipoForm
+from ..forms import PrestamoEquipoForm, DevolucionEquipoForm, EditarPrestamoForm
 from ..constants import (
     ESTADO_ACTIVO, ESTADO_DE_BAJA,
     PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO, PRESTAMO_VENCIDO, PRESTAMO_CANCELADO,
@@ -29,16 +29,16 @@ def listar_prestamos(request):
     Lista todos los préstamos de la empresa del usuario.
     Incluye filtros por estado y búsqueda.
     """
-    # Base queryset filtrado por empresa - EXCLUYE DEVUELTOS
-    # Los devueltos ya están en el historial del equipo
     prestamos = PrestamoEquipo.objects.select_related(
         'equipo', 'empresa', 'prestado_por', 'recibido_por'
-    ).filter(empresa=request.user.empresa).exclude(estado_prestamo=PRESTAMO_DEVUELTO)
+    ).filter(empresa=request.user.empresa)
 
-    # Filtro por estado
+    # Filtro por estado — sin filtro muestra solo activos/vencidos (no devueltos ni cancelados)
     estado_filter = request.GET.get('estado')
     if estado_filter:
         prestamos = prestamos.filter(estado_prestamo=estado_filter)
+    else:
+        prestamos = prestamos.exclude(estado_prestamo__in=[PRESTAMO_DEVUELTO, PRESTAMO_CANCELADO])
 
     # Búsqueda
     search_query = request.GET.get('search')
@@ -415,6 +415,80 @@ def equipos_disponibles(request):
         'tipo': 'disponibles'
     }
     return render(request, 'core/prestamos/equipos_estado.html', context)
+
+
+@access_check
+@login_required
+@permission_required('core.can_change_prestamo', raise_exception=True)
+def editar_prestamo(request, pk):
+    """
+    Edita los datos de un préstamo activo: prestatario, fecha de devolución y observaciones.
+    No permite cambiar el equipo ni el estado.
+    """
+    prestamo = get_object_or_404(
+        PrestamoEquipo.objects.select_related('equipo', 'empresa'),
+        pk=pk
+    )
+
+    if not request.user.is_superuser and prestamo.empresa != request.user.empresa:
+        return HttpResponseForbidden("No tienes permiso para modificar este préstamo.")
+
+    if prestamo.estado_prestamo not in (PRESTAMO_ACTIVO, PRESTAMO_VENCIDO):
+        messages.warning(request, 'Solo se pueden editar préstamos activos.')
+        return redirect('core:detalle_prestamo', pk=prestamo.pk)
+
+    if request.method == 'POST':
+        form = EditarPrestamoForm(request.POST, instance=prestamo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Préstamo actualizado correctamente.')
+            return redirect('core:detalle_prestamo', pk=prestamo.pk)
+        else:
+            messages.error(request, 'Por favor corrige los errores en el formulario.')
+    else:
+        form = EditarPrestamoForm(instance=prestamo)
+
+    context = {
+        'form': form,
+        'prestamo': prestamo,
+        'titulo_pagina': f'Editar Préstamo — {prestamo.equipo.codigo_interno}',
+    }
+    return render(request, 'core/prestamos/editar.html', context)
+
+
+@access_check
+@login_required
+@permission_required('core.can_change_prestamo', raise_exception=True)
+def cancelar_prestamo(request, pk):
+    """
+    Cancela un préstamo activo. Solo acepta POST con un motivo.
+    """
+    prestamo = get_object_or_404(
+        PrestamoEquipo.objects.select_related('equipo', 'empresa'),
+        pk=pk
+    )
+
+    if not request.user.is_superuser and prestamo.empresa != request.user.empresa:
+        return HttpResponseForbidden("No tienes permiso para cancelar este préstamo.")
+
+    if prestamo.estado_prestamo != PRESTAMO_ACTIVO:
+        messages.warning(request, 'Solo se pueden cancelar préstamos activos.')
+        return redirect('core:detalle_prestamo', pk=prestamo.pk)
+
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo', '').strip()
+        prestamo.cancelar(user=request.user, motivo=motivo)
+        messages.success(
+            request,
+            f'Préstamo de {prestamo.equipo.codigo_interno} cancelado correctamente.'
+        )
+        return redirect('core:listar_prestamos')
+
+    context = {
+        'prestamo': prestamo,
+        'titulo_pagina': f'Cancelar Préstamo — {prestamo.equipo.codigo_interno}',
+    }
+    return render(request, 'core/prestamos/cancelar.html', context)
 
 
 @access_check
