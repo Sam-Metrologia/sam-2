@@ -160,18 +160,18 @@
 
                         <!-- Observaciones -->
                         <td class="px-5 py-4 align-top">
-                            {% for prestamo in prestatario.prestamos %}
-                                {% if prestamo.observaciones_prestamo %}
-                                <div class="mb-1.5 last:mb-0">
-                                    <span class="text-xs font-semibold text-gray-400">
-                                        {{ prestamo.equipo.codigo_interno }}:
-                                    </span>
-                                    <span class="text-xs text-gray-600 italic">
-                                        {{ prestamo.observaciones_prestamo|truncatechars:60 }}
-                                    </span>
+                            {% if prestatario.obs_simple %}
+                                <span class="text-xs text-gray-600 italic">
+                                    {{ prestatario.obs_simple|truncatechars:80 }}
+                                </span>
+                            {% elif prestatario.obs_lista %}
+                                {% for item in prestatario.obs_lista %}
+                                <div class="mb-1 last:mb-0">
+                                    <span class="text-xs font-semibold text-gray-400">{{ item.codigo }}:</span>
+                                    <span class="text-xs text-gray-600 italic">{{ item.texto|truncatechars:60 }}</span>
                                 </div>
-                                {% endif %}
-                            {% endfor %}
+                                {% endfor %}
+                            {% endif %}
                         </td>
 
                         <!-- Fecha vence -->

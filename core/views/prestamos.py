@@ -315,6 +315,33 @@ def dashboard_prestamos(request):
             if prestatarios[nombre].get('fecha_vence') is None or \
                prestamo.fecha_devolucion_programada < prestatarios[nombre]['fecha_vence']:
                 prestatarios[nombre]['fecha_vence'] = prestamo.fecha_devolucion_programada
+        # acumular observaciones para deduplicar al final
+        if prestamo.observaciones_prestamo:
+            prestatarios[nombre].setdefault('_obs_raw', []).append(
+                (prestamo.equipo.codigo_interno, prestamo.observaciones_prestamo)
+            )
+
+    # Deduplicar observaciones por grupo
+    for datos in prestatarios.values():
+        raw = datos.pop('_obs_raw', [])
+        textos_unicos = list(dict.fromkeys(t for _, t in raw))
+        if len(textos_unicos) == 1:
+            # Todos tienen la misma obs → una sola línea sin prefijo de equipo
+            datos['obs_simple'] = textos_unicos[0]
+            datos['obs_lista'] = None
+        elif textos_unicos:
+            # Obs distintas → cada texto único con el código del primer equipo que lo tiene
+            vistos = set()
+            items = []
+            for codigo, texto in raw:
+                if texto not in vistos:
+                    items.append({'codigo': codigo, 'texto': texto})
+                    vistos.add(texto)
+            datos['obs_simple'] = None
+            datos['obs_lista'] = items
+        else:
+            datos['obs_simple'] = None
+            datos['obs_lista'] = None
 
     # Estadísticas generales
     total_prestamos_activos = prestamos_activos.count()
