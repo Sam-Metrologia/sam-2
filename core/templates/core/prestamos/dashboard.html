@@ -260,6 +260,110 @@
     </div>
     {% endif %}
 
+    <!-- Equipos disponibles por familia -->
+    {% if familias_disponibles %}
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-boxes text-gray-400 text-sm"></i>
+                <span class="text-sm font-semibold text-gray-600">Equipos Disponibles para Préstamo</span>
+            </div>
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                {{ equipos_disponibles }} equipo{{ equipos_disponibles|pluralize }}
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead>
+                    <tr class="border-b border-gray-100">
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-32">Código</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">Equipo</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-36">Marca / Modelo</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-36">Ubicación</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-32">Próx. calibración</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-24">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for familia, equipos in familias_disponibles.items %}
+
+                    <!-- Fila de familia -->
+                    <tr class="bg-slate-50 border-t border-slate-200">
+                        <td colspan="6" class="px-5 py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    {{ familia }}
+                                </span>
+                                <span class="text-xs text-slate-400">— {{ equipos|length }} equipo{{ equipos|length|pluralize }}</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Filas de equipos de esta familia -->
+                    {% for equipo in equipos %}
+                    <tr class="border-t border-gray-50 hover:bg-emerald-50 transition-colors">
+                        <td class="px-5 py-3">
+                            <a href="{% url 'core:detalle_equipo' equipo.pk %}"
+                               class="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                                {{ equipo.codigo_interno }}
+                            </a>
+                        </td>
+                        <td class="px-5 py-3">
+                            <div class="text-sm text-gray-800 font-medium">{{ equipo.nombre }}</div>
+                            {% if equipo.numero_serie %}
+                            <div class="text-xs text-gray-400">S/N: {{ equipo.numero_serie }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3 text-sm text-gray-500">
+                            {% if equipo.marca %}{{ equipo.marca }}{% endif %}
+                            {% if equipo.modelo %}<span class="text-gray-400"> / {{ equipo.modelo }}</span>{% endif %}
+                        </td>
+                        <td class="px-5 py-3">
+                            {% if equipo.ubicacion %}
+                            <span class="inline-flex items-center gap-1 text-xs text-gray-500">
+                                <i class="fas fa-map-marker-alt text-gray-300 w-3"></i>
+                                {{ equipo.ubicacion }}
+                            </span>
+                            {% else %}
+                            <span class="text-gray-300 text-xs">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3 text-sm">
+                            {% if equipo.proxima_calibracion %}
+                                {% now "Y-m-d" as today_str %}
+                                {% if equipo.proxima_calibracion|date:"Y-m-d" < today_str %}
+                                <span class="inline-flex items-center gap-1 text-xs text-red-600 font-semibold">
+                                    <i class="fas fa-exclamation-circle text-red-400 w-3"></i>
+                                    {{ equipo.proxima_calibracion|date:"d/m/Y" }}
+                                </span>
+                                {% else %}
+                                <span class="text-gray-600 text-xs">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="text-gray-300 text-xs">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3">
+                            {% if perms.core.can_add_prestamo %}
+                            <a href="{% url 'core:crear_prestamo' %}?equipo={{ equipo.pk }}"
+                               class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                <i class="fas fa-hand-holding w-3"></i> Prestar
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 {% endblock %}
 

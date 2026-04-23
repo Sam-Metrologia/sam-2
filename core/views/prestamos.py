@@ -331,10 +331,26 @@ def dashboard_prestamos(request):
     # Estadísticas de equipos disponibles/prestados
     total_equipos = Equipo.objects.filter(
         empresa=request.user.empresa,
-        estado=ESTADO_ACTIVO  # Solo contar equipos activos
+        estado=ESTADO_ACTIVO
     ).count()
+    pks_prestados = prestamos_activos.values_list('equipo_id', flat=True)
     equipos_prestados = prestamos_activos.values('equipo').distinct().count()
     equipos_disponibles = total_equipos - equipos_prestados
+
+    # Equipos disponibles agrupados por tipo/familia para la tabla inferior
+    equipos_disp_qs = Equipo.objects.filter(
+        empresa=request.user.empresa,
+        estado=ESTADO_ACTIVO,
+    ).exclude(
+        id__in=pks_prestados,
+    ).order_by('tipo_equipo', 'codigo_interno')
+
+    familias = {}
+    for equipo in equipos_disp_qs:
+        tipo = equipo.tipo_equipo or 'Otro'
+        if tipo not in familias:
+            familias[tipo] = []
+        familias[tipo].append(equipo)
 
     context = {
         'prestatarios': prestatarios.values(),
@@ -345,6 +361,7 @@ def dashboard_prestamos(request):
         'total_equipos': total_equipos,
         'equipos_prestados': equipos_prestados,
         'equipos_disponibles': equipos_disponibles,
+        'familias_disponibles': familias,
         'titulo_pagina': 'Dashboard de Préstamos',
     }
     return render(request, 'core/prestamos/dashboard.html', context)
