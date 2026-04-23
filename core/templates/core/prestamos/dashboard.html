@@ -8,16 +8,19 @@
 
     <!-- Header -->
     <div class="mb-6 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-900">{{ titulo_pagina }}</h1>
-        <div class="flex gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Panel de Préstamos</h1>
+            <p class="text-sm text-gray-400 mt-0.5">Equipos actualmente prestados por inspector</p>
+        </div>
+        <div class="flex gap-2">
             <a href="{% url 'core:listar_prestamos' %}"
-               class="border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 transition text-sm">
-                Ver lista completa
+               class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                Lista completa
             </a>
             {% if perms.core.can_add_prestamo %}
             <a href="{% url 'core:crear_prestamo' %}"
-               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition text-sm font-medium">
-                + Nuevo Préstamo
+               class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
+                <i class="fas fa-plus mr-1"></i> Nuevo préstamo
             </a>
             {% endif %}
         </div>
@@ -25,158 +28,209 @@
 
     <!-- Estadísticas -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-        <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
             <div class="text-2xl font-bold text-blue-600">{{ total_prestamos_activos }}</div>
-            <div class="text-gray-500 text-xs mt-1">Préstamos activos</div>
+            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Activos</div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
             <div class="text-2xl font-bold text-indigo-600">{{ total_prestatarios }}</div>
-            <div class="text-gray-500 text-xs mt-1">Inspectores</div>
+            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Inspectores</div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-            <div class="text-2xl font-bold {% if prestamos_vencidos > 0 %}text-red-600{% else %}text-gray-400{% endif %}">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+            <div class="text-2xl font-bold {% if prestamos_vencidos > 0 %}text-red-500{% else %}text-gray-300{% endif %}">
                 {{ prestamos_vencidos }}
             </div>
-            <div class="text-gray-500 text-xs mt-1">Vencidos</div>
+            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Vencidos</div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-            <div class="text-2xl font-bold text-orange-500">{{ devoluciones_proximas }}</div>
-            <div class="text-gray-500 text-xs mt-1">Vencen en 7 días</div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+            <div class="text-2xl font-bold text-amber-500">{{ devoluciones_proximas }}</div>
+            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Vencen pronto</div>
         </div>
         <a href="{% url 'core:equipos_disponibles' %}"
-           class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-green-500 hover:shadow-md transition block">
-            <div class="text-2xl font-bold text-green-600">{{ equipos_disponibles }}</div>
-            <div class="text-gray-500 text-xs mt-1">Disponibles →</div>
+           class="bg-white rounded-xl shadow-sm border-l-4 border-emerald-400 border border-gray-100 p-4 text-center hover:shadow-md transition block">
+            <div class="text-2xl font-bold text-emerald-600">{{ equipos_disponibles }}</div>
+            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Disponibles →</div>
         </a>
         <a href="{% url 'core:equipos_prestados' %}"
-           class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-orange-400 hover:shadow-md transition block">
-            <div class="text-2xl font-bold text-orange-500">{{ equipos_prestados }}</div>
-            <div class="text-gray-500 text-xs mt-1">Prestados →</div>
+           class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 border border-gray-100 p-4 text-center hover:shadow-md transition block">
+            <div class="text-2xl font-bold text-amber-500">{{ equipos_prestados }}</div>
+            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Prestados →</div>
         </a>
     </div>
 
     <!-- Tabla principal -->
     {% if prestatarios %}
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 class="text-base font-semibold text-gray-700">Equipos por Inspector</h2>
-            <span class="text-xs text-gray-400">{{ total_prestatarios }} inspector{{ total_prestatarios|pluralize }}</span>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+        <!-- Cabecera de la tarjeta -->
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-users text-gray-400 text-sm"></i>
+                <span class="text-sm font-semibold text-gray-600">Equipos por Inspector</span>
+            </div>
+            <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                {{ total_prestatarios }} inspector{{ total_prestatarios|pluralize }}
+            </span>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-56">
+            <table class="min-w-full">
+                <thead>
+                    <tr class="border-b border-gray-100">
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-52">
                             Inspector
                         </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Equipos prestados
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">
+                            Equipos
                         </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-44">
+                            Observaciones
+                        </th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-28">
                             Vence
                         </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">
+                        <th class="px-5 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-24">
                             Estado
                         </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">
+                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-32">
                             Acciones
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-100">
+                <tbody>
                     {% for prestatario in prestatarios %}
-                    <tr class="hover:bg-gray-50 {% if prestatario.equipos_vencidos > 0 %}bg-red-50 hover:bg-red-100{% endif %}">
+                    <tr class="border-b border-gray-50 transition-colors
+                        {% if prestatario.equipos_vencidos > 0 %}
+                            bg-red-50 hover:bg-red-100
+                        {% else %}
+                            hover:bg-slate-50
+                        {% endif %}">
 
                         <!-- Inspector -->
-                        <td class="px-5 py-4">
-                            <div class="font-semibold text-gray-900 text-sm">{{ prestatario.nombre }}</div>
+                        <td class="px-5 py-4 align-top">
+                            <div class="font-semibold text-gray-800 text-sm leading-tight">
+                                {{ prestatario.nombre }}
+                            </div>
                             {% if prestatario.cargo %}
-                            <div class="text-xs text-gray-400 mt-0.5">{{ prestatario.cargo }}</div>
+                            <div class="text-xs text-gray-400 mt-1">{{ prestatario.cargo }}</div>
                             {% endif %}
                             {% if prestatario.cedula %}
                             <div class="text-xs text-gray-400">CC {{ prestatario.cedula }}</div>
                             {% endif %}
-                            {% if prestatario.email %}
-                            <div class="text-xs text-gray-400 truncate max-w-[180px]" title="{{ prestatario.email }}">
-                                {{ prestatario.email }}
+                            {% if prestatario.email or prestatario.telefono %}
+                            <div class="mt-1.5 space-y-0.5">
+                                {% if prestatario.email %}
+                                <div class="flex items-center gap-1 text-xs text-gray-400" title="{{ prestatario.email }}">
+                                    <i class="fas fa-envelope w-3 text-gray-300"></i>
+                                    <span class="truncate max-w-[150px]">{{ prestatario.email }}</span>
+                                </div>
+                                {% endif %}
+                                {% if prestatario.telefono %}
+                                <div class="flex items-center gap-1 text-xs text-gray-400">
+                                    <i class="fas fa-phone w-3 text-gray-300"></i>
+                                    {{ prestatario.telefono }}
+                                </div>
+                                {% endif %}
                             </div>
-                            {% endif %}
-                            {% if prestatario.telefono %}
-                            <div class="text-xs text-gray-400">{{ prestatario.telefono }}</div>
                             {% endif %}
                         </td>
 
                         <!-- Chips de equipos -->
-                        <td class="px-5 py-4">
+                        <td class="px-5 py-4 align-top">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for prestamo in prestatario.prestamos %}
                                 <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
-                                   title="{{ prestamo.equipo.nombre }}{% if prestamo.esta_vencido %} — VENCIDO{% endif %}"
-                                   class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition
+                                   title="{{ prestamo.equipo.nombre }} — {{ prestamo.fecha_prestamo|date:'d/m/Y' }}{% if prestamo.esta_vencido %} ⚠ VENCIDO{% endif %}"
+                                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition shadow-sm
                                        {% if prestamo.esta_vencido %}
-                                           bg-red-100 text-red-800 hover:bg-red-200 ring-1 ring-red-300
+                                           bg-red-100 text-red-700 hover:bg-red-200 ring-1 ring-red-200
                                        {% else %}
-                                           bg-blue-100 text-blue-800 hover:bg-blue-200
+                                           bg-blue-50 text-blue-700 hover:bg-blue-100 ring-1 ring-blue-100
                                        {% endif %}">
-                                    {{ prestamo.equipo.codigo_interno }}
                                     {% if prestamo.esta_vencido %}
-                                    <span class="ml-1 text-red-500">!</span>
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                                    {% else %}
+                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></span>
                                     {% endif %}
+                                    {{ prestamo.equipo.codigo_interno }}
                                 </a>
                                 {% endfor %}
                             </div>
                         </td>
 
+                        <!-- Observaciones -->
+                        <td class="px-5 py-4 align-top">
+                            {% for prestamo in prestatario.prestamos %}
+                                {% if prestamo.observaciones_prestamo %}
+                                <div class="mb-1.5 last:mb-0">
+                                    <span class="text-xs font-semibold text-gray-400">
+                                        {{ prestamo.equipo.codigo_interno }}:
+                                    </span>
+                                    <span class="text-xs text-gray-600 italic">
+                                        {{ prestamo.observaciones_prestamo|truncatechars:60 }}
+                                    </span>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </td>
+
                         <!-- Fecha vence -->
-                        <td class="px-5 py-4 text-sm">
+                        <td class="px-5 py-4 align-top">
                             {% if prestatario.fecha_vence %}
                                 {% if prestatario.equipos_vencidos > 0 %}
-                                <span class="text-red-600 font-semibold">
-                                    {{ prestatario.fecha_vence|date:"d/m/Y" }}
-                                </span>
+                                <div class="flex items-center gap-1">
+                                    <i class="fas fa-exclamation-circle text-red-400 text-xs"></i>
+                                    <span class="text-red-600 font-semibold text-sm">
+                                        {{ prestatario.fecha_vence|date:"d/m/Y" }}
+                                    </span>
+                                </div>
                                 {% else %}
-                                <span class="text-gray-700">{{ prestatario.fecha_vence|date:"d/m/Y" }}</span>
+                                <span class="text-gray-600 text-sm">{{ prestatario.fecha_vence|date:"d/m/Y" }}</span>
                                 {% endif %}
                             {% else %}
-                            <span class="text-gray-400 text-xs">No definida</span>
+                            <span class="text-gray-300 text-xs">—</span>
                             {% endif %}
                         </td>
 
                         <!-- Estado -->
-                        <td class="px-5 py-4">
+                        <td class="px-5 py-4 align-top text-center">
                             {% if prestatario.equipos_vencidos > 0 %}
-                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                ⚠ Vencido
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                Vencido
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                 Activo
                             </span>
                             {% endif %}
                         </td>
 
                         <!-- Acciones -->
-                        <td class="px-5 py-4">
-                            <div class="flex flex-col gap-1.5">
+                        <td class="px-5 py-4 align-top">
+                            <div class="flex flex-col gap-2">
                                 {% if perms.core.can_change_prestamo %}
                                 <a href="{% url 'core:editar_grupo_prestamos' prestatario.pk_ref %}"
-                                   class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                                    <i class="fas fa-edit w-3"></i> Editar
+                                   class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium group">
+                                    <i class="fas fa-edit text-blue-400 group-hover:text-blue-600 w-3"></i>
+                                    Editar
                                 </a>
                                 <a href="{% url 'core:devolver_todos' prestatario.pk_ref %}"
-                                   class="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium">
-                                    <i class="fas fa-undo w-3"></i> Devolver todos
+                                   class="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-800 font-medium group">
+                                    <i class="fas fa-check-circle text-emerald-400 group-hover:text-emerald-600 w-3"></i>
+                                    Devolver todos
                                 </a>
                                 {% if prestatario.equipos_vencidos > 0 %}
                                 <button onclick="enviarAlerta('{{ prestatario.nombre }}', '{{ prestatario.email }}', {{ prestatario.equipos_vencidos }})"
-                                        class="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-medium text-left">
-                                    <i class="fas fa-bell w-3"></i> Alertar
+                                        class="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-800 font-medium text-left group">
+                                    <i class="fas fa-bell text-amber-400 group-hover:text-amber-600 w-3"></i>
+                                    Alertar
                                 </button>
                                 {% endif %}
                                 {% else %}
                                 <a href="{% url 'core:detalle_prestamo' prestatario.pk_ref %}"
-                                   class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                   class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium">
                                     <i class="fas fa-eye w-3"></i> Ver
                                 </a>
                                 {% endif %}
@@ -191,13 +245,15 @@
     </div>
 
     {% else %}
-    <div class="bg-white rounded-lg shadow p-12 text-center">
-        <div class="text-gray-300 text-6xl mb-4">📦</div>
-        <h3 class="text-lg font-semibold text-gray-600 mb-2">No hay préstamos activos</h3>
-        <p class="text-gray-400 mb-6 text-sm">Actualmente no hay equipos prestados.</p>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-16 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-box-open text-gray-300 text-2xl"></i>
+        </div>
+        <h3 class="text-base font-semibold text-gray-500 mb-1">Sin préstamos activos</h3>
+        <p class="text-gray-400 text-sm mb-6">Actualmente no hay equipos prestados.</p>
         {% if perms.core.can_add_prestamo %}
         <a href="{% url 'core:crear_prestamo' %}"
-           class="inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition text-sm">
+           class="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
             Crear primer préstamo
         </a>
         {% endif %}
@@ -210,10 +266,10 @@
 {% block extra_js %}
 <script>
 function enviarAlerta(nombre, email, cantidadVencidos) {
-    const msg = `Recordatorio de devolución para ${nombre}.\n\n` +
+    const msg = `Recordatorio para ${nombre}.\n\n` +
                 `Tiene ${cantidadVencidos} equipo(s) con devolución vencida.\n` +
-                (email ? `Se enviará notificación a: ${email}` : 'No hay email registrado.');
-    if (confirm(msg + '\n\n¿Desea enviar el recordatorio?')) {
+                (email ? `Notificación a: ${email}` : 'Sin email registrado.');
+    if (confirm(msg + '\n\n¿Enviar recordatorio?')) {
         alert('Recordatorio enviado a ' + nombre);
     }
 }
