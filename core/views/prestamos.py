@@ -310,6 +310,11 @@ def dashboard_prestamos(request):
         # pk de referencia para editar/devolver grupo (primer préstamo del grupo)
         if 'pk_ref' not in prestatarios[nombre]:
             prestatarios[nombre]['pk_ref'] = prestamo.pk
+        # fecha de vencimiento más próxima del grupo
+        if prestamo.fecha_devolucion_programada:
+            if prestatarios[nombre].get('fecha_vence') is None or \
+               prestamo.fecha_devolucion_programada < prestatarios[nombre]['fecha_vence']:
+                prestatarios[nombre]['fecha_vence'] = prestamo.fecha_devolucion_programada
 
     # Estadísticas generales
     total_prestamos_activos = prestamos_activos.count()
