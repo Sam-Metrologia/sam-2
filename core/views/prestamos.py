@@ -91,6 +91,8 @@ def crear_prestamo(request):
         messages.error(request, 'Tu usuario no tiene una empresa asignada. Contacta al administrador.')
         return redirect('core:dashboard')
 
+    prestamo_ref = None
+
     if request.method == 'POST':
         form = PrestamoEquipoForm(request.POST, empresa=request.user.empresa)
         if form.is_valid():
@@ -165,10 +167,30 @@ def crear_prestamo(request):
         else:
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
-        form = PrestamoEquipoForm(empresa=request.user.empresa)
+        initial = {}
+        prestamo_ref = None
+        desde_pk = request.GET.get('desde')
+        if desde_pk:
+            try:
+                prestamo_ref = PrestamoEquipo.objects.get(
+                    pk=desde_pk, empresa=request.user.empresa
+                )
+                initial = {
+                    'nombre_prestatario': prestamo_ref.nombre_prestatario,
+                    'cedula_prestatario': prestamo_ref.cedula_prestatario,
+                    'cargo_prestatario': prestamo_ref.cargo_prestatario,
+                    'email_prestatario': prestamo_ref.email_prestatario,
+                    'telefono_prestatario': prestamo_ref.telefono_prestatario,
+                    'fecha_devolucion_programada': prestamo_ref.fecha_devolucion_programada,
+                    'observaciones_prestamo': prestamo_ref.observaciones_prestamo,
+                }
+            except PrestamoEquipo.DoesNotExist:
+                pass
+        form = PrestamoEquipoForm(empresa=request.user.empresa, initial=initial)
 
     context = {
         'form': form,
+        'prestamo_ref': prestamo_ref,
         'titulo_pagina': 'Nuevo Préstamo de Equipo',
     }
     return render(request, 'core/prestamos/crear.html', context)

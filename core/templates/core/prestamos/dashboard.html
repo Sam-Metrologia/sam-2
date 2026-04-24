@@ -211,6 +211,13 @@
                         <td class="px-5 py-4 align-top">
                             <div class="flex flex-col gap-2">
                                 {% if perms.core.can_change_prestamo %}
+                                {% if perms.core.can_add_prestamo %}
+                                <a href="{% url 'core:crear_prestamo' %}?desde={{ prestatario.pk_ref }}"
+                                   class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium group">
+                                    <i class="fas fa-plus-circle text-indigo-400 group-hover:text-indigo-600 w-3"></i>
+                                    Añadir equipo
+                                </a>
+                                {% endif %}
                                 <a href="{% url 'core:editar_grupo_prestamos' prestatario.pk_ref %}"
                                    class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium group">
                                     <i class="fas fa-edit text-blue-400 group-hover:text-blue-600 w-3"></i>
