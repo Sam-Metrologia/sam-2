@@ -10,12 +10,14 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 **Language:** Spanish (Colombia)
 **Version:** 2.0.0
 
-## Current Status (Apr 09, 2026)
+## Current Status (Apr 24, 2026)
 
 - **Tests:** 1,847 passing, 1 skipped, 3 xfailed (+37 nuevos: test_multi_magnitud.py)
 - **Coverage:** 70.00% ✓ (Goal alcanzado)
-- **Score:** 8.3/10 (auditado Mar-15-2026)
+- **Score:** 8.3/10 (auditado Mar-15-2026) | Audit Plan → `auditorias/PLAN_AUDITORIA_2026-04.md`
 - **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md`
+- **Models paquete (2026-04):** `core/models.py` dividido en paquete `core/models/` — 12 módulos: `empresa`, `users`, `catalogs`, `equipment`, `activities`, `loans`, `documents`, `payments`, `common`, `system`, `_signals`, `__init__`. Imports sin cambio (`from core.models import Equipo` sigue funcionando).
+- **Préstamos UX (2026-04-24):** Dashboard con secciones colapsables + filtro de búsqueda + chips de equipos disponibles agrupados por familia (clickeables → préstamo directo). Ver `core/templates/core/prestamos/dashboard.html`.
 - **Multi-magnitud (2026-04-09):** Confirmaciones y comprobaciones soportan múltiples variables (tabs). Datos guardados en formato v2 `{magnitudes: [{nombre, unidad, puntos_medicion}]}`. Compatibilidad backward con v1 (`puntos_medicion` en raíz). PDF muestra tabla+gráfica por variable. Gráficas históricas (detalle equipo + hoja de vida) normalizadas por EMP (±1 = límite), una gráfica por variable.
 - **Bug CORREGIDO:** `eliminar_equipo.html` → usa `confirmar_eliminacion.html` (equipment.py:955)
 - **Decoradores confirmacion.py:** `@monitor_view` + `@trial_check` añadidos a todas las vistas; bug en `trial_check` con `empresa=None` corregido (base.py:185)
@@ -44,7 +46,19 @@ sam-2/
   terminos_condiciones_v1.0.html  # Legal terms (loaded by management command)
 
   core/                      # Main Django app (all business logic)
-    models.py                # All models (4,600 lines - 28 clases, índice en línea 77)
+    models/                  # Models package (28 clases — dividido en módulos)
+      __init__.py            # Re-exporta todo; `from core.models import Equipo` funciona
+      empresa.py             # Empresa, PlanSuscripcion
+      users.py               # CustomUser, roles
+      equipment.py           # Equipo, BajaEquipo, NotificacionVencimiento
+      activities.py          # Calibracion, Mantenimiento, Comprobacion
+      loans.py               # PrestamoEquipo
+      documents.py           # Documentos de aprobación
+      payments.py            # Pagos, Suscripcion
+      catalogs.py            # Catálogos y magnitudes
+      common.py              # Modelos base / mixins
+      system.py              # Sistema, TerminosYCondiciones
+      _signals.py            # Todos los @receiver
     constants.py             # Centralized constants (327 lines)
     forms.py                 # All forms (1,742 lines)
     signals.py               # Cache invalidation signals
@@ -243,13 +257,16 @@ EMAIL_HOST_PASSWORD, ADMIN_EMAIL, GEMINI_API_KEY
 
 ## Known Technical Debt
 
-- `core/models.py`: 4,148 lines (should be split into modules)
 - `core/views/reports.py`: 3,699 lines (has helpers but still large)
 - `core/forms.py`: 1,742 lines (should split by domain)
-- Coverage gaps: comprobacion.py (32%), maintenance.py (32%), confirmacion.py (58%)
-- ISO 17020 modules missing: complaints, non-conformities, impartiality
-- `core/views_optimized.py`, `core/zip_optimizer.py`, `core/async_zip_improved.py`: Evaluate if still needed
-- **CSP `unsafe-inline`**: 52 bloques `<script>` inline en 51 templates — requiere middleware de nonces + atributo en cada tag. Estimado: 1-2 días. Diferido a próxima auditoría.
+- Coverage gaps: confirmacion.py (58.77%), pagos.py (49.84%), zip_functions.py (49.22%)
+- `confirmacion.py` sin `@access_check` (pendiente desde Feb-2026) — ver PLAN_AUDITORIA_2026-04.md
+- **CSP `unsafe-inline`**: 52 bloques `<script>` inline en 51 templates — requiere middleware de nonces. Estimado: 1-2 días.
+- `core/views_optimized.py` (292), `core/zip_optimizer.py` (473), `core/async_zip_improved.py` (579): evaluar si son necesarios
+- ISO 17020 módulos faltantes: quejas de clientes (7.9), no conformidades (8.7), imparcialidad (4.1)
+- 6 tests en `test_mejoras_ux.py` usan `return` en vez de `assert` → siempre pasan (falsos positivos)
+- `pytest.mark.performance` no registrado en pyproject.toml → genera warnings
+- README.md raíz: 19 bytes ("# Forzar redeploy") — no funcional
 
 ## Backups
 

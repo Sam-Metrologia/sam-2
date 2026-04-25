@@ -7,7 +7,7 @@
 <div class="container mx-auto px-4 py-6">
 
     <!-- Header -->
-    <div class="mb-6 flex justify-between items-center">
+    <div class="mb-5 flex justify-between items-center">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Panel de Préstamos</h1>
             <p class="text-sm text-gray-400 mt-0.5">Equipos actualmente prestados por inspector</p>
@@ -27,347 +27,254 @@
     </div>
 
     <!-- Estadísticas -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
             <div class="text-2xl font-bold text-blue-600">{{ total_prestamos_activos }}</div>
-            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Activos</div>
+            <div class="text-gray-400 text-xs mt-0.5 font-medium uppercase tracking-wide">Activos</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
             <div class="text-2xl font-bold text-indigo-600">{{ total_prestatarios }}</div>
-            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Inspectores</div>
+            <div class="text-gray-400 text-xs mt-0.5 font-medium uppercase tracking-wide">Inspectores</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
             <div class="text-2xl font-bold {% if prestamos_vencidos > 0 %}text-red-500{% else %}text-gray-300{% endif %}">
                 {{ prestamos_vencidos }}
             </div>
-            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Vencidos</div>
+            <div class="text-gray-400 text-xs mt-0.5 font-medium uppercase tracking-wide">Vencidos</div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center">
             <div class="text-2xl font-bold text-amber-500">{{ devoluciones_proximas }}</div>
-            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Vencen pronto</div>
+            <div class="text-gray-400 text-xs mt-0.5 font-medium uppercase tracking-wide">Vencen pronto</div>
         </div>
         <a href="{% url 'core:equipos_disponibles' %}"
-           class="bg-white rounded-xl shadow-sm border-l-4 border-emerald-400 border border-gray-100 p-4 text-center hover:shadow-md transition block">
+           class="bg-white rounded-xl shadow-sm border-l-4 border-emerald-400 border border-gray-100 p-3 text-center hover:shadow-md transition block">
             <div class="text-2xl font-bold text-emerald-600">{{ equipos_disponibles }}</div>
-            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Disponibles →</div>
+            <div class="text-gray-400 text-xs mt-0.5 font-medium uppercase tracking-wide">Disponibles →</div>
         </a>
         <a href="{% url 'core:equipos_prestados' %}"
-           class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 border border-gray-100 p-4 text-center hover:shadow-md transition block">
+           class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 border border-gray-100 p-3 text-center hover:shadow-md transition block">
             <div class="text-2xl font-bold text-amber-500">{{ equipos_prestados }}</div>
-            <div class="text-gray-400 text-xs mt-1 font-medium uppercase tracking-wide">Prestados →</div>
+            <div class="text-gray-400 text-xs mt-0.5 font-medium uppercase tracking-wide">Prestados →</div>
         </a>
     </div>
 
-    <!-- Tabla principal -->
+    <!-- ══════════════════════════════════════════════════════════
+         SECCIÓN: EQUIPOS POR INSPECTOR (colapsable)
+    ══════════════════════════════════════════════════════════ -->
     {% if prestatarios %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden mb-4">
 
-        <!-- Cabecera de la tarjeta -->
-        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-users text-gray-400 text-sm"></i>
-                <span class="text-sm font-semibold text-gray-600">Equipos por Inspector</span>
+        <!-- Cabecera de sección — clic para colapsar -->
+        <div class="section-header cursor-pointer px-5 py-3.5 flex items-center gap-3 bg-gray-50 border-b border-gray-200 hover:bg-gray-100 transition-colors select-none"
+             onclick="toggleSection('sec-inspectores', 'chev-inspectores')">
+            <i class="fas fa-users text-blue-500 text-sm w-4"></i>
+            <span class="text-base font-bold text-gray-800 flex-1">Equipos por Inspector</span>
+            <!-- Filtro dentro de la cabecera -->
+            <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+                    <input type="text" id="filtro-inspectores" placeholder="Buscar inspector o equipo…"
+                           oninput="filtrarInspectores(this.value)"
+                           class="pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 w-52">
+                </div>
             </div>
             <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
                 {{ total_prestatarios }} inspector{{ total_prestatarios|pluralize }}
             </span>
+            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform duration-200" id="chev-inspectores"></i>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="border-b border-gray-100">
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-52">
-                            Inspector
-                        </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">
-                            Equipos
-                        </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-44">
-                            Observaciones
-                        </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-28">
-                            Vence
-                        </th>
-                        <th class="px-5 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-24">
-                            Estado
-                        </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-32">
-                            Acciones
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for prestatario in prestatarios %}
-                    <tr class="border-b border-gray-50 transition-colors
+        <!-- Contenido de la sección -->
+        <div id="sec-inspectores">
+            <div class="divide-y divide-gray-100" id="lista-inspectores">
+                {% for prestatario in prestatarios %}
+                <div class="fila-inspector px-5 py-3 flex items-center gap-3 {% if prestatario.equipos_vencidos > 0 %}bg-red-50 hover:bg-red-100{% else %}hover:bg-slate-50{% endif %} transition-colors"
+                     data-nombre="{{ prestatario.nombre|lower }}"
+                     data-equipos="{% for p in prestatario.prestamos %}{{ p.equipo.codigo_interno|lower }} {% endfor %}">
+
+                    <!-- Avatar -->
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-sm
+                        {% if prestatario.equipos_vencidos > 0 %}bg-red-400{% else %}bg-blue-500{% endif %}">
+                        {{ prestatario.nombre|first|upper }}
+                    </div>
+
+                    <!-- Nombre + cargo -->
+                    <div class="flex-shrink-0 w-40 min-w-0">
+                        <div class="font-semibold text-gray-800 text-sm leading-tight">{{ prestatario.nombre }}</div>
+                        {% if prestatario.cargo %}
+                        <div class="text-xs text-gray-400 truncate">{{ prestatario.cargo }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Chips de equipos (clic → detalle del préstamo) -->
+                    <div class="flex-1 flex flex-wrap gap-1.5 min-w-0">
+                        {% for prestamo in prestatario.prestamos %}
+                        <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
+                           title="{{ prestamo.equipo.nombre }} — {{ prestamo.fecha_prestamo|date:'d/m/Y' }}{% if prestamo.esta_vencido %} ⚠ VENCIDO{% endif %}"
+                           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold transition shadow-sm
+                               {% if prestamo.esta_vencido %}
+                                   bg-red-100 text-red-700 hover:bg-red-200 ring-1 ring-red-300
+                               {% else %}
+                                   bg-blue-50 text-blue-700 hover:bg-blue-100 ring-1 ring-blue-200
+                               {% endif %}">
+                            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0
+                                {% if prestamo.esta_vencido %}bg-red-500{% else %}bg-blue-400{% endif %}"></span>
+                            {{ prestamo.equipo.codigo_interno }}
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Fecha vence -->
+                    <div class="flex-shrink-0 text-xs {% if prestatario.equipos_vencidos > 0 %}text-red-600 font-semibold{% else %}text-gray-400{% endif %} hidden md:block w-24 text-right">
+                        {% if prestatario.fecha_vence %}
+                        {% if prestatario.equipos_vencidos > 0 %}<i class="fas fa-exclamation-circle mr-0.5"></i>{% endif %}
+                        {{ prestatario.fecha_vence|date:"d/m/Y" }}
+                        {% else %}—{% endif %}
+                    </div>
+
+                    <!-- Estado -->
+                    <div class="flex-shrink-0">
                         {% if prestatario.equipos_vencidos > 0 %}
-                            bg-red-50 hover:bg-red-100
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 ring-1 ring-red-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Vencido
+                        </span>
                         {% else %}
-                            hover:bg-slate-50
-                        {% endif %}">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Activo
+                        </span>
+                        {% endif %}
+                    </div>
 
-                        <!-- Inspector -->
-                        <td class="px-5 py-4 align-top">
-                            <div class="font-semibold text-gray-800 text-sm leading-tight">
-                                {{ prestatario.nombre }}
-                            </div>
-                            {% if prestatario.cargo %}
-                            <div class="text-xs text-gray-400 mt-1">{{ prestatario.cargo }}</div>
-                            {% endif %}
-                            {% if prestatario.cedula %}
-                            <div class="text-xs text-gray-400">CC {{ prestatario.cedula }}</div>
-                            {% endif %}
-                            {% if prestatario.email or prestatario.telefono %}
-                            <div class="mt-1.5 space-y-0.5">
-                                {% if prestatario.email %}
-                                <div class="flex items-center gap-1 text-xs text-gray-400" title="{{ prestatario.email }}">
-                                    <i class="fas fa-envelope w-3 text-gray-300"></i>
-                                    <span class="truncate max-w-[150px]">{{ prestatario.email }}</span>
-                                </div>
-                                {% endif %}
-                                {% if prestatario.telefono %}
-                                <div class="flex items-center gap-1 text-xs text-gray-400">
-                                    <i class="fas fa-phone w-3 text-gray-300"></i>
-                                    {{ prestatario.telefono }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        </td>
+                    <!-- Acciones -->
+                    <div class="flex-shrink-0 flex items-center gap-1.5">
+                        {% if perms.core.can_change_prestamo %}
+                        {% if perms.core.can_add_prestamo %}
+                        <a href="{% url 'core:crear_prestamo' %}?desde={{ prestatario.pk_ref }}"
+                           title="Añadir equipo"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition">
+                            <i class="fas fa-plus text-xs"></i>
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'core:editar_grupo_prestamos' prestatario.pk_ref %}"
+                           title="Editar"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+                            <i class="fas fa-edit text-xs"></i>
+                        </a>
+                        <a href="{% url 'core:devolver_todos' prestatario.pk_ref %}"
+                           title="Devolver todos"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition">
+                            <i class="fas fa-check-circle text-xs"></i>
+                        </a>
+                        {% if prestatario.equipos_vencidos > 0 %}
+                        <button onclick="enviarAlerta('{{ prestatario.nombre }}', '{{ prestatario.email }}', {{ prestatario.equipos_vencidos }})"
+                                title="Alertar"
+                                class="w-7 h-7 flex items-center justify-center rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition">
+                            <i class="fas fa-bell text-xs"></i>
+                        </button>
+                        {% endif %}
+                        {% else %}
+                        <a href="{% url 'core:detalle_prestamo' prestatario.pk_ref %}"
+                           class="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+                            <i class="fas fa-eye text-xs"></i>
+                        </a>
+                        {% endif %}
+                    </div>
 
-                        <!-- Chips de equipos -->
-                        <td class="px-5 py-4 align-top">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for prestamo in prestatario.prestamos %}
-                                <a href="{% url 'core:detalle_prestamo' prestamo.pk %}"
-                                   title="{{ prestamo.equipo.nombre }} — {{ prestamo.fecha_prestamo|date:'d/m/Y' }}{% if prestamo.esta_vencido %} ⚠ VENCIDO{% endif %}"
-                                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition shadow-sm
-                                       {% if prestamo.esta_vencido %}
-                                           bg-red-100 text-red-700 hover:bg-red-200 ring-1 ring-red-200
-                                       {% else %}
-                                           bg-blue-50 text-blue-700 hover:bg-blue-100 ring-1 ring-blue-100
-                                       {% endif %}">
-                                    {% if prestamo.esta_vencido %}
-                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
-                                    {% else %}
-                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></span>
-                                    {% endif %}
-                                    {{ prestamo.equipo.codigo_interno }}
-                                </a>
-                                {% endfor %}
-                            </div>
-                        </td>
-
-                        <!-- Observaciones -->
-                        <td class="px-5 py-4 align-top">
-                            {% if prestatario.obs_simple %}
-                                <span class="text-xs text-gray-600 italic">
-                                    {{ prestatario.obs_simple|truncatechars:80 }}
-                                </span>
-                            {% elif prestatario.obs_lista %}
-                                {% for item in prestatario.obs_lista %}
-                                <div class="mb-1 last:mb-0">
-                                    <span class="text-xs font-semibold text-gray-400">{{ item.codigo }}:</span>
-                                    <span class="text-xs text-gray-600 italic">{{ item.texto|truncatechars:60 }}</span>
-                                </div>
-                                {% endfor %}
-                            {% endif %}
-                        </td>
-
-                        <!-- Fecha vence -->
-                        <td class="px-5 py-4 align-top">
-                            {% if prestatario.fecha_vence %}
-                                {% if prestatario.equipos_vencidos > 0 %}
-                                <div class="flex items-center gap-1">
-                                    <i class="fas fa-exclamation-circle text-red-400 text-xs"></i>
-                                    <span class="text-red-600 font-semibold text-sm">
-                                        {{ prestatario.fecha_vence|date:"d/m/Y" }}
-                                    </span>
-                                </div>
-                                {% else %}
-                                <span class="text-gray-600 text-sm">{{ prestatario.fecha_vence|date:"d/m/Y" }}</span>
-                                {% endif %}
-                            {% else %}
-                            <span class="text-gray-300 text-xs">—</span>
-                            {% endif %}
-                        </td>
-
-                        <!-- Estado -->
-                        <td class="px-5 py-4 align-top text-center">
-                            {% if prestatario.equipos_vencidos > 0 %}
-                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                Vencido
-                            </span>
-                            {% else %}
-                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                Activo
-                            </span>
-                            {% endif %}
-                        </td>
-
-                        <!-- Acciones -->
-                        <td class="px-5 py-4 align-top">
-                            <div class="flex flex-col gap-2">
-                                {% if perms.core.can_change_prestamo %}
-                                {% if perms.core.can_add_prestamo %}
-                                <a href="{% url 'core:crear_prestamo' %}?desde={{ prestatario.pk_ref }}"
-                                   class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium group">
-                                    <i class="fas fa-plus-circle text-indigo-400 group-hover:text-indigo-600 w-3"></i>
-                                    Añadir equipo
-                                </a>
-                                {% endif %}
-                                <a href="{% url 'core:editar_grupo_prestamos' prestatario.pk_ref %}"
-                                   class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium group">
-                                    <i class="fas fa-edit text-blue-400 group-hover:text-blue-600 w-3"></i>
-                                    Editar
-                                </a>
-                                <a href="{% url 'core:devolver_todos' prestatario.pk_ref %}"
-                                   class="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-800 font-medium group">
-                                    <i class="fas fa-check-circle text-emerald-400 group-hover:text-emerald-600 w-3"></i>
-                                    Devolver todos
-                                </a>
-                                {% if prestatario.equipos_vencidos > 0 %}
-                                <button onclick="enviarAlerta('{{ prestatario.nombre }}', '{{ prestatario.email }}', {{ prestatario.equipos_vencidos }})"
-                                        class="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-800 font-medium text-left group">
-                                    <i class="fas fa-bell text-amber-400 group-hover:text-amber-600 w-3"></i>
-                                    Alertar
-                                </button>
-                                {% endif %}
-                                {% else %}
-                                <a href="{% url 'core:detalle_prestamo' prestatario.pk_ref %}"
-                                   class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                                    <i class="fas fa-eye w-3"></i> Ver
-                                </a>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                </div>
+                {% endfor %}
+            </div>
+            <!-- Mensaje de no resultados en filtro -->
+            <div id="sin-resultados-inspector" class="hidden px-5 py-6 text-center text-sm text-gray-400 italic">
+                No se encontraron inspectores con ese criterio.
+            </div>
         </div>
     </div>
 
     {% else %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-16 text-center">
-        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center mb-4">
+        <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <i class="fas fa-box-open text-gray-300 text-2xl"></i>
         </div>
         <h3 class="text-base font-semibold text-gray-500 mb-1">Sin préstamos activos</h3>
-        <p class="text-gray-400 text-sm mb-6">Actualmente no hay equipos prestados.</p>
+        <p class="text-gray-400 text-sm mb-5">Actualmente no hay equipos prestados.</p>
         {% if perms.core.can_add_prestamo %}
         <a href="{% url 'core:crear_prestamo' %}"
-           class="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
+           class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
             Crear primer préstamo
         </a>
         {% endif %}
     </div>
     {% endif %}
 
-    <!-- Equipos disponibles por familia -->
+    <!-- ══════════════════════════════════════════════════════════
+         SECCIÓN: EQUIPOS DISPONIBLES (colapsable, chips)
+    ══════════════════════════════════════════════════════════ -->
     {% if familias_disponibles %}
-    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
 
-        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-boxes text-gray-400 text-sm"></i>
-                <span class="text-sm font-semibold text-gray-600">Equipos Disponibles para Préstamo</span>
+        <!-- Cabecera de sección — clic para colapsar -->
+        <div class="section-header cursor-pointer px-5 py-3.5 flex items-center gap-3 bg-gray-50 border-b border-gray-200 hover:bg-gray-100 transition-colors select-none"
+             onclick="toggleSection('sec-disponibles', 'chev-disponibles')">
+            <i class="fas fa-boxes text-emerald-500 text-sm w-4"></i>
+            <span class="text-base font-bold text-gray-800 flex-1">Equipos Disponibles para Préstamo</span>
+            <!-- Filtro -->
+            <div onclick="event.stopPropagation()">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+                    <input type="text" id="filtro-disponibles" placeholder="Buscar código…"
+                           oninput="filtrarDisponibles(this.value)"
+                           class="pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200 w-44">
+                </div>
             </div>
-            <span class="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full ring-1 ring-emerald-200">
                 {{ equipos_disponibles }} equipo{{ equipos_disponibles|pluralize }}
             </span>
+            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform duration-200" id="chev-disponibles"></i>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="border-b border-gray-100">
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-32">Código</th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">Equipo</th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-36">Marca / Modelo</th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-36">Ubicación</th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-32">Próx. calibración</th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 w-24">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for familia, equipos in familias_disponibles.items %}
-
-                    <!-- Fila de familia -->
-                    <tr class="bg-slate-50 border-t border-slate-200">
-                        <td colspan="6" class="px-5 py-2">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    {{ familia }}
-                                </span>
-                                <span class="text-xs text-slate-400">— {{ equipos|length }} equipo{{ equipos|length|pluralize }}</span>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Filas de equipos de esta familia -->
-                    {% for equipo in equipos %}
-                    <tr class="border-t border-gray-50 hover:bg-emerald-50 transition-colors">
-                        <td class="px-5 py-3">
-                            <a href="{% url 'core:detalle_equipo' equipo.pk %}"
-                               class="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
-                                {{ equipo.codigo_interno }}
-                            </a>
-                        </td>
-                        <td class="px-5 py-3">
-                            <div class="text-sm text-gray-800 font-medium">{{ equipo.nombre }}</div>
-                            {% if equipo.numero_serie %}
-                            <div class="text-xs text-gray-400">S/N: {{ equipo.numero_serie }}</div>
-                            {% endif %}
-                        </td>
-                        <td class="px-5 py-3 text-sm text-gray-500">
-                            {% if equipo.marca %}{{ equipo.marca }}{% endif %}
-                            {% if equipo.modelo %}<span class="text-gray-400"> / {{ equipo.modelo }}</span>{% endif %}
-                        </td>
-                        <td class="px-5 py-3">
-                            {% if equipo.ubicacion %}
-                            <span class="inline-flex items-center gap-1 text-xs text-gray-500">
-                                <i class="fas fa-map-marker-alt text-gray-300 w-3"></i>
-                                {{ equipo.ubicacion }}
-                            </span>
-                            {% else %}
-                            <span class="text-gray-300 text-xs">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-5 py-3 text-sm">
+        <!-- Contenido de la sección (colapsado por defecto para ahorrar espacio) -->
+        <div id="sec-disponibles" class="hidden">
+            <div class="px-5 py-4 space-y-4" id="lista-disponibles">
+                {% for familia, equipos in familias_disponibles.items %}
+                <div class="grupo-familia">
+                    <!-- Encabezado de familia -->
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ familia }}</span>
+                        <span class="text-xs text-slate-400">— {{ equipos|length }} equipo{{ equipos|length|pluralize }}</span>
+                    </div>
+                    <!-- Chips de equipos -->
+                    <div class="flex flex-wrap gap-2 pl-4 chips-familia">
+                        {% for equipo in equipos %}
+                        {% if perms.core.can_add_prestamo %}
+                        <a href="{% url 'core:crear_prestamo' %}?equipo={{ equipo.pk }}"
+                           title="{{ equipo.nombre }}{% if equipo.marca %} · {{ equipo.marca }}{% endif %}{% if equipo.modelo %} {{ equipo.modelo }}{% endif %}{% if equipo.ubicacion %} · {{ equipo.ubicacion }}{% endif %}"
+                           class="chip-equipo inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 ring-1 ring-emerald-300 hover:ring-emerald-400 transition shadow-sm group"
+                           data-codigo="{{ equipo.codigo_interno|lower }}">
+                            <i class="fas fa-box text-emerald-400 group-hover:text-emerald-600 transition-colors w-3"></i>
+                            {{ equipo.codigo_interno }}
                             {% if equipo.proxima_calibracion %}
-                                {% now "Y-m-d" as today_str %}
-                                {% if equipo.proxima_calibracion|date:"Y-m-d" < today_str %}
-                                <span class="inline-flex items-center gap-1 text-xs text-red-600 font-semibold">
-                                    <i class="fas fa-exclamation-circle text-red-400 w-3"></i>
-                                    {{ equipo.proxima_calibracion|date:"d/m/Y" }}
-                                </span>
-                                {% else %}
-                                <span class="text-gray-600 text-xs">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
-                                {% endif %}
-                            {% else %}
-                            <span class="text-gray-300 text-xs">—</span>
+                            {% now "Y-m-d" as today_str %}
+                            {% if equipo.proxima_calibracion|date:"Y-m-d" < today_str %}
+                            <i class="fas fa-exclamation-circle text-amber-400 text-xs" title="Calibración vencida"></i>
                             {% endif %}
-                        </td>
-                        <td class="px-5 py-3">
-                            {% if perms.core.can_add_prestamo %}
-                            <a href="{% url 'core:crear_prestamo' %}?equipo={{ equipo.pk }}"
-                               class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                                <i class="fas fa-hand-holding w-3"></i> Prestar
-                            </a>
                             {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </a>
+                        {% else %}
+                        <a href="{% url 'core:detalle_equipo' equipo.pk %}"
+                           title="{{ equipo.nombre }}"
+                           class="chip-equipo inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 ring-1 ring-gray-200 transition"
+                           data-codigo="{{ equipo.codigo_interno|lower }}">
+                            {{ equipo.codigo_interno }}
+                        </a>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
+
     </div>
     {% endif %}
 
@@ -376,6 +283,48 @@
 
 {% block extra_js %}
 <script>
+/* ── Toggle de sección completa ── */
+function toggleSection(sectionId, chevronId) {
+    const section = document.getElementById(sectionId);
+    const chevron = document.getElementById(chevronId);
+    const opening = section.classList.contains('hidden');
+    section.classList.toggle('hidden');
+    chevron.style.transform = opening ? 'rotate(180deg)' : '';
+}
+
+/* ── Filtro de inspectores ── */
+function filtrarInspectores(query) {
+    const q = query.trim().toLowerCase();
+    const filas = document.querySelectorAll('.fila-inspector');
+    let hayResultados = false;
+    filas.forEach(fila => {
+        const nombre = fila.dataset.nombre || '';
+        const equipos = fila.dataset.equipos || '';
+        const match = !q || nombre.includes(q) || equipos.includes(q);
+        fila.style.display = match ? '' : 'none';
+        if (match) hayResultados = true;
+    });
+    const sinRes = document.getElementById('sin-resultados-inspector');
+    if (sinRes) sinRes.classList.toggle('hidden', hayResultados || !q);
+}
+
+/* ── Filtro de equipos disponibles ── */
+function filtrarDisponibles(query) {
+    const q = query.trim().toLowerCase();
+    document.querySelectorAll('.grupo-familia').forEach(grupo => {
+        const chips = grupo.querySelectorAll('.chip-equipo');
+        let hayChip = false;
+        chips.forEach(chip => {
+            const codigo = chip.dataset.codigo || '';
+            const match = !q || codigo.includes(q);
+            chip.style.display = match ? '' : 'none';
+            if (match) hayChip = true;
+        });
+        grupo.style.display = hayChip || !q ? '' : 'none';
+    });
+}
+
+/* ── Alerta de devolución vencida ── */
 function enviarAlerta(nombre, email, cantidadVencidos) {
     const msg = `Recordatorio para ${nombre}.\n\n` +
                 `Tiene ${cantidadVencidos} equipo(s) con devolución vencida.\n` +
