@@ -603,15 +603,6 @@ class Empresa(models.Model):
         else:
             return -(hoy - self.fecha_proximo_pago).days  # Días de retraso (negativo)
 
-    def esta_al_dia_con_pagos(self):
-        """
-        Verifica si la empresa está al día con sus pagos.
-        """
-        dias = self.dias_hasta_proximo_pago()
-        if dias is None:
-            return True  # Sin fecha definida, asumimos que está al día
-        return dias >= -7  # Permitir 7 días de gracia
-
     def restore(self, user=None):
         """
         Restaura una empresa previamente eliminada.
