@@ -245,7 +245,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key === 'ArrowLeft') {
         const prevBtn = document.querySelector('button[name="save_and_prev"]');

@@ -392,7 +392,7 @@ class OptimizedEquipmentService:
         # Esto invalida todas las claves de cache que usan el versionado
         version_key = f"equipment_version_{empresa_id}"
         current_version = cache.get(version_key, 0)
-        cache.set(version_key, current_version + 1, None)  # Sin expiración
+        cache.set(version_key, current_version + 1, 86400 * 30)  # 30 días
 
 
 class CacheManager:
@@ -445,7 +445,7 @@ class CacheManager:
         # Incrementar versión para invalidar todo el cache relacionado
         version_key = f"equipment_version_{empresa_id}"
         current_version = cache.get(version_key, 0)
-        cache.set(version_key, current_version + 1, None)
+        cache.set(version_key, current_version + 1, 86400 * 30)
 
         logger.info(f"Cache invalidado para empresa {empresa_id}, nueva versión: {current_version + 1}")
 

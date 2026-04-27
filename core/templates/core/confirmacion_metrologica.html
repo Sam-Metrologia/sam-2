@@ -31,8 +31,8 @@
     }
 
     .condicional {
-        background-color: #fef3c7;
-        color: #92400e;
+        background-color: #ffedd5;
+        color: #c2410c;
         font-weight: bold;
     }
 
@@ -303,16 +303,28 @@
             <label class="block text-sm font-bold text-gray-800 mb-2">
                 <i class="fas fa-gavel mr-2"></i> Regla de Decisión (ILAC G8:09/2019)
             </label>
-            <select id="regla-decision" onchange="recalcularTodasFilas()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 font-medium">
+            <select id="regla-decision" onchange="recalcularTodasFilas(); actualizarDescripcionRegla();" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 font-medium">
                 <option value="guard_band_U" selected>Banda de Guarda U Completa (Recomendado ISO/IEC 17025 - Riesgo ≤ 2.5%)</option>
                 <option value="simple_acceptance">Aceptación Simple - Riesgo Compartido (Sin banda de guarda - 50% riesgo)</option>
                 <option value="guard_band_half">Banda de Guarda U/2 (Balance comercial - Riesgo ≈ 16%)</option>
                 <option value="guard_band_sqrt">Banda de Guarda Óptima √(EMP² - U²) (Rigor matemático - Riesgo ≤ 2%)</option>
                 <option value="conditional">Aceptación Condicional (Identifica zona gris - Transparencia total)</option>
             </select>
-            <p class="text-xs text-gray-600 mt-2" id="regla-descripcion">
-                Se acepta solo si el peor caso (Error + Incertidumbre) NO supera el EMP. Protege al cliente minimizando riesgo de falso aceptado (≤2.5%).
+            <p class="mt-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1.5 leading-snug">
+                Seleccione la regla que su empresa tiene definida en el procedimiento de confirmación metrológica.
+                Si aún no está definida, la recomendada para laboratorios acreditados es <strong>Banda de Guarda U Completa</strong>.
+                No cambie la regla de equipo en equipo — debe ser consistente en toda la empresa.
             </p>
+            <!-- Preview de zonas + descripción -->
+            <div class="mt-3 flex gap-3 items-start">
+                <div id="regla-mini-svg" class="flex-shrink-0 border border-gray-200 rounded-md p-1 bg-white"></div>
+                <div class="flex-1">
+                    <p class="text-xs text-gray-600 leading-relaxed" id="regla-descripcion">
+                        Se acepta solo si el peor caso (Error + Incertidumbre) NO supera el EMP. Protege al cliente minimizando riesgo de falso aceptado (≤2.5%).
+                    </p>
+                    <p class="text-xs font-semibold text-indigo-600 mt-1" id="regla-ilac-tag">≡ ILAC G8: Regla 2 — Declaración Binaria con zona de seguridad (w = U)</p>
+                </div>
+            </div>
         </div>
 
         <!-- Tabla de Análisis de Mediciones -->
@@ -408,21 +420,17 @@
             </div>
         </div>
 
-        <!-- Gráfica de Comportamiento por Año -->
+        <!-- Gráfica de Confirmación con Zonas ILAC G8 -->
         <div class="mt-6 bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
-            <h3 class="font-bold text-lg mb-3">
-                <i class="fas fa-chart-area mr-2"></i> Gráfica de Comportamiento Histórico
+            <h3 class="font-bold text-lg mb-2 flex items-center justify-between">
+                <span><i class="fas fa-chart-area mr-2"></i> Gráfica de Confirmación Metrológica</span>
+                <span id="preview-grafica-loading" class="hidden text-xs text-gray-400 italic font-normal">Generando...</span>
             </h3>
-            <p class="text-sm text-gray-700 mb-4">Visualización de errores con barras de incertidumbre a través de los años. Permite identificar deriva y tendencias.</p>
+            <p class="text-sm text-gray-700 mb-3">Errores normalizados (Error/EMP) con zonas de decisión según la regla ILAC G8 seleccionada. Se actualiza al ingresar datos.</p>
 
-            <div class="bg-white border-2 border-gray-300 rounded-lg p-4">
-                <canvas id="grafico-historico" width="800" height="400"></canvas>
-            </div>
-
-            <div class="mt-3 text-xs text-gray-600">
-                <p><strong>Leyenda:</strong></p>
-                <p>• <span class="font-semibold">Puntos:</span> Errores de medición | <span class="font-semibold">Barras:</span> ± Incertidumbre (U) | <span class="font-semibold text-red-600">Líneas rojas:</span> Límites EMP ±</p>
-                <p class="mt-1">Los errores deben mantenerse dentro de los límites EMP (líneas rojas discontinuas) para conformidad</p>
+            <div id="preview-grafica-container" class="bg-white border-2 border-gray-300 rounded-lg p-4 flex items-center justify-center min-h-[160px]">
+                <p id="preview-grafica-empty" class="text-sm text-gray-400">Complete la tabla de mediciones para ver la gráfica</p>
+                <img id="preview-grafica-img" class="w-full" style="display:none" alt="Gráfica de confirmación metrológica">
             </div>
         </div>
     </div>
@@ -477,7 +485,7 @@
 
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     // ========== INTEGRACIÓN CON DJANGO: DATOS DEL EQUIPO ==========
 
     // Variable global con puntos de medición desde Django
@@ -656,7 +664,7 @@
 
         // Actualizar gráfica después de calcular (con debounce)
         const actualizarGraficaDespues = () => {
-            dibujarGraficoHistoricoDebounced();
+            actualizarPreviewGraficaDebounced();
         };
 
         const nominal = parseFloat(cells[1].querySelector('input').value) || 0;
@@ -746,21 +754,24 @@
                     const toleranciaAjustada = Math.sqrt(Math.pow(empDecimal, 2) - Math.pow(incertNorm, 2));
                     cumple = (Math.abs(errorNorm) <= toleranciaAjustada);
                     break;
-                case 'conditional':
-                    if (Math.abs(errorNorm) <= empDecimal && Math.abs(errorMasUNorm) <= empDecimal) {
+                case 'conditional': {
+                    // ILAC G8 Regla 3: límite = EMP - U (simétrico por valor absoluto)
+                    const limite_cond = empDecimal - incertNorm;
+                    if (Math.abs(errorNorm) <= limite_cond) {
                         textoConformidad = 'Cumple';
                         claseConformidad = 'cumple';
                         cumple = true;
-                    } else if (Math.abs(errorNorm) > empDecimal) {
-                        textoConformidad = 'No Cumple';
-                        claseConformidad = 'no-cumple';
-                        cumple = false;
-                    } else {
+                    } else if (Math.abs(errorNorm) <= empDecimal) {
                         textoConformidad = 'Condicionado';
                         claseConformidad = 'condicional';
                         cumple = false;
+                    } else {
+                        textoConformidad = 'No Cumple';
+                        claseConformidad = 'no-cumple';
+                        cumple = false;
                     }
                     break;
+                }
             }
         } else {
             // Modo unidades absolutas (usar empAbsoluto calculado)
@@ -779,21 +790,24 @@
                     const toleranciaAjustada = Math.sqrt(Math.pow(empAbsoluto, 2) - Math.pow(incertidumbre, 2));
                     cumple = (Math.abs(error) <= toleranciaAjustada);
                     break;
-                case 'conditional':
-                    if (Math.abs(error) <= empAbsoluto && Math.abs(errorMasU) <= empAbsoluto) {
+                case 'conditional': {
+                    // ILAC G8 Regla 3: límite = EMP - U (simétrico por valor absoluto)
+                    const limite_cond_abs = empAbsoluto - incertidumbre;
+                    if (Math.abs(error) <= limite_cond_abs) {
                         textoConformidad = 'Cumple';
                         claseConformidad = 'cumple';
                         cumple = true;
-                    } else if (Math.abs(error) > empAbsoluto) {
-                        textoConformidad = 'No Cumple';
-                        claseConformidad = 'no-cumple';
-                        cumple = false;
-                    } else {
+                    } else if (Math.abs(error) <= empAbsoluto) {
                         textoConformidad = 'Condicionado';
                         claseConformidad = 'condicional';
                         cumple = false;
+                    } else {
+                        textoConformidad = 'No Cumple';
+                        claseConformidad = 'no-cumple';
+                        cumple = false;
                     }
                     break;
+                }
             }
         }
 
@@ -830,17 +844,196 @@
 
     function actualizarDescripcionRegla() {
         const regla = document.getElementById('regla-decision').value;
-        const descripcion = document.getElementById('regla-descripcion');
 
         const descripciones = {
-            'simple_acceptance': 'Acepta si el error medido está dentro del EMP, ignorando la incertidumbre. Cliente y proveedor comparten el riesgo de falso aceptado (hasta 50% en el límite).',
-            'guard_band_U': 'Se acepta solo si el peor caso (Error + Incertidumbre) NO supera el EMP. Protege al cliente minimizando riesgo de falso aceptado (≤2.5%).',
-            'guard_band_half': 'Usa la mitad de la incertidumbre como banda de protección. Balance comercial razonable entre riesgo del productor y consumidor (≈16%).',
-            'guard_band_sqrt': 'Ajuste matemático riguroso del límite: √(EMP² - U²). Minimiza simultáneamente ambos riesgos (productor y consumidor ≤2%).',
-            'conditional': 'Identifica casos en zona de incertidumbre que requieren decisión del cliente o análisis adicional. Transparencia total sobre el riesgo.'
+            'simple_acceptance': 'CUMPLE si el error está dentro del EMP — la incertidumbre del certificado no se tiene en cuenta. Zona naranja: no aplica. Zona roja: error fuera del EMP → NO CUMPLE. Es la más permisiva y no se recomienda para acreditación porque ignora si la incertidumbre podría sacar el error del límite.',
+            'guard_band_U':      'CUMPLE solo si el error + U ≤ EMP (el peor caso queda dentro del límite). Zona naranja: el error está dentro del EMP pero al sumarle la incertidumbre completa se sale → NO CUMPLE. Zona roja: error ya supera el EMP → NO CUMPLE. Es la más estricta (riesgo ≤ 2.5%) y la recomendada por ISO/IEC 17025.',
+            'guard_band_half':   'CUMPLE si el error + U/2 ≤ EMP. Zona naranja: el error está bien pero al sumarle media incertidumbre supera el límite → NO CUMPLE. Zona roja: error fuera del EMP → NO CUMPLE. Es un punto medio entre exigencia y practicidad (riesgo ≈ 16%).',
+            'guard_band_sqrt':   'CUMPLE si el error ≤ √(EMP² − U²). Este límite es el óptimo matemático que balancea el riesgo del proveedor y el del cliente (riesgo ≤ 2%). Zona naranja: error entre el límite óptimo y el EMP → NO CUMPLE. Requiere que U sea menor que el EMP.',
+            'conditional':       'Tres resultados posibles — CUMPLE: el error + U ≤ EMP. CONDICIONADO (zona naranja): el error está dentro del EMP pero la incertidumbre lo saca → debe revisarlo el responsable antes de decidir. NO CUMPLE: el error supera el EMP directamente. Ofrece máxima transparencia sobre la situación real del equipo.'
         };
 
-        descripcion.textContent = descripciones[regla];
+        const ilacTags = {
+            'simple_acceptance': '≡ ILAC G8: Regla 1 — Declaración Binaria (w = 0, sin banda de guarda)',
+            'guard_band_U':      '≡ ILAC G8: Regla 2 — Declaración Binaria con zona de seguridad (w = U)',
+            'guard_band_half':   '≡ ILAC G8: Regla 2 — Declaración Binaria con zona de seguridad (w = U/2)',
+            'guard_band_sqrt':   '≡ ILAC G8: Regla 2 — Declaración Binaria con zona de seguridad (w = EMP − √(EMP²−U²))',
+            'conditional':       '≡ ILAC G8: Regla 3 — Declaración No Binaria con zona de revisión condicional'
+        };
+
+        // Diagramas SVG de zonas por regla (ilustrativos — proporciones fijas)
+        const miniSvgs = {
+            'simple_acceptance': `<svg width="280" height="64" viewBox="0 0 280 64" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="16" width="260" height="32" fill="#dcfce7" rx="2"/>
+                <line x1="10" y1="10" x2="10" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="270" y1="10" x2="270" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="140" y1="16" x2="140" y2="48" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+                <text x="140" y="36" text-anchor="middle" font-size="9" fill="#15803d" font-weight="bold" font-family="sans-serif">CUMPLE</text>
+                <text x="10" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">−EMP</text>
+                <text x="270" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">+EMP</text>
+                <text x="140" y="63" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="sans-serif">0</text>
+            </svg>`,
+
+            'guard_band_U': `<svg width="280" height="64" viewBox="0 0 280 64" xmlns="http://www.w3.org/2000/svg">
+                <rect x="49" y="16" width="182" height="32" fill="#dcfce7" rx="2"/>
+                <rect x="10" y="16" width="39" height="32" fill="#ffedd5"/>
+                <rect x="231" y="16" width="39" height="32" fill="#ffedd5"/>
+                <line x1="10" y1="10" x2="10" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="270" y1="10" x2="270" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="49" y1="10" x2="49" y2="54" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="231" y1="10" x2="231" y2="54" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="140" y1="16" x2="140" y2="48" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+                <text x="140" y="36" text-anchor="middle" font-size="8" fill="#15803d" font-weight="bold" font-family="sans-serif">CUMPLE</text>
+                <text x="29" y="30" text-anchor="middle" font-size="7" fill="#c2410c" font-family="sans-serif">BANDA</text>
+                <text x="29" y="41" text-anchor="middle" font-size="7" fill="#c2410c" font-family="sans-serif">w=U</text>
+                <text x="251" y="30" text-anchor="middle" font-size="7" fill="#c2410c" font-family="sans-serif">BANDA</text>
+                <text x="251" y="41" text-anchor="middle" font-size="7" fill="#c2410c" font-family="sans-serif">w=U</text>
+                <text x="10" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">−EMP</text>
+                <text x="270" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">+EMP</text>
+                <text x="49" y="63" text-anchor="middle" font-size="7" fill="#16a34a" font-family="sans-serif">EMP−U</text>
+                <text x="231" y="63" text-anchor="middle" font-size="7" fill="#16a34a" font-family="sans-serif">EMP−U</text>
+            </svg>`,
+
+            'guard_band_half': `<svg width="280" height="64" viewBox="0 0 280 64" xmlns="http://www.w3.org/2000/svg">
+                <rect x="30" y="16" width="220" height="32" fill="#dcfce7" rx="2"/>
+                <rect x="10" y="16" width="20" height="32" fill="#ffedd5"/>
+                <rect x="250" y="16" width="20" height="32" fill="#ffedd5"/>
+                <line x1="10" y1="10" x2="10" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="270" y1="10" x2="270" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="30" y1="10" x2="30" y2="54" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="250" y1="10" x2="250" y2="54" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="140" y1="16" x2="140" y2="48" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+                <text x="140" y="36" text-anchor="middle" font-size="8" fill="#15803d" font-weight="bold" font-family="sans-serif">CUMPLE</text>
+                <text x="20" y="35" text-anchor="middle" font-size="6.5" fill="#c2410c" font-family="sans-serif">U/2</text>
+                <text x="260" y="35" text-anchor="middle" font-size="6.5" fill="#c2410c" font-family="sans-serif">U/2</text>
+                <text x="10" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">−EMP</text>
+                <text x="270" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">+EMP</text>
+                <text x="30" y="63" text-anchor="middle" font-size="7" fill="#16a34a" font-family="sans-serif">EMP−U/2</text>
+            </svg>`,
+
+            'guard_band_sqrt': `<svg width="280" height="64" viewBox="0 0 280 64" xmlns="http://www.w3.org/2000/svg">
+                <rect x="40" y="16" width="200" height="32" fill="#dcfce7" rx="2"/>
+                <rect x="10" y="16" width="30" height="32" fill="#ffedd5"/>
+                <rect x="240" y="16" width="30" height="32" fill="#ffedd5"/>
+                <line x1="10" y1="10" x2="10" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="270" y1="10" x2="270" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="40" y1="10" x2="40" y2="54" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="240" y1="10" x2="240" y2="54" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="140" y1="16" x2="140" y2="48" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+                <text x="140" y="36" text-anchor="middle" font-size="8" fill="#15803d" font-weight="bold" font-family="sans-serif">CUMPLE</text>
+                <text x="25" y="30" text-anchor="middle" font-size="6.5" fill="#6d28d9" font-family="sans-serif">BANDA</text>
+                <text x="25" y="40" text-anchor="middle" font-size="6.5" fill="#6d28d9" font-family="sans-serif">√ópt.</text>
+                <text x="255" y="30" text-anchor="middle" font-size="6.5" fill="#6d28d9" font-family="sans-serif">BANDA</text>
+                <text x="255" y="40" text-anchor="middle" font-size="6.5" fill="#6d28d9" font-family="sans-serif">√ópt.</text>
+                <text x="10" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">−EMP</text>
+                <text x="270" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">+EMP</text>
+                <text x="40" y="63" text-anchor="middle" font-size="7" fill="#6d28d9" font-family="sans-serif">√(E²−U²)</text>
+            </svg>`,
+
+            'conditional': `<svg width="280" height="64" viewBox="0 0 280 64" xmlns="http://www.w3.org/2000/svg">
+                <rect x="49" y="16" width="182" height="32" fill="#dcfce7" rx="2"/>
+                <rect x="10" y="16" width="39" height="32" fill="#fef3c7"/>
+                <rect x="231" y="16" width="39" height="32" fill="#fef3c7"/>
+                <line x1="10" y1="10" x2="10" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="270" y1="10" x2="270" y2="54" stroke="#dc2626" stroke-width="2"/>
+                <line x1="49" y1="10" x2="49" y2="54" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="231" y1="10" x2="231" y2="54" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line x1="140" y1="16" x2="140" y2="48" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2"/>
+                <text x="140" y="36" text-anchor="middle" font-size="8" fill="#15803d" font-weight="bold" font-family="sans-serif">CUMPLE</text>
+                <text x="29" y="30" text-anchor="middle" font-size="6.5" fill="#c2410c" font-family="sans-serif">ZONA</text>
+                <text x="29" y="41" text-anchor="middle" font-size="6.5" fill="#c2410c" font-family="sans-serif">GRIS</text>
+                <text x="251" y="30" text-anchor="middle" font-size="6.5" fill="#c2410c" font-family="sans-serif">ZONA</text>
+                <text x="251" y="41" text-anchor="middle" font-size="6.5" fill="#c2410c" font-family="sans-serif">GRIS</text>
+                <text x="10" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">−EMP</text>
+                <text x="270" y="63" text-anchor="middle" font-size="8" fill="#dc2626" font-family="sans-serif">+EMP</text>
+                <text x="140" y="63" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="sans-serif">0</text>
+            </svg>`
+        };
+
+        document.getElementById('regla-descripcion').textContent = descripciones[regla] || '';
+        document.getElementById('regla-ilac-tag').textContent = ilacTags[regla] || '';
+        const svgEl = document.getElementById('regla-mini-svg');
+        if (svgEl) svgEl.innerHTML = miniSvgs[regla] || '';
+        actualizarPreviewGraficaDebounced();
+    }
+
+    // ── Preview de gráfica en vivo ────────────────────────────────────────────
+    let _previewTimer = null;
+    function actualizarPreviewGraficaDebounced() {
+        clearTimeout(_previewTimer);
+        _previewTimer = setTimeout(actualizarPreviewGrafica, 900);
+    }
+
+    function actualizarPreviewGrafica() {
+        const regla = document.getElementById('regla-decision').value;
+        const empValor = parseFloat(
+            document.getElementById('mag-emp-val')?.value ||
+            document.getElementById('emp')?.value || 1
+        );
+        const empUnidad = document.getElementById('mag-emp-tipo')?.value ||
+                          document.getElementById('emp-unidad')?.value || '%';
+        const unidadEquipo = document.getElementById('mag-unidad')?.value ||
+                             document.getElementById('unidad-equipo')?.value || '';
+
+        // Recolectar puntos de la tabla activa
+        const tbody = document.getElementById('tbody-mediciones');
+        const loading = document.getElementById('preview-grafica-loading');
+        const img = document.getElementById('preview-grafica-img');
+        const empty = document.getElementById('preview-grafica-empty');
+
+        if (!tbody) return;
+        const puntos = [];
+        Array.from(tbody.getElementsByTagName('tr')).forEach(fila => {
+            const cells = fila.cells;
+            if (!cells || cells.length < 7) return;
+            const nominal = parseFloat(cells[1]?.querySelector('input')?.value) || 0;
+            const lectura = parseFloat(cells[2]?.querySelector('input')?.value) || 0;
+            const incertidumbre = parseFloat(cells[3]?.querySelector('input')?.value) || 0;
+            const empPunto = parseFloat(cells[4]?.querySelector('input')?.value) || 0;
+            const empTipo = cells[5]?.querySelector('select')?.value || '%';
+            const empAbsText = cells[6]?.textContent?.trim();
+            const empAbsoluto = (empAbsText && empAbsText !== '-') ? parseFloat(empAbsText) : 0;
+            if (nominal === 0) return;
+            puntos.push({
+                nominal, lectura, error: lectura - nominal,
+                incertidumbre, emp_valor: empPunto, emp_tipo: empTipo,
+                emp_absoluto: empAbsoluto || 0,
+            });
+        });
+
+        if (puntos.length === 0) {
+            if (empty) empty.style.display = 'block';
+            if (img) img.style.display = 'none';
+            return;
+        }
+
+        if (empty) empty.style.display = 'none';
+        if (loading) loading.classList.remove('hidden');
+        if (img) img.style.display = 'none';
+
+        fetch('{% url "core:preview_grafica_confirmacion" equipo.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+                puntos_medicion: puntos,
+                emp_valor: empValor,
+                emp_unidad: empUnidad,
+                unidad_equipo: unidadEquipo,
+                regla_decision: regla,
+            }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (loading) loading.classList.add('hidden');
+            if (data.imagen && img) {
+                img.src = data.imagen;
+                img.style.display = 'block';
+            }
+        })
+        .catch(() => { if (loading) loading.classList.add('hidden'); });
     }
 
     function eliminarFila(button) {
@@ -909,16 +1102,15 @@
     }
 
     // ==================== GRÁFICA HISTÓRICA COMPLETA ====================
-    let timeoutGrafica = null;
+    // Redirigido a gráfica matplotlib con zonas ILAC G8
     function dibujarGraficoHistoricoDebounced() {
-        // Debounce para evitar redibujos excesivos
-        if (timeoutGrafica) clearTimeout(timeoutGrafica);
-        timeoutGrafica = setTimeout(() => {
-            requestAnimationFrame(dibujarGraficoHistorico);
-        }, 150);
+        actualizarPreviewGraficaDebounced();
     }
 
     function dibujarGraficoHistorico() {
+        actualizarPreviewGrafica();
+        return;
+        // Canvas reemplazado — código inactivo:
         const canvas = document.getElementById('grafico-historico');
         if (!canvas) return;
 

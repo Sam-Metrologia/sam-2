@@ -212,7 +212,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 let selectedTaskType = '';
 const taskNames = {
     'backup_db': 'Backup de Base de Datos',

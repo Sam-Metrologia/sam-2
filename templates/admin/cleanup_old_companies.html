@@ -148,7 +148,7 @@
     </div>
 
     <!-- Script para seleccionar todas -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.getElementById('select-all')?.addEventListener('change', function() {
             const checkboxes = document.querySelectorAll('.company-checkbox');
             checkboxes.forEach(cb => cb.checked = this.checked);

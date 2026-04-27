@@ -1,6 +1,7 @@
 # core/middleware.py
 # Middleware para rate limiting y seguridad
 
+import secrets
 import time
 import hashlib
 from django.core.cache import cache
@@ -341,3 +342,21 @@ class SessionActivityMiddleware(MiddlewareMixin):
             request.session['last_activity'] = now.isoformat()
 
         return None
+
+class CSPNonceMiddleware:
+    """Genera un nonce por request para CSP. Añade {{{{ csp_nonce }}}} a scripts inline.
+    Una vez todos los templates migren a nonce, quitar 'unsafe-inline' de settings.py CSP.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        request.csp_nonce = secrets.token_urlsafe(16)
+        response = self.get_response(request)
+        existing_csp = response.get("Content-Security-Policy", "")
+        if existing_csp and "script-src" in existing_csp:
+            response["Content-Security-Policy"] = existing_csp.replace(
+                "'unsafe-inline'",
+                f"'nonce-{request.csp_nonce}' 'unsafe-inline'",
+            )
+        return response

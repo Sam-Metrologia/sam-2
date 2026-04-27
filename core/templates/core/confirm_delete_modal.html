@@ -33,7 +33,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     // Función genérica para abrir el modal de eliminación
     function openDeleteModal(objectId, objectName, deleteUrlPattern) {
         const modal = document.getElementById('delete-modal');

@@ -311,9 +311,14 @@ def dashboard(request):
         if _empresa_id_para_version != 'all'
         else "dashboard_version_all"
     )
-    _cache_version = cache.get(_version_key, 0)
-    cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}_v{_cache_version}"
-    cached_context = cache.get(cache_key)
+    try:
+        _cache_version = cache.get(_version_key, 0)
+        cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}_v{_cache_version}"
+        cached_context = cache.get(cache_key)
+    except Exception:
+        _cache_version = 0
+        cache_key = None
+        cached_context = None
     if cached_context:
         return render(request, 'core/dashboard.html', cached_context)
 
@@ -400,7 +405,11 @@ def dashboard(request):
     }
 
     # Cache por 5 minutos (invalidado automáticamente por signals)
-    cache.set(cache_key, context, 300)
+    if cache_key:
+        try:
+            cache.set(cache_key, context, 300)
+        except Exception:
+            pass
 
     # Onboarding (NO se cachea - es específico por usuario y cambia frecuentemente)
     onboarding_progress = None

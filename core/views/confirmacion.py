@@ -6,7 +6,7 @@ Integrado con datos reales de la base de datos
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, permission_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from core.models import Equipo, Calibracion, meses_decimales_a_relativedelta
 from core.decorators_pdf import safe_pdf_response
@@ -20,6 +20,8 @@ from io import BytesIO
 import matplotlib
 matplotlib.use('Agg')  # Backend sin GUI
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
 import numpy as np
 import logging
 
@@ -46,11 +48,20 @@ def safe_float(value, default=0.0):
         return default
 
 
-def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad_equipo):
+def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad_equipo,
+                                   regla_decision='guard_band_U'):
     """
     Genera gráfica de confirmación metrológica normalizada por EMP.
     Y = error / EMP_absoluto  →  límites siempre en ±1, sin efecto embudo.
+    Las zonas de color se adaptan a la regla de decisión (ILAC G8:09/2019).
     """
+    _NOMBRES_REGLA = {
+        'simple_acceptance': 'Aceptación Simple (sin banda de guarda)',
+        'guard_band_U':      'Banda de Guarda U Completa',
+        'guard_band_half':   'Banda de Guarda U/2',
+        'guard_band_sqrt':   'Banda Óptima √(EMP² − U²)',
+        'conditional':       'Aceptación Condicional (zona gris)',
+    }
     try:
         puntos_validos = [p for p in puntos_medicion
                          if p.get('nominal') and (p.get('error') is not None or p.get('lectura') is not None)]
@@ -75,7 +86,6 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
             if p.get('emp_absoluto') is not None and safe_float(p['emp_absoluto'], 0) != 0:
                 emps_abs.append(safe_float(p['emp_absoluto'], 0))
             else:
-                # Calcular desde emp_valor global
                 n = nominales[i]
                 if emp_unidad == '%':
                     emps_abs.append(abs(n) * (emp_valor / 100) if n != 0 else emp_valor)
@@ -88,6 +98,10 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
 
         # Detectar si EMP varía entre puntos
         emp_variable = max(emps_abs) / min(emps_abs) > 1.05 if min(emps_abs) > 0 else False
+
+        # Rango vertical: al menos ±1.6, o lo que requieran los datos
+        y_max_data = max((abs(y) + u for y, u in zip(y_norm, u_norm)), default=1.0)
+        y_max_plot = max(1.6, y_max_data * 1.15)
 
         n_puntos = len(puntos_validos)
         ancho_fig = max(12, n_puntos * 0.9)
@@ -103,48 +117,169 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
             log_min = math.log10(min(nominales_pos))
             log_max = math.log10(max(nominales_pos))
             pad = (log_max - log_min) * 0.06
-            ax.set_xlim(10 ** (log_min - pad), 10 ** (log_max + pad))
+            x_min_plot = 10 ** (log_min - pad)
+            x_max_plot = 10 ** (log_max + pad)
+            ax.set_xlim(x_min_plot, x_max_plot)
         elif nominales:
             span = max(nominales) - min(nominales)
             margin = span * 0.06 if span > 0 else abs(nominales[0]) * 0.5 or 1
-            ax.set_xlim(min(nominales) - margin, max(nominales) + margin)
+            x_min_plot = min(nominales) - margin
+            x_max_plot = max(nominales) + margin
+            ax.set_xlim(x_min_plot, x_max_plot)
+        else:
+            x_min_plot, x_max_plot = -1.0, 1.0
 
-        # Puntos con barras de incertidumbre normalizadas
+        # ── ZONAS DE COLOR según regla de decisión (zorder=0 → detrás de todo) ──
+        _Z = 0        # zorder zonas
+        _ZL = 1       # zorder líneas límite
+        _ALFA_EXT = 0.07    # rojo: fuera de ±EMP
+        _ALFA_BANDA = 0.25  # amarillo: banda de guarda (más visible)
+        _ALFA_OK = 0.10     # verde: zona cumple
+
+        # Zona roja siempre fuera de ±1 (límite EMP normalizado)
+        ax.axhspan(1.0, y_max_plot, alpha=_ALFA_EXT, color='#ef4444', zorder=_Z)
+        ax.axhspan(-y_max_plot, -1.0, alpha=_ALFA_EXT, color='#ef4444', zorder=_Z)
+
+        legend_extras = []  # Patch/Line2D adicionales para la leyenda inferior
+
+        def _fill_zonas(lv_list, color_banda='#fde047', color_limite='#16a34a'):
+            """Dibuja zonas verde/amarillo per-punto (fill_between) o con axhspan si n=1."""
+            if n_puntos == 1:
+                lv = lv_list[0]
+                ax.axhspan(-lv, lv, alpha=_ALFA_OK, color='#22c55e', zorder=_Z)
+                if lv < 1.0:
+                    ax.axhspan(lv, 1.0, alpha=_ALFA_BANDA, color=color_banda, zorder=_Z)
+                    ax.axhspan(-1.0, -lv, alpha=_ALFA_BANDA, color=color_banda, zorder=_Z)
+                return
+            x_ext = [x_min_plot] + list(nominales) + [x_max_plot]
+            lv_ext = [lv_list[0]] + list(lv_list) + [lv_list[-1]]
+            lv_neg = [-v for v in lv_ext]
+            # Verde: entre -lv y +lv para cada punto
+            ax.fill_between(x_ext, lv_neg, lv_ext, alpha=_ALFA_OK, color='#22c55e',
+                            step='post', zorder=_Z)
+            # Amarillo: entre lv y 1 (y entre -1 y -lv) para cada punto
+            ax.fill_between(x_ext, lv_ext, [1.0] * len(x_ext), alpha=_ALFA_BANDA,
+                            color=color_banda, step='post', zorder=_Z)
+            ax.fill_between(x_ext, [-1.0] * len(x_ext), lv_neg, alpha=_ALFA_BANDA,
+                            color=color_banda, step='post', zorder=_Z)
+            # Línea de límite per-punto en escalón punteado
+            ax.step(x_ext, lv_ext, where='post', color=color_limite, linestyle=':',
+                    linewidth=1.5, zorder=_ZL)
+            ax.step(x_ext, lv_neg, where='post', color=color_limite, linestyle=':',
+                    linewidth=1.5, zorder=_ZL)
+
+        if regla_decision == 'simple_acceptance':
+            ax.axhspan(-1.0, 1.0, alpha=_ALFA_OK, color='#22c55e', zorder=_Z)
+            legend_extras = [
+                mpatches.Patch(facecolor='#22c55e', alpha=0.5, label='CUMPLE (|error| ≤ EMP)'),
+                mpatches.Patch(facecolor='#ef4444', alpha=0.5, label='NO CUMPLE (|error| > EMP)'),
+            ]
+
+        elif regla_decision == 'guard_band_U':
+            lv_por_punto = [max(0.0, 1.0 - un) for un in u_norm]
+            _fill_zonas(lv_por_punto)
+            legend_extras = [
+                Line2D([0], [0], color='#16a34a', linestyle=':', linewidth=2,
+                       label='Límite aceptación (EMP−U, por punto)'),
+                mpatches.Patch(facecolor='#22c55e', alpha=0.5, label='CUMPLE'),
+                mpatches.Patch(facecolor='#fde047', alpha=0.5, label='NO CUMPLE (banda w=U)'),
+                mpatches.Patch(facecolor='#ef4444', alpha=0.5, label='NO CUMPLE (fuera EMP)'),
+            ]
+
+        elif regla_decision == 'guard_band_half':
+            lv_por_punto = [max(0.0, 1.0 - un / 2.0) for un in u_norm]
+            _fill_zonas(lv_por_punto)
+            legend_extras = [
+                Line2D([0], [0], color='#16a34a', linestyle=':', linewidth=2,
+                       label='Límite aceptación (EMP−U/2, por punto)'),
+                mpatches.Patch(facecolor='#22c55e', alpha=0.5, label='CUMPLE'),
+                mpatches.Patch(facecolor='#fde047', alpha=0.5, label='NO CUMPLE (banda w=U/2)'),
+                mpatches.Patch(facecolor='#ef4444', alpha=0.5, label='NO CUMPLE (fuera EMP)'),
+            ]
+
+        elif regla_decision == 'guard_band_sqrt':
+            lv_por_punto = [(max(0.0, 1.0 - un ** 2)) ** 0.5 if un < 1.0 else 0.0
+                            for un in u_norm]
+            _fill_zonas(lv_por_punto)
+            legend_extras = [
+                Line2D([0], [0], color='#16a34a', linestyle=':', linewidth=2,
+                       label='Límite aceptación (√(EMP²−U²), por punto)'),
+                mpatches.Patch(facecolor='#22c55e', alpha=0.5, label='CUMPLE'),
+                mpatches.Patch(facecolor='#fde047', alpha=0.5, label='NO CUMPLE (banda óptima)'),
+                mpatches.Patch(facecolor='#ef4444', alpha=0.5, label='NO CUMPLE (fuera EMP)'),
+            ]
+
+        elif regla_decision == 'conditional':
+            lv_por_punto = [max(0.0, 1.0 - un) for un in u_norm]
+            _fill_zonas(lv_por_punto, color_banda='#fde047', color_limite='#d97706')
+            legend_extras = [
+                Line2D([0], [0], color='#d97706', linestyle=':', linewidth=2,
+                       label='Límite zona gris (EMP−U, por punto)'),
+                mpatches.Patch(facecolor='#22c55e', alpha=0.5, label='CUMPLE'),
+                mpatches.Patch(facecolor='#fde047', alpha=0.5, label='CONDICIONAL (zona gris)'),
+                mpatches.Patch(facecolor='#ef4444', alpha=0.5, label='NO CUMPLE'),
+            ]
+
+        else:
+            # Fallback genérico
+            ax.axhspan(-1.0, 1.0, alpha=0.06, color='#22c55e', zorder=_Z)
+
+        # ── PUNTOS con barras de incertidumbre (zorder=3 → encima de zonas) ──────
         ax.errorbar(nominales, y_norm, yerr=u_norm,
                    fmt='o-', color='#3b82f6', linewidth=2, markersize=markersize,
                    ecolor='#60a5fa', elinewidth=2, capsize=4, capthick=2,
-                   label='Error normalizado (Error/EMP) ± Incertidumbre')
+                   label='Error normalizado (Error/EMP) ± U', zorder=3)
 
-        # Límites EMP: siempre ±1
+        # ── LÍMITES EMP: siempre ±1 (zorder=2) ──────────────────────────────────
         if emp_variable:
-            # EMP diferente por punto → líneas escalonadas en ±1 con anotación del valor real
             ax.step(nominales, [1.0] * n_puntos, where='mid',
-                   color='r', linestyle='--', linewidth=2, label='Límite EMP (variable)')
+                   color='#dc2626', linestyle='--', linewidth=2,
+                   label='Límite EMP (variable)', zorder=2)
             ax.step(nominales, [-1.0] * n_puntos, where='mid',
-                   color='r', linestyle='--', linewidth=2)
-            # Anotar el EMP real de cada punto
+                   color='#dc2626', linestyle='--', linewidth=2, zorder=2)
             for i, (n, ea) in enumerate(zip(nominales, emps_abs)):
                 emp_tipo = puntos_validos[i].get('emp_tipo', emp_unidad)
-                label_emp = f'{ea:.3g} {emp_tipo}'
-                ax.annotate(label_emp, xy=(n, 1.0), xytext=(0, 6),
+                ax.annotate(f'{ea:.3g} {emp_tipo}', xy=(n, 1.0), xytext=(0, 6),
                            textcoords='offset points', ha='center',
                            fontsize=7, color='darkred')
         else:
-            ax.axhline(y=1.0, color='r', linestyle='--', linewidth=2, label='+EMP')
-            ax.axhline(y=-1.0, color='r', linestyle='--', linewidth=2, label='−EMP')
+            ax.axhline(y=1.0, color='#dc2626', linestyle='--', linewidth=2,
+                       label='+EMP (límite)', zorder=2)
+            ax.axhline(y=-1.0, color='#dc2626', linestyle='--', linewidth=2,
+                       label='−EMP (límite)', zorder=2)
 
-        ax.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.3)
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.3, zorder=1)
 
-        # Zona de conformidad sombreada
-        ax.axhspan(-1.0, 1.0, alpha=0.04, color='green')
-
+        # ── Etiquetas y formato ──────────────────────────────────────────────────
+        nombre_regla = _NOMBRES_REGLA.get(regla_decision, regla_decision)
         ax.set_xlabel(f'Valor Nominal ({unidad_equipo})', fontsize=12, fontweight='bold')
         ax.set_ylabel('Error normalizado  (Error / EMP)', fontsize=12, fontweight='bold')
-        ax.set_title('Confirmación Metrológica — Error normalizado por EMP  (±1 = límite)',
-                    fontsize=13, fontweight='bold', pad=20)
+        ax.set_title(
+            f'Confirmación Metrológica — {nombre_regla}\n'
+            f'Eje Y normalizado por EMP  (±1 = límite EMP, ILAC G8:09/2019)',
+            fontsize=12, fontweight='bold', pad=20
+        )
+        ax.set_ylim(-y_max_plot, y_max_plot)
 
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
-                 ncol=3, fontsize=9, framealpha=0.95, edgecolor='gray')
+        # ── Leyenda en la parte inferior ────────────────────────────────────────
+        legend_elements = [
+            Line2D([0], [0], color='#3b82f6', marker='o', markersize=6,
+                   label='Error normalizado (Error/EMP) ± U'),
+        ]
+        if emp_variable:
+            legend_elements.append(
+                Line2D([0], [0], color='#dc2626', linestyle='--', linewidth=2,
+                       label='Límite EMP (variable)')
+            )
+        else:
+            legend_elements.append(
+                Line2D([0], [0], color='#dc2626', linestyle='--', linewidth=2,
+                       label='±EMP (límite)')
+            )
+        legend_elements.extend(legend_extras)
+
+        ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.12),
+                  ncol=3, fontsize=9, framealpha=0.95, edgecolor='gray')
         ax.grid(True, alpha=0.3, linestyle='--')
         plt.tight_layout()
         plt.subplots_adjust(bottom=0.15)
@@ -897,7 +1032,10 @@ def generar_pdf_confirmacion(request, equipo_id):
             emp_valor_mag = safe_float(mag.get('emp', 0), 0)
             emp_unidad_mag = mag.get('emp_unidad', '%')
             unidad_mag = mag.get('unidad', datos_confirmacion.get('unidad_equipo', ''))
-            g = _generar_grafica_confirmacion(puntos_mag, emp_valor_mag, emp_unidad_mag, unidad_mag)
+            g = _generar_grafica_confirmacion(
+                puntos_mag, emp_valor_mag, emp_unidad_mag, unidad_mag,
+                regla_decision=datos_confirmacion.get('regla_decision', 'guard_band_U'),
+            )
             graficas.append(g)
             # Embeber gráfica en la magnitud del template para acceso fácil
             if i < len(mags_template):
@@ -910,7 +1048,10 @@ def generar_pdf_confirmacion(request, equipo_id):
         emp_valor = safe_float(datos_confirmacion.get('emp') or context['datos_confirmacion']['emp'], 0)
         emp_unidad = datos_confirmacion.get('emp_unidad', context['datos_confirmacion']['emp_unidad'])
         unidad_equipo = datos_confirmacion.get('unidad_equipo', context['datos_confirmacion']['unidad_equipo'])
-        grafica_base64 = _generar_grafica_confirmacion(puntos, emp_valor, emp_unidad, unidad_equipo)
+        grafica_base64 = _generar_grafica_confirmacion(
+            puntos, emp_valor, emp_unidad, unidad_equipo,
+            regla_decision=datos_confirmacion.get('regla_decision', 'guard_band_U'),
+        )
         context['grafica_imagen'] = grafica_base64
         context['graficas'] = [grafica_base64]
         # Embeber en la única magnitud del template
@@ -1528,3 +1669,42 @@ def actualizar_formato_empresa(request):
             'success': False,
             'message': f'Error al actualizar formato: {str(e)}'
         }, status=500)
+
+
+@login_required
+@require_http_methods(['POST'])
+def preview_grafica_confirmacion(request, equipo_id):
+    """Vista AJAX: genera una gráfica de confirmación en base64 para preview en formulario."""
+    try:
+        if request.user.is_superuser:
+            get_object_or_404(Equipo, id=equipo_id)
+        else:
+            get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+
+        data = json.loads(request.body)
+        puntos = data.get('puntos_medicion', [])
+        emp_valor = safe_float(data.get('emp_valor', 1.0), 1.0)
+        emp_unidad = data.get('emp_unidad', '%')
+        unidad_equipo = data.get('unidad_equipo', '')
+        regla_decision = data.get('regla_decision', 'guard_band_U')
+
+        _REGLAS_VALIDAS = {
+            'simple_acceptance', 'guard_band_U', 'guard_band_half',
+            'guard_band_sqrt', 'conditional',
+        }
+        if regla_decision not in _REGLAS_VALIDAS:
+            regla_decision = 'guard_band_U'
+
+        imagen = _generar_grafica_confirmacion(
+            puntos, emp_valor, emp_unidad, unidad_equipo, regla_decision
+        )
+        if imagen:
+            return JsonResponse({'imagen': imagen})
+        return JsonResponse(
+            {'error': 'No hay puntos válidos para generar la gráfica'}, status=400
+        )
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido en el cuerpo de la solicitud'}, status=400)
+    except Exception as e:
+        logger.error(f"Error en preview_grafica_confirmacion: {e}")
+        return JsonResponse({'error': str(e)}, status=500)

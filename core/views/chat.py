@@ -6,6 +6,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
@@ -228,9 +229,32 @@ def chat_ayuda(request):
     de SAM Metrología y devuelve la respuesta.
     """
     try:
+        # Rate limiting: 20 mensajes por hora por usuario
+        rate_key = f"chat_rate_{request.user.id}"
+        conteo = cache.get(rate_key, 0)
+        if conteo >= 20:
+            return JsonResponse(
+                {'error': 'Has alcanzado el límite de 20 mensajes por hora. '
+                          'Por favor espera un momento antes de continuar. '
+                          'Si necesitas ayuda urgente, escribe a soporte@sammetrologia.com.'},
+                status=429,
+            )
+        cache.set(rate_key, conteo + 1, timeout=3600)
+
         data = json.loads(request.body)
         pregunta = data.get('pregunta', '').strip()
-        historial = data.get('historial', [])  # últimos mensajes de la conversación
+
+        # Validar y sanear historial recibido del cliente
+        historial_raw = data.get('historial', [])
+        if not isinstance(historial_raw, list):
+            historial_raw = []
+        historial = []
+        for msg in historial_raw[:20]:  # máximo 20 turnos
+            if isinstance(msg, dict):
+                historial.append({
+                    'tipo': str(msg.get('tipo', ''))[:20],
+                    'texto': str(msg.get('texto', ''))[:2000],
+                })
 
         if not pregunta:
             return JsonResponse({'error': 'Pregunta vacía.'}, status=400)

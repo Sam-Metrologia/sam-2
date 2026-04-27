@@ -199,7 +199,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function() {
     // Gráfico de Distribución de Costos
     const costsCtx = document.getElementById('costsChart').getContext('2d');

@@ -672,7 +672,7 @@
         </footer>
     </div>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const mainContent = document.getElementById('main-content');
@@ -955,7 +955,7 @@
     <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
     <!-- Mejoras de UX con JavaScript -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         // Sistema de loading overlay
         window.showLoading = function(message = 'Cargando...') {
             const overlay = document.getElementById('loadingOverlay');
@@ -1136,7 +1136,7 @@
     {% endif %}
 
     <!-- Sistema de Modo Trabajo (Impersonación) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
     document.addEventListener('DOMContentLoaded', function() {
         // Selector de empresa para iniciar modo trabajo
         const empresaSelect = document.getElementById('empresa-trabajo-select');
@@ -1266,7 +1266,7 @@
 
     {% if has_active_onboarding %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/css/shepherd.css"/>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         var samOnboardingTourCompletado = {{ onboarding_tour_completado|yesno:"true,false" }};
     </script>
     <script src="https://cdn.jsdelivr.net/npm/shepherd.js@11.2.0/dist/js/shepherd.min.js"></script>
@@ -1326,7 +1326,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
     const SAM_CHAT_KEY = 'sam_chat_{{ user.id }}';
     const SAM_CHAT_OPEN_KEY = 'sam_chat_open_{{ user.id }}';
     const SAM_CHAT_WELCOME = '👋 Hola <strong>{{ user.first_name|default:user.username }}</strong>. Soy <strong>SAM</strong>, tu asistente de SAM Metrología.<br><br>Pregúntame sobre cómo usar la plataforma: permisos, funciones, reportes, usuarios, planes, etc.';

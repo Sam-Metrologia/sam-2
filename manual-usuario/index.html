@@ -83,7 +83,7 @@
             </li>
             <li class="toc-item">
                 <a href="#seccion-9">
-                    <span><i class="fas fa-file-pdf"></i> 9. Generación de Reportes</span>
+                    <span><i class="fas fa-file-pdf"></i> 9. Reportes y Panel de Decisiones</span>
                     <span class="toc-page-number">28</span>
                 </a>
             </li>
@@ -331,7 +331,7 @@
         </div>
     </div>
 
-    <!-- Placeholder para las siguientes secciones -->
+    <!-- ==================== SECCIÓN 3: CREACIÓN DE EQUIPOS ==================== -->
     <div class="section" id="seccion-3">
         <div class="section-header">
             <h2>
@@ -340,9 +340,699 @@
             </h2>
             <p class="section-subtitle">Registre nuevos equipos de medición en el sistema</p>
         </div>
-        <p style="text-align: center; padding: 3rem; color: #94a3b8; font-style: italic;">
-            [Contenido en desarrollo - Sección 3 a 11]
+
+        <h3>Datos Básicos del Equipo</h3>
+        <p>Para registrar un equipo vaya a <strong>Equipos → Nuevo Equipo</strong> y complete los campos requeridos:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Campo</th>
+                    <th>Descripción</th>
+                    <th>Obligatorio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Nombre</strong></td>
+                    <td>Nombre descriptivo del equipo (ej: "Balanza analítica Mettler AB204")</td>
+                    <td style="color:#10b981;">Sí</td>
+                </tr>
+                <tr>
+                    <td><strong>Código / Etiqueta</strong></td>
+                    <td>Código interno único del laboratorio (ej: BAL-001)</td>
+                    <td style="color:#10b981;">Sí</td>
+                </tr>
+                <tr>
+                    <td><strong>Número de Serie</strong></td>
+                    <td>Serie del fabricante para trazabilidad</td>
+                    <td style="color:#6b7280;">No</td>
+                </tr>
+                <tr>
+                    <td><strong>Magnitud / Familia</strong></td>
+                    <td>Tipo de medición (Masa, Longitud, Temperatura…). Se selecciona del catálogo.</td>
+                    <td style="color:#10b981;">Sí</td>
+                </tr>
+                <tr>
+                    <td><strong>Ubicación</strong></td>
+                    <td>Área o laboratorio donde está físicamente el equipo</td>
+                    <td style="color:#6b7280;">No</td>
+                </tr>
+                <tr>
+                    <td><strong>Intervalo de Calibración</strong></td>
+                    <td>Cada cuántos meses se debe calibrar (el sistema calcula la próxima fecha)</td>
+                    <td style="color:#10b981;">Sí</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Catálogos: Magnitudes y Familias</h3>
+        <p>
+            El catálogo define las <strong>magnitudes</strong> (Masa, Longitud, Temperatura, Presión…)
+            y las <strong>familias</strong> de equipos disponibles en su organización. Un administrador
+            puede configurarlos en <strong>Configuración → Catálogos</strong>.
         </p>
+        <div class="info-box">
+            <div class="box-title">
+                <i class="fas fa-book"></i>
+                ¿Por qué son importantes los catálogos?
+            </div>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>Unifican la terminología de toda la organización</li>
+                <li>Permiten filtrar y agrupar equipos por tipo de medición</li>
+                <li>Son la base para definir los puntos de medición en confirmaciones y comprobaciones</li>
+                <li>Facilitan la generación de reportes por magnitud (ISO 10012)</li>
+            </ul>
+        </div>
+
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Vaya a Configuración → Catálogos</div>
+                    <div class="step-description">Solo disponible para roles Administrador y Gerencia</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Cree o edite magnitudes</div>
+                    <div class="step-description">Defina nombre, símbolo y unidades de medición (ej: Masa → kg, g, mg)</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Asocie familias</div>
+                    <div class="step-description">Las familias agrupan equipos similares (ej: "Balanzas" pertenece a "Masa")</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tip-box">
+            <div class="box-title">
+                <i class="fas fa-lightbulb"></i>
+                Consejo
+            </div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Configure los catálogos <strong>antes</strong> de registrar equipos.
+                Cambiarlos después puede afectar reportes históricos.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 4: CALIBRACIONES ==================== -->
+    <div class="section" id="seccion-4">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">4</span>
+                <span class="section-title">Gestión de Calibraciones</span>
+            </h2>
+            <p class="section-subtitle">Registre y haga seguimiento a las calibraciones externas</p>
+        </div>
+
+        <h3>¿Qué es una Calibración?</h3>
+        <p>
+            La calibración es el proceso de comparar las indicaciones de un equipo de medición con un patrón
+            de referencia trazable. En SAM se registra el <strong>certificado de calibración externo</strong>
+            emitido por el laboratorio acreditado.
+        </p>
+
+        <h3>Registrar una Calibración</h3>
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Abra el detalle del equipo</div>
+                    <div class="step-description">Vaya a <strong>Equipos</strong> y haga clic en el equipo que fue calibrado</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Clic en "Nueva Calibración"</div>
+                    <div class="step-description">Complete: fecha, laboratorio, número de certificado, resultado (Apto / No Apto)</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Adjunte el certificado PDF</div>
+                    <div class="step-description">El sistema guarda el archivo y lo asocia permanentemente al registro</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <div class="step-title">El sistema actualiza la próxima fecha</div>
+                    <div class="step-description">Automáticamente calcula la próxima calibración según el intervalo configurado</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <div class="box-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                Equipo No Apto
+            </div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Si el resultado es <strong>No Apto</strong>, el equipo queda marcado como fuera de servicio
+                y el sistema bloquea su uso hasta que se registre una calibración satisfactoria o se dé de baja.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 5: CONFIRMACIÓN METROLÓGICA ==================== -->
+    <div class="section" id="seccion-5">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">5</span>
+                <span class="section-title">Confirmación Metrológica</span>
+            </h2>
+            <p class="section-subtitle">Evalúe la aptitud del equipo para su uso previsto (ISO 10012)</p>
+        </div>
+
+        <h3>¿Qué es la Confirmación Metrológica?</h3>
+        <p>
+            La confirmación metrológica es el proceso definido en <strong>ISO 10012:2003</strong> que verifica
+            si un equipo, después de calibrarse, cumple con los requisitos metrológicos del proceso de medición
+            para el que se va a usar. No basta con tener el certificado: hay que analizar si los errores
+            encontrados en la calibración son aceptables para la aplicación específica.
+        </p>
+
+        <div class="info-box">
+            <div class="box-title">
+                <i class="fas fa-calculator"></i>
+                ¿Qué es el EMP (Error Máximo Permitido)?
+            </div>
+            <p style="margin-top: 0.5rem;">
+                El <strong>EMP</strong> (Error Máximo Permitido, también llamado MPE en inglés) es el
+                límite de error que un equipo puede tener y aún ser considerado apto para un uso específico.
+                Lo define el usuario o el proceso, <em>no</em> el fabricante ni el laboratorio de calibración.
+            </p>
+            <p>Ejemplo práctico:</p>
+            <ul style="padding-left: 1.5rem;">
+                <li>Una balanza tiene un error de calibración de <strong>±0,8 g</strong></li>
+                <li>Su proceso requiere pesar con una tolerancia de <strong>±2,0 g</strong></li>
+                <li>Como 0,8 g &lt; 2,0 g, el equipo es <strong>APTO</strong> ✓</li>
+            </ul>
+            <p style="margin-bottom: 0;">
+                En SAM puede definir el EMP para cada punto de medición, y el sistema calcula
+                automáticamente si el equipo es apto, rechazado o está en zona de riesgo.
+            </p>
+        </div>
+
+        <h3>Cómo Registrar una Confirmación</h3>
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Abra el equipo → pestaña "Confirmación"</div>
+                    <div class="step-description">Disponible después de registrar al menos una calibración</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Defina las variables de medición</div>
+                    <div class="step-description">
+                        Para equipos con múltiples magnitudes (ej: una cámara que mide temperatura Y humedad),
+                        puede agregar una pestaña por cada variable
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Ingrese los puntos de medición</div>
+                    <div class="step-description">
+                        Para cada punto: valor de referencia, valor indicado por el equipo, incertidumbre y EMP.
+                        El sistema calcula el error y determina aptitud automáticamente.
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <div class="step-title">Genere el PDF de confirmación</div>
+                    <div class="step-description">
+                        El documento incluye tabla de resultados, gráfica de aptitud y decisión final
+                        firmada por el técnico responsable
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Resultado</th>
+                    <th>Condición</th>
+                    <th>Acción recomendada</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="color:#10b981;"><strong>APTO</strong></td>
+                    <td>Error ≤ EMP en todos los puntos</td>
+                    <td>El equipo puede usarse normalmente</td>
+                </tr>
+                <tr>
+                    <td style="color:#f59e0b;"><strong>ZONA DE RIESGO</strong></td>
+                    <td>Error cercano al EMP (>80%)</td>
+                    <td>Monitorear, considerar recalibración pronto</td>
+                </tr>
+                <tr>
+                    <td style="color:#ef4444;"><strong>NO APTO</strong></td>
+                    <td>Error > EMP en algún punto</td>
+                    <td>Retirar de servicio, enviar a recalibración o reparación</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ==================== SECCIÓN 6: COMPROBACIÓN INTERMEDIA ==================== -->
+    <div class="section" id="seccion-6">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">6</span>
+                <span class="section-title">Comprobación Intermedia</span>
+            </h2>
+            <p class="section-subtitle">Verificaciones periódicas entre calibraciones (ISO 17020)</p>
+        </div>
+
+        <h3>¿Por qué hacer comprobaciones intermedias?</h3>
+        <p>
+            La comprobación intermedia permite detectar a tiempo si un equipo ha derivado
+            fuera de sus límites aceptables entre calibraciones. Es especialmente importante
+            para equipos críticos o en ambientes exigentes. Está requerida por
+            <strong>ISO 17020:2012</strong> e <strong>ISO 17025:2017</strong>.
+        </p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fas fa-clock"></i></div>
+                <h4 class="feature-title">Periodicidad</h4>
+                <p class="feature-description">Diaria, semanal o mensual según criticidad del equipo</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
+                <h4 class="feature-title">Gráfica de tendencia</h4>
+                <p class="feature-description">SAM genera automáticamente el gráfico histórico de desempeño</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fas fa-file-alt"></i></div>
+                <h4 class="feature-title">Registro trazable</h4>
+                <p class="feature-description">Cada comprobación queda firmada con fecha, técnico y patrón usado</p>
+            </div>
+        </div>
+
+        <h3>Registrar una Comprobación</h3>
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Vaya al equipo → pestaña "Comprobación"</div>
+                    <div class="step-description">O use el atajo desde el calendario de actividades</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Ingrese los valores medidos con el patrón</div>
+                    <div class="step-description">
+                        Registre: valor de referencia (patrón), valor indicado por el equipo y la fecha de medición
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">El sistema evalúa y genera alerta si hay desvío</div>
+                    <div class="step-description">
+                        Si el error supera el EMP configurado, se genera una notificación automática
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 7: MANTENIMIENTO ==================== -->
+    <div class="section" id="seccion-7">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">7</span>
+                <span class="section-title">Mantenimiento de Equipos</span>
+            </h2>
+            <p class="section-subtitle">Programe y registre mantenimientos preventivos y correctivos</p>
+        </div>
+
+        <h3>Tipos de Mantenimiento</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
+                    <th>Frecuencia típica</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Preventivo</strong></td>
+                    <td>Limpieza, lubricación, ajuste programado antes de que falle</td>
+                    <td>Semestral / anual</td>
+                </tr>
+                <tr>
+                    <td><strong>Correctivo</strong></td>
+                    <td>Reparación de una falla detectada</td>
+                    <td>Cuando se requiera</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Registrar un Mantenimiento</h3>
+        <p>
+            Desde el detalle del equipo, haga clic en <strong>"Nuevo Mantenimiento"</strong>.
+            Complete el tipo, descripción de actividades realizadas, técnico responsable y adjunte
+            fotos o reportes si aplica.
+        </p>
+        <div class="tip-box">
+            <div class="box-title"><i class="fas fa-lightbulb"></i> Consejo</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Después de un mantenimiento correctivo, verifique si el equipo requiere
+                una nueva calibración antes de volver a usarlo. El sistema le recordará esta revisión.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 8: INTERVALOS DE CALIBRACIÓN ==================== -->
+    <div class="section" id="seccion-8">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">8</span>
+                <span class="section-title">Intervalos de Calibración</span>
+            </h2>
+            <p class="section-subtitle">Determinación y ajuste de intervalos según ILAC G-24:2022</p>
+        </div>
+
+        <h3>¿Por qué es importante el intervalo de calibración?</h3>
+        <p>
+            Un intervalo muy largo puede llevar a que el equipo derive sin detectarse.
+            Un intervalo muy corto genera costos innecesarios. El estándar
+            <strong>ILAC G-24:2022</strong> proporciona métodos para determinar intervalos óptimos
+            basados en evidencia histórica del equipo.
+        </p>
+
+        <div class="info-box">
+            <div class="box-title">
+                <i class="fas fa-globe"></i>
+                ILAC G-24:2022 — Guía Internacional
+            </div>
+            <p style="margin-top: 0.5rem;">
+                ILAC (International Laboratory Accreditation Cooperation) publicó la guía G-24 para
+                orientar a los laboratorios en la <strong>determinación de intervalos de recalibración</strong>.
+                Los principales métodos que reconoce son:
+            </p>
+            <ul style="padding-left: 1.5rem;">
+                <li><strong>Método calendario:</strong> intervalo fijo en meses (ej: cada 12 meses)</li>
+                <li><strong>Método por uso:</strong> basado en horas de operación o número de mediciones</li>
+                <li><strong>Método estadístico:</strong> ajuste dinámico según historial de resultados de calibración</li>
+                <li><strong>Método de control:</strong> revisión continua mediante comprobaciones intermedias</li>
+            </ul>
+            <p style="margin-bottom: 0;">
+                SAM implementa principalmente el <strong>método calendario</strong> y complementa con
+                comprobaciones intermedias. El módulo de Intervalos analiza el historial de errores
+                para sugerir si el intervalo debe acortarse o puede extenderse.
+            </p>
+        </div>
+
+        <h3>Módulo de Intervalos en SAM</h3>
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Vaya a Equipos → Intervalos de Calibración</div>
+                    <div class="step-description">El módulo analiza el historial de las últimas confirmaciones metrológicas</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Revise la gráfica de tendencia de errores</div>
+                    <div class="step-description">
+                        Si los errores están sistemáticamente lejos del EMP (zona segura),
+                        el intervalo puede extenderse. Si se acercan al límite, debe acortarse.
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Justifique y apruebe el cambio</div>
+                    <div class="step-description">
+                        Todo cambio de intervalo queda registrado con su justificación técnica
+                        y la firma del responsable metrológico
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <div class="box-title">
+                <i class="fas fa-exclamation-triangle"></i>
+                Requisito de acreditación
+            </div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Los organismos de acreditación (ONAC, ENAC, A2LA, etc.) verifican que los
+                intervalos estén <strong>documentados y justificados</strong>. SAM genera
+                automáticamente el registro de justificación que exige el evaluador.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 9: REPORTES ==================== -->
+    <div class="section" id="seccion-9">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">9</span>
+                <span class="section-title">Generación de Reportes</span>
+            </h2>
+            <p class="section-subtitle">Exporte documentación oficial en PDF y Excel</p>
+        </div>
+
+        <h3>Panel de Decisiones</h3>
+        <p>
+            El <strong>Panel de Decisiones</strong> es una herramienta analítica disponible en
+            <strong>Reportes → Panel de Decisiones</strong>. Centraliza la información crítica
+            para que el responsable metrológico tome decisiones fundamentadas sin revisar equipo por equipo.
+        </p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fas fa-exclamation-circle" style="color:#ef4444;"></i></div>
+                <h4 class="feature-title">Equipos Críticos</h4>
+                <p class="feature-description">Lista de equipos con vencimientos inminentes o resultados no aptos</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fas fa-chart-line" style="color:#3b82f6;"></i></div>
+                <h4 class="feature-title">Tendencias</h4>
+                <p class="feature-description">Gráficas de desempeño histórico por equipo o por magnitud</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fas fa-tasks" style="color:#10b981;"></i></div>
+                <h4 class="feature-title">Estado General</h4>
+                <p class="feature-description">Porcentaje de equipos aptos, en riesgo y fuera de servicio</p>
+            </div>
+        </div>
+
+        <h3>Tipos de Reportes Disponibles</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Reporte</th>
+                    <th>Formato</th>
+                    <th>Contenido</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Hoja de Vida del Equipo</strong></td>
+                    <td><i class="fas fa-file-pdf" style="color:#ef4444;"></i> PDF</td>
+                    <td>Historial completo: calibraciones, confirmaciones, mantenimientos</td>
+                </tr>
+                <tr>
+                    <td><strong>Certificado de Confirmación</strong></td>
+                    <td><i class="fas fa-file-pdf" style="color:#ef4444;"></i> PDF</td>
+                    <td>Documento oficial de aptitud metrológica con gráficas</td>
+                </tr>
+                <tr>
+                    <td><strong>Inventario de Equipos</strong></td>
+                    <td><i class="fas fa-file-excel" style="color:#10b981;"></i> Excel</td>
+                    <td>Listado completo con estados y fechas de vencimiento</td>
+                </tr>
+                <tr>
+                    <td><strong>Plan de Calibraciones</strong></td>
+                    <td><i class="fas fa-file-excel" style="color:#10b981;"></i> Excel</td>
+                    <td>Programación anual de calibraciones por equipo</td>
+                </tr>
+                <tr>
+                    <td><strong>Paquete ZIP</strong></td>
+                    <td><i class="fas fa-file-archive" style="color:#f59e0b;"></i> ZIP</td>
+                    <td>Todos los documentos de un equipo comprimidos en un archivo</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="tip-box">
+            <div class="box-title"><i class="fas fa-lightbulb"></i> Descarga masiva (ZIP)</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Para descargar los documentos de múltiples equipos a la vez, use la opción
+                <strong>"Generar ZIP"</strong> en la lista de equipos. El sistema los prepara
+                en segundo plano y le notifica cuando están listos.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 10: BAJA DE EQUIPOS ==================== -->
+    <div class="section" id="seccion-10">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">10</span>
+                <span class="section-title">Baja de Equipos</span>
+            </h2>
+            <p class="section-subtitle">Retire equipos del inventario activo de forma trazable</p>
+        </div>
+
+        <h3>¿Cuándo dar de baja un equipo?</h3>
+        <ul style="padding-left: 1.5rem; line-height: 2;">
+            <li>El equipo está dañado y no tiene reparación viable</li>
+            <li>El equipo fue reemplazado por uno nuevo</li>
+            <li>El equipo ya no es necesario para los procesos de medición</li>
+            <li>El equipo fue robado o perdido</li>
+        </ul>
+
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Abra el equipo → opción "Dar de Baja"</div>
+                    <div class="step-description">Solo disponible para roles Administrador y Gerencia</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Seleccione el motivo y fecha de baja</div>
+                    <div class="step-description">El motivo queda registrado en el historial del equipo</div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">El equipo queda inactivo</div>
+                    <div class="step-description">
+                        No aparece en el inventario activo, pero <strong>todo su historial se conserva</strong>
+                        para auditorías futuras. Los datos nunca se eliminan.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <div class="box-title">
+                <i class="fas fa-history"></i>
+                Trazabilidad garantizada
+            </div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                SAM nunca borra el historial de un equipo dado de baja. Si un organismo de acreditación
+                solicita documentos de un equipo retirado hace 5 años, puede consultarlos en
+                <strong>Equipos → Equipos Inactivos / Bajas</strong>.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==================== SECCIÓN 11: PREGUNTAS FRECUENTES ==================== -->
+    <div class="section" id="seccion-11">
+        <div class="section-header">
+            <h2>
+                <span class="section-number">11</span>
+                <span class="section-title">Preguntas Frecuentes</span>
+            </h2>
+            <p class="section-subtitle">Respuestas a las dudas más comunes</p>
+        </div>
+
+        <h3>Acceso y Cuenta</h3>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> ¿Olvidé mi contraseña, qué hago?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                En la pantalla de inicio de sesión haga clic en <strong>"¿Olvidaste tu contraseña?"</strong>.
+                El sistema enviará un enlace de restablecimiento al correo registrado.
+                Si no tiene correo configurado, contacte a su administrador de sistema.
+            </p>
+        </div>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> ¿Por qué no veo todos los equipos?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                SAM es multiempresa. Solo verá los equipos de la empresa a la que pertenece su usuario.
+                Si necesita acceso a otra empresa, solicítelo al administrador principal.
+            </p>
+        </div>
+
+        <h3>Calibraciones y Confirmaciones</h3>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> ¿Puedo registrar una calibración sin adjuntar el PDF del certificado?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Sí, el PDF no es obligatorio en el formulario. Sin embargo, adjuntarlo es una buena práctica
+                y recomendado para auditorías. Puede cargarlo después editando el registro.
+            </p>
+        </div>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> ¿Cuántos puntos de medición debo ingresar en la confirmación?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Depende del uso del equipo. Se recomienda al menos <strong>3 puntos representativos</strong>
+                del rango de trabajo: mínimo, medio y máximo. Para equipos críticos se recomiendan 5 o más puntos.
+            </p>
+        </div>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> ¿Qué pasa si el equipo es APTO en algunos puntos y NO APTO en otros?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                El sistema marcará la confirmación como <strong>NO APTO</strong> si algún punto supera el EMP.
+                En ese caso puede documentar que el equipo es apto para un rango de uso reducido
+                (excluyendo los puntos no conformes), siempre que la restricción quede anotada.
+            </p>
+        </div>
+
+        <h3>Reportes y Documentos</h3>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> ¿Los PDFs generados tienen validez para una auditoría?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Sí. Los reportes incluyen número de registro, fecha, técnico responsable y están
+                diseñados para cumplir los requisitos documentales de ISO 17020 e ISO 17025.
+                Para firmas digitales, contáctenos para integrar con su sistema de firma electrónica.
+            </p>
+        </div>
+        <div class="info-box" style="margin-bottom: 1rem;">
+            <div class="box-title"><i class="fas fa-question-circle"></i> El ZIP tarda mucho en descargarse, ¿es normal?</div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Los ZIP se generan en segundo plano porque pueden contener muchos documentos.
+                Recibirá una <strong>notificación</strong> cuando esté listo. Si después de 15 minutos
+                no recibe la notificación, reintente o contacte soporte.
+            </p>
+        </div>
+
+        <h3>Soporte Técnico</h3>
+        <div class="warning-box">
+            <div class="box-title">
+                <i class="fas fa-headset"></i>
+                ¿Necesita ayuda?
+            </div>
+            <p style="margin-top: 0.5rem; margin-bottom: 0;">
+                Para soporte técnico escriba a <strong>metrologiasam@gmail.com</strong>
+                o use el chat de ayuda <strong>"Señor SAM"</strong> disponible en la esquina
+                inferior derecha de la plataforma. El asistente puede responder dudas frecuentes
+                en tiempo real.
+            </p>
+        </div>
     </div>
 
     <!-- ==================== FOOTER ==================== -->

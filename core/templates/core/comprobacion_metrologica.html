@@ -450,7 +450,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 let comprobacionId = {% if comprobacion_id %}{{ comprobacion_id }}{% else %}null{% endif %};
 let datosExistentes = {% if datos_existentes %}{{ datos_existentes|safe }}{% else %}null{% endif %};
 let datosCalibracion = {% if datos_calibracion %}{{ datos_calibracion|safe }}{% else %}null{% endif %};

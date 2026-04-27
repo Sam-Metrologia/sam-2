@@ -400,7 +400,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     // Habilitar botón de aceptar solo cuando marque el checkbox
     document.getElementById('acepta_terminos').addEventListener('change', function() {
         document.getElementById('btnAceptar').disabled = !this.checked;

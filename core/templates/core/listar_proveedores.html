@@ -225,7 +225,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
     function showDeleteModal(deleteUrl, entityName) {
         document.getElementById('entityName').innerHTML = entityName; // Usar innerHTML para que reconozca negritas
         document.getElementById('deleteForm').action = deleteUrl;

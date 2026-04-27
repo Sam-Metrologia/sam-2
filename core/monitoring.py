@@ -576,10 +576,10 @@ def monitor_view(func):
     Decorator simple para monitorear views (placeholder).
     En el futuro se puede expandir para métricas de performance.
     """
+    from functools import wraps
+
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        # Por ahora solo ejecuta la vista normalmente
         return func(*args, **kwargs)
 
-    wrapper.__name__ = func.__name__
-    wrapper.__doc__ = func.__doc__
     return wrapper

@@ -270,7 +270,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // Mostrar mensaje de carga al enviar formulario
 document.getElementById('testForm').addEventListener('submit', function() {
     document.getElementById('loadingMessage').classList.remove('hidden');

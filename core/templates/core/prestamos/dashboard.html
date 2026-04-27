@@ -282,7 +282,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 /* ── Toggle de sección completa ── */
 function toggleSection(sectionId, chevronId) {
     const section = document.getElementById(sectionId);

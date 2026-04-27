@@ -208,7 +208,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 async function executeQuickNotification(notificationType) {
     const empresaId = document.getElementById('empresa_id').value;
     const empresaText = empresaId ? ` a ${document.getElementById('empresa_id').selectedOptions[0].text.split(' (')[0]}` : '';

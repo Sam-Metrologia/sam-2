@@ -2,9 +2,9 @@ name: Tests y Cobertura
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
   test:
@@ -29,10 +29,10 @@ jobs:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar Python 3.11
+      - name: 🐍 Configurar Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           cache: 'pip'
 
       - name: 🗑️ Limpiar cache de pytest
@@ -43,7 +43,7 @@ jobs:
       - name: 📦 Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements_test.txt
 
       - name: 🔍 Verificar instalación
         run: |
@@ -80,6 +80,16 @@ jobs:
           echo ""
           echo "=== Intentando importar un test directamente ==="
           python -c "import sys; sys.path.insert(0, '.'); from tests.test_models import test_empresa; print('test_empresa importado OK')" || echo "ERROR importando test"
+
+      - name: 🗄️ Verificar migraciones
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_sam
+          DJANGO_SETTINGS_MODULE: proyecto_c.settings
+          SECRET_KEY: test-secret-key-for-ci-only
+          DEBUG_VALUE: 'False'
+        run: |
+          python manage.py migrate --noinput
+          python manage.py migrate --check
 
       - name: 🧪 Ejecutar tests
         env:
@@ -130,10 +140,10 @@ jobs:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar Python 3.11
+      - name: 🐍 Configurar Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: 📦 Instalar linters
         run: |
@@ -161,10 +171,10 @@ jobs:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
 
-      - name: 🐍 Configurar Python 3.11
+      - name: 🐍 Configurar Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: 🔒 Verificar dependencias con Safety
         run: |

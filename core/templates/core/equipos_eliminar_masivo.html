@@ -70,7 +70,7 @@
         </form>
 
         <!-- Confirmación adicional con JavaScript -->
-        <script>
+        <script nonce="{{ csp_nonce }}">
         document.getElementById('form-eliminar-masivo').addEventListener('submit', function(e) {
             const count = {{ equipos.count }};
             const confirmed = confirm(

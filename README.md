@@ -6,14 +6,15 @@ Maneja equipos, calibraciones, mantenimientos, verificaciones intermedias y conf
 
 ---
 
-## Estado actual (Marzo 2026)
+## Estado actual (Abril 2026)
 
 | Indicador | Valor |
 |-----------|-------|
 | Score auditado | **8.3 / 10** |
-| Tests | **1,768 pasando** — 0 fallando |
+| Tests | **1,883 pasando** — 0 fallando |
 | Cobertura | **70%** |
 | Última auditoría | `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md` |
+| Plan hacia 9/10 | `auditorias/PLAN_AUDITORIA_2026-04.md` |
 | Versión | 2.0.0 |
 
 ---

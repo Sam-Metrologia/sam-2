@@ -169,6 +169,11 @@ def modo_trabajo_context(request):
     }
 
 
+def csp_nonce(request):
+    """Expone el nonce CSP al contexto de templates para usar en <script nonce="{{ csp_nonce }}">."""
+    return {'csp_nonce': getattr(request, 'csp_nonce', '')}
+
+
 def onboarding_context(request):
     """Inyecta estado de onboarding en todas las páginas para el tour multi-página."""
     if isinstance(request.user, AnonymousUser) or not request.user.is_authenticated:

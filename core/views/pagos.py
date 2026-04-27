@@ -2,6 +2,7 @@
 # Módulo C: Pagos con Wompi (PSE / Tarjeta)
 
 import hashlib
+import hmac
 import json
 import logging
 import re
@@ -225,7 +226,7 @@ def _validar_firma_webhook(payload_bytes, signature_props, checksum_recibido, ev
             f"Webhook Wompi firma — props: {signature_props} | "
             f"timestamp: {timestamp} | calculado: {checksum_calculado} | recibido: {checksum_recibido}"
         )
-        return checksum_calculado == checksum_recibido
+        return hmac.compare_digest(checksum_calculado, checksum_recibido)
     except Exception as e:
         logger.error(f"Error validando firma webhook Wompi: {e}")
         return False

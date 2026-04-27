@@ -12,16 +12,16 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 
 ## Current Status (Apr 24, 2026)
 
-- **Tests:** 1,847 passing, 1 skipped, 3 xfailed (+37 nuevos: test_multi_magnitud.py)
+- **Tests:** ~1,889 passing, 1 skipped, 3 xfailed (+37 test_multi_magnitud + 26 test_prestamos_dashboard) — `test_mejoras_ux.py` (6 tests) recreado y corregido 2026-04-25
 - **Coverage:** 70.00% ✓ (Goal alcanzado)
-- **Score:** 8.3/10 (auditado Mar-15-2026) | Audit Plan → `auditorias/PLAN_AUDITORIA_2026-04.md`
-- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md`
+- **Score:** 8.5/10 (estimado 2026-04-25) | Audit Plan → `auditorias/PLAN_AUDITORIA_2026-04.md`
+- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-04-25.md` — 18 hallazgos, 8 corregidos en sesión
 - **Models paquete (2026-04):** `core/models.py` dividido en paquete `core/models/` — 12 módulos: `empresa`, `users`, `catalogs`, `equipment`, `activities`, `loans`, `documents`, `payments`, `common`, `system`, `_signals`, `__init__`. Imports sin cambio (`from core.models import Equipo` sigue funcionando).
 - **Préstamos UX (2026-04-24):** Dashboard con secciones colapsables + filtro de búsqueda + chips de equipos disponibles agrupados por familia (clickeables → préstamo directo). Ver `core/templates/core/prestamos/dashboard.html`.
 - **Multi-magnitud (2026-04-09):** Confirmaciones y comprobaciones soportan múltiples variables (tabs). Datos guardados en formato v2 `{magnitudes: [{nombre, unidad, puntos_medicion}]}`. Compatibilidad backward con v1 (`puntos_medicion` en raíz). PDF muestra tabla+gráfica por variable. Gráficas históricas (detalle equipo + hoja de vida) normalizadas por EMP (±1 = límite), una gráfica por variable.
 - **Bug CORREGIDO:** `eliminar_equipo.html` → usa `confirmar_eliminacion.html` (equipment.py:955)
 - **Decoradores confirmacion.py:** `@monitor_view` + `@trial_check` añadidos a todas las vistas; bug en `trial_check` con `empresa=None` corregido (base.py:185)
-- **SSE R2:** Cloudflare R2 encripta en reposo con AES-256 por defecto (sin configuración adicional). Comentario corregido en settings.py.
+- **SSE R2 (2026-04-25):** `AWS_S3_OBJECT_PARAMETERS = {'ServerSideEncryption': 'AES256'}` añadido en `settings.py` para ambas ramas (R2 + AWS S3). Cloudflare R2 también encripta por defecto.
 - **Coverage confirmacion.py:** 26% → 58.77% — nuevo archivo `tests/test_views/test_confirmacion_coverage.py` (36 tests)
 - **Dashboard Cache:** Habilitado (5 min, invalidado por signals) + stats pre-computados en Empresa
 - **Dependencies:** Actualizadas 2026-02-19 (32 CVEs corregidos)
@@ -260,11 +260,11 @@ EMAIL_HOST_PASSWORD, ADMIN_EMAIL, GEMINI_API_KEY
 - `core/views/reports.py`: 3,699 lines (has helpers but still large)
 - `core/forms.py`: 1,742 lines (should split by domain)
 - Coverage gaps: confirmacion.py (58.77%), pagos.py (49.84%), zip_functions.py (49.22%)
-- `confirmacion.py` sin `@access_check` (pendiente desde Feb-2026) — ver PLAN_AUDITORIA_2026-04.md
+- `confirmacion.py` con `@access_check` + `@monitor_view` + `@trial_check` (corregido 2026-04)
 - **CSP `unsafe-inline`**: 52 bloques `<script>` inline en 51 templates — requiere middleware de nonces. Estimado: 1-2 días.
 - `core/views_optimized.py` (292), `core/zip_optimizer.py` (473), `core/async_zip_improved.py` (579): evaluar si son necesarios
 - ISO 17020 módulos faltantes: quejas de clientes (7.9), no conformidades (8.7), imparcialidad (4.1)
-- 6 tests en `test_mejoras_ux.py` usan `return` en vez de `assert` → siempre pasan (falsos positivos)
+- **CORREGIDO 2026-04-25:** `test_mejoras_ux.py` recreado con `assert`; propiedad `puede_eliminar_equipos` llamada sin `()`
 - `pytest.mark.performance` no registrado en pyproject.toml → genera warnings
 - README.md raíz: 19 bytes ("# Forzar redeploy") — no funcional
 

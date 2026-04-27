@@ -186,7 +186,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // Auto-refresh si la tarea está en ejecución
 {% if task.status == 'running' or task.status == 'pending' %}
 let refreshInterval = setInterval(function() {

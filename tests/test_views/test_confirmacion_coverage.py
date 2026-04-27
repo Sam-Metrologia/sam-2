@@ -264,6 +264,96 @@ class TestGenerarGraficaConfirmacion:
             )
         assert result is None
 
+    # ── Reglas de decisión ILAC G8 ────────────────────────────────────────────
+
+    _PUNTOS_REGLA = [
+        {'nominal': 100.0, 'error': 0.05, 'incertidumbre': 0.03},
+        {'nominal': 200.0, 'error': -0.04, 'incertidumbre': 0.03},
+        {'nominal': 300.0, 'error': 0.08, 'incertidumbre': 0.03},
+    ]
+
+    def test_regla_simple_acceptance(self):
+        """Zona verde ±1 sin banda — genera gráfica sin excepción."""
+        result = self._run_with_mock_plt(self._PUNTOS_REGLA, 0.1, 'mm', 'mm')
+        assert result is not None
+
+    def test_regla_guard_band_U(self):
+        """Banda guarda U completa — zonas per-punto con fill_between (n>1)."""
+        from core.views.confirmacion import _generar_grafica_confirmacion
+        fake_png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        mock_ax = MagicMock()
+        mock_fig = MagicMock()
+        with patch('matplotlib.pyplot.subplots', return_value=(mock_fig, mock_ax)), \
+             patch('matplotlib.pyplot.savefig', side_effect=lambda buf, **kw: buf.write(fake_png)), \
+             patch('matplotlib.pyplot.close'):
+            result = _generar_grafica_confirmacion(
+                self._PUNTOS_REGLA, 0.1, 'mm', 'mm', regla_decision='guard_band_U'
+            )
+        assert result is not None
+        # fill_between: verde + amarillo_sup + amarillo_inf = 3 (n>1)
+        assert mock_ax.fill_between.call_count >= 2
+        # axhspan solo para las 2 zonas rojas externas
+        assert mock_ax.axhspan.call_count >= 2
+
+    def test_regla_guard_band_half(self):
+        """Banda guarda U/2 — zonas per-punto con fill_between."""
+        from core.views.confirmacion import _generar_grafica_confirmacion
+        fake_png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        mock_ax = MagicMock()
+        mock_fig = MagicMock()
+        with patch('matplotlib.pyplot.subplots', return_value=(mock_fig, mock_ax)), \
+             patch('matplotlib.pyplot.savefig', side_effect=lambda buf, **kw: buf.write(fake_png)), \
+             patch('matplotlib.pyplot.close'):
+            result = _generar_grafica_confirmacion(
+                self._PUNTOS_REGLA, 0.1, 'mm', 'mm', regla_decision='guard_band_half'
+            )
+        assert result is not None
+        assert mock_ax.fill_between.call_count >= 2
+
+    def test_regla_guard_band_sqrt(self):
+        """Banda óptima √(EMP²−U²) — zonas per-punto con fill_between."""
+        from core.views.confirmacion import _generar_grafica_confirmacion
+        fake_png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        mock_ax = MagicMock()
+        mock_fig = MagicMock()
+        with patch('matplotlib.pyplot.subplots', return_value=(mock_fig, mock_ax)), \
+             patch('matplotlib.pyplot.savefig', side_effect=lambda buf, **kw: buf.write(fake_png)), \
+             patch('matplotlib.pyplot.close'):
+            result = _generar_grafica_confirmacion(
+                self._PUNTOS_REGLA, 0.1, 'mm', 'mm', regla_decision='guard_band_sqrt'
+            )
+        assert result is not None
+        assert mock_ax.fill_between.call_count >= 2
+
+    def test_regla_conditional(self):
+        """Regla condicional — zonas per-punto (verde/gris/rojo) con fill_between."""
+        from core.views.confirmacion import _generar_grafica_confirmacion
+        fake_png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        mock_ax = MagicMock()
+        mock_fig = MagicMock()
+        with patch('matplotlib.pyplot.subplots', return_value=(mock_fig, mock_ax)), \
+             patch('matplotlib.pyplot.savefig', side_effect=lambda buf, **kw: buf.write(fake_png)), \
+             patch('matplotlib.pyplot.close'):
+            result = _generar_grafica_confirmacion(
+                self._PUNTOS_REGLA, 0.1, 'mm', 'mm', regla_decision='conditional'
+            )
+        assert result is not None
+        assert mock_ax.fill_between.call_count >= 2
+
+    def test_regla_desconocida_usa_fallback(self):
+        """Regla no reconocida — fallback genérico sin excepción."""
+        from core.views.confirmacion import _generar_grafica_confirmacion
+        fake_png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        mock_ax = MagicMock()
+        mock_fig = MagicMock()
+        with patch('matplotlib.pyplot.subplots', return_value=(mock_fig, mock_ax)), \
+             patch('matplotlib.pyplot.savefig', side_effect=lambda buf, **kw: buf.write(fake_png)), \
+             patch('matplotlib.pyplot.close'):
+            result = _generar_grafica_confirmacion(
+                self._PUNTOS_REGLA, 0.1, 'mm', 'mm', regla_decision='regla_inexistente'
+            )
+        assert result is not None
+
 
 # ---------------------------------------------------------------------------
 # 3. confirmacion_metrologica con datos de confirmación (líneas 505-644)

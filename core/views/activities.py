@@ -554,7 +554,17 @@ def _process_calibracion_files(calibracion, files):
             archivo_subido = files[campo]
             nombre_archivo = sanitize_filename(archivo_subido.name)
             ruta_final = f"pdfs/{nombre_archivo}"
-            default_storage.save(ruta_final, archivo_subido)
+            try:
+                default_storage.save(ruta_final, archivo_subido)
+            except Exception as e:
+                logger.error(
+                    f"Error al subir archivo '{campo}' a R2 para calibración ID {calibracion.pk}: "
+                    f"{type(e).__name__}: {e}"
+                )
+                raise Exception(
+                    f"No se pudo subir el archivo '{archivo_subido.name}' al almacenamiento. "
+                    "Por favor intenta de nuevo o contacta al soporte."
+                ) from e
             setattr(calibracion, campo, ruta_final)
 
     # Documentos subidos manualmente NO entran en flujo de aprobación.
@@ -573,7 +583,18 @@ def _process_single_file(instance, files, field_name):
         archivo_subido = files[field_name]
         nombre_archivo = sanitize_filename(archivo_subido.name)
         ruta_final = f"pdfs/{nombre_archivo}"
-        default_storage.save(ruta_final, archivo_subido)
+        try:
+            default_storage.save(ruta_final, archivo_subido)
+        except Exception as e:
+            logger.error(
+                f"Error al subir archivo '{field_name}' a R2 para "
+                f"{type(instance).__name__} ID {instance.pk}: "
+                f"{type(e).__name__}: {e}"
+            )
+            raise Exception(
+                f"No se pudo subir el archivo '{archivo_subido.name}' al almacenamiento. "
+                "Por favor intenta de nuevo o contacta al soporte."
+            ) from e
         setattr(instance, field_name, ruta_final)
 
 

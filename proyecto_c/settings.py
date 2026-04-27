@@ -116,6 +116,7 @@ TEMPLATES = [
                 'core.context_processors.aprobaciones_pendientes_count',
                 'core.context_processors.modo_trabajo_context',
                 'core.context_processors.onboarding_context',
+                'core.context_processors.csp_nonce',
             ],
         },
     },
@@ -154,7 +155,7 @@ if RENDER_EXTERNAL_HOSTNAME:
     if REDIS_URL:
         CACHES = {
             'default': {
-                'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                'BACKEND': 'django_redis.cache.RedisCache',
                 'LOCATION': REDIS_URL,
                 'OPTIONS': {
                     'CLIENT_CLASS': 'django_redis.client.DefaultClient',
@@ -387,9 +388,7 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME:
         AWS_S3_CUSTOM_DOMAIN = None  # R2 no tiene custom domain por defecto
         AWS_S3_OBJECT_PARAMETERS = {
             'CacheControl': 'max-age=86400',
-            # R2 encripta todos los objetos en reposo automáticamente con AES-256.
-            # No requiere parámetro ServerSideEncryption — Cloudflare lo gestiona internamente.
-            # Ref: https://developers.cloudflare.com/r2/reference/data-security/
+            'ServerSideEncryption': 'AES256',
         }
         AWS_LOCATION = 'media'
         # Para R2, las URLs serán firmadas (querystring auth)

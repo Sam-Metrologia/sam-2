@@ -1592,7 +1592,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
     // Register the datalabels plugin globally
     Chart.register(ChartDataLabels);
 
@@ -2685,7 +2685,7 @@
 </script>
 
 {% if setup_usuarios %}
-<script>
+<script nonce="{{ csp_nonce }}">
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('setup-usuarios-modal').classList.remove('hidden');
     });
@@ -2817,7 +2817,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   // Precios con IVA incluido
   const PRECIOS_PLAN = {

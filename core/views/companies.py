@@ -725,14 +725,17 @@ def editar_perfil_empresa(request):
     if request.method == 'POST':
         form = EmpresaPerfilForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
-            empresa_actualizada = form.save(commit=False)
-            # Procesar logo si se subió uno nuevo
-            if 'logo_empresa' in request.FILES:
-                _process_company_logo(empresa_actualizada, request.FILES['logo_empresa'])
-            empresa_actualizada.save()
-            messages.success(request, 'Perfil de empresa actualizado exitosamente.')
-            logger.info(f"Perfil empresa actualizado: {empresa.nombre} por {request.user.username}")
-            return redirect('core:editar_perfil_empresa')
+            try:
+                empresa_actualizada = form.save(commit=False)
+                if 'logo_empresa' in request.FILES:
+                    _process_company_logo(empresa_actualizada, request.FILES['logo_empresa'])
+                empresa_actualizada.save()
+                messages.success(request, 'Perfil de empresa actualizado exitosamente.')
+                logger.info(f"Perfil empresa actualizado: {empresa.nombre} por {request.user.username}")
+                return redirect('core:editar_perfil_empresa')
+            except Exception as e:
+                logger.error(f"Error al actualizar perfil de empresa {empresa.pk}: {e}")
+                messages.error(request, str(e))
         else:
             messages.error(request, 'Revisa los datos ingresados.')
     else:
@@ -768,6 +771,16 @@ def _process_company_logo(empresa, logo_file):
     archivo_subido = logo_file
     nombre_archivo = sanitize_filename(archivo_subido.name)
     ruta_s3 = f'empresas_logos/{nombre_archivo}'
-    default_storage.save(ruta_s3, archivo_subido)
+    try:
+        default_storage.save(ruta_s3, archivo_subido)
+    except Exception as e:
+        logger.error(
+            f"Error al subir logo a R2 para empresa '{empresa.nombre}': "
+            f"{type(e).__name__}: {e}"
+        )
+        raise Exception(
+            "No se pudo subir el logo de la empresa al almacenamiento. "
+            "Por favor intenta de nuevo o contacta al soporte."
+        ) from e
     empresa.logo_empresa = ruta_s3
     logger.info(f'Logo subido para empresa {empresa.nombre}: {ruta_s3}')

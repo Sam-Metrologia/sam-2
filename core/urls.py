@@ -94,6 +94,7 @@ urlpatterns = [
     path('equipos/<int:equipo_id>/confirmacion-metrologica/pdf/', views.generar_pdf_confirmacion, name='generar_pdf_confirmacion'),
     path('equipos/<int:equipo_id>/intervalos-calibracion/pdf/', views.generar_pdf_intervalos, name='generar_pdf_intervalos'),
     path('equipos/<int:equipo_id>/confirmacion-metrologica/guardar/', views.guardar_confirmacion, name='guardar_confirmacion'),
+    path('equipos/<int:equipo_id>/confirmacion-metrologica/preview-grafica/', confirmacion.preview_grafica_confirmacion, name='preview_grafica_confirmacion'),
     path('empresas/actualizar-formato/', confirmacion.actualizar_formato_empresa, name='actualizar_formato_empresa'),
 
     # Sistema de Aprobaciones

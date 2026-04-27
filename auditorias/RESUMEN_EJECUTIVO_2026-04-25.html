@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAM Metrología — Auditoría Ejecutiva 2026</title>
+<style>
+  :root {
+    --verde:   #10b981;
+    --amarillo:#f59e0b;
+    --naranja: #f97316;
+    --rojo:    #ef4444;
+    --azul:    #3b82f6;
+    --gris:    #6b7280;
+    --bg:      #0f172a;
+    --surface: #1e293b;
+    --surface2:#273548;
+    --texto:   #e2e8f0;
+    --subtexto:#94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    line-height: 1.6;
+    padding: 0 0 60px 0;
+  }
+
+  /* ── HEADER ── */
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    border-bottom: 1px solid #334155;
+    padding: 48px 40px 40px;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(59,130,246,.15);
+    border: 1px solid rgba(59,130,246,.4);
+    color: var(--azul);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 { font-size: 36px; font-weight: 700; margin-bottom: 6px; }
+  .hero .sub { color: var(--subtexto); font-size: 15px; margin-bottom: 40px; }
+
+  /* ── PUNTAJE PRINCIPAL ── */
+  .score-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 60px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .score-circle {
+    position: relative;
+    width: 160px;
+    height: 160px;
+  }
+  .score-circle svg { transform: rotate(-90deg); }
+  .score-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-num { font-size: 42px; font-weight: 800; color: #fff; line-height: 1; }
+  .score-max { font-size: 13px; color: var(--subtexto); }
+  .score-label { font-size: 12px; color: var(--subtexto); margin-top: 10px; text-align: center; }
+  .score-deltas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .delta-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--subtexto);
+  }
+  .delta-val {
+    font-weight: 700;
+    font-size: 20px;
+  }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  section { margin-top: 48px; }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #334155;
+  }
+
+  /* ── GRID BUENO/MALO ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width:700px){ .two-col { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid #334155;
+  }
+  .card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card.bueno { border-top: 3px solid var(--verde); }
+  .card.malo  { border-top: 3px solid var(--rojo); }
+  .card ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .card ul li {
+    font-size: 13.5px;
+    color: var(--subtexto);
+    padding-left: 20px;
+    position: relative;
+  }
+  .card ul li::before {
+    position: absolute;
+    left: 0;
+    font-size: 12px;
+  }
+  .card.bueno ul li::before { content: '✓'; color: var(--verde); }
+  .card.malo  ul li::before { content: '✗'; color: var(--rojo); }
+  .card ul li strong { color: var(--texto); }
+
+  /* ── ÁREAS CON PUNTAJE ── */
+  .areas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .area-card {
+    background: var(--surface);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .area-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .area-name { font-size: 13px; font-weight: 600; color: var(--texto); }
+  .area-desc { font-size: 12px; color: var(--subtexto); margin-top: 2px; }
+  .area-score {
+    font-size: 22px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .bar-bg {
+    height: 6px;
+    background: #334155;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .3s;
+  }
+  .s10 { color: var(--verde); }
+  .s8  { color: var(--verde); }
+  .s7  { color: var(--amarillo); }
+  .s6  { color: var(--naranja); }
+  .s5  { color: var(--naranja); }
+  .s3  { color: var(--rojo); }
+  .bar-10,.bar-8 { background: var(--verde); }
+  .bar-7  { background: var(--amarillo); }
+  .bar-6,.bar-5 { background: var(--naranja); }
+  .bar-3  { background: var(--rojo); }
+
+  /* ── HALLAZGOS ── */
+  .hallazgos { display: flex; flex-direction: column; gap: 12px; }
+  .hallazgo {
+    background: var(--surface);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: start;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-critico  { background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+  .badge-alto     { background: rgba(249,115,22,.15); color: #fb923c; border: 1px solid rgba(249,115,22,.3); }
+  .badge-medio    { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.3); }
+  .badge-bajo     { background: rgba(107,114,128,.15);color: #9ca3af; border: 1px solid rgba(107,114,128,.3); }
+  .badge-ok       { background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(16,185,129,.3); }
+  .hallazgo-body { min-width: 0; }
+  .hallazgo-title { font-size: 14px; font-weight: 600; color: var(--texto); margin-bottom: 4px; }
+  .hallazgo-desc  { font-size: 13px; color: var(--subtexto); }
+  .hallazgo-impact {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--subtexto);
+    white-space: nowrap;
+    text-align: right;
+  }
+  .hallazgo-impact span {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  /* ── PLAN DE ACCIÓN ── */
+  .plan { display: flex; flex-direction: column; gap: 0; }
+  .plan-fase {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 0 24px;
+    position: relative;
+  }
+  .plan-fase::before {
+    content: '';
+    position: absolute;
+    left: 139px;
+    top: 28px;
+    bottom: -1px;
+    width: 2px;
+    background: #334155;
+  }
+  .plan-fase:last-child::before { display: none; }
+  .fase-label {
+    text-align: right;
+    padding: 20px 0 20px;
+    position: relative;
+  }
+  .fase-label::after {
+    content: '';
+    position: absolute;
+    right: -8px;
+    top: 28px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid;
+  }
+  .fase-urgente .fase-label::after  { border-color: var(--rojo);    background: #1e293b; }
+  .fase-pronto  .fase-label::after  { border-color: var(--naranja);  background: #1e293b; }
+  .fase-despues .fase-label::after  { border-color: var(--amarillo); background: #1e293b; }
+  .fase-name {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .fase-urgente  .fase-name { color: var(--rojo); }
+  .fase-pronto   .fase-name { color: var(--naranja); }
+  .fase-despues  .fase-name { color: var(--amarillo); }
+  .fase-when { font-size: 11px; color: var(--subtexto); margin-top: 2px; }
+  .fase-items {
+    padding: 20px 0 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .plan-item {
+    background: var(--surface);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .plan-item-left { min-width: 0; }
+  .plan-item-title { font-size: 13.5px; font-weight: 600; color: var(--texto); }
+  .plan-item-why   { font-size: 12px; color: var(--subtexto); margin-top: 2px; }
+  .plan-esfuerzo {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--subtexto);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+
+  /* ── CORREGIDO EN SESIÓN ── */
+  .corregidos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .corregido-item {
+    background: rgba(16,185,129,.08);
+    border: 1px solid rgba(16,185,129,.25);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .corr-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+  .corr-title { font-size: 13px; font-weight: 600; color: var(--verde); }
+  .corr-desc  { font-size: 12px; color: var(--subtexto); margin-top: 3px; }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 60px;
+    border-top: 1px solid #334155;
+    padding-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--subtexto);
+  }
+
+  /* ── STAT PILLS ── */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 28px;
+  }
+  .stat-pill {
+    background: rgba(255,255,255,.05);
+    border: 1px solid #334155;
+    border-radius: 30px;
+    padding: 8px 20px;
+    text-align: center;
+  }
+  .stat-pill .val { font-size: 20px; font-weight: 800; color: #fff; }
+  .stat-pill .lbl { font-size: 11px; color: var(--subtexto); margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════ -->
+<div class="hero">
+  <div class="hero-badge">Auditoría Integral — 25 Abril 2026</div>
+  <h1>SAM Metrología</h1>
+  <p class="sub">Revisión completa de la plataforma · Estado actual · Plan de mejora</p>
+
+  <div class="score-wrap">
+    <!-- Puntaje general -->
+    <div>
+      <div class="score-circle">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <circle cx="80" cy="80" r="68" fill="none" stroke="#334155" stroke-width="12"/>
+          <!-- 8.5/10 = 85% de circunferencia = 427.25 * 0.85 = 362.9 -->
+          <circle cx="80" cy="80" r="68" fill="none" stroke="#3b82f6" stroke-width="12"
+            stroke-dasharray="362.9 427.3" stroke-linecap="round"/>
+        </svg>
+        <div class="score-inner">
+          <span class="score-num">8.5</span>
+          <span class="score-max">de 10</span>
+        </div>
+      </div>
+      <div class="score-label">Puntaje general<br>de la plataforma</div>
+    </div>
+
+    <!-- Deltas -->
+    <div class="score-deltas">
+      <div class="delta-item">
+        <div>
+          <div class="delta-val" style="color:var(--verde)">+0.2</div>
+          <div style="font-size:12px">vs auditoría anterior (8.3 — Mar 2026)</div>
+        </div>
+      </div>
+      <div class="delta-item" style="margin-top:8px">
+        <div style="width:1px;height:40px;background:#334155"></div>
+      </div>
+      <div class="delta-item">
+        <div>
+          <div class="delta-val" style="color:var(--rojo)">2</div>
+          <div style="font-size:12px">problemas críticos sin resolver</div>
+        </div>
+      </div>
+      <div class="delta-item">
+        <div>
+          <div class="delta-val" style="color:var(--naranja)">6</div>
+          <div style="font-size:12px">problemas importantes</div>
+        </div>
+      </div>
+      <div class="delta-item">
+        <div>
+          <div class="delta-val" style="color:var(--verde)">8</div>
+          <div style="font-size:12px">cosas corregidas en esta sesión</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-pill">
+      <div class="val">1,889</div>
+      <div class="lbl">Pruebas automáticas pasando</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">70%</div>
+      <div class="lbl">Cobertura de código</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">18</div>
+      <div class="lbl">Hallazgos totales</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val" style="color:var(--verde)">8</div>
+      <div class="lbl">Corregidos hoy</div>
+    </div>
+    <div class="stat-pill">
+      <div class="val">12</div>
+      <div class="lbl">Áreas auditadas</div>
+    </div>
+  </div>
+</div>
+
+
+<div class="container">
+
+<!-- ══════════════════════════════════════════════
+     LO BUENO Y LO MALO
+══════════════════════════════════════════════ -->
+<section>
+  <h2>📊 Resumen General</h2>
+  <div class="two-col">
+    <div class="card bueno">
+      <h3 style="color:var(--verde)">✅ Lo que está bien</h3>
+      <ul>
+        <li><strong>Base técnica sólida.</strong> La plataforma está bien construida. El código es ordenado, organizado y sigue buenas prácticas.</li>
+        <li><strong>Muchas pruebas automáticas.</strong> Hay 1,889 pruebas que se ejecutan solos para detectar errores antes de que lleguen al usuario. 0 fallando.</li>
+        <li><strong>Cada empresa ve solo sus datos.</strong> El sistema de aislamiento multi-empresa funciona correctamente.</li>
+        <li><strong>Dashboard rápido.</strong> Usa caché para no recalcular todo cada vez que alguien abre la página.</li>
+        <li><strong>Almacenamiento en la nube.</strong> Archivos guardados en Cloudflare R2 con encriptación.</li>
+        <li><strong>Chatbot IA integrado.</strong> "Señor SAM" con Gemini funciona y persiste la conversación.</li>
+        <li><strong>Pagos con Wompi.</strong> Integración funcional con el procesador de pagos colombiano.</li>
+        <li><strong>Generación de PDFs y Excel.</strong> Reportes metrológicos completos y exportables.</li>
+        <li><strong>Documentación mejorada.</strong> README y guía de contribución reescritos y actualizados.</li>
+        <li><strong>Score subió de 8.3 a 8.5</strong> respecto a la auditoría de marzo 2026.</li>
+      </ul>
+    </div>
+    <div class="card malo">
+      <h3 style="color:var(--rojo)">⚠️ Lo que preocupa</h3>
+      <ul>
+        <li><strong>Los emails de recordatorio están rotos.</strong> La plataforma envía correos de vencimiento semanales, pero todos dicen "N/A días" en vez de los días reales. Nadie recibe información útil.</li>
+        <li><strong>Vulnerabilidad en pagos.</strong> Hay una falla técnica en cómo se validan los pagos de Wompi que un atacante avanzado podría explotar.</li>
+        <li><strong>Si el servidor de caché se cae, el dashboard falla para todos.</strong> No hay plan B si Redis no responde.</li>
+        <li><strong>El chatbot no tiene límite de uso.</strong> Cualquier usuario puede enviar miles de mensajes y generar costos altos de API.</li>
+        <li><strong>Las pruebas automáticas en CI no son iguales a producción.</strong> Se prueban en Python 3.11 pero el servidor real usa Python 3.13.</li>
+        <li><strong>Si el almacenamiento de archivos falla, los datos quedan en estado inconsistente.</strong> Se guarda en la base de datos pero el archivo no llega.</li>
+        <li><strong>Scripts de seguridad web desactualizados.</strong> La protección contra ataques tipo XSS no está completamente activada (52 secciones sin protección).</li>
+        <li><strong>Código antiguo sin usar.</strong> Archivos que ya nadie usa siguen existiendo y hacen el proyecto más difícil de mantener.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     ÁREAS EVALUADAS
+══════════════════════════════════════════════ -->
+<section>
+  <h2>🔍 Estado por Área</h2>
+  <div class="areas-grid">
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Calidad del Código</div>
+          <div class="area-desc">Organización, limpieza, mantenibilidad</div>
+        </div>
+        <div class="area-score s8">8/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-8" style="width:80%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Bien estructurado. Hay algunos archivos viejos sin usar que se deben eliminar.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Pruebas Automáticas</div>
+          <div class="area-desc">Tests, cobertura, confiabilidad</div>
+        </div>
+        <div class="area-score s8">8/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-8" style="width:80%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">1,889 pruebas pasando, 70% de código cubierto. Había 6 pruebas falsas — ya corregidas.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Seguridad</div>
+          <div class="area-desc">Vulnerabilidades, protección de datos</div>
+        </div>
+        <div class="area-score s6">6/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-6" style="width:60%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Falla técnica en pagos Wompi. CSP sin configurar bien. Chatbot sin límite de uso.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Notificaciones / Emails</div>
+          <div class="area-desc">Correos de vencimiento y recordatorios</div>
+        </div>
+        <div class="area-score s3">3/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-3" style="width:30%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Los emails semanales de vencimiento siempre dicen "N/A días". El sistema falla silenciosamente.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">CI/CD — Pipeline de Despliegue</div>
+          <div class="area-desc">Automatización, pruebas en servidores</div>
+        </div>
+        <div class="area-score s5">5/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-5" style="width:50%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Python 3.11 en pruebas vs 3.13 en producción. Dependencias de test no instaladas en CI.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Velocidad / Rendimiento</div>
+          <div class="area-desc">Tiempo de carga, consultas a la BD</div>
+        </div>
+        <div class="area-score s7">7/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-7" style="width:70%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Con 100 equipos, el dashboard hace hasta 100 consultas extras. El caché ayuda, pero puede fallar.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Resiliencia</div>
+          <div class="area-desc">Qué pasa cuando algo falla</div>
+        </div>
+        <div class="area-score s6">6/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-6" style="width:60%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Si Redis cae → dashboard falla para todos. Si R2 falla → archivos se pierden silenciosamente.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Integraciones Externas</div>
+          <div class="area-desc">Wompi, Cloudflare R2, Gemini AI</div>
+        </div>
+        <div class="area-score s7">7/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-7" style="width:70%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Funcionan, pero sin planes de contingencia si alguno falla. Falla de seguridad en Wompi.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Documentación</div>
+          <div class="area-desc">README, guías, manual de usuario</div>
+        </div>
+        <div class="area-score s8">8/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-8" style="width:80%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">README y CONTRIBUTING reescritos. Manual actualizado con capturas correctas.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Aislamiento Multi-empresa</div>
+          <div class="area-desc">Seguridad entre clientes del sistema</div>
+        </div>
+        <div class="area-score s8">9/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-8" style="width:90%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Muy bien implementado. Pequeña falla: caché admin comparte datos entre empresas.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Funcionalidad Core</div>
+          <div class="area-desc">Calibraciones, equipos, informes</div>
+        </div>
+        <div class="area-score s10">9/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-10" style="width:90%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Multi-magnitud, PDFs, Excel, préstamos, confirmaciones metrológicas — todo funciona.</div>
+    </div>
+
+    <div class="area-card">
+      <div class="area-top">
+        <div>
+          <div class="area-name">Coherencia con Norma ISO</div>
+          <div class="area-desc">ISO/IEC 17020:2012 — módulos faltantes</div>
+        </div>
+        <div class="area-score s7">7/10</div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill bar-7" style="width:70%"></div></div>
+      <div style="font-size:12px;color:var(--subtexto)">Faltan módulos: quejas de clientes (7.9), no conformidades (8.7), imparcialidad (4.1).</div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     HALLAZGOS
+══════════════════════════════════════════════ -->
+<section>
+  <h2>🚨 Hallazgos Detallados</h2>
+  <div class="hallazgos">
+
+    <!-- CRÍTICOS -->
+    <div class="hallazgo" style="border-left: 3px solid var(--rojo);">
+      <div><span class="badge badge-critico">● Crítico</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Los emails de recordatorio de vencimiento no funcionan</div>
+        <div class="hallazgo-desc">Cada semana la plataforma envía correos avisando qué equipos están por vencer. Pero todos dicen "N/A días" porque el sistema intenta leer información que no existe. Los usuarios reciben el correo pero sin datos reales — lo que hace que el aviso sea inútil.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--rojo)">Alto</span>Impacto en<br>usuarios</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--rojo);">
+      <div><span class="badge badge-critico">● Crítico</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Vulnerabilidad técnica en la validación de pagos (Wompi)</div>
+        <div class="hallazgo-desc">Cuando Wompi confirma un pago, la plataforma verifica que el mensaje venga realmente de Wompi comparando una firma. El método de comparación usado permite a un atacante muy sofisticado adivinar la firma midiendo cuánto tiempo tarda el servidor en responder. Solución: cambiar una sola línea de código.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--rojo)">Alto</span>Riesgo<br>financiero</div>
+    </div>
+
+    <!-- ALTOS -->
+    <div class="hallazgo" style="border-left: 3px solid var(--naranja);">
+      <div><span class="badge badge-alto">▲ Alto</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">El dashboard falla para todos si el servidor de caché cae</div>
+        <div class="hallazgo-desc">El sistema usa Redis (servidor de caché) para que el dashboard cargue rápido. Si Redis tiene un problema, el dashboard devuelve un error a todos los usuarios al mismo tiempo, en vez de simplemente cargarlo más lento. Se necesita un plan de respaldo.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--naranja)">Medio</span>Disponibilidad</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--naranja);">
+      <div><span class="badge badge-alto">▲ Alto</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Archivos pueden perderse si el almacenamiento en la nube falla a la mitad</div>
+        <div class="hallazgo-desc">Al subir un archivo (certificado de calibración, logo de empresa, etc.), el sistema primero registra el archivo en la base de datos y luego lo sube a Cloudflare R2. Si la subida a R2 falla, el registro queda en la base de datos pero el archivo no existe en ningún lado. No hay reintento automático ni aviso.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--naranja)">Medio</span>Integridad<br>de datos</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--naranja);">
+      <div><span class="badge badge-alto">▲ Alto</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">El chatbot "Señor SAM" no tiene límite de mensajes</div>
+        <div class="hallazgo-desc">Cualquier usuario puede enviar mensajes sin límite. Cada mensaje consume créditos de la API de Google Gemini (que se pagan). Un usuario malintencionado o un script automatizado podría generar costos elevados en poco tiempo sin que nadie lo note.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--naranja)">Medio</span>Costo<br>operativo</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--naranja);">
+      <div><span class="badge badge-alto">▲ Alto</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Las pruebas automáticas en CI usan una versión de Python diferente a producción</div>
+        <div class="hallazgo-desc">El servidor de producción corre Python 3.13. Las pruebas automáticas que se ejecutan al subir código al repositorio usan Python 3.11. Un error que solo ocurra en 3.13 podría llegar a producción sin ser detectado. Además, no se instalan todas las dependencias necesarias para correr los tests.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--naranja)">Medio</span>Riesgo en<br>deploy</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--naranja);">
+      <div><span class="badge badge-alto">▲ Alto</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Consultas lentas al dashboard con muchos equipos</div>
+        <div class="hallazgo-desc">En la gráfica de estado de los equipos, el sistema hace una consulta separada a la base de datos por cada equipo. Con 100 equipos, eso son 100 consultas extras cuando podrían hacerse todas en una sola. A mayor número de equipos por empresa, más lento el dashboard.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--naranja)">Medio</span>Velocidad</div>
+    </div>
+
+    <!-- MEDIOS -->
+    <div class="hallazgo" style="border-left: 3px solid var(--amarillo);">
+      <div><span class="badge badge-medio">◆ Medio</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Protección avanzada contra ataques web (CSP) no está activa</div>
+        <div class="hallazgo-desc">Existe un tipo de ataque llamado XSS donde alguien inyecta código malicioso en la página. Para prevenirlo hay un mecanismo llamado CSP (política de seguridad de contenido). La plataforma lo tiene configurado pero desactivado en 52 secciones porque el código de la página está mezclado con el código de estilo/scripts. Requiere refactorización de 51 pantallas.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--amarillo)">Largo plazo</span>Seguridad<br>web</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--amarillo);">
+      <div><span class="badge badge-medio">◆ Medio</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Claves de caché que nunca expiran en Redis</div>
+        <div class="hallazgo-desc">Algunas claves de caché se guardan en Redis sin fecha de expiración. Con el tiempo, Redis acumula datos que nadie usa, consumiendo memoria del servidor innecesariamente.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--amarillo)">Bajo</span>Memoria<br>del servidor</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--amarillo);">
+      <div><span class="badge badge-medio">◆ Medio</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Un dato de caché del admin es compartido entre todas las empresas</div>
+        <div class="hallazgo-desc">El historial de acciones del administrador del sistema se guarda en caché con una clave genérica (sin identificar la empresa). Esto significa que todas las empresas podrían ver el historial de otra. Es un problema de privacidad menor pero real.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--amarillo)">Bajo</span>Aislamiento<br>de datos</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--amarillo);">
+      <div><span class="badge badge-medio">◆ Medio</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Configuración de Redis mezclada entre dos librerías diferentes</div>
+        <div class="hallazgo-desc">La configuración del caché mezcla opciones de dos librerías distintas que no son totalmente compatibles. Funciona por ahora, pero puede generar comportamientos inesperados en condiciones de estrés.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--amarillo)">Bajo</span>Estabilidad</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--amarillo);">
+      <div><span class="badge badge-medio">◆ Medio</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Módulos ISO 17020 faltantes</div>
+        <div class="hallazgo-desc">La norma ISO/IEC 17020:2012 exige gestionar quejas de clientes (sección 7.9), no conformidades (8.7) e imparcialidad (4.1). La plataforma no tiene estos módulos. Dependiendo del nivel de cumplimiento que se quiera certificar, esto puede ser un bloqueador.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--amarillo)">Medio</span>Cumplimiento<br>normativo</div>
+    </div>
+
+    <!-- BAJOS -->
+    <div class="hallazgo" style="border-left: 3px solid var(--gris);">
+      <div><span class="badge badge-bajo">○ Bajo</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Marcador de pruebas "performance" no registrado</div>
+        <div class="hallazgo-desc">Al correr las pruebas aparece un aviso técnico porque el marcador "performance" existe en los archivos de test pero no está declarado en la configuración. No afecta el funcionamiento pero ensucia la salida de los tests.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--gris)">Cosmético</span>Limpieza</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--gris);">
+      <div><span class="badge badge-bajo">○ Bajo</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Archivos de código antiguo sin usar (zip_optimizer, async_zip_improved)</div>
+        <div class="hallazgo-desc">Dos archivos grandes (473 y 579 líneas) parecen ser versiones antiguas del sistema de generación de ZIPs que ya no se usan. Hacen el proyecto más difícil de entender y mantener. Pendiente confirmar que no tienen referencias antes de eliminar.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--gris)">Cosmético</span>Limpieza</div>
+    </div>
+
+    <div class="hallazgo" style="border-left: 3px solid var(--gris);">
+      <div><span class="badge badge-bajo">○ Bajo</span></div>
+      <div class="hallazgo-body">
+        <div class="hallazgo-title">Historial del chatbot llega del navegador sin validación</div>
+        <div class="hallazgo-desc">El historial de conversación con "Señor SAM" se guarda en el navegador del usuario y se envía al servidor en cada mensaje. Un usuario podría manipular ese historial para intentar confundir al modelo de IA. El riesgo es bajo pero existe.</div>
+      </div>
+      <div class="hallazgo-impact"><span style="color:var(--gris)">Bajo</span>IA seguridad</div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     CORREGIDO EN SESIÓN
+══════════════════════════════════════════════ -->
+<section>
+  <h2>✅ Corregido en Esta Sesión</h2>
+  <div class="corregidos">
+    <div class="corregido-item">
+      <div class="corr-icon">🔐</div>
+      <div>
+        <div class="corr-title">Encriptación en almacenamiento</div>
+        <div class="corr-desc">Añadida configuración explícita de encriptación AES-256 para archivos en Cloudflare R2 y S3.</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">🧹</div>
+      <div>
+        <div class="corr-title">Código muerto eliminado</div>
+        <div class="corr-desc">Eliminado archivo views_optimized.py (292 líneas sin ninguna referencia en el proyecto).</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">🧪</div>
+      <div>
+        <div class="corr-title">6 pruebas automáticas falsas</div>
+        <div class="corr-desc">Recreado test_mejoras_ux.py con pruebas reales que detectan errores. Las anteriores siempre pasaban sin verificar nada.</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">🐛</div>
+      <div>
+        <div class="corr-title">Bug en prueba de permisos</div>
+        <div class="corr-desc">La prueba llamaba un campo como si fuera una función. Corregido para que funcione correctamente.</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">📖</div>
+      <div>
+        <div class="corr-title">README reescrito</div>
+        <div class="corr-desc">El README principal tenía solo 19 bytes ("# Forzar redeploy"). Ahora tiene estado real, instrucciones y tecnologías.</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">📝</div>
+      <div>
+        <div class="corr-title">Guía de contribución creada</div>
+        <div class="corr-desc">Nuevo CONTRIBUTING.md con flujo de trabajo Git, convenciones de código y tipos de commits.</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">📸</div>
+      <div>
+        <div class="corr-title">Manual de usuario actualizado</div>
+        <div class="corr-desc">12 capturas de pantalla reemplazadas con las correctas. Sección de Intervalos tenía imagen incorrecta — corregida.</div>
+      </div>
+    </div>
+    <div class="corregido-item">
+      <div class="corr-icon">📊</div>
+      <div>
+        <div class="corr-title">Sección Intervalos del manual</div>
+        <div class="corr-desc">Mostraba una gráfica de historial de actividades en vez de intervalos de calibración. Reemplazada con 3 imágenes correctas.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     PLAN DE ACCIÓN
+══════════════════════════════════════════════ -->
+<section>
+  <h2>🗓️ Plan de Acción</h2>
+  <div class="plan">
+
+    <div class="plan-fase fase-urgente">
+      <div class="fase-label">
+        <div class="fase-name">Urgente</div>
+        <div class="fase-when">Esta semana</div>
+      </div>
+      <div class="fase-items">
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Corregir validación de pagos Wompi</div>
+            <div class="plan-item-why">Vulnerabilidad de seguridad en la verificación de pagos reales. Cambio de una línea de código.</div>
+          </div>
+          <div class="plan-esfuerzo">5 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Reparar emails de vencimiento ("N/A días")</div>
+            <div class="plan-item-why">Los usuarios reciben correos vacíos cada semana. Afecta directamente la experiencia de uso y la utilidad de la plataforma.</div>
+          </div>
+          <div class="plan-esfuerzo">30 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Proteger el dashboard si Redis se cae</div>
+            <div class="plan-item-why">Si el caché falla, todos los usuarios quedan sin acceso al dashboard en lugar de cargarlo más lento.</div>
+          </div>
+          <div class="plan-esfuerzo">20 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Igualar versión de Python en CI (3.11 → 3.13)</div>
+            <div class="plan-item-why">Las pruebas automáticas corren en un ambiente diferente al de producción. Riesgo de errores no detectados.</div>
+          </div>
+          <div class="plan-esfuerzo">5 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Instalar dependencias completas en CI</div>
+            <div class="plan-item-why">El pipeline de pruebas no instala requirements_test.txt — las pruebas podrían correr incompletas.</div>
+          </div>
+          <div class="plan-esfuerzo">5 minutos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plan-fase fase-pronto">
+      <div class="fase-label">
+        <div class="fase-name">Pronto</div>
+        <div class="fase-when">Próximas 2 semanas</div>
+      </div>
+      <div class="fase-items">
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Poner límite de mensajes al chatbot</div>
+            <div class="plan-item-why">Sin límite, cualquier usuario puede generar costos elevados de API de Google. Límite sugerido: 20 mensajes/hora.</div>
+          </div>
+          <div class="plan-esfuerzo">1 hora</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Optimizar consultas del dashboard (N+1)</div>
+            <div class="plan-item-why">Con muchos equipos, el dashboard hace cientos de consultas innecesarias que lo hacen más lento.</div>
+          </div>
+          <div class="plan-esfuerzo">2 horas</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Manejar errores si R2 falla al subir archivos</div>
+            <div class="plan-item-why">Si Cloudflare R2 falla, el registro queda en la base de datos sin archivo. Se necesita rollback o reintento.</div>
+          </div>
+          <div class="plan-esfuerzo">30 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Corregir caché admin compartido entre empresas</div>
+            <div class="plan-item-why">El historial de acciones del admin usa la misma clave para todas las empresas. Se debe separar por empresa.</div>
+          </div>
+          <div class="plan-esfuerzo">15 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Poner fecha de expiración a claves de caché en Redis</div>
+            <div class="plan-item-why">Claves sin expiración acumulan en Redis indefinidamente consumiendo memoria del servidor.</div>
+          </div>
+          <div class="plan-esfuerzo">15 minutos</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Eliminar archivos de código antiguo sin usar</div>
+            <div class="plan-item-why">zip_optimizer.py y async_zip_improved.py (1,052 líneas en total). Verificar que no tengan referencias y eliminar.</div>
+          </div>
+          <div class="plan-esfuerzo">30 minutos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plan-fase fase-despues">
+      <div class="fase-label">
+        <div class="fase-name">Después</div>
+        <div class="fase-when">Próximo mes</div>
+      </div>
+      <div class="fase-items">
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Activar protección CSP completa (anti-XSS)</div>
+            <div class="plan-item-why">Requiere modificar 51 pantallas del sistema. Alto impacto en seguridad pero alto riesgo de romper cosas si no se hace con cuidado.</div>
+          </div>
+          <div class="plan-esfuerzo">1-2 días</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Módulos ISO 17020 faltantes (quejas, no conformidades, imparcialidad)</div>
+            <div class="plan-item-why">Requeridos por la norma para organismos de inspección. Su ausencia puede afectar procesos de certificación.</div>
+          </div>
+          <div class="plan-esfuerzo">Varios sprints</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Validar historial de conversación del chatbot</div>
+            <div class="plan-item-why">El historial llega del navegador sin validar. Riesgo bajo de manipulación del modelo de IA.</div>
+          </div>
+          <div class="plan-esfuerzo">1 hora</div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-item-left">
+            <div class="plan-item-title">Verificar instrucciones de importación Excel en producción</div>
+            <div class="plan-item-why">Confirmar que las instrucciones en pantalla corresponden exactamente a las columnas y validaciones del código.</div>
+          </div>
+          <div class="plan-esfuerzo">1 hora</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<div class="footer container">
+  <p>Auditoría Integral SAM Metrología · 25 de abril de 2026 · Claude Code (Sonnet 4.6)</p>
+  <p style="margin-top:6px">Reporte técnico completo: <code>auditorias/AUDITORIA_INTEGRAL_2026-04-25.md</code></p>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

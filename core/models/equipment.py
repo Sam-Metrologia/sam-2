@@ -285,6 +285,24 @@ class Equipo(models.Model):
             self.proxima_comprobacion = None
 
     @property
+    def dias_hasta_calibracion(self):
+        if self.proxima_calibracion:
+            return (timezone.localdate() - self.proxima_calibracion).days
+        return None
+
+    @property
+    def dias_hasta_mantenimiento(self):
+        if self.proximo_mantenimiento:
+            return (timezone.localdate() - self.proximo_mantenimiento).days
+        return None
+
+    @property
+    def dias_hasta_comprobacion(self):
+        if self.proxima_comprobacion:
+            return (timezone.localdate() - self.proxima_comprobacion).days
+        return None
+
+    @property
     def esta_prestado(self):
         """Verifica si el equipo está actualmente prestado."""
         return self.prestamos.filter(estado_prestamo=PRESTAMO_ACTIVO).exists()
