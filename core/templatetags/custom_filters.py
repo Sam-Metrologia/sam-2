@@ -106,3 +106,17 @@ def abs_value(value):
         return abs(int(value))
     except (ValueError, TypeError):
         return value
+
+@register.filter
+def split(value, arg):
+    """Divide una cadena por el separador dado."""
+    if isinstance(value, str):
+        return [s.strip() for s in value.split(arg)]
+    return []
+
+@register.filter
+def dict_get(d, key):
+    """Obtiene un valor de un diccionario por clave."""
+    if isinstance(d, dict):
+        return d.get(key, [])
+    return []

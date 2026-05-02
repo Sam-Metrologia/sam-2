@@ -245,6 +245,7 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'json' if not DEBUG else 'verbose',
             'encoding': 'utf-8',
+            'delay': True,  # Evita PermissionError en Windows al rotar
         },
         'file_error': {
             'level': 'ERROR',
@@ -254,6 +255,7 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'json' if not DEBUG else 'verbose',
             'encoding': 'utf-8',
+            'delay': True,
         },
         'file_security': {
             'level': 'WARNING',
@@ -263,6 +265,7 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'json' if not DEBUG else 'verbose',
             'encoding': 'utf-8',
+            'delay': True,
         },
         'mail_admins': {
             'level': 'ERROR',
@@ -523,7 +526,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 # Configuración de sesiones
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db' if not DEBUG else 'django.contrib.sessions.backends.db'
 SESSION_CACHE_ALIAS = 'default'
-SESSION_COOKIE_AGE = 28800  # 8 horas (extendido para evitar expiración frecuente)
+SESSION_COOKIE_AGE = 1800  # 30 minutos (controlado por SessionActivityMiddleware)
 SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Mantener sesión aunque cierre el navegador
 

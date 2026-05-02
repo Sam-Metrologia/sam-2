@@ -8,7 +8,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
-from core.models import Equipo, Calibracion, meses_decimales_a_relativedelta
+from core.models import Equipo, Calibracion, meses_decimales_a_relativedelta, EmpresaFormatoLog
 from core.decorators_pdf import safe_pdf_response
 from .base import access_check, trial_check
 from core.monitoring import monitor_view
@@ -1626,6 +1626,29 @@ def actualizar_formato_empresa(request):
 
         campos = campos_map[tipo]
 
+        # Etiquetas legibles para historial (mismas que editar_empresa_formato)
+        etiquetas_campos = {
+            'intervalos':    {'codigo': 'Código Intervalos',    'version': 'Versión Intervalos',    'fecha': 'Fecha Intervalos'},
+            'mantenimiento': {'codigo': 'Código Mantenimiento', 'version': 'Versión Mantenimiento', 'fecha': 'Fecha Mantenimiento'},
+            'confirmacion':  {'codigo': 'Código Confirmación',  'version': 'Versión Confirmación',  'fecha': 'Fecha Confirmación'},
+            'comprobacion':  {'codigo': 'Código Comprobación',  'version': 'Versión Comprobación',  'fecha': 'Fecha Comprobación'},
+        }
+        etiquetas = etiquetas_campos[tipo]
+
+        def _campo_a_str(valor):
+            if valor is None or valor == '':
+                return ''
+            if hasattr(valor, 'strftime'):
+                return valor.strftime('%d/%m/%Y')
+            return str(valor)
+
+        # Capturar valores anteriores antes de modificar
+        old_values = {
+            'codigo':  _campo_a_str(getattr(empresa, campos['codigo'])),
+            'version': _campo_a_str(getattr(empresa, campos['version'])),
+            'fecha':   _campo_a_str(getattr(empresa, campos['fecha'])),
+        }
+
         # Actualizar los campos específicos del tipo de formato
         if 'codigo' in datos and datos['codigo']:
             setattr(empresa, campos['codigo'], datos['codigo'])
@@ -1646,6 +1669,24 @@ def actualizar_formato_empresa(request):
                 pass  # Si hay error en la fecha, no actualizar
 
         empresa.save()
+
+        # Registrar historial y enviar email si hubo cambios reales
+        from core.views.companies import _enviar_email_cambio_formato
+        cambios_log = []
+        for clave, etiqueta in etiquetas.items():
+            new_val = _campo_a_str(getattr(empresa, campos[clave]))
+            old_val = old_values[clave]
+            if old_val != new_val:
+                EmpresaFormatoLog.objects.create(
+                    empresa=empresa,
+                    campo=etiqueta,
+                    valor_anterior=old_val,
+                    valor_nuevo=new_val,
+                    usuario=request.user,
+                )
+                cambios_log.append((etiqueta, old_val, new_val))
+        if cambios_log:
+            _enviar_email_cambio_formato(empresa, request.user, cambios_log)
 
         # Obtener valores actualizados para respuesta
         codigo_actual = getattr(empresa, campos['codigo']) or ''

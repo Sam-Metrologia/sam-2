@@ -659,3 +659,168 @@ class TestZipIntegration:
 
         assert setup_full_zip['empresa'].nombre in readme
         assert str(len(setup_full_zip['equipos'])) in readme
+
+
+# ============================================================================
+# generar_descarga_multipartes — crea ZipRequests para empresas grandes
+# ============================================================================
+
+@pytest.mark.django_db
+class TestGenerarDescargaMultipartes:
+    """Cubre generar_descarga_multipartes (líneas 390-479 en zip_functions.py)."""
+
+    def _make_request(self, user):
+        """Crea un HttpRequest fake con user y session."""
+        from django.test import RequestFactory
+        from django.contrib.sessions.backends.db import SessionStore
+        factory = RequestFactory()
+        request = factory.get('/')
+        request.user = user
+        request.session = SessionStore()
+        return request
+
+    def test_crea_zip_requests_para_cada_parte(self):
+        """Con 40 equipos y max_por_parte=20 → 2 ZipRequests creados."""
+        from core.zip_functions import generar_descarga_multipartes
+        empresa = EmpresaFactory(nombre='Multipartes Test')
+        user = UserFactory(username='mp_user', empresa=empresa)
+        request = self._make_request(user)
+
+        # La función maneja internamente la falta del procesador asíncrono
+        response = generar_descarga_multipartes(request, empresa, equipos_count=40, max_equipos_por_parte=20)
+
+        import json as _json
+        data = _json.loads(response.content)
+        assert 'partes' in data
+        assert len(data['partes']) == 2
+        assert ZipRequest.objects.filter(empresa=empresa).count() == 2
+
+    def test_partes_tienen_rangos_correctos(self):
+        """Las partes tienen rango_inicio y rango_fin correctos."""
+        from core.zip_functions import generar_descarga_multipartes
+        import json as _json
+        empresa = EmpresaFactory(nombre='Rangos Test')
+        user = UserFactory(username='rangos_user', empresa=empresa)
+        request = self._make_request(user)
+
+        response = generar_descarga_multipartes(request, empresa, equipos_count=30, max_equipos_por_parte=15)
+
+        data = _json.loads(response.content)
+        parte1 = data['partes'][0]
+        parte2 = data['partes'][1]
+        assert parte1['rango_inicio'] == 1
+        assert parte1['rango_fin'] == 15
+        assert parte2['rango_inicio'] == 16
+        assert parte2['rango_fin'] == 30
+
+    def test_limpia_solicitudes_pendientes_anteriores(self):
+        """Solicitudes pendientes anteriores del usuario se eliminan."""
+        from core.zip_functions import generar_descarga_multipartes
+        empresa = EmpresaFactory(nombre='Limpieza Test')
+        user = UserFactory(username='clean_user', empresa=empresa)
+
+        # Crear solicitudes antiguas pendientes
+        ZipRequest.objects.create(
+            user=user, empresa=empresa,
+            status='pending', position_in_queue=1
+        )
+        ZipRequest.objects.create(
+            user=user, empresa=empresa,
+            status='queued', position_in_queue=2
+        )
+        count_antes = ZipRequest.objects.filter(empresa=empresa).count()
+
+        request = self._make_request(user)
+        generar_descarga_multipartes(request, empresa, equipos_count=20, max_equipos_por_parte=10)
+
+        # Las antiguas pendientes/queued se eliminaron y se reemplazaron con nuevas
+        count_despues = ZipRequest.objects.filter(empresa=empresa).count()
+        # Debe haber exactamente 2 nuevas (una por cada parte)
+        assert count_despues == 2
+
+
+# ============================================================================
+# ZipRequest — transiciones de estado y expiración
+# ============================================================================
+
+@pytest.mark.django_db
+class TestZipRequestEstados:
+    """Cubre transiciones de estado y expiración de ZipRequest."""
+
+    def test_zip_request_estado_inicial_es_pending(self):
+        """ZipRequest recién creado tiene estado 'pending'."""
+        empresa = EmpresaFactory(nombre='Estado Test')
+        user = UserFactory(username='estado_user', empresa=empresa)
+        zr = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1
+        )
+        assert zr.status == 'pending'
+
+    def test_zip_request_puede_pasar_a_processing(self):
+        """ZipRequest puede cambiar de pending a processing."""
+        empresa = EmpresaFactory(nombre='Proc Test')
+        user = UserFactory(username='proc_user', empresa=empresa)
+        zr = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1, status='pending'
+        )
+        zr.status = 'processing'
+        zr.save()
+        zr.refresh_from_db()
+        assert zr.status == 'processing'
+
+    def test_zip_request_puede_pasar_a_completed(self):
+        """ZipRequest puede cambiar a completed con file_path."""
+        empresa = EmpresaFactory(nombre='Comp Test')
+        user = UserFactory(username='comp_user', empresa=empresa)
+        zr = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1, status='processing'
+        )
+        zr.status = 'completed'
+        zr.file_path = '/media/zips/test.zip'
+        zr.save()
+        zr.refresh_from_db()
+        assert zr.status == 'completed'
+        assert zr.file_path == '/media/zips/test.zip'
+
+    def test_zip_request_puede_pasar_a_failed_con_mensaje(self):
+        """ZipRequest en error guarda error_message."""
+        empresa = EmpresaFactory(nombre='Fail Test')
+        user = UserFactory(username='fail_user', empresa=empresa)
+        zr = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1, status='pending'
+        )
+        zr.status = 'failed'
+        zr.error_message = 'Error de almacenamiento'
+        zr.save()
+        zr.refresh_from_db()
+        assert zr.status == 'failed'
+        assert 'almacenamiento' in zr.error_message
+
+    def test_zip_request_con_expires_at_futuro(self):
+        """ZipRequest con expires_at en el futuro no está expirado."""
+        from django.utils import timezone
+        from datetime import timedelta
+        empresa = EmpresaFactory(nombre='Expire Test')
+        user = UserFactory(username='exp_user', empresa=empresa)
+        zr = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1,
+            expires_at=timezone.now() + timedelta(hours=6)
+        )
+        assert zr.expires_at > timezone.now()
+
+    def test_zip_status_solicitud_processing_muestra_progreso(self):
+        """ZipRequest en processing devuelve progreso en el endpoint de status."""
+        empresa = EmpresaFactory(nombre='Progress Test')
+        user = UserFactory(username='prog_user', empresa=empresa)
+        zr = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1,
+            status='processing', progress_percentage=45,
+            total_equipos=20, equipos_procesados=9,
+            current_step='Generando PDF',
+        )
+        c = Client()
+        c.force_login(user)
+        response = c.get(reverse('core:zip_status', args=[zr.id]))
+        assert response.status_code == 200
+        data = response.json()
+        assert data['status'] == 'processing'

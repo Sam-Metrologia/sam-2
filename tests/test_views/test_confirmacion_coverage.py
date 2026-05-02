@@ -775,3 +775,56 @@ class TestGenerarPdfIntervalosKeyError:
         assert response.status_code in (200, 500)
         content_type = response.get('Content-Type', '')
         assert 'json' in content_type or response.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# 8. actualizar_formato_empresa — historial de cambios (EmpresaFormatoLog)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestActualizarFormatoHistorialCobertura:
+    """Verifica que actualizar_formato_empresa crea registros de auditoría."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, db):
+        self.empresa = _make_empresa('hist2')
+        self.user = _make_user(self.empresa, username='hist2_user')
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse('core:actualizar_formato_empresa')
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_log_creado_con_usuario_correcto(self):
+        """El EmpresaFormatoLog registra el usuario que hizo el cambio."""
+        from core.models import EmpresaFormatoLog
+        self.empresa.confirmacion_codigo = 'COD-ANTES'
+        self.empresa.save()
+
+        self._post({'tipo': 'confirmacion', 'codigo': 'COD-DESPUES'})
+
+        log = EmpresaFormatoLog.objects.filter(empresa=self.empresa).first()
+        assert log is not None
+        assert log.usuario == self.user
+
+    def test_log_no_creado_si_valor_no_cambia(self):
+        """Sin cambio real no se guarda ningún log."""
+        from core.models import EmpresaFormatoLog
+        self.empresa.comprobacion_version = 'V1'
+        self.empresa.save()
+
+        count_antes = EmpresaFormatoLog.objects.filter(empresa=self.empresa).count()
+        self._post({'tipo': 'comprobacion', 'version': 'V1'})
+        assert EmpresaFormatoLog.objects.filter(empresa=self.empresa).count() == count_antes
+
+    def test_tipo_invalido_retorna_400(self):
+        """tipo que no existe → HTTP 400."""
+        response = self._post({'tipo': 'tipo_invalido', 'codigo': 'X'})
+        assert response.status_code == 400
+        data = json.loads(response.content)
+        assert data['success'] is False

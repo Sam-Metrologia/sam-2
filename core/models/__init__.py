@@ -4,7 +4,7 @@
 import logging
 
 from .common import get_upload_path, meses_decimales_a_relativedelta
-from .empresa import Empresa, PlanSuscripcion
+from .empresa import Empresa, PlanSuscripcion, EmpresaFormatoLog
 from .users import CustomUser, OnboardingProgress
 from .catalogs import Unidad, Ubicacion, Procedimiento, Proveedor
 from .equipment import Equipo, BajaEquipo, NotificacionVencimiento
@@ -25,7 +25,7 @@ logger = logging.getLogger('core')
 
 __all__ = [
     'get_upload_path', 'meses_decimales_a_relativedelta',
-    'Empresa', 'PlanSuscripcion',
+    'Empresa', 'PlanSuscripcion', 'EmpresaFormatoLog',
     'CustomUser', 'OnboardingProgress',
     'Unidad', 'Ubicacion', 'Procedimiento', 'Proveedor',
     'Equipo', 'BajaEquipo', 'NotificacionVencimiento',

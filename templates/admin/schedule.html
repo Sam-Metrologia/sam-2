@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 
 {% block title %}Programación del Sistema{% endblock %}
 
@@ -19,6 +19,7 @@
             <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Backup</a>
             <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md">Monitoreo</a>
             <a href="{% url 'core:admin_schedule' %}" class="bg-white text-blue-600 px-4 py-2 rounded-md font-medium">Programación</a>
+            <a href="{% url 'core:reporte_validacion_software' %}" class="text-gray-600 hover:text-blue-600 px-4 py-2 rounded-md whitespace-nowrap">Validación ISO</a>
         </nav>
     </div>
 

@@ -1,0 +1,92 @@
+{% comment %}
+Parámetros:
+  modal_id  — id único del modal (ej: "modal-confirmacion")
+  titulo    — título de la sección (ej: "Confirmación Metrológica")
+  campos    — etiquetas separadas por coma (ej: "Código Confirmación,Versión Confirmación")
+{% endcomment %}
+{% load custom_filters %}
+
+<div id="{{ modal_id }}"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+     onclick="if(event.target===this) cerrarHistorial('{{ modal_id }}')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+
+        {# Cabecera #}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800">Historial de cambios</h3>
+                <p class="text-sm text-gray-500">{{ titulo }}</p>
+            </div>
+            <button onclick="cerrarHistorial('{{ modal_id }}')"
+                    class="text-gray-400 hover:text-gray-700 transition text-xl leading-none">✕</button>
+        </div>
+
+        {# Cuerpo #}
+        <div class="overflow-y-auto flex-1 px-6 py-4">
+            {% with campo_list=campos|split:"," %}
+            {% with all_empty=True %}
+
+            {% for etiqueta in campo_list %}
+            {% with logs=logs_por_campo|dict_get:etiqueta %}
+            {% if logs %}
+                <div class="mb-5">
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{{ etiqueta }}</h4>
+                    <table class="w-full text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-left text-xs text-gray-500">
+                                <th class="px-3 py-2 rounded-tl-lg">Fecha</th>
+                                <th class="px-3 py-2">Anterior</th>
+                                <th class="px-3 py-2">Nuevo</th>
+                                <th class="px-3 py-2 rounded-tr-lg">Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for log in logs %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-3 py-2 text-gray-500 whitespace-nowrap text-xs">{{ log.fecha|date:"d/m/Y H:i" }}</td>
+                                <td class="px-3 py-2 text-gray-400 font-mono text-xs">{{ log.valor_anterior|default:"—" }}</td>
+                                <td class="px-3 py-2 font-mono text-xs text-blue-700 font-semibold">{{ log.valor_nuevo|default:"—" }}</td>
+                                <td class="px-3 py-2 text-xs text-gray-500">{{ log.usuario.get_full_name|default:log.usuario.username|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+            {% endwith %}
+            {% endfor %}
+
+            {# Si no hay ningún log para esta sección #}
+            {% with tiene_logs=False %}
+            {% for etiqueta in campo_list %}{% with logs=logs_por_campo|dict_get:etiqueta %}{% if logs %}{% with tiene_logs=True %}{% endwith %}{% endif %}{% endwith %}{% endfor %}
+            {% endwith %}
+
+            {# Fallback si ningún campo tiene historial #}
+            {% with tiene_algo=False %}
+            {% for etiqueta in campo_list %}
+                {% if logs_por_campo|dict_get:etiqueta %}{% with tiene_algo=True %}{% endwith %}{% endif %}
+            {% endfor %}
+            {% if not tiene_algo %}
+                <div class="flex flex-col items-center justify-center py-12 text-center">
+                    <svg class="w-12 h-12 text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <p class="text-gray-400 text-sm">Sin cambios registrados todavía.</p>
+                    <p class="text-gray-300 text-xs mt-1">Los cambios aparecen aquí cuando se guarda el formulario.</p>
+                </div>
+            {% endif %}
+            {% endwith %}
+
+            {% endwith %}
+            {% endwith %}
+        </div>
+
+        {# Pie #}
+        <div class="px-6 py-3 border-t border-gray-100 flex justify-end">
+            <button onclick="cerrarHistorial('{{ modal_id }}')"
+                    class="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 hover:border-gray-400 px-4 py-1.5 rounded-lg transition">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>

@@ -9,6 +9,59 @@ from datetime import timedelta
 import os
 
 
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Guarda resultados de pruebas en logs/last_test_results.json tras cada ejecución."""
+    import json
+    from pathlib import Path
+    from datetime import datetime
+
+    try:
+        stats = terminalreporter.stats
+        passed  = len(stats.get('passed',  []))
+        failed  = len(stats.get('failed',  []))
+        skipped = len(stats.get('skipped', []))
+        errors  = len(stats.get('error',   []))
+        total   = passed + failed + skipped + errors
+
+        # Intentar leer cobertura si el archivo .coverage existe
+        coverage_pct = '—'
+        try:
+            import coverage as _cov_mod
+            import io, contextlib
+            cov = _cov_mod.Coverage()
+            cov.load()
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+                pct = cov.report(show_missing=False)
+            coverage_pct = f'{pct:.1f}%'
+        except Exception:
+            pass
+
+        data = {
+            'timestamp': datetime.now().strftime('%d/%m/%Y %H:%M'),
+            'success':   exitstatus == 0,
+            'passed':    passed,
+            'failed':    failed,
+            'skipped':   skipped,
+            'total':     total,
+            'stats': {
+                'passed':   passed,
+                'failed':   failed,
+                'total':    total,
+                'coverage': coverage_pct,
+            },
+            'user': 'CLI (pytest)',
+        }
+
+        logs_dir = Path(config.rootdir) / 'logs'
+        logs_dir.mkdir(exist_ok=True)
+        (logs_dir / 'last_test_results.json').write_text(
+            json.dumps(data, ensure_ascii=False), encoding='utf-8'
+        )
+    except Exception:
+        pass
+
+
 # ============================================================================
 # FIXTURES: Cache Cleanup
 # ============================================================================

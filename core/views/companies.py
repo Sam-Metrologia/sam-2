@@ -3,8 +3,12 @@
 
 import re
 
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+
 from .base import *
 from ..constants import ESTADO_ACTIVO
+from ..models import EmpresaFormatoLog
 
 # =============================================================================
 # MAIN COMPANY VIEWS
@@ -517,6 +521,111 @@ def update_empresa_formato(request):
         return JsonResponse({'status': 'error', 'message': 'Errores de validación.', 'errors': errors}, status=400)
 
 
+def _enviar_email_cambio_formato(empresa, usuario_editor, cambios):
+    """Envía email de notificación a Admin/Gerencia cuando cambian códigos/versiones de formatos."""
+    import base64
+    from pathlib import Path
+
+    destinatarios = list(
+        CustomUser.objects.filter(
+            empresa=empresa,
+            rol_usuario__in=['ADMINISTRADOR', 'GERENCIA'],
+            is_active=True,
+        ).exclude(email='').values_list('email', flat=True)
+    )
+    if not destinatarios:
+        return
+
+    # Logo embebido en base64 para máxima compatibilidad con clientes de email
+    logo_tag = ''
+    try:
+        logo_path = Path(settings.BASE_DIR) / 'logo.png'
+        if logo_path.exists():
+            with open(logo_path, 'rb') as f:
+                logo_b64 = base64.b64encode(f.read()).decode()
+            logo_tag = (
+                f'<img src="data:image/png;base64,{logo_b64}" '
+                f'alt="SAM Metrología" style="max-width:80px;margin-top:14px;">'
+            )
+    except Exception:
+        pass
+
+    nombre_editor = usuario_editor.get_full_name() or usuario_editor.username
+
+    filas_html = ''.join(
+        f'<tr>'
+        f'<td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">{etiqueta}</td>'
+        f'<td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">{anterior or "—"}</td>'
+        f'<td style="padding:9px 14px;border-bottom:1px solid #e2e8f0;color:#003366;font-weight:600;">{nuevo or "—"}</td>'
+        f'</tr>'
+        for etiqueta, anterior, nuevo in cambios
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;line-height:1.6;margin:0;padding:0;">
+  <div style="max-width:600px;margin:20px auto;border:1px solid #e1e1e1;border-radius:10px;overflow:hidden;box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+
+    <div style="background-color:#003366;color:#ffffff;padding:25px;text-align:center;">
+      <h1 style="margin:0;font-size:22px;letter-spacing:1px;">SAM METROLOGÍA</h1>
+      <p style="margin:5px 0 0;opacity:0.9;font-size:14px;">Control Digital e Inteligencia Metrológica</p>
+      {logo_tag}
+    </div>
+
+    <div style="padding:35px;background-color:#ffffff;">
+      <p>Cordial saludo,</p>
+      <p>El usuario <strong>{nombre_editor}</strong> realizó cambios en los formatos de documentos
+         de la empresa <strong>{empresa.nombre}</strong>.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
+        <thead>
+          <tr style="background-color:#003366;color:#ffffff;">
+            <th style="padding:10px 14px;text-align:left;">Campo</th>
+            <th style="padding:10px 14px;text-align:left;">Valor anterior</th>
+            <th style="padding:10px 14px;text-align:left;">Valor nuevo</th>
+          </tr>
+        </thead>
+        <tbody>{filas_html}</tbody>
+      </table>
+
+      <p style="color:#555;font-size:14px;">Este cambio quedó registrado en el historial de auditoría
+         de SAM Metrología y puede consultarse desde el panel de administración.</p>
+      <p>Quedo atento a sus comentarios o cualquier requerimiento adicional.</p>
+      <p>Atentamente,</p>
+      <div style="color:#003366;font-weight:bold;font-size:16px;margin-top:10px;">SAM Metrología</div>
+      <div style="font-size:14px;color:#666;margin-top:4px;">
+        <a href="https://sammetrologia.com" style="color:#0056b3;text-decoration:none;">sammetrologia.com</a>
+        &nbsp;|&nbsp; +57 324 799 0534
+      </div>
+    </div>
+
+    <div style="background-color:#1a1a1a;padding:25px;font-size:12px;text-align:center;color:#999;">
+      <p style="margin:0;"><strong>SAM Metrología | Gestión Metrológica 4.0</strong><br>
+      Colombia | Soluciones Avanzadas en Medición</p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    text_body = (
+        f"Cambio en formatos de {empresa.nombre} por {nombre_editor}:\n"
+        + '\n'.join(f"  {e}: {a or '—'} → {n or '—'}" for e, a, n in cambios)
+    )
+
+    try:
+        msg = EmailMultiAlternatives(
+            subject=f'[SAM] Actualización de formatos — {empresa.nombre}',
+            body=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=destinatarios,
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send(fail_silently=True)
+    except Exception:
+        logger.exception("Error enviando email de cambio de formato para empresa %s", empresa.pk)
+
+
 @monitor_view
 @access_check
 @login_required
@@ -540,22 +649,90 @@ def editar_empresa_formato(request, pk):
             messages.error(request, 'Solo usuarios con rol Administrador o Gerencia pueden editar la información de formato.')
             return redirect('core:home')
 
+    CAMPOS_FORMATO = {
+        # Hoja de vida
+        'formato_codificacion_empresa': 'Código Hoja de Vida',
+        'formato_version_empresa': 'Versión Hoja de Vida',
+        'formato_fecha_version_empresa': 'Fecha Hoja de Vida',
+        # Confirmación metrológica
+        'confirmacion_codigo': 'Código Confirmación',
+        'confirmacion_version': 'Versión Confirmación',
+        'confirmacion_fecha_formato': 'Fecha Confirmación',
+        # Intervalos de calibración
+        'intervalos_codigo': 'Código Intervalos',
+        'intervalos_version': 'Versión Intervalos',
+        'intervalos_fecha_formato': 'Fecha Intervalos',
+        # Comprobación metrológica
+        'comprobacion_codigo': 'Código Comprobación',
+        'comprobacion_version': 'Versión Comprobación',
+        'comprobacion_fecha_formato': 'Fecha Comprobación',
+        # Mantenimiento
+        'mantenimiento_codigo': 'Código Mantenimiento',
+        'mantenimiento_version': 'Versión Mantenimiento',
+        'mantenimiento_fecha_formato': 'Fecha Mantenimiento',
+        # Listado de equipos
+        'listado_codigo': 'Código Listado de Equipos',
+        'listado_version': 'Versión Listado de Equipos',
+        'listado_fecha_formato': 'Fecha Listado de Equipos',
+    }
+
+    def _campo_a_str(valor):
+        """Convierte cualquier valor de campo (incluidos DateField) a string para el log."""
+        if valor is None or valor == '':
+            return ''
+        if hasattr(valor, 'strftime'):
+            return valor.strftime('%d/%m/%Y')
+        return str(valor)
+
     if request.method == 'POST':
         form = EmpresaFormatoForm(request.POST, instance=empresa)
         if form.is_valid():
+            # Capturar valores anteriores antes de guardar (incluye fechas)
+            valores_anteriores = {campo: _campo_a_str(getattr(empresa, campo, '')) for campo in CAMPOS_FORMATO}
+
             form.save()
+            empresa.refresh_from_db()
+
+            # Registrar y notificar cambios
+            cambios = []
+            for campo, etiqueta in CAMPOS_FORMATO.items():
+                valor_anterior = valores_anteriores[campo]
+                valor_nuevo = _campo_a_str(getattr(empresa, campo, ''))
+                if valor_anterior != valor_nuevo:
+                    EmpresaFormatoLog.objects.create(
+                        empresa=empresa,
+                        campo=etiqueta,
+                        valor_anterior=valor_anterior,
+                        valor_nuevo=valor_nuevo,
+                        usuario=request.user,
+                    )
+                    cambios.append((etiqueta, valor_anterior, valor_nuevo))
+
+            if cambios:
+                _enviar_email_cambio_formato(empresa, request.user, cambios)
+
             messages.success(request, f'Información de formato para "{empresa.nombre}" actualizada exitosamente.')
             logger.info(f"Formato actualizado para empresa {empresa.nombre} por {request.user.username}")
-            return redirect('core:home')
+            return redirect('core:editar_empresa_formato', pk=empresa.pk)
         else:
             messages.error(request, 'Hubo un error al actualizar el formato. Por favor, revisa los datos.')
     else:
         form = EmpresaFormatoForm(instance=empresa)
 
+    # Logs agrupados por campo para los modales de historial
+    logs_por_campo = {}
+    for etiqueta in CAMPOS_FORMATO.values():
+        logs_por_campo[etiqueta] = list(
+            EmpresaFormatoLog.objects.filter(empresa=empresa, campo=etiqueta)
+            .select_related('usuario')
+            .order_by('-fecha')[:20]
+        )
+
     context = {
         'form': form,
         'empresa': empresa,
         'titulo_pagina': f'Editar Formato de Empresa: {empresa.nombre}',
+        'logs_por_campo': logs_por_campo,
     }
     return render(request, 'core/editar_empresa_formato.html', context)
 

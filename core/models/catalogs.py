@@ -87,6 +87,24 @@ class Proveedor(models.Model):
         ('Otro', 'Otro'),
     ]
 
+    ESTADO_APROBACION_CHOICES = [
+        ('aprobado', 'Aprobado'),
+        ('en_evaluacion', 'En evaluación'),
+        ('suspendido', 'Suspendido'),
+        ('no_aplica', 'No aplica'),
+    ]
+
+    ENTIDAD_ACREDITADORA_CHOICES = [
+        ('ONAC', 'ONAC (Colombia)'),
+        ('IDEAM', 'IDEAM (Colombia)'),
+        ('ILAC', 'Miembro ILAC'),
+        ('DAkkS', 'DAkkS (Alemania)'),
+        ('UKAS', 'UKAS (Reino Unido)'),
+        ('A2LA', 'A2LA (EE.UU.)'),
+        ('otra', 'Otra entidad acreditadora'),
+        ('no_acreditado', 'No acreditado'),
+    ]
+
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='proveedores', verbose_name="Empresa")
     tipo_servicio = models.CharField(max_length=50, choices=TIPO_SERVICIO_CHOICES, verbose_name="Tipo de Servicio")
     nombre_contacto = models.CharField(max_length=200, blank=True, null=True, verbose_name="Nombre de Contacto")
@@ -96,6 +114,32 @@ class Proveedor(models.Model):
     pagina_web = models.URLField(blank=True, null=True, verbose_name="Página Web")
     alcance = models.TextField(blank=True, null=True, verbose_name="Alcance (áreas o magnitudes)")
     servicio_prestado = models.TextField(blank=True, null=True, verbose_name="Servicio Prestado")
+
+    # Campos de acreditación — ISO/IEC 17020:2026 (adquisición de servicios externos)
+    laboratorio_acreditado = models.BooleanField(
+        default=False,
+        verbose_name="¿Laboratorio acreditado?",
+        help_text="Aplica principalmente a proveedores de calibración. Marcar si el proveedor cuenta con acreditación vigente."
+    )
+    entidad_acreditadora = models.CharField(
+        max_length=20, choices=ENTIDAD_ACREDITADORA_CHOICES,
+        default='no_acreditado', blank=True,
+        verbose_name="Entidad acreditadora"
+    )
+    numero_acreditacion = models.CharField(
+        max_length=100, blank=True, default='',
+        verbose_name="Número de acreditación",
+        help_text="Ej: ONAC-L-0123"
+    )
+    estado_aprobacion = models.CharField(
+        max_length=20, choices=ESTADO_APROBACION_CHOICES,
+        default='no_aplica',
+        verbose_name="Estado de aprobación"
+    )
+    fecha_ultima_evaluacion = models.DateField(
+        blank=True, null=True,
+        verbose_name="Fecha última evaluación del proveedor"
+    )
 
     class Meta:
         verbose_name = "Proveedor"

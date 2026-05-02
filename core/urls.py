@@ -210,6 +210,7 @@ urlpatterns = [
     path('admin/system/email/', admin_views.email_configuration, name='admin_email_config'),
     path('admin/system/history/', admin_views.execution_history, name='admin_history'),
     path('admin/system/tests/', admin_views.run_tests_panel, name='run_tests_panel'),
+    path('admin/system/validacion-software/', admin_views.reporte_validacion_software, name='reporte_validacion_software'),
 
     # API endpoints para el panel de administración
     path('api/admin/status/', admin_views.api_system_status, name='api_system_status'),

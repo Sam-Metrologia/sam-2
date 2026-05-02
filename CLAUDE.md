@@ -10,12 +10,12 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 **Language:** Spanish (Colombia)
 **Version:** 2.0.0
 
-## Current Status (Apr 24, 2026)
+## Current Status (May 2026)
 
-- **Tests:** ~1,889 passing, 1 skipped, 3 xfailed (+37 test_multi_magnitud + 26 test_prestamos_dashboard) — `test_mejoras_ux.py` (6 tests) recreado y corregido 2026-04-25
+- **Tests:** 1,951 passing, 1 skipped, 3 xfailed (verificado 2026-05-02)
 - **Coverage:** 70.00% ✓ (Goal alcanzado)
 - **Score:** 8.5/10 (estimado 2026-04-25) | Audit Plan → `auditorias/PLAN_AUDITORIA_2026-04.md`
-- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-04-25.md` — 18 hallazgos, 8 corregidos en sesión
+- **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-04-25.md` — 18 hallazgos; 8 corregidos en sesión + 13 corregidos post-sesión (ver sección "Correcciones Post-Sesión" en el archivo de auditoría)
 - **Models paquete (2026-04):** `core/models.py` dividido en paquete `core/models/` — 12 módulos: `empresa`, `users`, `catalogs`, `equipment`, `activities`, `loans`, `documents`, `payments`, `common`, `system`, `_signals`, `__init__`. Imports sin cambio (`from core.models import Equipo` sigue funcionando).
 - **Préstamos UX (2026-04-24):** Dashboard con secciones colapsables + filtro de búsqueda + chips de equipos disponibles agrupados por familia (clickeables → préstamo directo). Ver `core/templates/core/prestamos/dashboard.html`.
 - **Multi-magnitud (2026-04-09):** Confirmaciones y comprobaciones soportan múltiples variables (tabs). Datos guardados en formato v2 `{magnitudes: [{nombre, unidad, puntos_medicion}]}`. Compatibilidad backward con v1 (`puntos_medicion` en raíz). PDF muestra tabla+gráfica por variable. Gráficas históricas (detalle equipo + hoja de vida) normalizadas por EMP (±1 = límite), una gráfica por variable.
@@ -260,13 +260,11 @@ EMAIL_HOST_PASSWORD, ADMIN_EMAIL, GEMINI_API_KEY
 - `core/views/reports.py`: 3,699 lines (has helpers but still large)
 - `core/forms.py`: 1,742 lines (should split by domain)
 - Coverage gaps: confirmacion.py (58.77%), pagos.py (49.84%), zip_functions.py (49.22%)
-- `confirmacion.py` con `@access_check` + `@monitor_view` + `@trial_check` (corregido 2026-04)
-- **CSP `unsafe-inline`**: 52 bloques `<script>` inline en 51 templates — requiere middleware de nonces. Estimado: 1-2 días.
-- `core/views_optimized.py` (292), `core/zip_optimizer.py` (473), `core/async_zip_improved.py` (579): evaluar si son necesarios
+- **CSP `unsafe-inline`**: 52 bloques `<script>` inline en 51 templates — requiere middleware de nonces. Estimado: 1-2 días. (Auditoría C2)
+- `core/zip_optimizer.py` (473), `core/async_zip_improved.py` (579): verificar referencias (`grep -r "zip_optimizer\|async_zip_improved" . --include="*.py"`), eliminar si hay 0. (Auditoría A2)
 - ISO 17020 módulos faltantes: quejas de clientes (7.9), no conformidades (8.7), imparcialidad (4.1)
-- **CORREGIDO 2026-04-25:** `test_mejoras_ux.py` recreado con `assert`; propiedad `puede_eliminar_equipos` llamada sin `()`
-- `pytest.mark.performance` no registrado en pyproject.toml → genera warnings
-- README.md raíz: 19 bytes ("# Forzar redeploy") — no funcional
+- Admin cache sin aislamiento multi-tenant: clave `"admin_execution_history"` sin `empresa_id` en `core/admin_services.py`. (Auditoría H5)
+- Chat historial sin validación de entrada (prompt injection via localStorage) en `core/views/chat.py`. (Auditoría C4)
 
 ## Backups
 
@@ -286,3 +284,11 @@ EMAIL_HOST_PASSWORD, ADMIN_EMAIL, GEMINI_API_KEY
 - Custom user model: `core.CustomUser`
 - File validation on all uploads
 - Rate limiting configured
+
+## Manual de Usuario
+
+Sitio web estático del manual de la plataforma.
+- **Ubicación:** `C:\Users\LENOVO\OneDrive\Escritorio\sam-website\manual-plataforma.html`
+- **Versión actual:** v1.1 (Mayo 2026) — 21 secciones + Glosario (VIM JCGM 200:2012)
+- **Secciones nuevas v1.1:** ★ Guía de inicio rápido · 2.5 Importación masiva desde Excel · G Glosario de términos
+- Referencia normas: ILAC G8:09/2019 (reglas de decisión) · ILAC-G24:2022 (intervalos de calibración)

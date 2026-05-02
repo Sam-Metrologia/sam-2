@@ -338,3 +338,34 @@ Los siguientes puntos requieren acceso al servidor de producción y no pudieron 
 
 *Auditoría completada: 2026-04-25*
 *Siguiente auditoría recomendada: 2026-06-15*
+
+---
+
+## Correcciones Post-Sesión (Abril–Mayo 2026)
+
+Los siguientes hallazgos fueron corregidos después de la sesión de auditoría, confirmados por inspección de código en 2026-05-02:
+
+| ID | Descripción | Archivo | Estado |
+|----|-------------|---------|--------|
+| **C1** | Timing attack Wompi — reemplazado `==` por `hmac.compare_digest()` | `core/views/pagos.py:228` | ✅ CORREGIDO |
+| **B2** | Email "N/A días" — añadidas propiedades `dias_hasta_calibracion`, `dias_hasta_mantenimiento`, `dias_hasta_comprobacion` a `Equipo` | `core/models/equipment.py` | ✅ CORREGIDO |
+| **C3** | Chat sin rate limiting — añadido límite 20 mensajes/hora via cache (`chat_rate_{user.id}`) | `core/views/chat.py` | ✅ CORREGIDO |
+| **H1** | Dashboard 500 si Redis cae — `cache.get` y `cache.set` envueltos en `try/except` | `core/views/dashboard.py` | ✅ CORREGIDO |
+| **H2** | R2 inconsistencia en activities — `default_storage.save()` envuelto en `try/except` con logging | `core/views/activities.py:558,587` | ✅ CORREGIDO |
+| **H3** | R2 error logo empresa — `_process_company_logo` con `try/except` y mensaje de error al usuario | `core/views/companies.py:944` | ✅ CORREGIDO |
+| **H4** | Cache keys `timeout=None` en Redis — reemplazados con timeout explícito | `core/services_new.py` | ✅ CORREGIDO |
+| **D1** | `pytest.mark.performance` no registrado — añadido en `markers` de `pyproject.toml` | `pyproject.toml` | ✅ CORREGIDO |
+| **F1** | Python 3.11 → 3.13 en CI | `.github/workflows/tests.yml` | ✅ CORREGIDO |
+| **F2** | `requirements_test.txt` no instalado en CI | `.github/workflows/tests.yml` | ✅ CORREGIDO |
+| **F3** | Sin `migrate --check` en CI | `.github/workflows/tests.yml` | ✅ CORREGIDO |
+| **F4** | Rama `develop` inexistente en CI triggers — eliminada | `.github/workflows/tests.yml` | ✅ CORREGIDO |
+| **I1** | Mezcla backend Redis — unificado a `django_redis.cache.RedisCache` consistentemente | `proyecto_c/settings.py` | ✅ CORREGIDO |
+
+### Hallazgos aún pendientes
+
+| ID | Descripción | Prioridad |
+|----|-------------|-----------|
+| **A2** | `zip_optimizer.py` y `async_zip_improved.py` — verificar referencias antes de eliminar | Media |
+| **C2** | CSP `unsafe-inline` en 52 templates — requiere nonces middleware (1-2 días de trabajo) | Media |
+| **C4** | Historial chat sin validación — prompt injection via localStorage | Baja |
+| **H5** | Cache admin sin aislamiento multi-tenant (`admin_execution_history` sin empresa_id) | Baja |

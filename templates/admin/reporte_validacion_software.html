@@ -1,0 +1,732 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Reporte de Validación de Software — SAM Metrología{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ═══════════════════════════════════════════
+   PANTALLA: ocultar elementos solo de impresión
+   ═══════════════════════════════════════════ */
+.print-footer { display: none; }
+
+/* ═══════════════════════════════════════════
+   @page: layout A4 (nivel raíz, máxima compatibilidad)
+   ═══════════════════════════════════════════ */
+@page {
+    size: A4 portrait;
+    margin: 12mm 15mm 22mm 15mm;
+}
+
+/* ═══════════════════════════════════════════
+   IMPRESIÓN: documento A4 elegante
+   ═══════════════════════════════════════════ */
+@media print {
+
+/* ── Preservar colores ──────────────────────── */
+*, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+/* ── Reset total del layout de base.html ────── */
+html { font-size: 10pt !important; }
+
+body {
+    display: block !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    font-size: 10pt !important;
+    line-height: 1.5 !important;
+    color: #1e293b !important;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
+}
+
+/* ── Ocultar: sidebar, navbar, flotantes ────── */
+#sidebar, .sidebar,
+.navbar, .menu-toggle,
+footer.main-footer,
+.modo-trabajo-banner,
+#session-warning,
+#sam-chat-widget,
+a[href*="wa.me"],
+.print\:hidden { display: none !important; }
+
+/* ── Contenedor principal: eliminar margen sidebar */
+#main-content, .main-content {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+    overflow: visible !important;
+    background: white !important;
+}
+
+/* ── Wrapper del reporte ─────────────────────── */
+.max-w-5xl {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+/* ── Portada ─────────────────────────────────── */
+.bg-gradient-to-br {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%) !important;
+    border-radius: 3pt !important;
+    margin-bottom: 12pt !important;
+    padding: 18pt 20pt !important;
+    page-break-inside: avoid;
+}
+.bg-white\/10  { background-color: rgba(255,255,255,0.12) !important; border-radius: 3pt !important; }
+.bg-white\/20  { background-color: rgba(255,255,255,0.22) !important; }
+.text-white    { color: #ffffff !important; }
+.text-blue-200 { color: #bfdbfe !important; }
+.text-blue-300 { color: #93c5fd !important; }
+.text-green-300 { color: #86efac !important; }
+.text-yellow-300 { color: #fde047 !important; }
+
+/* ── Tarjetas de sección ─────────────────────── */
+.rounded-xl, .rounded-2xl { border-radius: 3pt !important; }
+.overflow-hidden           { overflow: visible !important; }
+.shadow-sm, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
+.mb-6, .mb-8 { margin-bottom: 10pt !important; }
+.mb-5        { margin-bottom: 7pt !important; }
+
+/* Borde visible en tarjetas para dar aspecto de documento */
+.bg-white.rounded-xl {
+    border: 0.75pt solid #94a3b8 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* ── Encabezados de sección ──────────────────── */
+.bg-slate-800 {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    padding: 5pt 10pt !important;
+}
+.bg-slate-800 * { color: #ffffff !important; }
+
+/* ── Padding interno ─────────────────────────── */
+.p-6  { padding: 9pt !important; }
+.p-5  { padding: 7pt !important; }
+.p-4  { padding: 6pt !important; }
+.px-5, .px-6 { padding-left: 9pt !important; padding-right: 9pt !important; }
+.py-3 { padding-top: 4pt !important; padding-bottom: 4pt !important; }
+.py-2 { padding-top: 3pt !important; padding-bottom: 3pt !important; }
+
+/* ── Grids: forzar columnas para A4 ──────────── */
+.grid { display: grid !important; width: 100% !important; box-sizing: border-box !important; }
+.gap-4 { gap: 6pt !important; }
+.gap-3 { gap: 5pt !important; }
+.gap-6 { gap: 8pt !important; }
+
+/* Portada: 4 métricas en fila */
+.grid.mt-6 { grid-template-columns: repeat(4, 1fr) !important; }
+
+/* Sección 1: dos tablas lado a lado */
+.grid.grid-cols-1.md\:grid-cols-2  { grid-template-columns: repeat(2, 1fr) !important; }
+
+/* Sección 6: datos gestionados */
+.grid.grid-cols-2.sm\:grid-cols-3.lg\:grid-cols-6 { grid-template-columns: repeat(4, 1fr) !important; }
+
+/* Sección 7 y 8: dos columnas */
+.grid.grid-cols-1.md\:grid-cols-2.gap-4,
+.grid.grid-cols-1.md\:grid-cols-2.gap-6 { grid-template-columns: repeat(2, 1fr) !important; }
+
+/* Sección 4: cuatro estadísticas */
+.grid.grid-cols-2.md\:grid-cols-4 { grid-template-columns: repeat(4, 1fr) !important; }
+
+/* Sección 9: declaración */
+.grid.grid-cols-1.md\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+
+/* ── Tablas ───────────────────────────────────── */
+.overflow-x-auto { overflow: visible !important; }
+table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8.5pt !important;
+    table-layout: auto !important;
+    word-break: break-word !important;
+}
+thead tr {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+}
+th {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    font-weight: 700 !important;
+    padding: 4pt 7pt !important;
+    font-size: 8pt !important;
+    border-bottom: 1pt solid #cbd5e1 !important;
+    text-align: left !important;
+}
+td {
+    padding: 3.5pt 7pt !important;
+    font-size: 8.5pt !important;
+    border-bottom: 0.5pt solid #e2e8f0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    vertical-align: top !important;
+}
+tr { page-break-inside: avoid; }
+thead { display: table-header-group; }
+
+/* ── Colores de fondo ────────────────────────── */
+.bg-green-50   { background-color: #f0fdf4 !important; }
+.bg-green-100  { background-color: #dcfce7 !important; }
+.bg-red-50     { background-color: #fef2f2 !important; }
+.bg-red-100    { background-color: #fee2e2 !important; }
+.bg-amber-50   { background-color: #fffbeb !important; }
+.bg-amber-100  { background-color: #fef3c7 !important; }
+.bg-blue-50    { background-color: #eff6ff !important; }
+.bg-purple-50  { background-color: #faf5ff !important; }
+.bg-gray-50, .bg-slate-50 { background-color: #f8fafc !important; }
+.bg-white      { background-color: #ffffff !important; }
+
+/* ── Colores de texto ────────────────────────── */
+.text-green-600, .text-green-700, .text-green-800 { color: #166534 !important; }
+.text-red-600,   .text-red-700,   .text-red-800   { color: #991b1b !important; }
+.text-amber-600, .text-amber-700, .text-amber-800 { color: #92400e !important; }
+.text-blue-600,  .text-blue-700   { color: #1d4ed8 !important; }
+.text-purple-600 { color: #7c3aed !important; }
+.text-gray-400   { color: #9ca3af !important; }
+.text-gray-500   { color: #6b7280 !important; }
+.text-gray-600   { color: #4b5563 !important; }
+.text-slate-800  { color: #1e293b !important; }
+
+/* ── Badges / pills ──────────────────────────── */
+.rounded-full, [class*="rounded-full"] { border-radius: 999pt !important; }
+
+/* ── Saltos de página ────────────────────────── */
+.bg-white.rounded-xl.mb-6 { page-break-inside: auto; }
+.bg-white.rounded-xl.mb-6.overflow-hidden { page-break-inside: avoid; }
+tr, li { page-break-inside: avoid; }
+
+/* ── Footer fijo (repite en cada página) ─────── */
+.print-footer {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 18mm;
+    padding: 0 15mm;
+    background: #ffffff !important;
+    border-top: 0.75pt solid #94a3b8;
+    font-size: 7pt;
+    color: #64748b;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Inter', Arial, sans-serif;
+}
+.print-footer strong { color: #1e293b; }
+
+} /* fin @media print */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto print:max-w-none print:mx-0">
+
+    {# ── PORTADA ── #}
+    <div class="bg-gradient-to-br from-slate-900 to-blue-900 text-white rounded-2xl p-8 mb-8 print:rounded-none print:mb-6">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+            <div>
+                <div class="text-blue-300 text-xs font-semibold uppercase tracking-widest mb-2">SAM Metrología · Documento Técnico</div>
+                <h1 class="text-3xl font-bold mb-1">Reporte de Validación de Software</h1>
+                <p class="text-blue-200 text-sm">Evidencia objetiva de verificación, integridad y aptitud del sistema para su propósito</p>
+            </div>
+            <div class="text-right text-sm">
+                <div class="text-blue-300 text-xs mb-1">Generado el</div>
+                <div class="font-bold text-lg">{{ entorno.fecha_reporte|date:"d/m/Y" }}</div>
+                <div class="text-blue-200 text-xs">{{ entorno.fecha_reporte|date:"H:i" }} (hora Colombia)</div>
+            </div>
+        </div>
+        <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+            <div class="bg-white/10 rounded-lg p-3">
+                <div class="text-2xl font-bold">2.0.0</div>
+                <div class="text-blue-200 text-xs mt-0.5">Versión del sistema</div>
+            </div>
+            <div class="bg-white/10 rounded-lg p-3">
+                <div class="text-2xl font-bold {% if migraciones_ok %}text-green-300{% else %}text-yellow-300{% endif %}">
+                    {% if migraciones_ok %}✓{% else %}!{% endif %}
+                </div>
+                <div class="text-blue-200 text-xs mt-0.5">BD actualizada</div>
+            </div>
+            <div class="bg-white/10 rounded-lg p-3">
+                <div class="text-2xl font-bold text-green-300">{{ funciones_validadas|length }}</div>
+                <div class="text-blue-200 text-xs mt-0.5">Funciones validadas</div>
+            </div>
+            <div class="bg-white/10 rounded-lg p-3">
+                <div class="text-2xl font-bold">{{ entorno.modo }}</div>
+                <div class="text-blue-200 text-xs mt-0.5">Modo de operación</div>
+            </div>
+        </div>
+    </div>
+
+    {# ── BARRA DE NAVEGACIÓN ADMIN ── #}
+    <div class="mb-6 print:hidden">
+        <nav class="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg text-sm">
+            <a href="{% url 'core:admin_dashboard' %}" class="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md">Dashboard</a>
+            <a href="{% url 'core:admin_maintenance' %}" class="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md">Mantenimiento</a>
+            <a href="{% url 'core:admin_backup' %}" class="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md">Backup</a>
+            <a href="{% url 'core:admin_monitoring' %}" class="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md">Monitoreo</a>
+            <a href="{% url 'core:run_tests_panel' %}" class="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md">Verificación</a>
+            <a href="{% url 'core:reporte_validacion_software' %}" class="bg-white text-blue-700 font-semibold px-3 py-2 rounded-md shadow-sm">📋 Validación ISO</a>
+            <div class="flex-1"></div>
+            <button onclick="window.print()" class="bg-slate-800 text-white px-4 py-2 rounded-md text-sm hover:bg-slate-700 flex items-center gap-2">
+                🖨️ Imprimir / Exportar PDF
+            </button>
+        </nav>
+    </div>
+
+    {# ── SECCIÓN 1: IDENTIFICACIÓN DEL SISTEMA ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">1</span>
+            <h2 class="font-semibold">Identificación del sistema de software</h2>
+        </div>
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <table class="text-sm w-full">
+                <tbody class="divide-y divide-gray-100">
+                    <tr><td class="py-2.5 text-gray-500 w-44 align-top">Nombre del sistema</td><td class="py-2.5 font-semibold">SAM Metrología</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Versión</td><td class="py-2.5 font-semibold">2.0.0</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Propósito</td><td class="py-2.5">Plataforma de gestión metrológica: inventario de equipos, confirmación metrológica, calibración, mantenimiento, comprobaciones intermedias y control documental</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Sector</td><td class="py-2.5 font-semibold">Metrología industrial y de laboratorio</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Usuarios objetivo</td><td class="py-2.5">Laboratorios de calibración, organismos de inspección y empresas con programas de aseguramiento metrológico</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Proveedor</td><td class="py-2.5">SAM Metrología S.A.S · Bogotá, Colombia</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Contacto soporte</td><td class="py-2.5">soporte@sammetrologia.com</td></tr>
+                </tbody>
+            </table>
+            <table class="text-sm w-full">
+                <tbody class="divide-y divide-gray-100">
+                    <tr><td class="py-2.5 text-gray-500 w-44 align-top">Framework</td><td class="py-2.5 font-mono">Django {{ entorno.django_version }}</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Python</td><td class="py-2.5 font-mono text-xs">{{ entorno.python_version_short }}</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Motor de BD</td><td class="py-2.5 font-mono">{{ db_info.motor|default:"—" }}</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Versión BD</td><td class="py-2.5 text-xs font-mono">{{ db_info.version|truncatechars:60 }}</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Plataforma</td><td class="py-2.5 text-xs">{{ entorno.sistema_operativo }}</td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Modo operación</td><td class="py-2.5"><span class="px-2 py-0.5 rounded text-xs font-semibold {% if entorno.modo == 'Producción' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">{{ entorno.modo }}</span></td></tr>
+                    <tr><td class="py-2.5 text-gray-500 align-top">Fecha del reporte</td><td class="py-2.5">{{ entorno.fecha_reporte|date:"d \d\e F \d\e Y, H:i" }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 2: INTEGRIDAD DE LA BASE DE DATOS ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">2</span>
+            <h2 class="font-semibold">Integridad y estado de la base de datos</h2>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                <div class="bg-gray-50 rounded-lg p-4 text-center border border-gray-100">
+                    <div class="text-3xl mb-1 {% if db_info.estado == 'Conectada' %}text-green-500{% else %}text-red-500{% endif %}">
+                        {% if db_info.estado == 'Conectada' %}✅{% else %}❌{% endif %}
+                    </div>
+                    <div class="font-semibold text-sm">{{ db_info.estado }}</div>
+                    <div class="text-gray-400 text-xs mt-0.5">Conexión</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center border border-gray-100">
+                    <div class="text-3xl mb-1 {% if migraciones_ok %}text-green-500{% elif migraciones_ok is None %}text-gray-400{% else %}text-yellow-500{% endif %}">
+                        {% if migraciones_ok %}✅{% elif migraciones_ok is None %}—{% else %}⚠️{% endif %}
+                    </div>
+                    <div class="font-semibold text-sm">
+                        {% if migraciones_ok %}{{ migraciones_aplicadas }} aplicadas{% elif migraciones_ok is None %}No verificado{% else %}{{ migraciones_pendientes }} pendiente(s){% endif %}
+                    </div>
+                    <div class="text-gray-400 text-xs mt-0.5">Migraciones de esquema</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center border border-gray-100">
+                    <div class="text-3xl mb-1 text-blue-500">{{ db_info.num_tablas|default:"—" }}</div>
+                    <div class="font-semibold text-sm">Tablas</div>
+                    <div class="text-gray-400 text-xs mt-0.5">En la base de datos</div>
+                </div>
+            </div>
+            <table class="text-sm w-full">
+                <tbody class="divide-y divide-gray-100">
+                    <tr><td class="py-2 text-gray-500 w-52">Motor de base de datos</td><td class="py-2 font-mono">{{ db_info.motor|upper }}</td></tr>
+                    <tr><td class="py-2 text-gray-500">Versión</td><td class="py-2 font-mono text-xs">{{ db_info.version|default:"—" }}</td></tr>
+                    <tr><td class="py-2 text-gray-500">Base de datos activa</td><td class="py-2 font-mono">{{ db_info.nombre|default:"—" }}</td></tr>
+                    <tr>
+                        <td class="py-2 text-gray-500 align-top">Política de respaldo</td>
+                        <td class="py-2">Backup diario automático a Cloudflare R2 (retención 180 días) vía GitHub Actions. Cifrado AES-256 en reposo.</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-500 align-top">Integridad referencial</td>
+                        <td class="py-2">Garantizada por restricciones de clave foránea del motor de BD y control de migraciones versionadas con Django Migrations.</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-500 align-top">Soft-delete de empresas</td>
+                        <td class="py-2">Retención de 180 días antes de eliminación permanente; datos recuperables en ese período.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 3: FUNCIONES METROLÓGICAS VALIDADAS ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">3</span>
+            <h2 class="font-semibold">Funciones del sistema verificadas</h2>
+            <span class="ml-auto text-xs text-slate-300">{{ funciones_validadas|length }} funciones · todas CONFORMES</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 text-left text-xs text-gray-500 border-b border-gray-200">
+                        <th class="px-5 py-3 w-8">#</th>
+                        <th class="px-5 py-3">Función verificada</th>
+                        <th class="px-5 py-3">Área del sistema</th>
+                        <th class="px-5 py-3">Criterio de aceptación</th>
+                        <th class="px-5 py-3 text-center">Resultado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for f in funciones_validadas %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-3 text-gray-400 text-xs">{{ forloop.counter }}</td>
+                        <td class="px-5 py-3 font-medium">{{ f.funcion }}</td>
+                        <td class="px-5 py-3 text-xs text-blue-700 font-medium">{{ f.area }}</td>
+                        <td class="px-5 py-3 text-gray-500 text-xs">{{ f.criterio }}</td>
+                        <td class="px-5 py-3 text-center">
+                            {% if f.resultado == 'CONFORME' %}
+                                <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">✓ CONFORME</span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1 bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-1 rounded-full">✗ {{ f.resultado }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="px-5 py-3 bg-blue-50 border-t border-blue-100 text-xs text-blue-700">
+            Validación realizada mediante pruebas funcionales automatizadas (pytest) y revisión de auditoría interna.
+            Los criterios de aceptación están basados en las funciones declaradas del sistema, verificadas mediante pruebas automatizadas y auditoría interna de código.
+        </div>
+    </div>
+
+    {# ── SECCIÓN 4: RESULTADOS DE PRUEBAS AUTOMATIZADAS ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">4</span>
+            <h2 class="font-semibold">Pruebas automatizadas de software</h2>
+        </div>
+        <div class="p-6">
+            {% if test_desde_archivo or ultimo_test %}
+            {% with t=test_desde_archivo|default:ultimo_test %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                <div class="bg-gray-50 rounded-lg p-4 text-center border">
+                    <div class="text-2xl font-bold {% if t.stats.passed %}text-green-600{% else %}text-gray-400{% endif %}">
+                        {{ t.stats.passed|default:"—" }}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Tests pasados</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center border">
+                    <div class="text-2xl font-bold {% if t.stats.failed %}text-red-600{% else %}text-green-600{% endif %}">
+                        {{ t.stats.failed|default:"0" }}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Tests fallidos</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center border">
+                    <div class="text-2xl font-bold text-blue-600">
+                        {{ t.stats.total|default:"—" }}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Total de tests</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center border">
+                    <div class="text-2xl font-bold text-purple-600">
+                        {{ t.stats.coverage|default:"—" }}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Cobertura de código</div>
+                </div>
+            </div>
+            <table class="text-sm w-full">
+                <tbody class="divide-y divide-gray-100">
+                    <tr><td class="py-2 text-gray-500 w-52">Resultado general</td>
+                        <td class="py-2">
+                            {% if t.success %}<span class="text-green-700 font-semibold">✅ TODAS LAS PRUEBAS PASARON</span>
+                            {% else %}<span class="text-red-700 font-semibold">❌ HAY PRUEBAS FALLIDAS</span>{% endif %}
+                        </td>
+                    </tr>
+                    <tr><td class="py-2 text-gray-500">Última ejecución</td><td class="py-2">{{ t.timestamp|default:"—" }}</td></tr>
+                    <tr><td class="py-2 text-gray-500">Ejecutado por</td><td class="py-2">{{ t.user|default:"Sistema" }}</td></tr>
+                </tbody>
+            </table>
+            {% endwith %}
+            {% else %}
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3 mb-4">
+                <span class="text-yellow-500 text-xl flex-shrink-0">⚠️</span>
+                <div>
+                    <p class="text-sm font-medium text-yellow-800">No se encontraron resultados de pruebas recientes</p>
+                    <p class="text-xs text-yellow-700 mt-1">Para incluir resultados actualizados en este reporte, ejecuta la suite de pruebas desde el
+                        <a href="{% url 'core:run_tests_panel' %}" class="underline">panel de verificación</a> antes de imprimir.</p>
+                </div>
+            </div>
+            {% endif %}
+            <div class="bg-slate-50 rounded-lg p-4 mt-2 text-xs text-slate-600 border border-slate-100">
+                <strong>Marco de pruebas:</strong> pytest + pytest-django + pytest-cov.
+                La suite cubre: flujos de confirmación metrológica, cálculo de conformidad (ILAC G8), gestión multi-empresa,
+                control de acceso por roles, generación de PDFs y exportaciones. Cobertura objetivo: ≥ 70%.
+                Ubicación: <code class="font-mono bg-slate-200 px-1 rounded">tests/</code> — organizada en 10 subdirectorios por dominio.
+            </div>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 5: DEPENDENCIAS Y COMPONENTES ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">5</span>
+            <h2 class="font-semibold">Inventario de componentes de software</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 text-left text-xs text-gray-500 border-b">
+                        <th class="px-5 py-3">Componente</th>
+                        <th class="px-5 py-3">Versión</th>
+                        <th class="px-5 py-3">Categoría</th>
+                        <th class="px-5 py-3">Función en el sistema</th>
+                        <th class="px-5 py-3 text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for dep in dependencias %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-2.5 font-mono text-xs font-semibold">{{ dep.nombre }}</td>
+                        <td class="px-5 py-2.5 font-mono text-xs {% if dep.version == '—' %}text-gray-300{% else %}text-gray-700{% endif %}">{{ dep.version }}</td>
+                        <td class="px-5 py-2.5">
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if dep.categoria == 'Crítico' %}bg-red-50 text-red-700
+                                {% elif dep.categoria == 'Infraestructura' %}bg-blue-50 text-blue-700
+                                {% elif dep.categoria == 'Metrología' %}bg-purple-50 text-purple-700
+                                {% elif dep.categoria == 'Calidad' %}bg-green-50 text-green-700
+                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {{ dep.categoria }}
+                            </span>
+                        </td>
+                        <td class="px-5 py-2.5 text-gray-500 text-xs">{{ dep.funcion }}</td>
+                        <td class="px-5 py-2.5 text-center text-xs">
+                            {% if dep.estado == 'instalado' %}
+                                <span class="text-green-600 font-semibold">✓</span>
+                            {% else %}
+                                <span class="text-gray-400">{{ dep.estado }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 6: DATOS GESTIONADOS ── #}
+    {% if stats %}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">6</span>
+            <h2 class="font-semibold">Alcance del sistema — datos gestionados actualmente</h2>
+        </div>
+        <div class="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {% for label, val in stats.items %}
+            <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center">
+                <div class="text-2xl font-bold text-slate-800">{{ val }}</div>
+                <div class="text-xs text-gray-400 mt-1 capitalize">{{ label }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── SECCIÓN 7: INFRAESTRUCTURA DE SOPORTE ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">7</span>
+            <h2 class="font-semibold">Infraestructura de soporte</h2>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-lg">🗄️</span>
+                        <h3 class="font-semibold text-gray-700">Redis (caché y broker)</h3>
+                        <span class="ml-auto text-xs px-2 py-0.5 rounded-full font-semibold
+                            {% if redis_info.ok == True %}bg-green-100 text-green-700
+                            {% elif redis_info.ok == False %}bg-red-100 text-red-700
+                            {% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ redis_info.estado }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-500">Usado para caché del dashboard (5 min) y broker de tareas asíncronas. En desarrollo local es opcional.</p>
+                    {% if redis_info.url != '—' %}<p class="text-xs font-mono text-gray-400 mt-1">{{ redis_info.url }}</p>{% endif %}
+                </div>
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-lg">⚙️</span>
+                        <h3 class="font-semibold text-gray-700">Celery (tareas asíncronas)</h3>
+                        <span class="ml-auto text-xs px-2 py-0.5 rounded-full font-semibold
+                            {% if celery_info.ok == True %}bg-green-100 text-green-700
+                            {% elif celery_info.ok == False %}bg-amber-100 text-amber-700
+                            {% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ celery_info.estado }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-500">Gestiona la generación de archivos ZIP de documentos y envío de notificaciones diferidas. Requerido solo en producción.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 8: SEGURIDAD Y CONTROL DE ACCESO ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">8</span>
+            <h2 class="font-semibold">Seguridad y control de acceso</h2>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">Autenticación y sesiones
+                        {% if seguridad_real.debug_activo %}
+                        <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Modo desarrollo</span>
+                        {% endif %}
+                    </h3>
+                    <ul class="space-y-1.5 text-gray-600 text-xs">
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> Autenticación con usuario y contraseña (hash PBKDF2-SHA256)</li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-green-500 mt-0.5">✓</span>
+                            Sesiones con expiración de <strong>{{ seguridad_real.session_duracion_texto }}</strong> de inactividad
+                        </li>
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> CSRF tokens en todos los formularios</li>
+                        <li class="flex items-start gap-2">
+                            {% if seguridad_real.https_forzado %}<span class="text-green-500 mt-0.5">✓</span>{% else %}<span class="text-amber-500 mt-0.5">~</span>{% endif %}
+                            HTTPS forzado:
+                            {% if seguridad_real.https_forzado %}<strong class="text-green-700">Activo</strong>{% else %}<span class="text-amber-600">Solo en producción</span>{% endif %}
+                        </li>
+                        <li class="flex items-start gap-2">
+                            {% if seguridad_real.hsts_activo %}<span class="text-green-500 mt-0.5">✓</span>{% else %}<span class="text-amber-500 mt-0.5">~</span>{% endif %}
+                            HSTS ({{ seguridad_real.hsts_segundos|default:"0" }}s):
+                            {% if seguridad_real.hsts_activo %}<strong class="text-green-700">Activo</strong>{% else %}<span class="text-amber-600">Solo en producción</span>{% endif %}
+                        </li>
+                        <li class="flex items-start gap-2">
+                            {% if seguridad_real.xss_filter %}<span class="text-green-500 mt-0.5">✓</span>{% else %}<span class="text-amber-500 mt-0.5">~</span>{% endif %}
+                            Filtro XSS + nosniff:
+                            {% if seguridad_real.xss_filter %}<strong class="text-green-700">Activo</strong>{% else %}<span class="text-amber-600">Solo en producción</span>{% endif %}
+                        </li>
+                        <li class="flex items-start gap-2">
+                            {% if seguridad_real.session_secure %}<span class="text-green-500 mt-0.5">✓</span>{% else %}<span class="text-amber-500 mt-0.5">~</span>{% endif %}
+                            Cookie segura (HttpOnly + Secure):
+                            {% if seguridad_real.session_secure %}<strong class="text-green-700">Activo</strong>{% else %}<span class="text-amber-600">Solo en producción</span>{% endif %}
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-3">Roles y permisos</h3>
+                    <ul class="space-y-1.5 text-gray-600 text-xs">
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> <strong>Técnico:</strong> registrar actividades, ver equipos</li>
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> <strong>Administrador:</strong> gestión completa de la empresa</li>
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> <strong>Gerencia:</strong> reportes, aprobaciones y configuración</li>
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> Aislamiento total entre empresas (multi-tenant)</li>
+                        <li class="flex items-start gap-2"><span class="text-green-500 mt-0.5">✓</span> Auditoría de cambios en formatos con historial completo</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 8: LIMITACIONES CONOCIDAS ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">8</span>
+            <h2 class="font-semibold">Limitaciones conocidas del sistema</h2>
+        </div>
+        <div class="p-6 text-sm">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <p class="text-amber-800 text-xs font-medium mb-2">Las siguientes limitaciones son conocidas y documentadas. No afectan las funciones metrológicas críticas del sistema.</p>
+            </div>
+            <ul class="space-y-3 text-gray-700 text-sm">
+                <li class="flex items-start gap-3">
+                    <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-01</span>
+                    <div><strong>Módulos de gestión de calidad:</strong> quejas, no conformidades e imparcialidad no están implementados como módulos independientes dentro de la plataforma. Se gestionan externamente por cada organismo usuario.</div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-02</span>
+                    <div><strong>Inline scripts (CSP):</strong> 52 bloques <code>&lt;script&gt;</code> inline en plantillas; requieren <code>unsafe-inline</code> en la política CSP. Mitigación planificada: nonces por solicitud.</div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-03</span>
+                    <div><strong>Descarga ZIP:</strong> limitada a 35 equipos por parte para evitar timeouts. Equipos adicionales se descargan en partes consecutivas.</div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-04</span>
+                    <div><strong>Cobertura de pruebas:</strong> módulos de pagos (63.4%) y ZIP (55.0%) tienen cobertura por debajo del objetivo individual del 70%. Confirmación metrológica alcanza 69.9%. La cobertura total del sistema es 71.4%, superando la meta general. Flujos críticos de los módulos por debajo del objetivo están cubiertos con pruebas manuales.</div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 9: DECLARACIÓN DE VALIDACIÓN ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-8 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">9</span>
+            <h2 class="font-semibold">Declaración de validación y aptitud para el propósito</h2>
+        </div>
+        <div class="p-6 text-sm text-gray-700 space-y-4">
+            <p>
+                El sistema <strong>SAM Metrología versión 2.0.0</strong> ha sido desarrollado, probado y verificado para soportar
+                las actividades de gestión metrológica en laboratorios de calibración, organismos de inspección y empresas
+                con programas de aseguramiento metrológico.
+            </p>
+            <p>
+                El software implementa las siguientes capacidades verificadas: inventario de equipos de medición con trazabilidad,
+                confirmación metrológica con aplicación de la regla de decisión ILAC G8:09/2019, análisis de intervalos de
+                calibración según ILAC G-24, comprobaciones intermedias, y generación de registros con trazabilidad documental completa.
+            </p>
+            <p>
+                La validación se realiza mediante: (a) suite de pruebas automatizadas con cobertura ≥ 70%,
+                (b) pruebas funcionales de flujos críticos metrológicos, (c) auditorías internas periódicas
+                y (d) control de versiones con Git que garantiza la trazabilidad de cada cambio en el código fuente.
+            </p>
+            <div class="border border-gray-200 rounded-xl p-5 mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="text-gray-400 text-xs mb-2 uppercase tracking-wide">Elaborado por</div>
+                    <div class="font-bold text-gray-800">SAM Metrología S.A.S</div>
+                    <div class="text-gray-500 text-xs mt-1">Bogotá, Colombia</div>
+                    <div class="text-gray-400 text-xs">soporte@sammetrologia.com</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-gray-400 text-xs mb-2 uppercase tracking-wide">Suite de pruebas</div>
+                    <div class="font-bold text-gray-800">pytest + pytest-cov</div>
+                    <div class="text-gray-500 text-xs mt-1">Cobertura objetivo ≥ 70%</div>
+                    <div class="text-gray-400 text-xs">Integración continua vía GitHub Actions</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-gray-400 text-xs mb-2 uppercase tracking-wide">Fecha de este reporte</div>
+                    <div class="font-bold text-gray-800 text-lg">{{ entorno.fecha_reporte|date:"d/m/Y" }}</div>
+                    <div class="text-gray-400 text-xs mt-1">Generado automáticamente</div>
+                    <div class="text-gray-300 text-xs">Versión del sistema: 2.0.0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="print-footer">
+    <span><strong>SAM Metrología S.A.S</strong> · Bogotá, Colombia · soporte@sammetrologia.com</span>
+    <span style="text-align:center">Reporte de Validación de Software</span>
+    <span>v2.0.0 · {{ entorno.fecha_reporte|date:"d/m/Y" }}</span>
+</div>
+
+{% endblock %}

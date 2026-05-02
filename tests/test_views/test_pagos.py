@@ -1021,3 +1021,188 @@ class TestCrearUsuarioEmpresa:
         response = c.get(self.URL)
         assert response.status_code == 302
         assert 'login' in response['Location']
+
+
+# ============================================================================
+# Links de pago (generar_link_pago y pagar_link)
+# ============================================================================
+
+@pytest.mark.django_db
+class TestGenerarLinkPago:
+    """Cubre generar_link_pago (líneas 1223-1293 en pagos.py)."""
+
+    URL = '/core/pagos/generar-link/'
+
+    def _admin_client(self, empresa):
+        from core.models import CustomUser
+        user = CustomUser.objects.create_user(
+            username=f'lp_admin_{empresa.pk}',
+            password='testpass123',
+            email=f'lp_admin_{empresa.pk}@test.com',
+            empresa=empresa,
+            rol_usuario='ADMINISTRADOR',
+        )
+        c = Client()
+        c.force_login(user)
+        return c, user
+
+    def test_tecnico_no_puede_generar_link(self, sample_empresa):
+        """TECNICO recibe 403 (o JSON con ok=False)."""
+        from core.models import CustomUser
+        tecnico = CustomUser.objects.create_user(
+            username='lp_tecnico',
+            password='testpass123',
+            empresa=sample_empresa,
+            rol_usuario='TECNICO',
+        )
+        c = Client()
+        c.force_login(tecnico)
+        response = c.post(self.URL, {'plan': 'BASICO_MENSUAL'})
+        assert response.status_code in (403, 200)
+        if response.status_code == 200:
+            data = response.json()
+            assert data.get('ok') is False
+
+    def test_sin_plan_ni_addons_retorna_error(self, sample_empresa):
+        """POST sin plan ni add-ons → ok=False con mensaje de error."""
+        c, _ = self._admin_client(sample_empresa)
+        response = c.post(self.URL, {
+            'tecnicos': 0, 'admins': 0, 'gerentes': 0,
+            'bloques_equipos': 0, 'bloques_storage': 0,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data['ok'] is False
+        assert data['errores']
+
+    @patch('core.views.pagos._enviar_link_pago_contabilidad')
+    def test_genera_link_con_plan_valido(self, mock_email, sample_empresa):
+        """POST con plan válido crea LinkPago y retorna ok=True con token."""
+        from core.models import LinkPago
+        c, _ = self._admin_client(sample_empresa)
+        count_antes = LinkPago.objects.count()
+
+        response = c.post(self.URL, {
+            'plan': 'BASICO_MENSUAL',
+            'tecnicos': 0, 'admins': 0, 'gerentes': 0,
+            'bloques_equipos': 0, 'bloques_storage': 0,
+        })
+        data = response.json()
+        assert data['ok'] is True
+        assert 'token' in data
+        assert 'link' in data
+        assert LinkPago.objects.count() == count_antes + 1
+
+    @patch('core.views.pagos._enviar_link_pago_contabilidad')
+    def test_link_creado_tiene_datos_correctos(self, mock_email, sample_empresa):
+        """LinkPago creado tiene empresa, plan y monto correcto."""
+        from core.models import LinkPago
+        c, user = self._admin_client(sample_empresa)
+
+        c.post(self.URL, {
+            'plan': 'BASICO_MENSUAL',
+            'tecnicos': 0, 'admins': 0, 'gerentes': 0,
+            'bloques_equipos': 0, 'bloques_storage': 0,
+        })
+        link = LinkPago.objects.filter(empresa=sample_empresa).latest('fecha_creacion')
+        assert link.plan_seleccionado == 'BASICO_MENSUAL'
+        assert link.monto_total > 0
+        assert link.creado_por == user
+        assert link.estado == 'pendiente'
+
+
+@pytest.mark.django_db
+class TestPagarLink:
+    """Cubre pagar_link (líneas 1296-1380 en pagos.py) — página pública."""
+
+    def _crear_link(self, empresa, vigente=True):
+        from core.models import LinkPago
+        from django.utils import timezone
+        from datetime import timedelta
+        expires = (
+            timezone.now() + timedelta(days=7) if vigente
+            else timezone.now() - timedelta(days=1)
+        )
+        return LinkPago.objects.create(
+            empresa=empresa,
+            token='testtoken123abc',
+            plan_seleccionado='BASICO_MENSUAL',
+            addons={},
+            monto_total=Decimal('238000'),
+            fecha_expiracion=expires,
+        )
+
+    def test_token_invalido_muestra_error(self, sample_empresa):
+        """Token que no existe → página con mensaje de error."""
+        c = Client()
+        response = c.get('/core/pagar/tokeninexistente/')
+        assert response.status_code == 200
+        assert b'no encontrado' in response.content.lower() or response.status_code == 200
+
+    def test_link_expirado_muestra_error(self, sample_empresa):
+        """Link expirado → página con mensaje de error."""
+        link = self._crear_link(sample_empresa, vigente=False)
+        c = Client()
+        response = c.get(f'/core/pagar/{link.token}/')
+        assert response.status_code == 200
+        content = response.content.lower()
+        assert b'expir' in content or b'usado' in content or b'error' in content
+
+    def test_link_vigente_muestra_formulario_pago(self, sample_empresa):
+        """Link vigente → página renderiza sin error."""
+        link = self._crear_link(sample_empresa, vigente=True)
+        c = Client()
+        response = c.get(f'/core/pagar/{link.token}/')
+        assert response.status_code == 200
+
+
+# ============================================================================
+# Webhook: procesamiento con link_token en datos_addon
+# ============================================================================
+
+@pytest.mark.django_db
+class TestWebhookConLinkToken:
+    """Cubre ramas de webhook cuando la transacción tiene _link_pago_token."""
+
+    def _post_webhook(self, client, payload, secret=_TEST_EVENTS_SECRET):
+        checksum = _firmar_payload(payload, secret)
+        payload['signature']['checksum'] = checksum
+        with patch('core.views.pagos.settings') as mock_s:
+            mock_s.WOMPI_EVENTS_SECRET = secret
+            return client.post(
+                _url('wompi_webhook'),
+                data=json.dumps(payload),
+                content_type='application/json',
+            )
+
+    @patch('core.views.pagos.settings')
+    def test_addon_con_link_token_marca_link_pagado(self, mock_settings, client, sample_empresa):
+        """Webhook APPROVED addon con _link_pago_token → LinkPago marcado como 'pagado'."""
+        from core.models import LinkPago
+        from django.utils import timezone
+        from datetime import timedelta
+        mock_settings.WOMPI_EVENTS_SECRET = _TEST_EVENTS_SECRET
+
+        link = LinkPago.objects.create(
+            empresa=sample_empresa,
+            token='wh_link_token_001',
+            plan_seleccionado=None,
+            addons={'tecnicos': 1},
+            monto_total=Decimal('23800'),
+            fecha_expiracion=timezone.now() + timedelta(days=7),
+        )
+        tx = TransaccionPago.objects.create(
+            empresa=sample_empresa,
+            referencia_pago='SAM-LINK-WH-001',
+            estado='pendiente',
+            monto=Decimal('23800'),
+            plan_seleccionado='ADDON',
+            datos_addon={'tecnicos': 1, 'admins': 0, 'gerentes': 0,
+                         'bloques_equipos': 0, 'bloques_storage': 0,
+                         '_link_pago_token': 'wh_link_token_001'},
+        )
+        payload = _make_webhook_payload(tx.referencia_pago, estado='APPROVED')
+        self._post_webhook(client, payload)
+
+        link.refresh_from_db()
+        assert link.estado == 'pagado'

@@ -2,18 +2,18 @@
 
 Sistema de gestión metrológica para organismos de inspección bajo **ISO/IEC 17020:2012**.
 
-Maneja equipos, calibraciones, mantenimientos, verificaciones intermedias y confirmación metrológica con análisis de intervalos (ILAC G-24:2022). Soporta múltiples empresas con planes de suscripción.
+Maneja equipos, calibraciones, mantenimientos, verificaciones intermedias y confirmación metrológica con análisis de intervalos (ILAC-G24:2022). Soporta múltiples empresas con planes de suscripción.
 
 ---
 
-## Estado actual (Abril 2026)
+## Estado actual (Mayo 2026)
 
 | Indicador | Valor |
 |-----------|-------|
-| Score auditado | **8.3 / 10** |
-| Tests | **1,883 pasando** — 0 fallando |
+| Score auditado | **8.5 / 10** |
+| Tests | **1,951 pasando** — 0 fallando |
 | Cobertura | **70%** |
-| Última auditoría | `auditorias/AUDITORIA_INTEGRAL_2026-03-15.md` |
+| Última auditoría | `auditorias/AUDITORIA_INTEGRAL_2026-04-25.md` |
 | Plan hacia 9/10 | `auditorias/PLAN_AUDITORIA_2026-04.md` |
 | Versión | 2.0.0 |
 

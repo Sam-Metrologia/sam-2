@@ -328,11 +328,11 @@ def iniciar_pago(request):
         )
         return redirect('core:editar_perfil_empresa')
 
-    # Activar renovación automática si el cliente marcó el checkbox
-    if request.POST.get('renovacion_automatica'):
-        if not empresa.renovacion_automatica:
-            empresa.renovacion_automatica = True
-            empresa.save(update_fields=['renovacion_automatica'])
+    # Guardar preferencia de renovación automática según el checkbox
+    nueva_ra = bool(request.POST.get('renovacion_automatica'))
+    if empresa.renovacion_automatica != nueva_ra:
+        empresa.renovacion_automatica = nueva_ra
+        empresa.save(update_fields=['renovacion_automatica'])
     integrity_secret = getattr(settings, 'WOMPI_INTEGRITY_SECRET', '')
     public_key = getattr(settings, 'WOMPI_PUBLIC_KEY', '')
 

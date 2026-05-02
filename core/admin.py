@@ -6,8 +6,9 @@ from django.utils.translation import gettext_lazy as _ # Importar para las tradu
 from .models import (
     CustomUser, Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion,
     BajaEquipo, Ubicacion, Procedimiento, Proveedor, ZipRequest, MetricasEficienciaMetrologica,
-    TerminosYCondiciones, AceptacionTerminos, # Nuevos modelos para términos y condiciones
-    PrestamoEquipo, AgrupacionPrestamo # Sistema de préstamos de equipos
+    TerminosYCondiciones, AceptacionTerminos,
+    PrestamoEquipo, AgrupacionPrestamo,
+    EmpresaFormatoLog,
 )
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
@@ -520,3 +521,19 @@ class PrestamoEquipoAdmin(admin.ModelAdmin):
         if not change:  # Solo en creación
             obj.prestado_por = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(EmpresaFormatoLog)
+class EmpresaFormatoLogAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'empresa', 'campo', 'valor_anterior', 'valor_nuevo', 'usuario')
+    list_filter = ('empresa', 'campo', 'fecha')
+    search_fields = ('empresa__nombre', 'campo', 'valor_anterior', 'valor_nuevo', 'usuario__username')
+    readonly_fields = ('empresa', 'campo', 'valor_anterior', 'valor_nuevo', 'usuario', 'fecha')
+    ordering = ('-fecha',)
+    date_hierarchy = 'fecha'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

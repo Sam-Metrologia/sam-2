@@ -1197,3 +1197,21 @@ class PlanSuscripcion(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class EmpresaFormatoLog(models.Model):
+    """Historial de cambios en codificación y versiones de formatos de documentos."""
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='formato_logs')
+    campo = models.CharField(max_length=100)
+    valor_anterior = models.CharField(max_length=200, blank=True, default='')
+    valor_nuevo = models.CharField(max_length=200, blank=True, default='')
+    usuario = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = 'Historial de formato'
+        verbose_name_plural = 'Historial de formatos'
+
+    def __str__(self):
+        return f"{self.empresa} | {self.campo}: {self.valor_anterior} → {self.valor_nuevo}"
