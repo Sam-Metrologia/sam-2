@@ -11,7 +11,7 @@ Maneja equipos, calibraciones, mantenimientos, verificaciones intermedias y conf
 | Indicador | Valor |
 |-----------|-------|
 | Score auditado | **8.5 / 10** |
-| Tests | **1,951 pasando** — 0 fallando |
+| Tests | **1,960 pasando** — 0 fallando |
 | Cobertura | **70%** |
 | Última auditoría | `auditorias/AUDITORIA_INTEGRAL_2026-04-25.md` |
 | Plan hacia 9/10 | `auditorias/PLAN_AUDITORIA_2026-04.md` |

@@ -43,6 +43,19 @@
 
 ---
 
+## [2026-05-02] - Corrección de 3 bugs en confirmaciones metrológicas + tests de regresión
+
+### Corregido
+- **Bug 1 — Gráfica v2 desaparecía en PDF al aprobar** (`core/views/aprobaciones.py:277`): la lógica solo detectaba formato v1 (`'puntos_medicion'` en raíz del JSON). Confirmaciones multi-magnitud (v2, implementadas desde 2026-04-09) perdían todas las gráficas al ser aprobadas por el administrador. Ahora detecta `'magnitudes'` y genera una gráfica por variable antes de regenerar el PDF.
+- **Bug 2 — `fecha_analisis` en PDF salía con fecha del día de generación** (`core/views/confirmacion.py:1111`): `campos_comunes` no incluía `fecha_analisis`, por lo que al recuperar los datos guardados siempre se usaba `datetime.now()`. Ahora `campos_comunes` guarda `fecha_analisis` del formulario del técnico.
+- **Bug 3 — `fecha_analisis` se sobreescribía al abrir el formulario existente** (`core/views/confirmacion.py:486`): al abrir un formulario sin POST (GET), la función no leía `datos_guardados.fecha_analisis` como fallback, poniendo `datetime.now()`. Ahora usa la fecha guardada si existe.
+
+### Tests
+- Nuevo archivo `tests/test_views/test_confirmacion_bugs.py` — **9 tests de regresión** que fallarán automáticamente si cualquiera de estos bugs regresa.
+- Suite total: **1,960 pasando** (antes 1,951) · 1 skipped · 3 xfailed · 0 fallando.
+
+---
+
 ## [2026-03-23] - Chatbot IA "Señor SAM", Perfil Empresa, Modo Oscuro y UX
 
 ### Agregado

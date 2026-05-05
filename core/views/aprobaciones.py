@@ -263,7 +263,7 @@ def aprobar_confirmacion(request, calibracion_id):
         datos_json = calibracion.confirmacion_metrologica_datos
         if datos_json and isinstance(datos_json, dict) and len(datos_json) > 0:
             try:
-                from ..views.confirmacion import _preparar_contexto_confirmacion, _generar_grafica_confirmacion
+                from ..views.confirmacion import _preparar_contexto_confirmacion, _generar_grafica_confirmacion, safe_float
                 from django.template.loader import render_to_string
                 from django.core.files.base import ContentFile
                 from weasyprint import HTML
@@ -273,8 +273,21 @@ def aprobar_confirmacion(request, calibracion_id):
                 equipo = calibracion.equipo
                 context = _preparar_contexto_confirmacion(request, equipo, calibracion, datos_json)
 
-                # Generar gráfica si hay datos
-                if 'puntos_medicion' in datos_json:
+                # Generar gráfica(s) — soporta v1 (puntos_medicion en raíz) y v2 (magnitudes)
+                if 'magnitudes' in datos_json:
+                    # v2: una gráfica por magnitud, embebida en cada entrada de magnitudes_template
+                    mags_context = context.get('datos_confirmacion', {}).get('magnitudes', [])
+                    for i, mag in enumerate(datos_json.get('magnitudes', [])):
+                        puntos_mag = mag.get('puntos_medicion', [])
+                        emp_valor_mag = safe_float(mag.get('emp', 0), 0)
+                        emp_unidad_mag = mag.get('emp_unidad', '%')
+                        unidad_mag = mag.get('unidad', datos_json.get('unidad_equipo', ''))
+                        g = _generar_grafica_confirmacion(puntos_mag, emp_valor_mag, emp_unidad_mag, unidad_mag)
+                        if i < len(mags_context):
+                            mags_context[i]['grafica'] = g
+                    context['grafica_imagen'] = mags_context[0].get('grafica') if mags_context else None
+                elif 'puntos_medicion' in datos_json:
+                    # v1: gráfica única
                     emp_valor = datos_json.get('emp_valor', 0)
                     emp_unidad = datos_json.get('emp_unidad', '%')
                     unidad_equipo = datos_json.get('unidad_equipo', '')

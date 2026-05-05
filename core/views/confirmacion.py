@@ -483,7 +483,13 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
             'numero_serie': datos_confirmacion.get('equipo', {}).get('numero_serie', equipo.numero_serie or 'N/A') if datos_confirmacion else (equipo.numero_serie or 'N/A'),
             'marca': datos_confirmacion.get('equipo', {}).get('marca', equipo.marca or 'N/A') if datos_confirmacion else (equipo.marca or 'N/A'),
             'modelo': datos_confirmacion.get('equipo', {}).get('modelo', equipo.modelo or 'N/A') if datos_confirmacion else (equipo.modelo or 'N/A'),
-            'fecha_analisis': datos_confirmacion.get('equipo', {}).get('fecha_analisis', datetime.now().date()) if datos_confirmacion else datetime.now().date(),
+            'fecha_analisis': (
+                datos_confirmacion.get('equipo', {}).get('fecha_analisis')
+                or datos_confirmacion.get('fecha_analisis')
+            ) if datos_confirmacion else (
+                (datos_guardados.get('fecha_analisis') if datos_guardados else None)
+                or datetime.now().date()
+            ),
         },
         'laboratorio': datos_confirmacion.get('laboratorio', ultima_calibracion.proveedor.nombre_empresa if ultima_calibracion and ultima_calibracion.proveedor else 'N/A') if datos_confirmacion else (ultima_calibracion.proveedor.nombre_empresa if ultima_calibracion and ultima_calibracion.proveedor else 'N/A'),
         'fecha_certificado': datos_confirmacion.get('fecha_certificado', ultima_calibracion.fecha_calibracion if ultima_calibracion else None) if datos_confirmacion else (ultima_calibracion.fecha_calibracion if ultima_calibracion else None),
@@ -1109,6 +1115,7 @@ def generar_pdf_confirmacion(request, equipo_id):
 
         campos_comunes = {
             'fecha_confirmacion': datetime.now().strftime('%Y-%m-%d'),
+            'fecha_analisis': datos_confirmacion.get('equipo', {}).get('fecha_analisis', datetime.now().strftime('%Y-%m-%d')),
             'regla_decision': datos_confirmacion.get('regla_decision', 'guard_band_U'),
             'decision': datos_confirmacion.get('conclusion', {}).get('decision', 'Pendiente'),
             'responsable': datos_confirmacion.get('conclusion', {}).get('responsable', request.user.get_full_name() or request.user.username),

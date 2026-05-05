@@ -12,10 +12,14 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 
 ## Current Status (May 2026)
 
-- **Tests:** 1,951 passing, 1 skipped, 3 xfailed (verificado 2026-05-02)
+- **Tests:** 1,960 passing, 1 skipped, 3 xfailed (verificado 2026-05-02)
 - **Coverage:** 70.00% ✓ (Goal alcanzado)
 - **Score:** 8.5/10 (estimado 2026-04-25) | Audit Plan → `auditorias/PLAN_AUDITORIA_2026-04.md`
 - **Last Audit:** `auditorias/AUDITORIA_INTEGRAL_2026-04-25.md` — 18 hallazgos; 8 corregidos en sesión + 13 corregidos post-sesión (ver sección "Correcciones Post-Sesión" en el archivo de auditoría)
+- **Bugs corregidos (2026-05-02):** 3 bugs en confirmaciones metrológicas → `tests/test_views/test_confirmacion_bugs.py` (9 tests de regresión):
+  1. Gráfica v2 desaparecía en PDF al aprobar (`aprobaciones.py:277` — solo detectaba v1)
+  2. `fecha_analisis` en PDF salía con fecha de hoy (`confirmacion.py:1111` — no se guardaba en `campos_comunes`)
+  3. `fecha_analisis` se sobreescribía al abrir formulario existente (`confirmacion.py:486` — no leía `datos_guardados`)
 - **Models paquete (2026-04):** `core/models.py` dividido en paquete `core/models/` — 12 módulos: `empresa`, `users`, `catalogs`, `equipment`, `activities`, `loans`, `documents`, `payments`, `common`, `system`, `_signals`, `__init__`. Imports sin cambio (`from core.models import Equipo` sigue funcionando).
 - **Préstamos UX (2026-04-24):** Dashboard con secciones colapsables + filtro de búsqueda + chips de equipos disponibles agrupados por familia (clickeables → préstamo directo). Ver `core/templates/core/prestamos/dashboard.html`.
 - **Multi-magnitud (2026-04-09):** Confirmaciones y comprobaciones soportan múltiples variables (tabs). Datos guardados en formato v2 `{magnitudes: [{nombre, unidad, puntos_medicion}]}`. Compatibilidad backward con v1 (`puntos_medicion` en raíz). PDF muestra tabla+gráfica por variable. Gráficas históricas (detalle equipo + hoja de vida) normalizadas por EMP (±1 = límite), una gráfica por variable.
