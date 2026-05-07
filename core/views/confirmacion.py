@@ -96,6 +96,16 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
         y_norm = [e / ea if ea != 0 else 0 for e, ea in zip(errores, emps_abs)]
         u_norm = [u / ea if ea != 0 else 0 for u, ea in zip(incertidumbres, emps_abs)]
 
+        # Ordenar por nominal ascendente — fill_between requiere x monotónico;
+        # si el usuario ingresó los puntos en orden inverso la zona de color queda cruzada
+        if len(nominales) > 1:
+            _ord = sorted(range(len(nominales)), key=lambda i: nominales[i])
+            nominales      = [nominales[i]      for i in _ord]
+            y_norm         = [y_norm[i]         for i in _ord]
+            u_norm         = [u_norm[i]         for i in _ord]
+            emps_abs       = [emps_abs[i]       for i in _ord]
+            puntos_validos = [puntos_validos[i] for i in _ord]
+
         # Detectar si EMP varía entre puntos
         emp_variable = max(emps_abs) / min(emps_abs) > 1.05 if min(emps_abs) > 0 else False
 
@@ -133,7 +143,7 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
         _Z = 0        # zorder zonas
         _ZL = 1       # zorder líneas límite
         _ALFA_EXT = 0.07    # rojo: fuera de ±EMP
-        _ALFA_BANDA = 0.25  # amarillo: banda de guarda (más visible)
+        _ALFA_BANDA = 0.25  # amarillo: banda de guarda
         _ALFA_OK = 0.10     # verde: zona cumple
 
         # Zona roja siempre fuera de ±1 (límite EMP normalizado)
@@ -238,8 +248,7 @@ def _generar_grafica_confirmacion(puntos_medicion, emp_valor, emp_unidad, unidad
             ax.step(nominales, [-1.0] * n_puntos, where='mid',
                    color='#dc2626', linestyle='--', linewidth=2, zorder=2)
             for i, (n, ea) in enumerate(zip(nominales, emps_abs)):
-                emp_tipo = puntos_validos[i].get('emp_tipo', emp_unidad)
-                ax.annotate(f'{ea:.3g} {emp_tipo}', xy=(n, 1.0), xytext=(0, 6),
+                ax.annotate(f'{ea:.3g} {unidad_equipo}', xy=(n, 1.0), xytext=(0, 6),
                            textcoords='offset points', ha='center',
                            fontsize=7, color='darkred')
         else:
