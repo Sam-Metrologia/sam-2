@@ -1499,8 +1499,11 @@
             btn.innerHTML = `${label}`;
             if (magnitudesData.length > 1) {
                 const x = document.createElement('span');
-                x.innerHTML = ' <span class="ml-1 opacity-60 hover:opacity-100 cursor-pointer" onclick="event.stopPropagation();eliminarMagnitud(' + i + ')">✕</span>';
-                btn.appendChild(x.firstChild);
+                x.className = 'ml-2 opacity-50 hover:opacity-100 cursor-pointer font-bold';
+                x.textContent = '✕';
+                x.title = 'Eliminar variable';
+                x.addEventListener('click', (e) => { e.stopPropagation(); eliminarMagnitud(i); });
+                btn.appendChild(x);
             }
             btn.addEventListener('click', () => {
                 guardarTabActual();
