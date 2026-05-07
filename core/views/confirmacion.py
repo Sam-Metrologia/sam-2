@@ -493,11 +493,13 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
             'marca': datos_confirmacion.get('equipo', {}).get('marca', equipo.marca or 'N/A') if datos_confirmacion else (equipo.marca or 'N/A'),
             'modelo': datos_confirmacion.get('equipo', {}).get('modelo', equipo.modelo or 'N/A') if datos_confirmacion else (equipo.modelo or 'N/A'),
             'fecha_analisis': (
-                datos_confirmacion.get('equipo', {}).get('fecha_analisis')
-                or datos_confirmacion.get('fecha_analisis')
+                str(datos_confirmacion.get('equipo', {}).get('fecha_analisis')
+                    or datos_confirmacion.get('fecha_analisis', ''))[:10]
+                or datetime.now().strftime('%Y-%m-%d')
             ) if datos_confirmacion else (
-                (datos_guardados.get('fecha_analisis') if datos_guardados else None)
-                or datetime.now().date()
+                str(datos_guardados.get('fecha_analisis', ''))[:10]
+                if datos_guardados and datos_guardados.get('fecha_analisis')
+                else datetime.now().strftime('%Y-%m-%d')
             ),
         },
         'laboratorio': datos_confirmacion.get('laboratorio', ultima_calibracion.proveedor.nombre_empresa if ultima_calibracion and ultima_calibracion.proveedor else 'N/A') if datos_confirmacion else (ultima_calibracion.proveedor.nombre_empresa if ultima_calibracion and ultima_calibracion.proveedor else 'N/A'),
