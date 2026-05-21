@@ -18,7 +18,7 @@
 }
 
 /* ═══════════════════════════════════════════
-   IMPRESIÓN: documento A4 elegante
+   IMPRESIÓN: documento A4 — 4 páginas exactas
    ═══════════════════════════════════════════ */
 @media print {
 
@@ -31,7 +31,7 @@
 }
 
 /* ── Reset total del layout de base.html ────── */
-html { font-size: 10pt !important; }
+html { font-size: 8.5pt !important; }
 
 body {
     display: block !important;
@@ -40,8 +40,8 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
-    font-size: 10pt !important;
-    line-height: 1.5 !important;
+    font-size: 8.5pt !important;
+    line-height: 1.35 !important;
     color: #1e293b !important;
     font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
 }
@@ -56,7 +56,7 @@ footer.main-footer,
 a[href*="wa.me"],
 .print\:hidden { display: none !important; }
 
-/* ── Contenedor principal: eliminar margen sidebar */
+/* ── Contenedor principal ───────────────────── */
 #main-content, .main-content {
     display: block !important;
     margin: 0 !important;
@@ -81,11 +81,11 @@ a[href*="wa.me"],
 .bg-gradient-to-br {
     background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%) !important;
     border-radius: 3pt !important;
-    margin-bottom: 12pt !important;
-    padding: 18pt 20pt !important;
+    margin-bottom: 6pt !important;
+    padding: 10pt 14pt !important;
     page-break-inside: avoid;
 }
-.bg-white\/10  { background-color: rgba(255,255,255,0.12) !important; border-radius: 3pt !important; }
+.bg-white\/10  { background-color: rgba(255,255,255,0.12) !important; border-radius: 2pt !important; }
 .bg-white\/20  { background-color: rgba(255,255,255,0.22) !important; }
 .text-white    { color: #ffffff !important; }
 .text-blue-200 { color: #bfdbfe !important; }
@@ -95,91 +95,105 @@ a[href*="wa.me"],
 
 /* ── Tarjetas de sección ─────────────────────── */
 .rounded-xl, .rounded-2xl { border-radius: 3pt !important; }
-.overflow-hidden           { overflow: visible !important; }
 .shadow-sm, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
-.mb-6, .mb-8 { margin-bottom: 10pt !important; }
-.mb-5        { margin-bottom: 7pt !important; }
+.mb-6, .mb-8 { margin-bottom: 6pt !important; }
+.mb-5        { margin-bottom: 4pt !important; }
 
-/* Borde visible en tarjetas para dar aspecto de documento */
+/* overflow-hidden: solo restaurar en tablas, no en tarjetas */
+.overflow-hidden { overflow: hidden !important; }
+.overflow-x-auto { overflow: visible !important; }
+
+/* Borde visible en tarjetas */
 .bg-white.rounded-xl {
-    border: 0.75pt solid #94a3b8 !important;
+    border: 0.6pt solid #94a3b8 !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
 }
 
 /* ── Encabezados de sección ──────────────────── */
 .bg-slate-800 {
     background-color: #1e293b !important;
     color: #ffffff !important;
-    padding: 5pt 10pt !important;
+    padding: 3.5pt 8pt !important;
 }
 .bg-slate-800 * { color: #ffffff !important; }
 
 /* ── Padding interno ─────────────────────────── */
-.p-6  { padding: 9pt !important; }
-.p-5  { padding: 7pt !important; }
-.p-4  { padding: 6pt !important; }
-.px-5, .px-6 { padding-left: 9pt !important; padding-right: 9pt !important; }
-.py-3 { padding-top: 4pt !important; padding-bottom: 4pt !important; }
-.py-2 { padding-top: 3pt !important; padding-bottom: 3pt !important; }
+.p-6  { padding: 6pt !important; }
+.p-5  { padding: 5pt !important; }
+.p-4  { padding: 4pt !important; }
+.px-5, .px-6 { padding-left: 6pt !important; padding-right: 6pt !important; }
+.py-3 { padding-top: 3pt !important; padding-bottom: 3pt !important; }
+.py-2 { padding-top: 2pt !important; padding-bottom: 2pt !important; }
 
-/* ── Grids: forzar columnas para A4 ──────────── */
+/* ── Grids ────────────────────────────────────── */
 .grid { display: grid !important; width: 100% !important; box-sizing: border-box !important; }
-.gap-4 { gap: 6pt !important; }
-.gap-3 { gap: 5pt !important; }
-.gap-6 { gap: 8pt !important; }
+.gap-4 { gap: 4pt !important; }
+.gap-3 { gap: 3pt !important; }
+.gap-6 { gap: 5pt !important; }
 
-/* Portada: 4 métricas en fila */
-.grid.mt-6 { grid-template-columns: repeat(4, 1fr) !important; }
-
-/* Sección 1: dos tablas lado a lado */
-.grid.grid-cols-1.md\:grid-cols-2  { grid-template-columns: repeat(2, 1fr) !important; }
-
-/* Sección 6: datos gestionados */
+.grid.mt-6                             { grid-template-columns: repeat(4, 1fr) !important; }
+.grid.grid-cols-1.md\:grid-cols-2      { grid-template-columns: repeat(2, 1fr) !important; }
 .grid.grid-cols-2.sm\:grid-cols-3.lg\:grid-cols-6 { grid-template-columns: repeat(4, 1fr) !important; }
-
-/* Sección 7 y 8: dos columnas */
 .grid.grid-cols-1.md\:grid-cols-2.gap-4,
 .grid.grid-cols-1.md\:grid-cols-2.gap-6 { grid-template-columns: repeat(2, 1fr) !important; }
-
-/* Sección 4: cuatro estadísticas */
-.grid.grid-cols-2.md\:grid-cols-4 { grid-template-columns: repeat(4, 1fr) !important; }
-
-/* Sección 9: declaración */
-.grid.grid-cols-1.md\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+.grid.grid-cols-2.md\:grid-cols-4      { grid-template-columns: repeat(4, 1fr) !important; }
+.grid.grid-cols-1.md\:grid-cols-3      { grid-template-columns: repeat(3, 1fr) !important; }
 
 /* ── Tablas ───────────────────────────────────── */
-.overflow-x-auto { overflow: visible !important; }
 table {
     width: 100% !important;
     border-collapse: collapse !important;
-    font-size: 8.5pt !important;
-    table-layout: auto !important;
+    font-size: 7.5pt !important;
+    table-layout: fixed !important;
     word-break: break-word !important;
+    overflow: hidden !important;
 }
-thead tr {
-    background-color: #f1f5f9 !important;
-    color: #1e293b !important;
-}
+thead tr { background-color: #f1f5f9 !important; color: #1e293b !important; }
 th {
     background-color: #f1f5f9 !important;
     color: #1e293b !important;
     font-weight: 700 !important;
-    padding: 4pt 7pt !important;
-    font-size: 8pt !important;
+    padding: 2.5pt 5pt !important;
+    font-size: 7pt !important;
     border-bottom: 1pt solid #cbd5e1 !important;
     text-align: left !important;
+    overflow: hidden !important;
+    white-space: normal !important;
 }
 td {
-    padding: 3.5pt 7pt !important;
-    font-size: 8.5pt !important;
+    padding: 2pt 5pt !important;
+    font-size: 7.5pt !important;
     border-bottom: 0.5pt solid #e2e8f0 !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
-    vertical-align: top !important;
+    overflow: hidden !important;
+    vertical-align: middle !important;
+    max-width: 0 !important;
 }
 tr { page-break-inside: avoid; }
 thead { display: table-header-group; }
+
+/* ── Badges / pills con ✓ — evitar desbordamiento ── */
+.inline-flex {
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+.rounded-full, [class*="rounded-full"] { border-radius: 999pt !important; }
+span[class*="px-2"] {
+    padding-left: 3pt !important;
+    padding-right: 3pt !important;
+    font-size: 7pt !important;
+    line-height: 1.3 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+}
+.gap-1 { gap: 2pt !important; }
 
 /* ── Colores de fondo ────────────────────────── */
 .bg-green-50   { background-color: #f0fdf4 !important; }
@@ -204,26 +218,22 @@ thead { display: table-header-group; }
 .text-gray-600   { color: #4b5563 !important; }
 .text-slate-800  { color: #1e293b !important; }
 
-/* ── Badges / pills ──────────────────────────── */
-.rounded-full, [class*="rounded-full"] { border-radius: 999pt !important; }
-
 /* ── Saltos de página ────────────────────────── */
 .bg-white.rounded-xl.mb-6 { page-break-inside: auto; }
-.bg-white.rounded-xl.mb-6.overflow-hidden { page-break-inside: avoid; }
 tr, li { page-break-inside: avoid; }
 
-/* ── Footer fijo (repite en cada página) ─────── */
+/* ── Footer fijo ─────────────────────────────── */
 .print-footer {
     display: flex !important;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 18mm;
+    height: 16mm;
     padding: 0 15mm;
     background: #ffffff !important;
     border-top: 0.75pt solid #94a3b8;
-    font-size: 7pt;
+    font-size: 6.5pt;
     color: #64748b;
     justify-content: space-between;
     align-items: center;
@@ -716,6 +726,41 @@ tr, li { page-break-inside: avoid; }
                     <div class="font-bold text-gray-800 text-lg">{{ entorno.fecha_reporte|date:"d/m/Y" }}</div>
                     <div class="text-gray-400 text-xs mt-1">Generado automáticamente</div>
                     <div class="text-gray-300 text-xs">Versión del sistema: 2.0.0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── SECCIÓN 10: FIRMA DEL RESPONSABLE TÉCNICO ── #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-8 overflow-hidden">
+        <div class="bg-slate-800 text-white px-6 py-3 flex items-center gap-3">
+            <span class="bg-white/20 text-xs font-bold px-2 py-1 rounded">10</span>
+            <h2 class="font-semibold">Responsable técnico</h2>
+        </div>
+        <div class="p-6 text-sm text-gray-700">
+            <p class="text-xs text-gray-400 mb-6">
+                El presente reporte fue generado automáticamente por la plataforma SAM Metrología.
+                La firma a continuación certifica que el responsable técnico ha revisado su contenido
+                y lo avala como evidencia objetiva del estado del sistema.
+            </p>
+            <div class="border border-gray-300 rounded-xl p-6 max-w-lg">
+                <div class="space-y-5">
+                    <div>
+                        <div class="text-xs text-gray-400 uppercase tracking-widest mb-1">Nombre</div>
+                        <div class="border-b border-gray-300 pb-1 min-h-[24px]"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 uppercase tracking-widest mb-1">Tarjeta profesional</div>
+                        <div class="border-b border-gray-300 pb-1 min-h-[24px]"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 uppercase tracking-widest mb-1">Firma</div>
+                        <div class="border-b border-gray-300 min-h-[72px]"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 uppercase tracking-widest mb-1">Fecha</div>
+                        <div class="border-b border-gray-300 pb-1 min-h-[24px]"></div>
+                    </div>
                 </div>
             </div>
         </div>

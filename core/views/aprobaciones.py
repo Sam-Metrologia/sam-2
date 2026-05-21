@@ -424,7 +424,8 @@ def aprobar_intervalos(request, calibracion_id):
         # Obtener fechas ajustables del POST (si se proporcionan)
         from datetime import datetime
 
-        # Fecha de realización (por defecto: fecha_calibracion)
+        # Fecha de realización: si no se envía explícitamente, usar fecha_analisis del formulario
+        # de intervalos (que es cuando se hizo el análisis real), no la fecha de calibración
         fecha_realizacion_str = request.POST.get('fecha_realizacion')
         if fecha_realizacion_str:
             try:
@@ -432,7 +433,15 @@ def aprobar_intervalos(request, calibracion_id):
             except ValueError:
                 calibracion.intervalos_fecha_realizacion = calibracion.fecha_calibracion
         else:
-            calibracion.intervalos_fecha_realizacion = calibracion.fecha_calibracion
+            datos_int = calibracion.intervalos_calibracion_datos or {}
+            fecha_analisis_guardada = datos_int.get('equipo', {}).get('fecha_analisis', '')
+            if fecha_analisis_guardada:
+                try:
+                    calibracion.intervalos_fecha_realizacion = datetime.strptime(str(fecha_analisis_guardada)[:10], '%Y-%m-%d').date()
+                except ValueError:
+                    calibracion.intervalos_fecha_realizacion = calibracion.fecha_calibracion
+            else:
+                calibracion.intervalos_fecha_realizacion = calibracion.fecha_calibracion
 
         # Fecha de emisión (por defecto: hoy)
         fecha_emision_str = request.POST.get('fecha_emision')
@@ -510,6 +519,59 @@ def aprobar_intervalos(request, calibracion_id):
                 elif datos_intervalos.get('formato', {}).get('fecha'):
                     formato_fecha_formateada_int = datos_intervalos['formato']['fecha']
 
+                # Recalcular derivas para que el PDF aprobado mantenga el cuadro de análisis
+                from ..views.confirmacion import _calcular_deriva_variable
+                deriva_automatica_aprobacion = None
+                derivas_por_variable_aprobacion = []
+
+                if cal_anterior and calibracion.confirmacion_metrologica_datos and cal_anterior.confirmacion_metrologica_datos:
+                    datos_act = calibracion.confirmacion_metrologica_datos
+                    datos_ant = cal_anterior.confirmacion_metrologica_datos
+                    mags_act = datos_act.get('magnitudes', [])
+                    mags_ant = datos_ant.get('magnitudes', [])
+
+                    if mags_act and mags_ant:
+                        for mag_act in mags_act:
+                            nombre_var = mag_act.get('nombre', '') or ''
+                            unidad_var = mag_act.get('unidad', '') or ''
+                            pts_act = mag_act.get('puntos_medicion', [])
+                            mag_ant = next((m for m in mags_ant if (m.get('nombre') or '') == nombre_var),
+                                          mags_ant[0] if mags_ant else None)
+                            pts_ant = mag_ant.get('puntos_medicion', []) if mag_ant else []
+                            resultado = _calcular_deriva_variable(
+                                pts_act, pts_ant, emp_info,
+                                calibracion.fecha_calibracion, cal_anterior.fecha_calibracion
+                            )
+                            if resultado:
+                                resultado['nombre'] = nombre_var
+                                resultado['unidad'] = unidad_var
+                                resultado['es_mas_restrictiva'] = False
+                                derivas_por_variable_aprobacion.append(resultado)
+                    else:
+                        pts_act = datos_act.get('puntos_medicion', [])
+                        pts_ant = datos_ant.get('puntos_medicion', [])
+                        resultado = _calcular_deriva_variable(
+                            pts_act, pts_ant, emp_info,
+                            calibracion.fecha_calibracion, cal_anterior.fecha_calibracion
+                        )
+                        if resultado:
+                            resultado['nombre'] = ''
+                            resultado['unidad'] = ''
+                            resultado['es_mas_restrictiva'] = False
+                            derivas_por_variable_aprobacion.append(resultado)
+
+                    vars_con_i = [v for v in derivas_por_variable_aprobacion if v.get('intervalo_limitante') is not None]
+                    if vars_con_i:
+                        var_rest = min(vars_con_i, key=lambda v: v['intervalo_limitante'])
+                    elif derivas_por_variable_aprobacion:
+                        var_rest = derivas_por_variable_aprobacion[0]
+                    else:
+                        var_rest = None
+
+                    if var_rest:
+                        var_rest['es_mas_restrictiva'] = True
+                        deriva_automatica_aprobacion = {**var_rest, 'puntos_detalle': var_rest['puntos_detalle']}
+
                 context = {
                     'equipo': equipo,
                     'cal_actual': calibracion,
@@ -519,7 +581,10 @@ def aprobar_intervalos(request, calibracion_id):
                     'logo_empresa_url': logo_empresa_url,
                     'emp_info': emp_info,
                     'datos_intervalos': datos_intervalos,
-                    'deriva_automatica': None,
+                    'deriva_automatica': deriva_automatica_aprobacion,
+                    'derivas_por_variable': derivas_por_variable_aprobacion if len(derivas_por_variable_aprobacion) > 1 else [],
+                    'total_calibraciones': Calibracion.objects.filter(equipo=equipo).count(),
+                    'emp_texto': equipo.error_maximo_permisible or f"{emp_info['valor']} {emp_info['unidad']}",
                 }
 
                 html_string = render_to_string('core/intervalos_calibracion_print.html', context)

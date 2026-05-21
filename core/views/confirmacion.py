@@ -926,6 +926,8 @@ def intervalos_calibracion(request, equipo_id):
         'deriva_automatica': deriva_automatica,
         # Tabla resumen por variable (solo cuando hay múltiples variables)
         'derivas_por_variable': derivas_por_variable if len(derivas_por_variable) > 1 else [],
+        # Datos guardados del análisis previo (para pre-rellenar el formulario)
+        'datos_guardados_intervalos': cal_actual.intervalos_calibracion_datos if cal_actual else None,
 
         # NUEVO: Error máximo para Método 1B
         'error_maximo_info': error_maximo_info,
