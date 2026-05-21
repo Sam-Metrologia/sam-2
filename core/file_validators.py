@@ -3,7 +3,11 @@
 
 import os
 import mimetypes
-import magic
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import hashlib

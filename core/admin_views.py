@@ -993,80 +993,24 @@ def run_tests_panel(request):
             start_time = datetime.now()
 
             if is_production:
-                # EN PRODUCCIÓN: Usar Django test runner (NO requiere pytest)
-                # Primero eliminar base de datos de tests si existe (evita conflictos de esquema)
-                try:
-                    import psycopg2
-                    from urllib.parse import urlparse
-                    import os
+                # EN PRODUCCIÓN: Usar pytest (está en requirements.txt) para encontrar
+                # todos los tests en tests/ igual que en desarrollo
+                cmd = [sys.executable, '-m', 'pytest', 'tests/', '--tb=short']
 
-                    database_url = os.environ.get('DATABASE_URL', '')
-                    if database_url:
-                        parsed = urlparse(database_url)
-                        test_db_name = 'test_' + parsed.path[1:]  # Remove leading '/'
-
-                        # Conectar a base de datos postgres por defecto para eliminar test db
-                        conn = psycopg2.connect(
-                            host=parsed.hostname,
-                            port=parsed.port or 5432,
-                            user=parsed.username,
-                            password=parsed.password,
-                            database='postgres'
-                        )
-                        conn.autocommit = True
-                        cursor = conn.cursor()
-
-                        # CORREGIDO: 2025-10-24 - SQL Injection Prevention
-                        # Usar parametrización segura para prevenir inyección SQL
-                        from psycopg2 import sql
-
-                        # Terminar conexiones activas a la base de datos de tests
-                        # Usar %s para valores, sql.Identifier para nombres de objetos
-                        cursor.execute("""
-                            SELECT pg_terminate_backend(pg_stat_activity.pid)
-                            FROM pg_stat_activity
-                            WHERE pg_stat_activity.datname = %s
-                            AND pid <> pg_backend_pid();
-                        """, [test_db_name])
-
-                        # Eliminar base de datos de tests si existe
-                        # Para nombres de BD, usar sql.Identifier (no se puede parametrizar con %s)
-                        drop_query = sql.SQL("DROP DATABASE IF EXISTS {db_name}").format(
-                            db_name=sql.Identifier(test_db_name)
-                        )
-                        cursor.execute(drop_query)
-                        cursor.close()
-                        conn.close()
-                        logger.info(f'Base de datos de tests {test_db_name} eliminada exitosamente')
-                except Exception as e:
-                    logger.warning(f'No se pudo eliminar base de datos de tests: {e} (se intentará crear de todos modos)')
-
-                # Ejecutar tests
-                cmd = [sys.executable, 'manage.py', 'test', '--noinput']
-
-                # Agregar opciones de Django
+                # Agregar opciones
                 if verbose:
-                    cmd.append('--verbosity=2')
+                    cmd.append('-v')
                 else:
-                    cmd.append('--verbosity=1')
+                    cmd.append('-q')
 
-                # Agregar parallel si está disponible
                 if parallel:
-                    cmd.extend(['--parallel', 'auto'])
+                    cmd.extend(['-n', 'auto'])
 
-                # Filtros por categoría (convertir a formato Django)
+                # Filtros por categoría
                 if test_category != 'all':
-                    # Django usa etiquetas con --tag
-                    category_mapping = {
-                        'unit': 'unit',
-                        'integration': 'integration',
-                        'views': 'views',
-                        'services': 'services'
-                    }
-                    tag = category_mapping.get(test_category, test_category)
-                    cmd.extend(['--tag', tag])
+                    cmd.extend(['-m', test_category])
 
-                logger.info(f'[PRODUCCIÓN] Ejecutando tests con Django runner: {" ".join(cmd)}')
+                logger.info(f'[PRODUCCIÓN] Ejecutando tests con pytest: {" ".join(cmd)}')
 
             else:
                 # EN DESARROLLO: Intentar usar pytest si está disponible
