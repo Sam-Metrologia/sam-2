@@ -243,6 +243,10 @@ def planes(request):
     Accesible para cualquier usuario autenticado; es el punto de entrada al pago.
     """
     empresa = request.user.empresa
+    if not empresa:
+        from django.contrib import messages
+        messages.warning(request, 'Tu cuenta no tiene una empresa asignada. Contacta al administrador.')
+        return redirect('core:dashboard')
     estado_plan = empresa.get_estado_suscripcion_display()
     dias_restantes = empresa.get_dias_restantes_plan()
     # Si dias_restantes es inf (plan sin límite) lo normalizamos a None para el template
