@@ -69,6 +69,7 @@ urlpatterns = [
     path('api/equipos-salud-detalles/', views.get_equipos_salud_detalles, name='get_equipos_salud_detalles'),
     path('exportar_analisis_financiero/', views.exportar_analisis_financiero_excel, name='exportar_analisis_financiero'),
     path('api/chart-details/', views.get_chart_details, name='get_chart_details'),
+    path('api/tortas-rango/', views.tortas_rango, name='tortas_rango'),
 
     # Equipos
     path('', views.home, name='home'), # Listado de equipos como página principal

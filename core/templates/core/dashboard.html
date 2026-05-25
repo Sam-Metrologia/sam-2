@@ -1050,10 +1050,29 @@
         {% endif %}
     </div>
 
+    {# Filtro de rango de meses para tortas #}
+    <div id="filtro-tortas-bar" class="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-wrap items-end gap-4 shadow-sm">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Desde (mes)</label>
+            <input type="month" id="filtro-desde" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Hasta (mes)</label>
+            <input type="month" id="filtro-hasta" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+        <button id="btn-aplicar-filtro" onclick="aplicarFiltroTortas()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
+            Ver reporte
+        </button>
+        <button id="btn-resetear-filtro" onclick="resetearTortas()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-5 py-2 rounded-lg transition-colors hidden">
+            Año actual
+        </button>
+        <span id="filtro-activo-label" class="text-sm text-blue-700 font-medium hidden"></span>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-10">
         {# Gráfica de Torta para Calibraciones #}
         <div class="pie-chart-card p-6 lg:p-8">
-            <h2 class="pie-chart-card-title">Cumplimiento Calibraciones (Año Actual)</h2>
+            <h2 id="titulo-cal" class="pie-chart-card-title">Cumplimiento Calibraciones (Año Actual)</h2>
             <div class="flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/2">
                     <div class="chart-container">
@@ -1073,23 +1092,23 @@
                         <tbody>
                             <tr>
                                 <td>Total Programadas</td>
-                                <td><strong>{{ cal_total_programmed_anual }}</strong></td>
+                                <td><strong id="cal-total">{{ cal_total_programmed_anual }}</strong></td>
                                 <td>100%</td>
                             </tr>
                             <tr>
                                 <td>Realizadas</td>
-                                <td><strong>{{ cal_realized_anual }}</strong></td>
-                                <td><span class="text-green-600 font-semibold">{{ cal_realized_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="cal-realizadas">{{ cal_realized_anual }}</strong></td>
+                                <td><span id="cal-realizadas-pct" class="text-green-600 font-semibold">{{ cal_realized_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                             <tr>
                                 <td>No Cumplidas</td>
-                                <td><strong>{{ cal_no_cumplido_anual }}</strong></td>
-                                <td><span class="text-red-600 font-semibold">{{ cal_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="cal-no-cumplidas">{{ cal_no_cumplido_anual }}</strong></td>
+                                <td><span id="cal-no-cumplidas-pct" class="text-red-600 font-semibold">{{ cal_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                             <tr>
                                 <td>Pendientes</td>
-                                <td><strong>{{ cal_pendiente_anual }}</strong></td>
-                                <td><span class="text-yellow-600 font-semibold">{{ cal_pendiente_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="cal-pendientes">{{ cal_pendiente_anual }}</strong></td>
+                                <td><span id="cal-pendientes-pct" class="text-yellow-600 font-semibold">{{ cal_pendiente_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1104,7 +1123,7 @@
 
         {# NUEVA Gráfica de Torta para Mantenimientos - Cumplimiento #}
         <div class="pie-chart-card p-6 lg:p-8">
-            <h2 class="pie-chart-card-title">Cumplimiento Mantenimientos (Año Actual)</h2>
+            <h2 id="titulo-mant" class="pie-chart-card-title">Cumplimiento Mantenimientos (Año Actual)</h2>
             <div class="flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/2">
                     <div class="chart-container">
@@ -1124,23 +1143,23 @@
                         <tbody>
                             <tr>
                                 <td>Total Programados</td>
-                                <td><strong>{{ mant_total_programmed_anual }}</strong></td>
+                                <td><strong id="mant-total">{{ mant_total_programmed_anual }}</strong></td>
                                 <td>100%</td>
                             </tr>
                             <tr>
                                 <td>Realizados</td>
-                                <td><strong>{{ mant_realized_anual }}</strong></td>
-                                <td><span class="text-green-600 font-semibold">{{ mant_realized_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="mant-realizados">{{ mant_realized_anual }}</strong></td>
+                                <td><span id="mant-realizados-pct" class="text-green-600 font-semibold">{{ mant_realized_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                             <tr>
                                 <td>No Cumplidos</td>
-                                <td><strong>{{ mant_no_cumplido_anual }}</strong></td>
-                                <td><span class="text-red-600 font-semibold">{{ mant_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="mant-no-cumplidos">{{ mant_no_cumplido_anual }}</strong></td>
+                                <td><span id="mant-no-cumplidos-pct" class="text-red-600 font-semibold">{{ mant_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                             <tr>
                                 <td>Pendientes</td>
-                                <td><strong>{{ mant_pendiente_anual }}</strong></td>
-                                <td><span class="text-yellow-600 font-semibold">{{ mant_pendiente_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="mant-pendientes">{{ mant_pendiente_anual }}</strong></td>
+                                <td><span id="mant-pendientes-pct" class="text-yellow-600 font-semibold">{{ mant_pendiente_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1155,7 +1174,7 @@
 
         {# Gráfica de Torta para Comprobaciones #}
         <div class="pie-chart-card p-6 lg:p-8">
-            <h2 class="pie-chart-card-title">Cumplimiento Comprobaciones (Año Actual)</h2>
+            <h2 id="titulo-comp" class="pie-chart-card-title">Cumplimiento Comprobaciones (Año Actual)</h2>
             <div class="flex flex-col lg:flex-row gap-6 items-start">
                 <div class="w-full lg:w-1/2">
                     <div class="chart-container">
@@ -1175,23 +1194,23 @@
                         <tbody>
                             <tr>
                                 <td>Total Programadas</td>
-                                <td><strong>{{ comp_total_programmed_anual }}</strong></td>
+                                <td><strong id="comp-total">{{ comp_total_programmed_anual }}</strong></td>
                                 <td>100%</td>
                             </tr>
                             <tr>
                                 <td>Realizadas</td>
-                                <td><strong>{{ comp_realized_anual }}</strong></td>
-                                <td><span class="text-green-600 font-semibold">{{ comp_realized_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="comp-realizadas">{{ comp_realized_anual }}</strong></td>
+                                <td><span id="comp-realizadas-pct" class="text-green-600 font-semibold">{{ comp_realized_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                             <tr>
                                 <td>No Cumplidas</td>
-                                <td><strong>{{ comp_no_cumplido_anual }}</strong></td>
-                                <td><span class="text-red-600 font-semibold">{{ comp_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="comp-no-cumplidas">{{ comp_no_cumplido_anual }}</strong></td>
+                                <td><span id="comp-no-cumplidas-pct" class="text-red-600 font-semibold">{{ comp_no_cumplido_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                             <tr>
                                 <td>Pendientes</td>
-                                <td><strong>{{ comp_pendiente_anual }}</strong></td>
-                                <td><span class="text-yellow-600 font-semibold">{{ comp_pendiente_anual_percent|floatformat:"0" }}%</span></td>
+                                <td><strong id="comp-pendientes">{{ comp_pendiente_anual }}</strong></td>
+                                <td><span id="comp-pendientes-pct" class="text-yellow-600 font-semibold">{{ comp_pendiente_anual_percent|floatformat:"0" }}%</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1264,6 +1283,9 @@
     </div>
 
 </div>
+
+{# URL API tortas-rango para usar en JavaScript #}
+<div id="tortas-rango-url" style="display:none;" data-url="{% url 'core:tortas_rango' %}"></div>
 
 {# Hidden divs to pass JSON data safely #}
 <div id="calibraciones_torta_labels_json" style="display:none;">{{ calibraciones_torta_labels_json }}</div>
@@ -1654,7 +1676,7 @@
             const calibracionesPieCtx = document.getElementById('calibracionesPieChart').getContext('2d');
             const totalCalibracionesTorta = getTotal(calibracionesTortaData);
 
-            new Chart(calibracionesPieCtx, {
+            window.chartCal = new Chart(calibracionesPieCtx, {
                 type: 'doughnut', // Use doughnut for a modern look
                 data: {
                     labels: calibracionesTortaLabels,
@@ -1724,7 +1746,7 @@
             const mantenimientosCumplimientoPieCtx = document.getElementById('mantenimientosCumplimientoPieChart').getContext('2d');
             const totalMantenimientosTorta = getTotal(mantenimientosCumplimientoTortaData);
 
-            new Chart(mantenimientosCumplimientoPieCtx, {
+            window.chartMant = new Chart(mantenimientosCumplimientoPieCtx, {
                 type: 'doughnut',
                 data: {
                     labels: mantenimientosCumplimientoTortaLabels,
@@ -1795,7 +1817,7 @@
             const mantenimientosTipoPieCtx = document.getElementById('mantenimientosTipoPieChart').getContext('2d');
             const totalMantenimientosTipo = getTotal(mantenimientosTipoData);
 
-            new Chart(mantenimientosTipoPieCtx, {
+            window.chartMantTipo = new Chart(mantenimientosTipoPieCtx, {
                 type: 'doughnut',
                 data: {
                     labels: mantenimientosTipoLabels,
@@ -1855,7 +1877,7 @@
             const comprobacionesPieCtx = document.getElementById('comprobacionesPieChart').getContext('2d');
             const totalComprobacionesTorta = getTotal(comprobacionesTortaData);
 
-            new Chart(comprobacionesPieCtx, {
+            window.chartComp = new Chart(comprobacionesPieCtx, {
                 type: 'doughnut',
                 data: {
                     labels: comprobacionesTortaLabels,
@@ -2956,5 +2978,127 @@
 })();
 </script>
 {% endif %}
+
+<script>
+(function() {
+    const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    function labelMes(yyyymm) {
+        if (!yyyymm) return '';
+        const [y, m] = yyyymm.split('-');
+        return MESES_ES[parseInt(m, 10) - 1] + ' ' + y;
+    }
+
+    function actualizarChart(chart, data) {
+        if (!chart) return;
+        chart.data.datasets[0].data = data;
+        chart.update();
+    }
+
+    function set(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    }
+
+    window.aplicarFiltroTortas = async function() {
+        const desde = document.getElementById('filtro-desde').value;
+        const hasta = document.getElementById('filtro-hasta').value;
+
+        if (!desde || !hasta) {
+            alert('Por favor selecciona ambas fechas.');
+            return;
+        }
+        if (desde > hasta) {
+            alert('El mes de inicio debe ser anterior o igual al mes de fin.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-aplicar-filtro');
+        btn.disabled = true;
+        btn.textContent = 'Cargando...';
+
+        try {
+            const apiUrl = document.getElementById('tortas-rango-url').dataset.url;
+            const empresaSelect = document.querySelector('select[name="empresa_id"]');
+            const empresaId = empresaSelect ? empresaSelect.value : '';
+            let url = `${apiUrl}?desde=${desde}&hasta=${hasta}`;
+            if (empresaId) url += `&empresa_id=${empresaId}`;
+
+            const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                alert('Error: ' + (err.error || 'No se pudo cargar el reporte.'));
+                return;
+            }
+
+            const d = await resp.json();
+
+            // Calibraciones
+            actualizarChart(window.chartCal, [d.cal.cal_realized_anual, d.cal.cal_no_cumplido_anual, d.cal.cal_pendiente_anual]);
+            set('cal-total', d.cal.cal_total_programmed_anual);
+            set('cal-realizadas', d.cal.cal_realized_anual);
+            set('cal-realizadas-pct', d.cal.cal_realized_anual_percent + '%');
+            set('cal-no-cumplidas', d.cal.cal_no_cumplido_anual);
+            set('cal-no-cumplidas-pct', d.cal.cal_no_cumplido_anual_percent + '%');
+            set('cal-pendientes', d.cal.cal_pendiente_anual);
+            set('cal-pendientes-pct', d.cal.cal_pendiente_anual_percent + '%');
+
+            // Mantenimientos cumplimiento
+            actualizarChart(window.chartMant, [d.mant.mant_realized_anual, d.mant.mant_no_cumplido_anual, d.mant.mant_pendiente_anual]);
+            set('mant-total', d.mant.mant_total_programmed_anual);
+            set('mant-realizados', d.mant.mant_realized_anual);
+            set('mant-realizados-pct', d.mant.mant_realized_anual_percent + '%');
+            set('mant-no-cumplidos', d.mant.mant_no_cumplido_anual);
+            set('mant-no-cumplidos-pct', d.mant.mant_no_cumplido_anual_percent + '%');
+            set('mant-pendientes', d.mant.mant_pendiente_anual);
+            set('mant-pendientes-pct', d.mant.mant_pendiente_anual_percent + '%');
+
+            // Mantenimientos por tipo
+            if (window.chartMantTipo && d.mant_tipo) {
+                window.chartMantTipo.data.labels = d.mant_tipo.labels;
+                window.chartMantTipo.data.datasets[0].data = d.mant_tipo.data;
+                window.chartMantTipo.update();
+            }
+
+            // Comprobaciones
+            actualizarChart(window.chartComp, [d.comp.comp_realized_anual, d.comp.comp_no_cumplido_anual, d.comp.comp_pendiente_anual]);
+            set('comp-total', d.comp.comp_total_programmed_anual);
+            set('comp-realizadas', d.comp.comp_realized_anual);
+            set('comp-realizadas-pct', d.comp.comp_realized_anual_percent + '%');
+            set('comp-no-cumplidas', d.comp.comp_no_cumplido_anual);
+            set('comp-no-cumplidas-pct', d.comp.comp_no_cumplido_anual_percent + '%');
+            set('comp-pendientes', d.comp.comp_pendiente_anual);
+            set('comp-pendientes-pct', d.comp.comp_pendiente_anual_percent + '%');
+
+            // Actualizar títulos
+            const rango = `${labelMes(desde)} – ${labelMes(hasta)}`;
+            const titulos = {
+                'titulo-cal': 'Cumplimiento Calibraciones',
+                'titulo-mant': 'Cumplimiento Mantenimientos',
+                'titulo-comp': 'Cumplimiento Comprobaciones',
+            };
+            for (const [id, base] of Object.entries(titulos)) {
+                set(id, `${base} (${rango})`);
+            }
+
+            // Mostrar botón reset y etiqueta
+            document.getElementById('btn-resetear-filtro').classList.remove('hidden');
+            const label = document.getElementById('filtro-activo-label');
+            label.textContent = `Filtrando: ${rango}`;
+            label.classList.remove('hidden');
+
+        } catch (e) {
+            alert('Error de conexión. Por favor intenta de nuevo.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Ver reporte';
+        }
+    };
+
+    window.resetearTortas = function() {
+        location.reload();
+    };
+})();
+</script>
 
 {% endblock content %}

@@ -1508,3 +1508,263 @@ def get_chart_details(request):
         'count': len(result),
         'debug': debug_info
     })
+
+
+def get_projected_activities_for_range(equipos_queryset, activity_type, start_date, end_date, today):
+    """
+    Actividades proyectadas entre start_date y end_date (inclusivo).
+    Misma lógica que get_projected_activities_for_year pero para un rango arbitrario.
+    """
+    from django.db.models import Max
+
+    equipos = list(equipos_queryset)
+    if not equipos:
+        return []
+
+    equipo_ids = [e.id for e in equipos]
+
+    if activity_type == 'calibracion':
+        ultimas = dict(
+            Calibracion.objects.filter(equipo_id__in=equipo_ids)
+            .values('equipo_id')
+            .annotate(u=Max('fecha_calibracion'))
+            .values_list('equipo_id', 'u')
+        )
+        realizadas_set = set(
+            Calibracion.objects.filter(
+                equipo_id__in=equipo_ids,
+                fecha_calibracion__gte=start_date,
+                fecha_calibracion__lte=end_date,
+            ).values_list('equipo_id', 'fecha_calibracion__year', 'fecha_calibracion__month')
+        )
+    elif activity_type == 'comprobacion':
+        ultimas = dict(
+            Comprobacion.objects.filter(equipo_id__in=equipo_ids)
+            .values('equipo_id')
+            .annotate(u=Max('fecha_comprobacion'))
+            .values_list('equipo_id', 'u')
+        )
+        ultimas_cal = dict(
+            Calibracion.objects.filter(equipo_id__in=equipo_ids)
+            .values('equipo_id')
+            .annotate(u=Max('fecha_calibracion'))
+            .values_list('equipo_id', 'u')
+        )
+        realizadas_set = set(
+            Comprobacion.objects.filter(
+                equipo_id__in=equipo_ids,
+                fecha_comprobacion__gte=start_date,
+                fecha_comprobacion__lte=end_date,
+            ).values_list('equipo_id', 'fecha_comprobacion__year', 'fecha_comprobacion__month')
+        )
+    else:
+        return []
+
+    projected_activities = []
+
+    for equipo in equipos:
+        if activity_type == 'calibracion':
+            if not equipo.frecuencia_calibracion_meses:
+                continue
+            freq = int(equipo.frecuencia_calibracion_meses)
+            plan_start_date = ultimas.get(equipo.id) or equipo.fecha_adquisicion
+            if not plan_start_date:
+                continue
+        else:
+            if not equipo.frecuencia_comprobacion_meses:
+                continue
+            freq = int(equipo.frecuencia_comprobacion_meses)
+            plan_start_date = (
+                ultimas.get(equipo.id)
+                or ultimas_cal.get(equipo.id)
+                or equipo.fecha_adquisicion
+            )
+            if not plan_start_date:
+                continue
+
+        if freq <= 0:
+            continue
+
+        fecha_baja = None
+        if equipo.estado == ESTADO_DE_BAJA:
+            if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
+                fecha_baja = equipo.baja_registro.fecha_baja
+                if fecha_baja < start_date:
+                    continue
+            else:
+                continue
+
+        current_date = plan_start_date
+        while current_date < start_date:
+            current_date += relativedelta(months=freq)
+
+        while current_date <= end_date:
+            realizadas = (equipo.id, current_date.year, current_date.month) in realizadas_set
+
+            if realizadas:
+                status = 'Realizado'
+            elif fecha_baja and current_date >= fecha_baja:
+                status = 'No Cumplido'
+            elif current_date < today:
+                status = 'No Cumplido'
+            else:
+                status = 'Pendiente/Programado'
+
+            projected_activities.append({
+                'equipo': equipo,
+                'fecha_programada': current_date,
+                'status': status,
+            })
+
+            current_date += relativedelta(months=freq)
+
+    return projected_activities
+
+
+def get_projected_maintenance_for_range(equipos_queryset, start_date, end_date, today):
+    """
+    Mantenimientos proyectados entre start_date y end_date (inclusivo).
+    """
+    from django.db.models import Max
+
+    equipos = list(equipos_queryset)
+    if not equipos:
+        return []
+
+    equipo_ids = [e.id for e in equipos]
+
+    ultimas_mant = dict(
+        Mantenimiento.objects.filter(equipo_id__in=equipo_ids)
+        .values('equipo_id')
+        .annotate(u=Max('fecha_mantenimiento'))
+        .values_list('equipo_id', 'u')
+    )
+    ultimas_cal = dict(
+        Calibracion.objects.filter(equipo_id__in=equipo_ids)
+        .values('equipo_id')
+        .annotate(u=Max('fecha_calibracion'))
+        .values_list('equipo_id', 'u')
+    )
+    realizados_set = set(
+        Mantenimiento.objects.filter(
+            equipo_id__in=equipo_ids,
+            fecha_mantenimiento__gte=start_date,
+            fecha_mantenimiento__lte=end_date,
+        ).values_list('equipo_id', 'fecha_mantenimiento__year', 'fecha_mantenimiento__month')
+    )
+
+    projected_maintenances = []
+
+    for equipo in equipos:
+        if not equipo.frecuencia_mantenimiento_meses:
+            continue
+
+        plan_start_date = (
+            ultimas_mant.get(equipo.id)
+            or ultimas_cal.get(equipo.id)
+            or equipo.fecha_adquisicion
+        )
+        if not plan_start_date:
+            continue
+
+        freq = int(equipo.frecuencia_mantenimiento_meses)
+        if freq <= 0:
+            continue
+
+        fecha_baja = None
+        if equipo.estado == ESTADO_DE_BAJA:
+            if hasattr(equipo, 'baja_registro') and equipo.baja_registro:
+                fecha_baja = equipo.baja_registro.fecha_baja
+                if fecha_baja < start_date:
+                    continue
+            else:
+                continue
+
+        current_date = plan_start_date
+        while current_date < start_date:
+            current_date += relativedelta(months=freq)
+
+        while current_date <= end_date:
+            realizados = (equipo.id, current_date.year, current_date.month) in realizados_set
+
+            if realizados:
+                status = 'Realizado'
+            elif fecha_baja and current_date >= fecha_baja:
+                status = 'No Cumplido'
+            elif current_date < today:
+                status = 'No Cumplido'
+            else:
+                status = 'Pendiente/Programado'
+
+            projected_maintenances.append({
+                'equipo': equipo,
+                'fecha_programada': current_date,
+                'status': status,
+            })
+
+            current_date += relativedelta(months=freq)
+
+    return projected_maintenances
+
+
+@login_required
+def tortas_rango(request):
+    """
+    API: retorna datos para las 4 gráficas de torta filtradas por rango de meses.
+    GET params: desde=YYYY-MM, hasta=YYYY-MM
+    """
+    import calendar as _calendar
+    from collections import defaultdict
+
+    desde_str = request.GET.get('desde', '')
+    hasta_str = request.GET.get('hasta', '')
+
+    if not desde_str or not hasta_str:
+        return JsonResponse({'error': 'Parámetros desde y hasta son requeridos'}, status=400)
+
+    try:
+        desde_year, desde_month = map(int, desde_str.split('-'))
+        hasta_year, hasta_month = map(int, hasta_str.split('-'))
+        start_date = date(desde_year, desde_month, 1)
+        last_day = _calendar.monthrange(hasta_year, hasta_month)[1]
+        end_date = date(hasta_year, hasta_month, last_day)
+    except (ValueError, AttributeError):
+        return JsonResponse({'error': 'Formato inválido. Use YYYY-MM'}, status=400)
+
+    if start_date > end_date:
+        return JsonResponse({'error': 'El mes de inicio debe ser anterior al mes de fin'}, status=400)
+
+    today = date.today()
+    user = request.user
+
+    selected_company_id = request.GET.get('empresa_id')
+    empresas_disponibles = Empresa.objects.filter(is_deleted=False)
+    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
+    equipos_para_dashboard = equipos_queryset.select_related('baja_registro')
+
+    projected_cal = get_projected_activities_for_range(equipos_para_dashboard, 'calibracion', start_date, end_date, today)
+    projected_comp = get_projected_activities_for_range(equipos_para_dashboard, 'comprobacion', start_date, end_date, today)
+    projected_mant = get_projected_maintenance_for_range(equipos_para_dashboard, start_date, end_date, today)
+
+    cal_data = _process_projected_activities_for_pie(projected_cal, 'cal')
+    comp_data = _process_projected_activities_for_pie(projected_comp, 'comp')
+    mant_data = _process_projected_activities_for_pie(projected_mant, 'mant')
+
+    mant_tipo_counts = defaultdict(int)
+    for mant in Mantenimiento.objects.filter(
+        equipo__in=equipos_para_dashboard,
+        fecha_mantenimiento__gte=start_date,
+        fecha_mantenimiento__lte=end_date,
+    ):
+        mant_tipo_counts[mant.tipo_mantenimiento] += 1
+
+    return JsonResponse({
+        'cal': cal_data,
+        'comp': comp_data,
+        'mant': mant_data,
+        'mant_tipo': {
+            'labels': list(mant_tipo_counts.keys()),
+            'data': list(mant_tipo_counts.values()),
+        },
+        'rango': {'desde': desde_str, 'hasta': hasta_str},
+    })
