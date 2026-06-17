@@ -401,6 +401,22 @@ def crear_usuario_empresa(request):
 # COMPANY PLAN MANAGEMENT
 # =============================================================================
 
+@login_required
+@superuser_required
+def toggle_modulo_prestamos(request, empresa_id):
+    """Activa o desactiva el módulo de préstamos para una empresa (solo superusuarios)."""
+    if request.method != 'POST':
+        return redirect('core:detalle_empresa', pk=empresa_id)
+
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    empresa.modulo_prestamos_activo = not empresa.modulo_prestamos_activo
+    empresa.save(update_fields=['modulo_prestamos_activo'])
+
+    estado = 'habilitado' if empresa.modulo_prestamos_activo else 'deshabilitado'
+    messages.success(request, f'Módulo de préstamos {estado} para {empresa.nombre}.')
+    return redirect('core:detalle_empresa', pk=empresa_id)
+
+
 @monitor_view
 @access_check
 @login_required
