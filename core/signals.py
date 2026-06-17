@@ -142,3 +142,14 @@ def crear_onboarding_para_trial(sender, instance, created, **kwargs):
             and instance.empresa
             and getattr(instance.empresa, 'es_periodo_prueba', False)):
         OnboardingProgress.objects.get_or_create(usuario=instance)
+
+
+@receiver(post_save, sender=CustomUser)
+def asignar_permisos_al_crear_usuario(sender, instance, created, **kwargs):
+    """Asigna permisos según el rol automáticamente cuando se crea un usuario nuevo."""
+    if created and not instance.is_superuser:
+        try:
+            from core.views.registro import asignar_permisos_por_rol
+            asignar_permisos_por_rol(instance)
+        except Exception as e:
+            logger.error(f"Error asignando permisos al usuario '{instance.username}': {e}")

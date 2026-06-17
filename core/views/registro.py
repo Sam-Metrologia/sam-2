@@ -53,6 +53,8 @@ PERMISOS_ADMINISTRADOR = PERMISOS_TECNICO + [
     'add_proveedor', 'change_proveedor', 'delete_proveedor',
     'add_procedimiento', 'change_procedimiento', 'delete_procedimiento',
     'can_add_prestamo', 'can_change_prestamo',
+    # Ubicaciones (requerido por companies.py)
+    'view_ubicacion', 'add_ubicacion', 'change_ubicacion', 'delete_ubicacion',
 ]
 
 # Gerencia tiene los mismos permisos que admin; el acceso extra se maneja con flags
@@ -67,7 +69,10 @@ def asignar_permisos_por_rol(user):
         'GERENCIA': PERMISOS_GERENCIA,
     }
     codenames = mapa.get(user.rol_usuario, PERMISOS_TECNICO)
-    permisos = Permission.objects.filter(codename__in=codenames)
+    permisos = Permission.objects.filter(
+        codename__in=codenames,
+        content_type__app_label='core',
+    )
     user.user_permissions.set(permisos)
 
 

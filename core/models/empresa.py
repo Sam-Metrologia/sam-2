@@ -292,6 +292,11 @@ class Empresa(models.Model):
     )
 
     acceso_manual_activo = models.BooleanField(default=False, verbose_name="Acceso Manual Activo")
+    modulo_prestamos_activo = models.BooleanField(
+        default=True,
+        verbose_name="Módulo de Préstamos Activo",
+        help_text="Activa o desactiva el módulo de préstamos de equipos para esta empresa. Útil para ocultarlo durante auditorías."
+    )
     estado_suscripcion = models.CharField(
         max_length=50,
         choices=[('Activo', 'Activo'), ('Expirado', 'Expirado'), ('Cancelado', 'Cancelado')],

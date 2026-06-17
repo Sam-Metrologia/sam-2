@@ -1041,7 +1041,7 @@
         </div>
 
         {# Préstamos Activos - CLICKEABLE #}
-        {% if perms.core.can_view_prestamo %}
+        {% if perms.core.can_view_prestamo and user.is_superuser or perms.core.can_view_prestamo and user.empresa.modulo_prestamos_activo %}
         <a href="{% url 'core:dashboard_prestamos' %}" class="info-card prestamos-activos {% if total_prestamos_activos > 0 %}bg-teal-100 hover:bg-teal-200{% else %}hover:bg-gray-100{% endif %} transition-colors cursor-pointer block no-underline">
             <h3>🤝 Préstamos Activos</h3>
             <p class="{% if total_prestamos_activos > 0 %}text-teal-700{% else %}text-gray-800{% endif %}">{{ total_prestamos_activos }}</p>

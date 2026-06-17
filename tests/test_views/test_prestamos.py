@@ -363,6 +363,8 @@ class PrestamoViewsTest(TestCase):
             password='pass123',
             empresa=self.empresa1
         )
+        # Limpiar permisos explícitamente para simular usuario sin acceso
+        user_sin_permiso.user_permissions.clear()
 
         self.client.login(username='sinpermiso', password='pass123')
 

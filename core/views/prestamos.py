@@ -12,6 +12,20 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import HttpResponseForbidden
+from functools import wraps
+
+
+def prestamos_module_required(view_func):
+    """Bloquea el acceso al módulo de préstamos si está deshabilitado para la empresa."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_superuser:
+            empresa = getattr(request.user, 'empresa', None)
+            if not empresa or not getattr(empresa, 'modulo_prestamos_activo', True):
+                messages.warning(request, 'El módulo de préstamos está deshabilitado temporalmente.')
+                return redirect('core:dashboard')
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 from ..models import PrestamoEquipo, AgrupacionPrestamo, Equipo
 from ..forms import PrestamoEquipoForm, DevolucionEquipoForm, EditarPrestamoForm
@@ -23,6 +37,7 @@ from ..constants import (
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def listar_prestamos(request):
     """
@@ -80,6 +95,7 @@ def listar_prestamos(request):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_add_prestamo', raise_exception=True)
 def crear_prestamo(request):
     """
@@ -198,6 +214,7 @@ def crear_prestamo(request):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def detalle_prestamo(request, pk):
     """
@@ -237,6 +254,7 @@ def detalle_prestamo(request, pk):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_change_prestamo', raise_exception=True)
 def devolver_equipo(request, pk):
     """
@@ -298,6 +316,7 @@ def devolver_equipo(request, pk):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def dashboard_prestamos(request):
     """
@@ -418,6 +437,7 @@ def dashboard_prestamos(request):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def historial_equipo(request, equipo_id):
     """
@@ -466,6 +486,7 @@ def historial_equipo(request, equipo_id):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_change_prestamo', raise_exception=True)
 def editar_grupo_prestamos(request, prestamo_pk):
     """
@@ -523,6 +544,7 @@ def editar_grupo_prestamos(request, prestamo_pk):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_change_prestamo', raise_exception=True)
 def devolver_todos(request, prestamo_pk):
     """
@@ -584,6 +606,7 @@ def devolver_todos(request, prestamo_pk):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def equipos_disponibles(request):
     """
@@ -611,6 +634,7 @@ def equipos_disponibles(request):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_change_prestamo', raise_exception=True)
 def editar_prestamo(request, pk):
     """
@@ -650,6 +674,7 @@ def editar_prestamo(request, pk):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_change_prestamo', raise_exception=True)
 def cancelar_prestamo(request, pk):
     """
@@ -685,6 +710,7 @@ def cancelar_prestamo(request, pk):
 
 @access_check
 @login_required
+@prestamos_module_required
 @permission_required('core.can_view_prestamo', raise_exception=True)
 def equipos_prestados(request):
     """

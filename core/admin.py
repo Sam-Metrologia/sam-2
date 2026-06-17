@@ -66,9 +66,13 @@ class EmpresaAdmin(admin.ModelAdmin):
         (None, {
             'fields': ('nombre', 'nit', 'direccion', 'telefono', 'email', 'logo_empresa')
         }),
-        ('Información de Formato', { # Nuevo fieldset para los campos de formato
+        ('Módulos', {
+            'fields': ('modulo_prestamos_activo',),
+            'description': 'Activa o desactiva módulos del sistema para esta empresa.',
+        }),
+        ('Información de Formato', {
             'fields': ('formato_version_empresa', 'formato_fecha_version_empresa', 'formato_codificacion_empresa'),
-            'classes': ('collapse',), # Opcional: hacer que este fieldset sea colapsable
+            'classes': ('collapse',),
         }),
     )
 
