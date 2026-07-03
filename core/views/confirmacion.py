@@ -618,12 +618,13 @@ def _calcular_deriva_variable(puntos_actual, puntos_anterior, emp_info, fecha_ac
     emp_unidad = emp_info['unidad']
 
     puntos_coincidentes = []
+    puntos_anterior_disponibles = list(puntos_anterior)
     for p_actual in puntos_actual:
         nominal_actual = p_actual.get('nominal')
         if nominal_actual is None:
             continue
-        mejor_match, mejor_dif = None, float('inf')
-        for p_anterior in puntos_anterior:
+        mejor_match, mejor_dif, mejor_idx = None, float('inf'), None
+        for idx, p_anterior in enumerate(puntos_anterior_disponibles):
             nominal_anterior = p_anterior.get('nominal')
             if nominal_anterior is None:
                 continue
@@ -632,7 +633,9 @@ def _calcular_deriva_variable(puntos_actual, puntos_anterior, emp_info, fecha_ac
             if dif_rel < mejor_dif and dif_rel <= 0.05:
                 mejor_match = p_anterior
                 mejor_dif = dif_rel
+                mejor_idx = idx
         if mejor_match:
+            puntos_anterior_disponibles.pop(mejor_idx)
             puntos_coincidentes.append({
                 'nominal': nominal_actual,
                 'desviacion_actual': p_actual.get('desviacion_abs', 0),
