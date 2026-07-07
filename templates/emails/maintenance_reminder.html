@@ -1,69 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Recordatorio de Mantenimiento - {{ site_name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordatorio de Mantenimiento - SAM Metrología</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #fd7e14; color: white; padding: 20px; border-radius: 8px; text-align: center; }
-        .content { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .urgent { background: #dc3545; color: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .high { background: #fd7e14; color: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .medium { background: #ffc107; color: #212529; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .equipment-details { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .footer { text-align: center; color: #6c757d; font-size: 14px; margin-top: 20px; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 20px; background-color: #eef2f7; }
+        .wrapper { max-width: 620px; margin: 0 auto; }
+        .container { border: 1px solid #e1e1e1; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.07); }
+        .header { background-color: #003366 !important; padding: 26px 30px; text-align: center; }
+        .header img { width: 68px; height: 68px; border-radius: 50%; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .header h1 { color: #ffffff !important; margin: 0 0 4px 0; font-size: 19px; letter-spacing: 1.5px; font-weight: 700; }
+        .header p { color: rgba(255,255,255,0.82) !important; margin: 0; font-size: 13px; }
+        .content { padding: 30px 35px; background-color: #ffffff; }
+        .empresa-badge { background-color: #eef2f7 !important; border-left: 4px solid #003366; padding: 11px 15px; border-radius: 0 6px 6px 0; margin-bottom: 22px; font-size: 13.5px; color: #444; }
+        .empresa-badge strong { color: #003366; }
+        .equipo-card { border: 1px solid #e0e7ef; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+        .equipo-card-header { background-color: #d35400 !important; color: #fff !important; padding: 10px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+        .equipo-card-body { padding: 14px 16px; }
+        .equipo-row { display: table; width: 100%; padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 13.5px; }
+        .equipo-row:last-child { border-bottom: none; }
+        .eq-label { display: table-cell; color: #777; width: 40%; }
+        .eq-value { display: table-cell; color: #222; font-weight: 600; }
+        .fecha-card { border: 1px solid #e0e7ef; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+        .fecha-card-header { background-color: #d35400 !important; color: #fff !important; padding: 10px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+        .fecha-card-body { padding: 14px 16px; }
+        .fecha-row { display: table; width: 100%; padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 13.5px; }
+        .fecha-row:last-child { border-bottom: none; }
+        .alert-bar { padding: 14px 18px; border-radius: 6px; margin-bottom: 18px; font-size: 14px; }
+        .alert-critical { background-color: #fdf2f2 !important; border-left: 4px solid #dc3545; color: #721c24; }
+        .alert-high     { background-color: #fff8f0 !important; border-left: 4px solid #e67e22; color: #7d3c00; }
+        .alert-medium   { background-color: #f0faf4 !important; border-left: 4px solid #27ae60; color: #1a5c35; }
+        .cuerpo-texto { font-size: 13.5px; color: #444; margin-bottom: 12px; }
+        .footer { background-color: #1a1a1a !important; padding: 20px 30px; text-align: center; }
+        .footer p { color: #999 !important; font-size: 11.5px; margin: 0 0 4px 0; }
+        .footer a { color: #aaa; text-decoration: none; }
     </style>
 </head>
 <body>
+<div class="wrapper">
+<div class="container">
+
     <div class="header">
-        <h1>🔧 Recordatorio de Mantenimiento</h1>
-        <h2>{{ site_name }}</h2>
+        <img src="https://sammetrologia.com/assets/images/logo.png" alt="SAM Metrología" onerror="this.style.display='none'">
+        <h1>SAM METROLOGÍA</h1>
+        <p>Recordatorio de Mantenimiento</p>
     </div>
 
     <div class="content">
-        <p>Estimado cliente,</p>
-        
-        <p>Le informamos que el siguiente equipo tiene un mantenimiento proximo a vencer:</p>
 
-        <div class="equipment-details">
-            <h3>📋 Detalles del Equipo</h3>
-            <ul>
-                <li><strong>Codigo:</strong> {{ equipo.codigo_interno }}</li>
-                <li><strong>Nombre:</strong> {{ equipo.nombre }}</li>
-                <li><strong>Marca:</strong> {{ equipo.marca }}</li>
-                <li><strong>Modelo:</strong> {{ equipo.modelo }}</li>
-                <li><strong>Serie:</strong> {{ equipo.numero_serie }}</li>
-            </ul>
-        </div>
-
-        <div class="equipment-details">
-            <h3>🗓️ Informacion de Mantenimiento</h3>
-            <ul>
-                <li><strong>Fecha de vencimiento:</strong> {{ due_date|date:"d/m/Y" }}</li>
-                <li><strong>Dias restantes:</strong> {{ days_until_due }}</li>
-            </ul>
+        <div class="empresa-badge">
+            Empresa: <strong>{{ empresa.nombre }}</strong>
         </div>
 
         {% if urgency_level == "critical" %}
-        <div class="urgent">
-            <strong>⚠️ ATENCION:</strong> El mantenimiento ha VENCIDO. Es necesario tomar accion inmediata.
+        <div class="alert-bar alert-critical">
+            <strong>Atención:</strong> El mantenimiento de este equipo ya ha VENCIDO. Se requiere acción inmediata.
         </div>
         {% elif urgency_level == "high" %}
-        <div class="high">
-            <strong>🚨 URGENTE:</strong> El mantenimiento vence en menos de 3 dias.
+        <div class="alert-bar alert-high">
+            <strong>Urgente:</strong> El mantenimiento vence en menos de 3 días. Coordine lo antes posible.
         </div>
         {% elif urgency_level == "medium" %}
-        <div class="medium">
-            <strong>⏰ IMPORTANTE:</strong> El mantenimiento vence en menos de 7 dias.
+        <div class="alert-bar alert-medium">
+            <strong>Aviso:</strong> El mantenimiento vence en menos de 7 días. Planifique con anticipación.
         </div>
         {% endif %}
 
-        <p>Por favor, coordine el mantenimiento lo antes posible para asegurar el funcionamiento optimo del equipo.</p>
+        <p class="cuerpo-texto">Le informamos que el siguiente equipo tiene un mantenimiento próximo a vencer:</p>
+
+        <div class="equipo-card">
+            <div class="equipo-card-header">Detalles del Equipo</div>
+            <div class="equipo-card-body">
+                <div class="equipo-row">
+                    <span class="eq-label">Código</span>
+                    <span class="eq-value">{{ equipo.codigo_interno }}</span>
+                </div>
+                <div class="equipo-row">
+                    <span class="eq-label">Nombre</span>
+                    <span class="eq-value">{{ equipo.nombre }}</span>
+                </div>
+                <div class="equipo-row">
+                    <span class="eq-label">Marca</span>
+                    <span class="eq-value">{{ equipo.marca|default:"—" }}</span>
+                </div>
+                <div class="equipo-row">
+                    <span class="eq-label">Modelo</span>
+                    <span class="eq-value">{{ equipo.modelo|default:"—" }}</span>
+                </div>
+                <div class="equipo-row">
+                    <span class="eq-label">Serie</span>
+                    <span class="eq-value">{{ equipo.numero_serie|default:"—" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="fecha-card">
+            <div class="fecha-card-header">Información de Mantenimiento</div>
+            <div class="fecha-card-body">
+                <div class="fecha-row">
+                    <span class="eq-label">Fecha de vencimiento</span>
+                    <span class="eq-value">{{ due_date|date:"d/m/Y" }}</span>
+                </div>
+                <div class="fecha-row">
+                    <span class="eq-label">Días restantes</span>
+                    <span class="eq-value">{{ days_until_due }}</span>
+                </div>
+            </div>
+        </div>
+
+        <p class="cuerpo-texto">Por favor coordine el mantenimiento a la brevedad posible para asegurar el funcionamiento óptimo del equipo.</p>
+
     </div>
 
     <div class="footer">
-        <p>{{ site_name }} - Sistema de Gestion de Metrologia</p>
-        <p>{{ empresa.nombre }}</p>
+        <p><strong style="color:#ccc;">SAM Metrología | Gestión Metrológica 4.0</strong></p>
+        <p>Colombia — <a href="https://sammetrologia.com">sammetrologia.com</a> — direccion@sammetrologia.com</p>
+        <p style="margin-top: 8px;">Este es un correo automático generado por la Plataforma SAM.</p>
     </div>
+
+</div>
+</div>
 </body>
 </html>

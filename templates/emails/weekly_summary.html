@@ -1,93 +1,135 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Resumen Semanal - {{ site_name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen Semanal - SAM Metrología</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #007bff; color: white; padding: 20px; border-radius: 8px; text-align: center; }
-        .content { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .section { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .urgent-section { border-left: 5px solid #dc3545; }
-        .upcoming-section { border-left: 5px solid #ffc107; }
-        .equipment-list { list-style: none; padding: 0; }
-        .equipment-item { padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 3px; }
-        .footer { text-align: center; color: #6c757d; font-size: 14px; margin-top: 20px; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 20px; background-color: #eef2f7; }
+        .wrapper { max-width: 620px; margin: 0 auto; }
+        .container { border: 1px solid #e1e1e1; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.07); }
+        .header { background-color: #003366 !important; padding: 26px 30px; text-align: center; }
+        .header img { width: 68px; height: 68px; border-radius: 50%; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .header h1 { color: #ffffff !important; margin: 0 0 4px 0; font-size: 19px; letter-spacing: 1.5px; font-weight: 700; }
+        .header p { color: rgba(255,255,255,0.82) !important; margin: 0; font-size: 13px; }
+        .content { padding: 30px 35px; background-color: #ffffff; }
+        .empresa-badge { background-color: #eef2f7 !important; border-left: 4px solid #003366; padding: 11px 15px; border-radius: 0 6px 6px 0; margin-bottom: 22px; font-size: 13.5px; color: #444; }
+        .empresa-badge strong { color: #003366; }
+        .section { border: 1px solid #e0e7ef; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+        .section-header { padding: 10px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #fff !important; display: table; width: 100%; }
+        .sh-inner { display: table-cell; vertical-align: middle; }
+        .sh-urgent { background-color: #c0392b !important; }
+        .sh-upcoming { background-color: #003366 !important; }
+        .equipment-list { list-style: none; padding: 0; margin: 0; }
+        .equipment-item { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; display: table; width: 100%; font-size: 13.5px; }
+        .equipment-item:last-child { border-bottom: none; }
+        .eq-info { display: table-cell; vertical-align: middle; }
+        .eq-date { display: table-cell; vertical-align: middle; text-align: right; white-space: nowrap; }
+        .date-pill { font-size: 12px; padding: 3px 9px; border-radius: 4px; font-weight: 600; }
+        .date-pill.urgent   { background-color: #fdf2f2 !important; color: #c0392b; }
+        .date-pill.upcoming { background-color: #eef2f7 !important; color: #495057; }
+        .eq-empty { padding: 12px 16px; font-size: 13px; color: #27ae60; font-style: italic; }
+        .report-date { font-size: 12px; color: #999; margin-top: 18px; text-align: right; }
+        .footer { background-color: #1a1a1a !important; padding: 20px 30px; text-align: center; }
+        .footer p { color: #999 !important; font-size: 11.5px; margin: 0 0 4px 0; }
+        .footer a { color: #aaa; text-decoration: none; }
     </style>
 </head>
 <body>
+<div class="wrapper">
+<div class="container">
+
     <div class="header">
-        <h1>📊 Resumen Semanal</h1>
-        <h2>{{ site_name }}</h2>
+        <img src="https://sammetrologia.com/assets/images/logo.png" alt="SAM Metrología" onerror="this.style.display='none'">
+        <h1>SAM METROLOGÍA</h1>
+        <p>Resumen Semanal de Actividades</p>
     </div>
 
     <div class="content">
-        <p>Estimado cliente,</p>
-        
-        <p>A continuacion se presenta el resumen semanal de actividades pendientes para <strong>{{ empresa.nombre }}</strong>.</p>
 
-        <div class="section urgent-section">
-            <h3>🚨 Calibraciones Urgentes (Proximos 7 dias)</h3>
+        <div class="empresa-badge">
+            Empresa: <strong>{{ empresa.nombre }}</strong>
+        </div>
+
+        <!-- CALIBRACIONES URGENTES -->
+        <div class="section">
+            <div class="section-header sh-urgent">
+                <span class="sh-inner">Calibraciones Urgentes — Próximos 7 días</span>
+            </div>
             <ul class="equipment-list">
                 {% for equipo in equipos_calibracion_urgente %}
                 <li class="equipment-item">
-                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
-                    <span style="color: #dc3545;">Vence: {{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
+                    <div class="eq-info"><strong>{{ equipo.codigo_interno }}</strong> — {{ equipo.nombre }}</div>
+                    <div class="eq-date"><span class="date-pill urgent">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</span></div>
                 </li>
                 {% empty %}
-                <li class="equipment-item" style="color: #28a745;">✅ No hay calibraciones urgentes en los proximos 7 dias.</li>
+                <li class="eq-empty">Sin calibraciones urgentes en los próximos 7 días.</li>
                 {% endfor %}
             </ul>
         </div>
 
-        <div class="section urgent-section">
-            <h3>🔧 Mantenimientos Urgentes (Proximos 7 dias)</h3>
+        <!-- MANTENIMIENTOS URGENTES -->
+        <div class="section">
+            <div class="section-header sh-urgent">
+                <span class="sh-inner">Mantenimientos Urgentes — Próximos 7 días</span>
+            </div>
             <ul class="equipment-list">
                 {% for equipo in equipos_mantenimiento_urgente %}
                 <li class="equipment-item">
-                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
-                    <span style="color: #dc3545;">Vence: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span>
+                    <div class="eq-info"><strong>{{ equipo.codigo_interno }}</strong> — {{ equipo.nombre }}</div>
+                    <div class="eq-date"><span class="date-pill urgent">{{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span></div>
                 </li>
                 {% empty %}
-                <li class="equipment-item" style="color: #28a745;">✅ No hay mantenimientos urgentes en los proximos 7 dias.</li>
+                <li class="eq-empty">Sin mantenimientos urgentes en los próximos 7 días.</li>
                 {% endfor %}
             </ul>
         </div>
 
-        <div class="section upcoming-section">
-            <h3>📅 Calibraciones Proximas (Proximos 30 dias)</h3>
+        <!-- CALIBRACIONES PRÓXIMAS -->
+        <div class="section">
+            <div class="section-header sh-upcoming">
+                <span class="sh-inner">Calibraciones Próximas — Próximos 30 días</span>
+            </div>
             <ul class="equipment-list">
                 {% for equipo in equipos_calibracion_proximo %}
                 <li class="equipment-item">
-                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
-                    <span style="color: #ffc107;">Vence: {{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
+                    <div class="eq-info"><strong>{{ equipo.codigo_interno }}</strong> — {{ equipo.nombre }}</div>
+                    <div class="eq-date"><span class="date-pill upcoming">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</span></div>
                 </li>
                 {% empty %}
-                <li class="equipment-item" style="color: #6c757d;">No hay calibraciones programadas en los proximos 30 dias.</li>
+                <li class="eq-empty">Sin calibraciones programadas en los próximos 30 días.</li>
                 {% endfor %}
             </ul>
         </div>
 
-        <div class="section upcoming-section">
-            <h3>🛠️ Mantenimientos Proximos (Proximos 30 dias)</h3>
+        <!-- MANTENIMIENTOS PRÓXIMOS -->
+        <div class="section">
+            <div class="section-header sh-upcoming">
+                <span class="sh-inner">Mantenimientos Próximos — Próximos 30 días</span>
+            </div>
             <ul class="equipment-list">
                 {% for equipo in equipos_mantenimiento_proximo %}
                 <li class="equipment-item">
-                    <strong>{{ equipo.codigo_interno }}:</strong> {{ equipo.nombre }} - 
-                    <span style="color: #ffc107;">Vence: {{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span>
+                    <div class="eq-info"><strong>{{ equipo.codigo_interno }}</strong> — {{ equipo.nombre }}</div>
+                    <div class="eq-date"><span class="date-pill upcoming">{{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span></div>
                 </li>
                 {% empty %}
-                <li class="equipment-item" style="color: #6c757d;">No hay mantenimientos programados en los proximos 30 dias.</li>
+                <li class="eq-empty">Sin mantenimientos programados en los próximos 30 días.</li>
                 {% endfor %}
             </ul>
         </div>
 
-        <p><strong>Fecha del reporte:</strong> {{ today|date:"d/m/Y" }}</p>
+        <p class="report-date">Reporte generado el {{ today|date:"d/m/Y" }}</p>
     </div>
 
     <div class="footer">
-        <p>{{ site_name }} - Sistema de Gestion de Metrologia</p>
-        <p>{{ empresa.nombre }}</p>
+        <p><strong style="color:#ccc;">SAM Metrología | Gestión Metrológica 4.0</strong></p>
+        <p>Colombia — <a href="https://sammetrologia.com">sammetrologia.com</a> — direccion@sammetrologia.com</p>
+        <p style="margin-top: 8px;">Este es un correo automático generado por la Plataforma SAM.</p>
     </div>
+
+</div>
+</div>
 </body>
 </html>

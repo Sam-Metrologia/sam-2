@@ -1,122 +1,162 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recordatorio Semanal - Actividades Vencidas</title>
+    <title>Actividades Vencidas - SAM Metrología</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
-        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .header { text-align: center; border-bottom: 3px solid #dc2626; padding-bottom: 20px; margin-bottom: 30px; }
-        .header h1 { color: #dc2626; margin: 0; font-size: 24px; }
-        .header p { color: #666; margin: 10px 0 0 0; }
-        .alert-box { background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .alert-box h2 { color: #dc2626; margin: 0 0 10px 0; font-size: 18px; }
-        .section { margin: 30px 0; }
-        .section-title { color: #dc2626; font-size: 18px; font-weight: bold; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 15px; }
-        .equipment-item { background-color: #fef2f2; padding: 15px; margin: 10px 0; border-left: 3px solid #dc2626; border-radius: 4px; }
-        .equipment-item strong { color: #dc2626; }
-        .equipment-details { margin: 5px 0; color: #666; font-size: 14px; }
-        .actions-box { background-color: #fef2f2; border: 2px solid #dc2626; padding: 20px; margin: 30px 0; border-radius: 8px; }
-        .actions-box h3 { color: #dc2626; margin: 0 0 15px 0; }
-        .actions-box ul { margin: 0; padding-left: 20px; }
-        .actions-box li { margin: 8px 0; color: #333; }
-        .warning-box { background-color: #fef2f2; border: 2px dashed #dc2626; padding: 15px; margin: 20px 0; border-radius: 4px; text-align: center; }
-        .warning-box strong { color: #dc2626; font-size: 16px; }
-        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .badge-danger { background-color: #dc2626; color: white; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 20px; background-color: #eef2f7; }
+        .wrapper { max-width: 620px; margin: 0 auto; }
+        .container { border: 1px solid #e1e1e1; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.07); }
+        .header { background-color: #003366 !important; padding: 26px 30px; text-align: center; }
+        .header img { width: 68px; height: 68px; border-radius: 50%; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .header h1 { color: #ffffff !important; margin: 0 0 4px 0; font-size: 19px; letter-spacing: 1.5px; font-weight: 700; }
+        .header p { color: rgba(255,255,255,0.82) !important; margin: 0; font-size: 13px; }
+        .content { padding: 30px 35px; background-color: #ffffff; }
+        .empresa-badge { background-color: #eef2f7 !important; border-left: 4px solid #003366; padding: 11px 15px; border-radius: 0 6px 6px 0; margin-bottom: 18px; font-size: 13.5px; color: #444; }
+        .empresa-badge strong { color: #003366; }
+        .alerta-total { background-color: #fdf2f2 !important; border-left: 4px solid #dc3545; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; }
+        .alerta-total h3 { color: #c0392b; font-size: 15px; margin: 0 0 4px 0; }
+        .alerta-total p { color: #721c24; font-size: 13px; margin: 0; }
+        .section { border: 1px solid #e0e7ef; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+        .section-header { background-color: #c0392b !important; padding: 10px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #fff !important; display: table; width: 100%; }
+        .sh-inner { display: table-cell; vertical-align: middle; }
+        .sh-count { display: table-cell; vertical-align: middle; text-align: right; }
+        .badge { background-color: rgba(255,255,255,0.25); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+        .equipment-list { list-style: none; padding: 0; margin: 0; }
+        .equipment-item { padding: 11px 16px; border-bottom: 1px solid #f5f0f0; display: table; width: 100%; }
+        .equipment-item:last-child { border-bottom: none; }
+        .eq-info { display: table-cell; vertical-align: middle; }
+        .eq-info strong { font-size: 13.5px; color: #222; }
+        .eq-info small { display: block; font-size: 12px; color: #888; margin-top: 2px; }
+        .eq-date { display: table-cell; vertical-align: middle; text-align: right; white-space: nowrap; }
+        .date-pill { font-size: 12px; padding: 4px 10px; border-radius: 4px; font-weight: 600; background-color: #dc3545 !important; color: #fff !important; }
+        .actions-box { background-color: #f8f9fa !important; border-radius: 8px; padding: 16px 18px; margin-top: 18px; }
+        .actions-box h4 { margin: 0 0 10px 0; font-size: 13px; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; }
+        .actions-box ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: #444; }
+        .actions-box li { margin-bottom: 5px; }
+        .aviso-box { background-color: #fff8f0 !important; border: 1px dashed #e67e22; border-radius: 6px; padding: 12px 16px; margin-top: 16px; font-size: 12.5px; color: #7d3c00; text-align: center; }
+        .report-date { font-size: 12px; color: #999; margin-top: 16px; text-align: right; }
+        .footer { background-color: #1a1a1a !important; padding: 20px 30px; text-align: center; }
+        .footer p { color: #999 !important; font-size: 11.5px; margin: 0 0 4px 0; }
+        .footer a { color: #aaa; text-decoration: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>⚠️ RECORDATORIO SEMANAL</h1>
-            <p>Actividades Vencidas - {{ empresa.nombre }}</p>
-            <p style="color: #dc2626; font-weight: bold;">{{ today|date:"d 'de' F 'de' Y" }}</p>
+<div class="wrapper">
+<div class="container">
+
+    <div class="header">
+        <img src="https://sammetrologia.com/assets/images/logo.png" alt="SAM Metrología" onerror="this.style.display='none'">
+        <h1>SAM METROLOGÍA</h1>
+        <p>Recordatorio Semanal — Actividades Vencidas</p>
+    </div>
+
+    <div class="content">
+
+        <div class="empresa-badge">
+            Empresa: <strong>{{ empresa.nombre }}</strong>
         </div>
 
-        <div class="alert-box">
-            <h2>🚨 {{ total_vencidos }} Actividad{{ total_vencidos|pluralize:"es" }} VENCIDA{{ total_vencidos|pluralize }}</h2>
-            <p style="margin: 5px 0 0 0;">Las siguientes actividades requieren atención URGENTE e INMEDIATA.</p>
+        <div class="alerta-total">
+            <h3>{{ total_vencidos }} Actividad{{ total_vencidos|pluralize:"es" }} Vencida{{ total_vencidos|pluralize }}</h3>
+            <p>Las siguientes actividades requieren atención urgente e inmediata.</p>
         </div>
 
+        <!-- CALIBRACIONES VENCIDAS -->
         {% if equipos_calibracion_vencidas %}
         <div class="section">
-            <div class="section-title">
-                📊 CALIBRACIONES VENCIDAS ({{ equipos_calibracion_vencidas|length }})
+            <div class="section-header">
+                <span class="sh-inner">Calibraciones Vencidas</span>
+                <span class="sh-count"><span class="badge">{{ equipos_calibracion_vencidas|length }}</span></span>
             </div>
-            {% for equipo in equipos_calibracion_vencidas %}
-            <div class="equipment-item">
-                <strong>{{ equipo.codigo_interno }}</strong>: {{ equipo.nombre }}
-                <div class="equipment-details">
-                    📍 Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}<br>
-                    📅 Fecha vencimiento: <span style="color: #dc2626; font-weight: bold;">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</span><br>
-                    ⏰ Días vencidos: <span class="badge badge-danger">{{ equipo.dias_hasta_calibracion|default:"N/A" }} días</span>
-                </div>
-            </div>
-            {% endfor %}
+            <ul class="equipment-list">
+                {% for equipo in equipos_calibracion_vencidas %}
+                <li class="equipment-item">
+                    <div class="eq-info">
+                        <strong>{{ equipo.codigo_interno }} — {{ equipo.nombre }}</strong>
+                        <small>{{ equipo.marca|default:"—" }} | {{ equipo.modelo|default:"—" }}</small>
+                    </div>
+                    <div class="eq-date">
+                        <span class="date-pill">{{ equipo.proxima_calibracion|date:"d/m/Y" }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
         {% endif %}
 
+        <!-- MANTENIMIENTOS VENCIDOS -->
         {% if equipos_mantenimiento_vencidos %}
         <div class="section">
-            <div class="section-title">
-                🔧 MANTENIMIENTOS VENCIDOS ({{ equipos_mantenimiento_vencidos|length }})
+            <div class="section-header">
+                <span class="sh-inner">Mantenimientos Vencidos</span>
+                <span class="sh-count"><span class="badge">{{ equipos_mantenimiento_vencidos|length }}</span></span>
             </div>
-            {% for equipo in equipos_mantenimiento_vencidos %}
-            <div class="equipment-item">
-                <strong>{{ equipo.codigo_interno }}</strong>: {{ equipo.nombre }}
-                <div class="equipment-details">
-                    📍 Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}<br>
-                    📅 Fecha vencimiento: <span style="color: #dc2626; font-weight: bold;">{{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span><br>
-                    ⏰ Días vencidos: <span class="badge badge-danger">{{ equipo.dias_hasta_mantenimiento|default:"N/A" }} días</span>
-                </div>
-            </div>
-            {% endfor %}
+            <ul class="equipment-list">
+                {% for equipo in equipos_mantenimiento_vencidos %}
+                <li class="equipment-item">
+                    <div class="eq-info">
+                        <strong>{{ equipo.codigo_interno }} — {{ equipo.nombre }}</strong>
+                        <small>{{ equipo.marca|default:"—" }} | {{ equipo.modelo|default:"—" }}</small>
+                    </div>
+                    <div class="eq-date">
+                        <span class="date-pill">{{ equipo.proximo_mantenimiento|date:"d/m/Y" }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
         {% endif %}
 
+        <!-- COMPROBACIONES VENCIDAS -->
         {% if equipos_comprobacion_vencidas %}
         <div class="section">
-            <div class="section-title">
-                ✓ COMPROBACIONES VENCIDAS ({{ equipos_comprobacion_vencidas|length }})
+            <div class="section-header">
+                <span class="sh-inner">Comprobaciones Vencidas</span>
+                <span class="sh-count"><span class="badge">{{ equipos_comprobacion_vencidas|length }}</span></span>
             </div>
-            {% for equipo in equipos_comprobacion_vencidas %}
-            <div class="equipment-item">
-                <strong>{{ equipo.codigo_interno }}</strong>: {{ equipo.nombre }}
-                <div class="equipment-details">
-                    📍 Marca: {{ equipo.marca|default:"N/A" }} | Modelo: {{ equipo.modelo|default:"N/A" }}<br>
-                    📅 Fecha vencimiento: <span style="color: #dc2626; font-weight: bold;">{{ equipo.proxima_comprobacion|date:"d/m/Y" }}</span><br>
-                    ⏰ Días vencidos: <span class="badge badge-danger">{{ equipo.dias_hasta_comprobacion|default:"N/A" }} días</span>
-                </div>
-            </div>
-            {% endfor %}
+            <ul class="equipment-list">
+                {% for equipo in equipos_comprobacion_vencidas %}
+                <li class="equipment-item">
+                    <div class="eq-info">
+                        <strong>{{ equipo.codigo_interno }} — {{ equipo.nombre }}</strong>
+                        <small>{{ equipo.marca|default:"—" }} | {{ equipo.modelo|default:"—" }}</small>
+                    </div>
+                    <div class="eq-date">
+                        <span class="date-pill">{{ equipo.proxima_comprobacion|date:"d/m/Y" }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
         {% endif %}
 
         <div class="actions-box">
-            <h3>🚨 ACCIONES URGENTES REQUERIDAS</h3>
+            <h4>Acciones Urgentes Requeridas</h4>
             <ul>
-                <li><strong>Coordinar INMEDIATAMENTE</strong> con proveedores de servicio</li>
-                <li><strong>Programar las actividades vencidas</strong> lo antes posible</li>
-                <li><strong>Actualizar el sistema SAM</strong> una vez completadas las actividades</li>
-                <li><strong>Mantener documentación de cumplimiento</strong> actualizada</li>
+                <li>Coordinar inmediatamente con proveedores de servicio.</li>
+                <li>Programar las actividades vencidas lo antes posible.</li>
+                <li>Actualizar la Plataforma SAM una vez completadas.</li>
+                <li>Mantener la documentación de cumplimiento al día.</li>
             </ul>
         </div>
 
-        <div class="warning-box">
-            <strong>⚠️ IMPORTANTE:</strong><br>
-            Este recordatorio se enviará semanalmente (mismo día cada semana) hasta que las actividades sean completadas.<br>
-            Máximo 3 recordatorios por actividad.
+        <div class="aviso-box">
+            Este recordatorio se enviará semanalmente hasta que las actividades sean completadas en la plataforma.
         </div>
 
-        <div class="footer">
-            <p><strong>{{ site_name }}</strong><br>Sistema de Gestión de Metrología</p>
-            <p>{{ empresa.nombre }}</p>
-            <p>Este es un email automático del sistema de recordatorios semanales.<br>
-            Para dejar de recibir este recordatorio, complete las actividades vencidas.</p>
-        </div>
+        <p class="report-date">Reporte generado el {{ today|date:"d/m/Y" }}</p>
     </div>
+
+    <div class="footer">
+        <p><strong style="color:#ccc;">SAM Metrología | Gestión Metrológica 4.0</strong></p>
+        <p>Colombia — <a href="https://sammetrologia.com">sammetrologia.com</a> — direccion@sammetrologia.com</p>
+        <p style="margin-top: 8px;">Este es un correo automático generado por la Plataforma SAM.</p>
+    </div>
+
+</div>
+</div>
 </body>
 </html>
