@@ -194,7 +194,7 @@ class FileUploadSecurityMiddleware(MiddlewareMixin):
                 # Verificar extensión peligrosa
                 file_name = uploaded_file.name.lower()
                 if any(file_name.endswith(ext) for ext in self.DANGEROUS_EXTENSIONS):
-                    logger.error(
+                    logger.warning(
                         f"Attempted upload of dangerous file: {uploaded_file.name}",
                         extra={
                             'client_ip': self.get_client_ip(request),
