@@ -147,9 +147,22 @@ class TestSolicitarZip:
         empresa = EmpresaFactory(nombre="Test ZIP Request")
         user = UserFactory(username="zipuser", empresa=empresa)
 
-        # Crear pocos equipos para descarga directa (≤20)
+        # Crear pocos equipos para descarga directa (≤10)
         equipos = [
             EquipoFactory(empresa=empresa, codigo_interno=f"ZIP-{i:03d}")
+            for i in range(5)
+        ]
+
+        return {'empresa': empresa, 'user': user, 'equipos': equipos}
+
+    @pytest.fixture
+    def setup_zip_empresa_mediana(self):
+        """Empresa por encima del límite de descarga directa (>10, ≤35) -> cola asíncrona."""
+        empresa = EmpresaFactory(nombre="Test ZIP Request Mediana")
+        user = UserFactory(username="zipuser_mediana", empresa=empresa)
+
+        equipos = [
+            EquipoFactory(empresa=empresa, codigo_interno=f"ZIPM-{i:03d}")
             for i in range(15)
         ]
 
@@ -172,13 +185,29 @@ class TestSolicitarZip:
         assert response.status_code in [400, 302]
 
     def test_solicitar_zip_empresa_pequeña_descarga_directa(self, setup_zip, client):
-        """Empresa con ≤20 equipos debe usar descarga directa"""
+        """Empresa con ≤10 equipos debe usar descarga directa (ZIP inmediato, no cola)."""
         client.force_login(setup_zip['user'])
 
         response = client.get(reverse('core:solicitar_zip'))
 
-        # Debe iniciar descarga directa (200) o procesar (302)
-        assert response.status_code in [200, 302]
+        assert response.status_code == 200
+        assert response.get('Content-Type') == 'application/zip'
+
+    def test_solicitar_zip_empresa_mediana_usa_cola_asincrona(self, setup_zip_empresa_mediana, client):
+        """Empresa con >10 equipos (aquí 15) debe encolarse, no generar el ZIP en la misma petición.
+
+        Regresión del timeout de gunicorn en producción (2026-08-19): sin Redis, el
+        caché de hojas de vida cae al respaldo en base de datos (lento para PDFs
+        pesados); una empresa justo en el límite anterior (20 equipos) podía superar
+        el timeout del worker web armando el ZIP de forma síncrona. El límite bajó de
+        20 a 10 para que estos casos usen la cola asíncrona (sin límite de tiempo).
+        """
+        client.force_login(setup_zip_empresa_mediana['user'])
+
+        response = client.get(reverse('core:solicitar_zip'))
+
+        assert response.get('Content-Type', '').startswith('application/json')
+        assert response.get('Content-Type') != 'application/zip'
 
     def test_solicitar_zip_superuser_sin_empresa_id(self, setup_zip, client):
         """Superusuario sin empresa_id debe recibir error"""
