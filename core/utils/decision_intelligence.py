@@ -309,7 +309,9 @@ def calcular_tendencias_historicas(empresa, current_year):
     promedio_anterior = sum(m['gasto_total'] for m in anteriores_3_meses) / len(anteriores_3_meses) if anteriores_3_meses else 0
 
     if promedio_anterior > 0:
-        tendencia_porcentaje = round(((promedio_reciente - promedio_anterior) / promedio_anterior) * 100, 1)
+        tendencia_porcentaje = round(
+            ((float(promedio_reciente) - float(promedio_anterior)) / float(promedio_anterior)) * 100, 1
+        )
     else:
         tendencia_porcentaje = 0
 
