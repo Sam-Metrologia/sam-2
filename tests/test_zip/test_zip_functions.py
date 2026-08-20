@@ -853,3 +853,70 @@ class TestZipRequestEstados:
         assert response.status_code == 200
         data = response.json()
         assert data['status'] == 'processing'
+
+
+@pytest.mark.django_db
+class TestPosicionColaReal:
+    """Regresión (2026-08-19): position_in_queue es un contador histórico que solo
+    crece (nunca baja ni se reinicia), así que mostrarlo tal cual como "posición en
+    cola" es engañoso — una solicitud nueva puede heredar un número enorme aunque
+    casi no haya nadie esperando en este momento. get_current_position() ahora
+    cuenta solo las solicitudes activas (pending/processing), no el histórico."""
+
+    def test_posicion_ignora_solicitudes_completadas_viejas(self):
+        """Muchas solicitudes completadas en el pasado no deben inflar la posición
+        de una solicitud nueva: la 'posición 94' del incidente real."""
+        empresa = EmpresaFactory(nombre='Historial ZIP')
+        user = UserFactory(username='historial_user', empresa=empresa)
+
+        # 93 solicitudes históricas ya completadas (o falladas/expiradas) —
+        # simula el volumen acumulado que causó "Posición 94" en producción.
+        for i in range(1, 94):
+            ZipRequest.objects.create(
+                user=user, empresa=empresa, position_in_queue=i, status='completed'
+            )
+
+        # La solicitud 94ª nunca debería mostrarse como "posición 94" si es la
+        # única activa ahora mismo.
+        nueva = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=94, status='pending'
+        )
+
+        assert nueva.get_current_position() == 1
+        assert nueva.get_detailed_status_message() == 'En cola - Posición 1'
+
+    def test_posicion_cuenta_solo_activas_entre_varias(self):
+        """Con varias solicitudes activas, la posición refleja el orden real entre
+        ellas, no el número de secuencia histórico."""
+        empresa = EmpresaFactory(nombre='Cola Real')
+        user = UserFactory(username='cola_user', empresa=empresa)
+
+        # 50 completadas viejas de por medio (no cuentan)
+        for i in range(1, 51):
+            ZipRequest.objects.create(
+                user=user, empresa=empresa, position_in_queue=i, status='completed'
+            )
+
+        primera_activa = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=51, status='pending'
+        )
+        segunda_activa = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=52, status='processing'
+        )
+        tercera_activa = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=53, status='pending'
+        )
+
+        assert primera_activa.get_current_position() == 1
+        assert segunda_activa.get_current_position() == 2
+        assert tercera_activa.get_current_position() == 3
+
+    def test_posicion_none_si_no_esta_activa(self):
+        """Una solicitud completada/fallida/expirada no tiene 'posición' (ya no espera)."""
+        empresa = EmpresaFactory(nombre='Sin Posicion')
+        user = UserFactory(username='sinpos_user', empresa=empresa)
+
+        completada = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1, status='completed'
+        )
+        assert completada.get_current_position() is None
