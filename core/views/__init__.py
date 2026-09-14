@@ -12,7 +12,7 @@ from .reports import *
 from .admin import *
 from .base import *
 from .export_financiero import *
-from .terminos import aceptar_terminos, rechazar_terminos, ver_terminos_pdf, mi_aceptacion_terminos
+from .terminos import aceptar_terminos, rechazar_terminos, ver_terminos_pdf, ver_terminos_html, mi_aceptacion_terminos
 from .chat import chat_ayuda
 
 # Funciones ZIP que están en zip_functions

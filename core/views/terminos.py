@@ -138,6 +138,25 @@ def ver_terminos_pdf(request):
 
 
 @login_required
+def ver_terminos_html(request):
+    """
+    Vista para leer el contrato completo (HTML) en una página aparte.
+    Pensada para abrirse en una pestaña nueva desde el botón de aceptación,
+    para que el usuario no tenga que leerlo para poder continuar.
+    """
+    terminos_activos = TerminosYCondiciones.get_terminos_activos()
+
+    if not terminos_activos:
+        return HttpResponse('No hay términos y condiciones configurados actualmente.', status=404)
+
+    context = {
+        'terminos': terminos_activos,
+    }
+
+    return render(request, 'core/contrato_terminos_completo.html', context)
+
+
+@login_required
 def mi_aceptacion_terminos(request):
     """
     Vista para que el usuario vea los términos que aceptó con los detalles de su aceptación.

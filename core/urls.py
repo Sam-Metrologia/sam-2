@@ -55,6 +55,7 @@ urlpatterns = [
     path('terminos-condiciones/', views.aceptar_terminos, name='aceptar_terminos'),
     path('terminos-condiciones/rechazar/', views.rechazar_terminos, name='rechazar_terminos'),
     path('terminos-condiciones/pdf/', views.ver_terminos_pdf, name='ver_terminos_pdf'),
+    path('terminos-condiciones/ver/', views.ver_terminos_html, name='ver_terminos_html'),
     path('mi-aceptacion-terminos/', views.mi_aceptacion_terminos, name='mi_aceptacion_terminos'),
 
     # Perfil de usuario
