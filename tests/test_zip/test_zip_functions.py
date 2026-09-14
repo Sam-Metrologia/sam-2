@@ -147,9 +147,22 @@ class TestSolicitarZip:
         empresa = EmpresaFactory(nombre="Test ZIP Request")
         user = UserFactory(username="zipuser", empresa=empresa)
 
-        # Crear pocos equipos para descarga directa (≤20)
+        # Crear pocos equipos para descarga directa (≤10)
         equipos = [
             EquipoFactory(empresa=empresa, codigo_interno=f"ZIP-{i:03d}")
+            for i in range(5)
+        ]
+
+        return {'empresa': empresa, 'user': user, 'equipos': equipos}
+
+    @pytest.fixture
+    def setup_zip_empresa_mediana(self):
+        """Empresa por encima del límite de descarga directa (>10, ≤35) -> cola asíncrona."""
+        empresa = EmpresaFactory(nombre="Test ZIP Request Mediana")
+        user = UserFactory(username="zipuser_mediana", empresa=empresa)
+
+        equipos = [
+            EquipoFactory(empresa=empresa, codigo_interno=f"ZIPM-{i:03d}")
             for i in range(15)
         ]
 
@@ -172,13 +185,29 @@ class TestSolicitarZip:
         assert response.status_code in [400, 302]
 
     def test_solicitar_zip_empresa_pequeña_descarga_directa(self, setup_zip, client):
-        """Empresa con ≤20 equipos debe usar descarga directa"""
+        """Empresa con ≤10 equipos debe usar descarga directa (ZIP inmediato, no cola)."""
         client.force_login(setup_zip['user'])
 
         response = client.get(reverse('core:solicitar_zip'))
 
-        # Debe iniciar descarga directa (200) o procesar (302)
-        assert response.status_code in [200, 302]
+        assert response.status_code == 200
+        assert response.get('Content-Type') == 'application/zip'
+
+    def test_solicitar_zip_empresa_mediana_usa_cola_asincrona(self, setup_zip_empresa_mediana, client):
+        """Empresa con >10 equipos (aquí 15) debe encolarse, no generar el ZIP en la misma petición.
+
+        Regresión del timeout de gunicorn en producción (2026-08-19): sin Redis, el
+        caché de hojas de vida cae al respaldo en base de datos (lento para PDFs
+        pesados); una empresa justo en el límite anterior (20 equipos) podía superar
+        el timeout del worker web armando el ZIP de forma síncrona. El límite bajó de
+        20 a 10 para que estos casos usen la cola asíncrona (sin límite de tiempo).
+        """
+        client.force_login(setup_zip_empresa_mediana['user'])
+
+        response = client.get(reverse('core:solicitar_zip'))
+
+        assert response.get('Content-Type', '').startswith('application/json')
+        assert response.get('Content-Type') != 'application/zip'
 
     def test_solicitar_zip_superuser_sin_empresa_id(self, setup_zip, client):
         """Superusuario sin empresa_id debe recibir error"""
@@ -824,3 +853,70 @@ class TestZipRequestEstados:
         assert response.status_code == 200
         data = response.json()
         assert data['status'] == 'processing'
+
+
+@pytest.mark.django_db
+class TestPosicionColaReal:
+    """Regresión (2026-08-19): position_in_queue es un contador histórico que solo
+    crece (nunca baja ni se reinicia), así que mostrarlo tal cual como "posición en
+    cola" es engañoso — una solicitud nueva puede heredar un número enorme aunque
+    casi no haya nadie esperando en este momento. get_current_position() ahora
+    cuenta solo las solicitudes activas (pending/processing), no el histórico."""
+
+    def test_posicion_ignora_solicitudes_completadas_viejas(self):
+        """Muchas solicitudes completadas en el pasado no deben inflar la posición
+        de una solicitud nueva: la 'posición 94' del incidente real."""
+        empresa = EmpresaFactory(nombre='Historial ZIP')
+        user = UserFactory(username='historial_user', empresa=empresa)
+
+        # 93 solicitudes históricas ya completadas (o falladas/expiradas) —
+        # simula el volumen acumulado que causó "Posición 94" en producción.
+        for i in range(1, 94):
+            ZipRequest.objects.create(
+                user=user, empresa=empresa, position_in_queue=i, status='completed'
+            )
+
+        # La solicitud 94ª nunca debería mostrarse como "posición 94" si es la
+        # única activa ahora mismo.
+        nueva = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=94, status='pending'
+        )
+
+        assert nueva.get_current_position() == 1
+        assert nueva.get_detailed_status_message() == 'En cola - Posición 1'
+
+    def test_posicion_cuenta_solo_activas_entre_varias(self):
+        """Con varias solicitudes activas, la posición refleja el orden real entre
+        ellas, no el número de secuencia histórico."""
+        empresa = EmpresaFactory(nombre='Cola Real')
+        user = UserFactory(username='cola_user', empresa=empresa)
+
+        # 50 completadas viejas de por medio (no cuentan)
+        for i in range(1, 51):
+            ZipRequest.objects.create(
+                user=user, empresa=empresa, position_in_queue=i, status='completed'
+            )
+
+        primera_activa = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=51, status='pending'
+        )
+        segunda_activa = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=52, status='processing'
+        )
+        tercera_activa = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=53, status='pending'
+        )
+
+        assert primera_activa.get_current_position() == 1
+        assert segunda_activa.get_current_position() == 2
+        assert tercera_activa.get_current_position() == 3
+
+    def test_posicion_none_si_no_esta_activa(self):
+        """Una solicitud completada/fallida/expirada no tiene 'posición' (ya no espera)."""
+        empresa = EmpresaFactory(nombre='Sin Posicion')
+        user = UserFactory(username='sinpos_user', empresa=empresa)
+
+        completada = ZipRequest.objects.create(
+            user=user, empresa=empresa, position_in_queue=1, status='completed'
+        )
+        assert completada.get_current_position() is None

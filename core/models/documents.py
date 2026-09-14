@@ -100,10 +100,22 @@ class ZipRequest(models.Model):
     estimated_completion = models.DateTimeField(null=True, blank=True, verbose_name="Tiempo Estimado de Finalización")
 
     def get_current_position(self):
-        """Obtiene la posición actual en la cola."""
+        """Obtiene la posición REAL en la cola: cuántas solicitudes activas
+        (pendientes o procesándose) hay antes o igual que esta.
+
+        `position_in_queue` es un contador que solo crece con cada solicitud
+        creada desde siempre (nunca baja ni se reinicia), así que usarlo
+        directamente como "posición" es engañoso: una solicitud recién creada
+        puede mostrar "Posición 94" aunque solo haya 1 o 2 solicitudes
+        realmente esperando en este momento. Este método cuenta solo las
+        solicitudes activas, para reflejar la espera real.
+        """
         if self.status not in ['pending', 'processing']:
             return None
-        return self.position_in_queue
+        return ZipRequest.objects.filter(
+            status__in=['pending', 'processing'],
+            position_in_queue__lte=self.position_in_queue
+        ).count()
 
     def get_estimated_wait_time(self):
         """Obtiene el tiempo estimado de espera."""
@@ -125,7 +137,7 @@ class ZipRequest(models.Model):
     def get_detailed_status_message(self):
         """Obtiene un mensaje detallado del estado."""
         status_messages = {
-            'pending': f'En cola - Posición {self.position_in_queue}',
+            'pending': f'En cola - Posición {self.get_current_position()}',
             'processing': f'Procesando - {self.progress_percentage}% completado',
             'completed': 'ZIP listo para descarga',
             'failed': f'Error: {self.error_message or "Error desconocido"}',
