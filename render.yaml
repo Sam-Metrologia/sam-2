@@ -126,138 +126,21 @@ databases:
     ipAllowList: []  # Vacío = permite desde cualquier IP (Render managed)
 
 # ===============================================================
-# CRON JOBS - TAREAS AUTOMATICAS
+# TAREAS AUTOMÁTICAS (cron)
 # ===============================================================
-# IMPORTANTE: Render usa UTC. Colombia es UTC-5
-# Para convertir: Hora Colombia + 5 = Hora UTC
-# Ejemplo: 8:00 AM Colombia = 13:00 UTC
-# ===============================================================
-
-cronJobs:
-  # 1. NOTIFICACIONES DIARIAS - 8:00 AM Colombia (13:00 UTC)
-  # Envía recordatorios de calibraciones, mantenimientos y comprobaciones
-  - name: notificaciones-diarias
-    schedule: "0 13 * * *"  # Diaria a las 13:00 UTC = 8:00 AM Colombia
-    command: "python manage.py send_notifications --type consolidated"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: EMAIL_HOST_USER
-        sync: false
-      - key: EMAIL_HOST_PASSWORD
-        sync: false
-
-  # 2. MANTENIMIENTO DIARIO - 3:00 AM Colombia (8:00 UTC)
-  # Ejecuta limpieza de cache, optimización DB, etc.
-  - name: mantenimiento-diario
-    schedule: "0 8 * * *"  # Diaria a las 8:00 UTC = 3:00 AM Colombia
-    command: "python manage.py run_scheduled_tasks"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
-
-  # 3. LIMPIEZA DE ARCHIVOS ZIP - Cada 6 horas
-  # Elimina archivos ZIP temporales antiguos
-  - name: limpieza-zips
-    schedule: "0 */6 * * *"  # Cada 6 horas
-    command: "python manage.py cleanup_zip_files --older-than-hours 6"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-
-  # 4. NOTIFICACIONES SEMANALES VENCIDAS - Lunes 8:00 AM Colombia (13:00 UTC)
-  # Recordatorio semanal de actividades vencidas
-  - name: notificaciones-vencidas-semanales
-    schedule: "0 13 * * 1"  # Lunes 13:00 UTC = 8:00 AM Colombia
-    command: "python manage.py send_notifications --type weekly_overdue"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
-      - key: EMAIL_HOST_USER
-        sync: false
-      - key: EMAIL_HOST_PASSWORD
-        sync: false
-
-  # 5. VERIFICAR TRIALS EXPIRADOS - Diaria 5:00 AM Colombia (10:00 UTC)
-  # Verifica y procesa empresas con periodo de prueba expirado
-  - name: verificar-trials
-    schedule: "0 10 * * *"  # Diaria a las 10:00 UTC = 5:00 AM Colombia
-    command: "python manage.py check_trial_expiration"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
-
-  # 6. LIMPIEZA DE NOTIFICACIONES ANTIGUAS - Domingos 4:00 AM Colombia (9:00 UTC)
-  # Limpia notificaciones de más de 30 días
-  - name: limpieza-notificaciones
-    schedule: "0 9 * * 0"  # Domingos 9:00 UTC = 4:00 AM Colombia
-    command: "python manage.py cleanup_notifications --days 30"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
-
-  # 7. RECALCULAR STATS DASHBOARD - 2:00 AM Colombia (7:00 UTC)
-  # Refresca métricas de vencidas/próximas que dependen de la fecha de hoy
-  - name: recalcular-stats-dashboard
-    schedule: "0 7 * * *"  # Diaria a las 7:00 UTC = 2:00 AM Colombia
-    command: "python manage.py recalcular_stats_empresas"
-    runtime: python
-    plan: free
-    region: oregon
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: sam-metrologia-db
-          property: connectionString
-      - key: SECRET_KEY
-        sync: false
+# Este blueprint nunca se desplegó con una sección `cronJobs` real activa
+# en Render (verificado 2026-09-14: la cuenta solo tiene el web service
+# "SAM", ningún Cron Job). Las tareas programadas del sistema corren todas
+# vía GitHub Actions (ver .github/workflows/), que llaman a endpoints en
+# core/views/scheduled_tasks_api.py protegidos con SCHEDULED_TASKS_TOKEN:
+#   - daily-notifications.yml              → alerta "vence hoy"
+#   - weekly-upcoming-notifications.yml     → recordatorio semanal (martes)
+#   - biweekly-upcoming-notifications.yml   → recordatorio quincenal (día 15)
+#   - monthly-ahead-notifications.yml       → planeación mensual (día 1)
+#   - weekly-overdue.yml                    → vencidas semanales (lunes)
+#   - daily-maintenance.yml, cleanup-zips.yml, check-trials.yml,
+#     cleanup-notifications.yml, cobrar-renovaciones.yml
+#
+# Pendiente sin cubrir por ningún lado (ni aquí ni en GitHub Actions):
+# recalcular_stats_empresas, que refresca los contadores de "vencidas hoy"
+# del dashboard con solo el paso del tiempo (sin que cambie ningún dato).

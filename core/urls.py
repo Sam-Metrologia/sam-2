@@ -268,6 +268,9 @@ urlpatterns = [
     # ==============================================================================
     path('api/scheduled/health/', views.scheduled_health_check, name='scheduled_health_check'),
     path('api/scheduled/notifications/daily/', views.trigger_daily_notifications, name='trigger_daily_notifications'),
+    path('api/scheduled/notifications/weekly-upcoming/', views.trigger_weekly_upcoming_notifications, name='trigger_weekly_upcoming_notifications'),
+    path('api/scheduled/notifications/biweekly-upcoming/', views.trigger_biweekly_upcoming_notifications, name='trigger_biweekly_upcoming_notifications'),
+    path('api/scheduled/notifications/monthly-ahead/', views.trigger_monthly_ahead_notifications, name='trigger_monthly_ahead_notifications'),
     path('api/scheduled/maintenance/daily/', views.trigger_daily_maintenance, name='trigger_daily_maintenance'),
     path('api/scheduled/cleanup/zips/', views.trigger_cleanup_zips, name='trigger_cleanup_zips'),
     path('api/scheduled/notifications/weekly-overdue/', views.trigger_weekly_overdue, name='trigger_weekly_overdue'),

@@ -1,0 +1,41 @@
+# GitHub Action: Planeación Mensual Adelantada
+# Se ejecuta el día 1 de cada mes a las 8:00 AM (hora Colombia = UTC-5 = 13:00 UTC)
+#
+# Manda las actividades de TODO el mes SIGUIENTE (no el actual) — así,
+# aunque algo venza el día 2 o 3 del mes siguiente, siempre hay al menos
+# un mes completo de anticipación para planear.
+#
+# Parte del esquema de 4 recordatorios de calendario fijo que reemplaza el
+# antiguo sistema de umbrales relativos (30/15/7/0 días).
+
+name: Planeación Mensual Adelantada
+
+on:
+  schedule:
+    # Día 1 de cada mes, 13:00 UTC = 8:00 AM Colombia
+    - cron: '0 13 1 * *'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  send-monthly-ahead:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar planeación mensual adelantada
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/notifications/monthly-ahead/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Planeación mensual enviada exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al enviar planeación mensual"
+          exit 1

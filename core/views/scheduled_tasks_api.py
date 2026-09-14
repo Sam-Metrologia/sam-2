@@ -74,6 +74,104 @@ def trigger_daily_notifications(request):
 
 @csrf_exempt
 @require_http_methods(["POST", "GET"])
+def trigger_weekly_upcoming_notifications(request):
+    """
+    Recordatorio semanal (martes): actividades que vencen esta semana.
+    Endpoint: /api/scheduled/notifications/weekly-upcoming/
+    """
+    if not verify_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    try:
+        logger.info('🔔 GitHub Actions: Ejecutando recordatorio semanal de próximas')
+
+        sent_count = NotificationScheduler.send_weekly_upcoming_digests()
+
+        logger.info(f'✅ Recordatorios semanales enviados: {sent_count}')
+
+        return JsonResponse({
+            'success': True,
+            'task': 'weekly_upcoming_notifications',
+            'sent_count': sent_count,
+            'message': f'Recordatorio semanal ejecutado. Enviados: {sent_count}'
+        })
+
+    except Exception as e:
+        logger.error(f'❌ Error en recordatorio semanal: {e}')
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
+def trigger_biweekly_upcoming_notifications(request):
+    """
+    Recordatorio quincenal (día 15 de cada mes): actividades de los
+    próximos 15 días.
+    Endpoint: /api/scheduled/notifications/biweekly-upcoming/
+    """
+    if not verify_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    try:
+        logger.info('🔔 GitHub Actions: Ejecutando recordatorio quincenal de próximas')
+
+        sent_count = NotificationScheduler.send_biweekly_upcoming_digests()
+
+        logger.info(f'✅ Recordatorios quincenales enviados: {sent_count}')
+
+        return JsonResponse({
+            'success': True,
+            'task': 'biweekly_upcoming_notifications',
+            'sent_count': sent_count,
+            'message': f'Recordatorio quincenal ejecutado. Enviados: {sent_count}'
+        })
+
+    except Exception as e:
+        logger.error(f'❌ Error en recordatorio quincenal: {e}')
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
+def trigger_monthly_ahead_notifications(request):
+    """
+    Planeación mensual (día 1 de cada mes): actividades de TODO el mes
+    siguiente — garantiza al menos un mes completo de anticipación.
+    Endpoint: /api/scheduled/notifications/monthly-ahead/
+    """
+    if not verify_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    try:
+        logger.info('🔔 GitHub Actions: Ejecutando planeación mensual adelantada')
+
+        sent_count = NotificationScheduler.send_monthly_ahead_digests()
+
+        logger.info(f'✅ Planeaciones mensuales enviadas: {sent_count}')
+
+        return JsonResponse({
+            'success': True,
+            'task': 'monthly_ahead_notifications',
+            'sent_count': sent_count,
+            'message': f'Planeación mensual ejecutada. Enviados: {sent_count}'
+        })
+
+    except Exception as e:
+        logger.error(f'❌ Error en planeación mensual: {e}')
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
 def trigger_daily_maintenance(request):
     """
     Ejecuta mantenimiento diario (limpieza cache, optimización).
