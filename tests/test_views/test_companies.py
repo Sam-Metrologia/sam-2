@@ -394,3 +394,93 @@ class TestEmpresaEquipmentLimits:
         # May be blocked or allowed depending on implementation
         # Just verify we get a response
         assert response.status_code in [200, 302, 403]
+
+
+@pytest.mark.django_db
+@pytest.mark.views
+class TestEmpresaMatrizField:
+    """Test suite for the empresa_matriz (multi-sede) field on EmpresaForm."""
+
+    def test_form_shows_empresa_matriz_field(self, admin_client, empresa_factory):
+        """El campo empresa_matriz aparece en el formulario de añadir/editar."""
+        empresa = empresa_factory()
+
+        url_añadir = reverse('core:añadir_empresa')
+        assert 'empresa_matriz' in admin_client.get(url_añadir).content.decode()
+
+        url_editar = reverse('core:editar_empresa', args=[empresa.pk])
+        assert 'empresa_matriz' in admin_client.get(url_editar).content.decode()
+
+    def test_matriz_dropdown_excludes_empresas_que_ya_son_sede(self, admin_client, empresa_factory):
+        """El dropdown no debe ofrecer como matriz a una empresa que ya es sede de otra
+        (jerarquía de un solo nivel)."""
+        matriz = empresa_factory(nombre="Hospital Central - Matriz")
+        sede = empresa_factory(nombre="Sede Norte", empresa_matriz=matriz)
+        candidata = empresa_factory(nombre="Empresa Independiente")
+
+        url = reverse('core:añadir_empresa')
+        response = admin_client.get(url)
+        form = response.context['formulario']
+        opciones = list(form.fields['empresa_matriz'].queryset)
+
+        assert matriz in opciones
+        assert candidata in opciones
+        assert sede not in opciones  # ya es sede de "matriz", no puede ser matriz de otra
+
+    def test_matriz_dropdown_excluye_instancia_propia_al_editar(self, admin_client, empresa_factory):
+        """Una empresa no puede elegirse a sí misma como su propia matriz."""
+        empresa = empresa_factory(nombre="Empresa Editable")
+
+        url = reverse('core:editar_empresa', args=[empresa.pk])
+        response = admin_client.get(url)
+        form = response.context['form']
+
+        assert empresa not in list(form.fields['empresa_matriz'].queryset)
+
+    def test_asignar_matriz_a_una_sede_via_post(self, admin_client, empresa_factory):
+        """POST a editar_empresa con empresa_matriz asigna correctamente la relación."""
+        matriz = empresa_factory(nombre="Hospital Central - Matriz")
+        sede = empresa_factory(nombre="Sede Sur", nit="900222222-2")
+
+        url = reverse('core:editar_empresa', args=[sede.pk])
+        data = {
+            'nombre': sede.nombre,
+            'nit': sede.nit,
+            'email': sede.email,
+            'telefono': sede.telefono,
+            'direccion': sede.direccion,
+            'limite_equipos_empresa': sede.limite_equipos_empresa,
+            'limite_almacenamiento_mb': 500,
+            'duracion_prueba_dias': 30,
+            'estado_suscripcion': 'Activo',
+            'empresa_matriz': matriz.pk,
+        }
+        response = admin_client.post(url, data)
+
+        assert response.status_code == 302, response.context['form'].errors if response.status_code == 200 else None
+        sede.refresh_from_db()
+        assert sede.empresa_matriz_id == matriz.pk
+
+    def test_empresa_matriz_es_opcional(self, admin_client, empresa_factory):
+        """Crear/editar una empresa sin empresa_matriz sigue funcionando (caso normal, 99%)."""
+        empresa = empresa_factory(nombre="Empresa Sin Matriz", nit="900333333-3")
+
+        url = reverse('core:editar_empresa', args=[empresa.pk])
+        data = {
+            'nombre': 'Empresa Sin Matriz Editada',
+            'nit': empresa.nit,
+            'email': empresa.email,
+            'telefono': empresa.telefono,
+            'direccion': empresa.direccion,
+            'limite_equipos_empresa': empresa.limite_equipos_empresa,
+            'limite_almacenamiento_mb': 500,
+            'duracion_prueba_dias': 30,
+            'estado_suscripcion': 'Activo',
+            # empresa_matriz omitido a propósito
+        }
+        response = admin_client.post(url, data)
+
+        assert response.status_code == 302, response.context['form'].errors if response.status_code == 200 else None
+        empresa.refresh_from_db()
+        assert empresa.empresa_matriz_id is None
+        assert empresa.nombre == 'Empresa Sin Matriz Editada'

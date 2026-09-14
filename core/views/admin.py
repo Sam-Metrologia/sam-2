@@ -2,6 +2,7 @@
 # Views administrativas: usuarios, proveedores, procedimientos, autenticación
 
 from .base import *
+from ..tenancy import get_empresa_activa
 
 # =============================================================================
 # AUTHENTICATION VIEWS
@@ -481,9 +482,9 @@ def listar_procedimientos(request):
     procedimientos = Procedimiento.objects.all().select_related('empresa')
 
     # Filtrar por empresa si no es superusuario
-    if not request.user.is_superuser and request.user.empresa:
-        procedimientos = procedimientos.filter(empresa=request.user.empresa)
-    elif not request.user.is_superuser and not request.user.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request):
+        procedimientos = procedimientos.filter(empresa=get_empresa_activa(request))
+    elif not request.user.is_superuser and not get_empresa_activa(request):
         procedimientos = Procedimiento.objects.none()
 
     procedimientos = procedimientos.order_by('codigo')
@@ -511,7 +512,7 @@ def añadir_procedimiento(request):
 
                 # Asignar empresa automáticamente para usuarios no-superusuarios
                 if not request.user.is_superuser and not procedimiento.empresa:
-                    procedimiento.empresa = request.user.empresa
+                    procedimiento.empresa = get_empresa_activa(request)
 
                 procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
@@ -543,7 +544,7 @@ def editar_procedimiento(request, pk):
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != procedimiento.empresa:
         messages.error(request, 'No tienes permiso para editar este procedimiento.')
         return redirect('core:listar_procedimientos')
 
@@ -582,7 +583,7 @@ def eliminar_procedimiento(request, pk):
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != procedimiento.empresa:
         messages.error(request, 'No tienes permiso para eliminar este procedimiento.')
         return redirect('core:listar_procedimientos')
 
@@ -625,9 +626,9 @@ def listar_proveedores(request):
     proveedores = Proveedor.objects.all().select_related('empresa')
 
     # Filtrar por empresa si no es superusuario
-    if not request.user.is_superuser and request.user.empresa:
-        proveedores = proveedores.filter(empresa=request.user.empresa)
-    elif not request.user.is_superuser and not request.user.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request):
+        proveedores = proveedores.filter(empresa=get_empresa_activa(request))
+    elif not request.user.is_superuser and not get_empresa_activa(request):
         proveedores = Proveedor.objects.none()
 
     # Aplicar filtro de búsqueda
@@ -676,7 +677,7 @@ def añadir_proveedor(request):
 
                 # Asignar empresa automáticamente para usuarios no-superusuarios
                 if not request.user.is_superuser and not proveedor.empresa:
-                    proveedor.empresa = request.user.empresa
+                    proveedor.empresa = get_empresa_activa(request)
 
                 proveedor.save()
                 messages.success(request, 'Proveedor añadido exitosamente.')
@@ -708,7 +709,7 @@ def editar_proveedor(request, pk):
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != proveedor.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != proveedor.empresa:
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -747,7 +748,7 @@ def eliminar_proveedor(request, pk):
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != proveedor.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != proveedor.empresa:
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -784,7 +785,7 @@ def detalle_proveedor(request, pk):
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != proveedor.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != proveedor.empresa:
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -847,8 +848,8 @@ def subir_pdf(request):
                 documento.archivo_s3_path = ruta_s3
                 documento.subido_por = request.user
 
-                if not request.user.is_superuser and request.user.empresa:
-                    documento.empresa = request.user.empresa
+                if not request.user.is_superuser and get_empresa_activa(request):
+                    documento.empresa = get_empresa_activa(request)
 
                 documento.save()
 
@@ -1094,7 +1095,7 @@ def configurar_usuarios_setup(request):
     from django.http import HttpResponseForbidden
     from .registro import asignar_permisos_por_rol
 
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         return redirect('core:dashboard')
 

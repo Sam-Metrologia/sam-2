@@ -7,8 +7,9 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
 from .base import *
-from ..constants import ESTADO_ACTIVO
-from ..models import EmpresaFormatoLog
+from ..constants import ESTADO_ACTIVO, ESTADO_DE_BAJA
+from ..models import EmpresaFormatoLog, PrestamoEquipo, TransferenciaEquipo
+from ..tenancy import get_empresa_activa, get_empresas_seleccionables
 
 # =============================================================================
 # MAIN COMPANY VIEWS
@@ -28,7 +29,7 @@ def listar_empresas(request):
 
     # Filtrar por empresa para usuarios normales
     if not request.user.is_superuser:
-        empresas_list = empresas_list.filter(pk=request.user.empresa.pk)
+        empresas_list = empresas_list.filter(pk=get_empresa_activa(request).pk)
 
     # Aplicar filtro de búsqueda si existe
     if query:
@@ -118,7 +119,7 @@ def detalle_empresa(request, pk):
     empresa = get_object_or_404(Empresa, pk=pk)
 
     # Verificar permisos de acceso
-    if not request.user.is_superuser and (not request.user.empresa or request.user.empresa.pk != empresa.pk):
+    if not request.user.is_superuser and (not get_empresa_activa(request) or get_empresa_activa(request).pk != empresa.pk):
         messages.error(request, 'No tienes permisos para ver esta empresa.')
         return redirect('core:access_denied')
 
@@ -239,7 +240,7 @@ def añadir_usuario_a_empresa(request, empresa_pk):
     titulo_pagina = f"Añadir Usuario a {empresa.nombre}"
 
     # Verificar permisos: superusuario o usuario de la misma empresa
-    if not request.user.is_superuser and request.user.empresa != empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != empresa:
         messages.error(request, 'No tienes permiso para añadir usuarios a esta empresa.')
         return redirect('core:detalle_empresa', pk=empresa.pk)
 
@@ -300,7 +301,7 @@ def crear_usuario_empresa(request):
         messages.error(request, 'Solo administradores pueden crear usuarios.')
         return redirect('core:dashboard')
 
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         messages.error(request, 'No tienes una empresa asociada.')
         return redirect('core:dashboard')
@@ -513,9 +514,9 @@ def update_empresa_formato(request):
                 return JsonResponse({'status': 'error', 'message': 'Empresa no encontrada.'}, status=404)
         else:
             return JsonResponse({'status': 'error', 'message': 'ID de empresa requerido para superusuario.'}, status=400)
-    elif request.user.empresa:
+    elif get_empresa_activa(request):
         # Usuario regular solo puede actualizar su propia empresa
-        company_to_update = request.user.empresa
+        company_to_update = get_empresa_activa(request)
     else:
         return JsonResponse({'status': 'error', 'message': 'Usuario no asociado a ninguna empresa.'}, status=403)
 
@@ -656,7 +657,7 @@ def editar_empresa_formato(request, pk):
     # Verificar permisos: Solo superusuario, ADMINISTRADOR o GERENCIA
     if not request.user.is_superuser:
         # Verificar que pertenece a la empresa
-        if request.user.empresa != empresa:
+        if get_empresa_activa(request) != empresa:
             messages.error(request, 'No tienes permiso para editar la información de formato de esta empresa.')
             return redirect('core:home')
 
@@ -769,9 +770,9 @@ def listar_ubicaciones(request):
     ubicaciones = Ubicacion.objects.all()
 
     # Filtrar por empresa si el usuario no es superusuario
-    if not request.user.is_superuser and request.user.empresa:
-        ubicaciones = ubicaciones.filter(empresa=request.user.empresa)
-    elif not request.user.is_superuser and not request.user.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request):
+        ubicaciones = ubicaciones.filter(empresa=get_empresa_activa(request))
+    elif not request.user.is_superuser and not get_empresa_activa(request):
         ubicaciones = Ubicacion.objects.none()
 
     return render(request, 'core/listar_ubicaciones.html', {
@@ -796,7 +797,7 @@ def añadir_ubicacion(request):
 
             # Asignar empresa automáticamente para usuarios no-superusuarios
             if not request.user.is_superuser and not ubicacion.empresa:
-                ubicacion.empresa = request.user.empresa
+                ubicacion.empresa = get_empresa_activa(request)
 
             ubicacion.save()
             messages.success(request, 'Ubicación añadida exitosamente.')
@@ -825,7 +826,7 @@ def editar_ubicacion(request, pk):
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
 
     # Verificar permisos
-    if not request.user.is_superuser and request.user.empresa != ubicacion.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != ubicacion.empresa:
         messages.error(request, 'No tienes permiso para editar esta ubicación.')
         return redirect('core:listar_ubicaciones')
 
@@ -860,7 +861,7 @@ def eliminar_ubicacion(request, pk):
     ubicacion = get_object_or_404(Ubicacion, pk=pk)
 
     # Verificar permisos
-    if not request.user.is_superuser and request.user.empresa != ubicacion.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != ubicacion.empresa:
         messages.error(request, 'No tienes permiso para eliminar esta ubicación.')
         return redirect('core:listar_ubicaciones')
 
@@ -902,11 +903,11 @@ def editar_perfil_empresa(request):
     if request.user.is_superuser:
         # Superusuario usa la vista completa editar_empresa
         messages.info(request, 'Como superusuario usa la vista de administración.')
-        if request.user.empresa:
-            return redirect('core:editar_empresa', pk=request.user.empresa.pk)
+        if get_empresa_activa(request):
+            return redirect('core:editar_empresa', pk=get_empresa_activa(request).pk)
         return redirect('core:listar_empresas')
 
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         messages.error(request, 'No tienes una empresa asociada.')
         return redirect('core:dashboard')
@@ -950,6 +951,141 @@ def editar_perfil_empresa(request):
         'empresa': empresa,
         'campos_faltantes': campos_faltantes,
         'titulo_pagina': 'Perfil de Empresa',
+    })
+
+
+@monitor_view
+@access_check
+@login_required
+def transferir_equipos(request):
+    """
+    Permite al GERENCIA de una empresa matriz mover uno o varios equipos de
+    una sede a otra (o hacia/desde la matriz), dentro del mismo grupo de sedes.
+
+    Solo se ofrece a usuarios que tienen más de una empresa entre qué elegir
+    (get_empresas_seleccionables) — el mismo criterio que habilita el selector
+    de sede del navbar.
+
+    Si el código interno de un equipo choca con uno ya existente en la sede
+    destino, se pide resolverlo ahí mismo (nuevo código) antes de confirmar;
+    no se bloquea la transferencia por préstamos activos (se mueven junto con
+    el equipo).
+    """
+    seleccionables = get_empresas_seleccionables(request.user)
+    if len(seleccionables) < 2:
+        messages.error(request, 'No tienes sedes entre las cuales transferir equipos.')
+        return redirect('core:dashboard')
+
+    empresa_origen = get_empresa_activa(request)
+    if empresa_origen not in seleccionables:
+        empresa_origen = seleccionables[0]
+
+    destinos_posibles = [e for e in seleccionables if e.id != empresa_origen.id]
+    equipos_origen = Equipo.objects.filter(empresa=empresa_origen).exclude(
+        estado=ESTADO_DE_BAJA
+    ).order_by('codigo_interno')
+
+    conflictos = []  # equipos cuyo código choca en destino, para pedir uno nuevo
+    equipo_ids_pendientes = []
+    empresa_destino_pendiente = None
+
+    if request.method == 'POST':
+        equipo_ids = request.POST.getlist('equipos')
+        empresa_destino_id = request.POST.get('empresa_destino')
+        empresa_destino = next((e for e in destinos_posibles if str(e.id) == empresa_destino_id), None)
+
+        equipos = []
+        if not equipo_ids:
+            messages.error(request, 'Selecciona al menos un equipo para transferir.')
+        elif not empresa_destino:
+            messages.error(request, 'Selecciona una sede destino válida.')
+        else:
+            # Filtra igual que la lista mostrada (empresa_origen + no dados de baja):
+            # nunca confiar en que el POST solo trae IDs de lo que se veía en pantalla.
+            equipos = list(equipos_origen.filter(pk__in=equipo_ids))
+            equipo_ids_pendientes = [str(e.pk) for e in equipos]
+            empresa_destino_pendiente = empresa_destino
+
+            if not equipos:
+                messages.error(request, 'Ninguno de los equipos seleccionados es válido para transferir.')
+            else:
+                limite = empresa_destino.get_limite_equipos()
+                ya_existentes = empresa_destino.equipos.count()
+                if limite != float('inf') and ya_existentes + len(equipos) > limite:
+                    messages.error(
+                        request,
+                        f'La sede {empresa_destino.nombre} no tiene cupo suficiente '
+                        f'({ya_existentes}/{limite} equipos).'
+                    )
+                else:
+                    cambios = []  # (equipo, codigo_nuevo_o_None)
+                    for equipo in equipos:
+                        choca = Equipo.objects.filter(
+                            empresa=empresa_destino, codigo_interno=equipo.codigo_interno
+                        ).exists()
+                        if not choca:
+                            cambios.append((equipo, None))
+                            continue
+
+                        nuevo_codigo = request.POST.get(f'codigo_nuevo_{equipo.pk}', '').strip()
+                        if not nuevo_codigo:
+                            conflictos.append(equipo)
+                        elif Equipo.objects.filter(
+                            empresa=empresa_destino, codigo_interno=nuevo_codigo
+                        ).exists():
+                            messages.error(
+                                request,
+                                f'El código "{nuevo_codigo}" para {equipo.codigo_interno} '
+                                f'también existe en {empresa_destino.nombre}.'
+                            )
+                            conflictos.append(equipo)
+                        else:
+                            cambios.append((equipo, nuevo_codigo))
+
+                    if conflictos:
+                        messages.warning(
+                            request,
+                            'Algunos equipos tienen un código que ya existe en la sede destino. '
+                            'Asigna un código nuevo para continuar.'
+                        )
+                    else:
+                        with transaction.atomic():
+                            for equipo, nuevo_codigo in cambios:
+                                codigo_anterior = equipo.codigo_interno
+                                if nuevo_codigo:
+                                    equipo.codigo_interno = nuevo_codigo
+                                equipo.empresa = empresa_destino
+                                equipo.save()
+
+                                PrestamoEquipo.objects.filter(equipo=equipo).update(empresa=empresa_destino)
+
+                                TransferenciaEquipo.objects.create(
+                                    equipo=equipo,
+                                    empresa_origen=empresa_origen,
+                                    empresa_destino=empresa_destino,
+                                    codigo_interno_anterior=codigo_anterior,
+                                    codigo_interno_nuevo=nuevo_codigo,
+                                    realizado_por=request.user,
+                                )
+
+                        logger.info(
+                            f"{request.user.username} transfirió {len(cambios)} equipo(s) de "
+                            f"{empresa_origen.nombre} a {empresa_destino.nombre}"
+                        )
+                        messages.success(
+                            request,
+                            f'{len(cambios)} equipo(s) transferido(s) a {empresa_destino.nombre}.'
+                        )
+                        return redirect('core:transferir_equipos')
+
+    return render(request, 'core/transferir_equipos.html', {
+        'empresa_origen': empresa_origen,
+        'destinos_posibles': destinos_posibles,
+        'equipos': equipos_origen,
+        'conflictos': conflictos,
+        'equipo_ids_pendientes': equipo_ids_pendientes,
+        'empresa_destino_pendiente': empresa_destino_pendiente,
+        'titulo_pagina': 'Transferir Equipos entre Sedes',
     })
 
 

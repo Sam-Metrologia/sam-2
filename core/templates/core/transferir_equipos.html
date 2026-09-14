@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Transferir Equipos entre Sedes - SAM Metrología{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-6">
+
+    <h1 class="text-2xl font-bold text-gray-800 mb-1">Transferir Equipos entre Sedes</h1>
+    <p class="text-gray-500 text-sm mb-6">
+        <i class="fas fa-building mr-1"></i>
+        Sede de origen: <strong>{{ empresa_origen.nombre }}</strong>
+    </p>
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="px-4 py-3 rounded-md mb-2 text-sm
+            {% if message.tags == 'success' %}bg-green-50 border border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700
+            {% elif message.tags == 'warning' %}bg-amber-50 border border-amber-300 text-amber-800
+            {% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not equipos %}
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+        {{ empresa_origen.nombre }} no tiene equipos para transferir.
+    </div>
+    {% else %}
+    <form method="post" class="bg-white rounded-lg shadow p-6 space-y-5">
+        {% csrf_token %}
+
+        <div>
+            <label for="empresa_destino" class="block text-sm font-semibold text-gray-700 mb-1">
+                Transferir a la sede
+            </label>
+            <select name="empresa_destino" id="empresa_destino" required
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                <option value="">— Selecciona una sede destino —</option>
+                {% for destino in destinos_posibles %}
+                <option value="{{ destino.id }}" {% if empresa_destino_pendiente.id == destino.id %}selected{% endif %}>
+                    {{ destino.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                Equipos de {{ empresa_origen.nombre }}
+            </label>
+            <div class="border border-gray-200 rounded-md divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                {% for equipo in equipos %}
+                <div class="flex items-center justify-between px-3 py-2 text-sm">
+                    <label class="flex items-center gap-2 flex-1 cursor-pointer">
+                        <input type="checkbox" name="equipos" value="{{ equipo.pk }}"
+                               {% if equipo.pk|stringformat:"s" in equipo_ids_pendientes %}checked{% endif %}>
+                        <span><strong>{{ equipo.codigo_interno }}</strong> — {{ equipo.nombre }}</span>
+                    </label>
+
+                    {% if equipo in conflictos %}
+                    <div class="flex items-center gap-2 ml-3">
+                        <span class="text-amber-600 text-xs">
+                            <i class="fas fa-exclamation-triangle"></i> código ya existe en destino
+                        </span>
+                        <input type="text" name="codigo_nuevo_{{ equipo.pk }}" placeholder="nuevo código"
+                               class="border border-amber-300 rounded-md px-2 py-1 text-xs w-32">
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-md">
+                Transferir equipos seleccionados
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

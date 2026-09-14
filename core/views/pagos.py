@@ -22,6 +22,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from core.models import CustomUser, TransaccionPago, LinkPago
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,7 @@ def planes(request):
     Muestra la página de planes y precios.
     Accesible para cualquier usuario autenticado; es el punto de entrada al pago.
     """
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         from django.contrib import messages
         messages.warning(request, 'Tu cuenta no tiene una empresa asignada. Contacta al administrador.')
@@ -314,7 +315,7 @@ def iniciar_pago(request):
         return redirect('core:planes')
 
     plan = PLANES[plan_key]
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
 
     # Validar que el perfil de empresa tenga los datos mínimos para facturar
     if not empresa.nit:
@@ -399,7 +400,7 @@ def iniciar_addon_pago(request):
     Crea una TransaccionPago de tipo ADDON y redirige al checkout de Wompi.
     El webhook activa los add-ons automáticamente al recibir APPROVED.
     """
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     public_key = getattr(settings, 'WOMPI_PUBLIC_KEY', '')
     integrity_secret = getattr(settings, 'WOMPI_INTEGRITY_SECRET', '')
 
@@ -512,17 +513,17 @@ def pago_resultado(request):
         try:
             transaccion = TransaccionPago.objects.get(
                 referencia_pago=referencia,
-                empresa=request.user.empresa
+                empresa=get_empresa_activa(request)
             )
         except TransaccionPago.DoesNotExist:
             pass
 
     # Fallback: buscar por el ID de Wompi en datos_respuesta (por si ref llegó vacío)
-    if not transaccion and wompi_id and request.user.empresa:
+    if not transaccion and wompi_id and get_empresa_activa(request):
         try:
             transaccion = TransaccionPago.objects.get(
                 datos_respuesta__id=wompi_id,
-                empresa=request.user.empresa
+                empresa=get_empresa_activa(request)
             )
             referencia = transaccion.referencia_pago
         except TransaccionPago.DoesNotExist:
@@ -1032,7 +1033,7 @@ def test_pago_view(request):
     from django.http import HttpResponse
     from django.middleware.csrf import get_token
 
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         return HttpResponse(
             "<h3>Este usuario no tiene empresa. Inicia sesión con una cuenta de empresa.</h3>"
@@ -1229,7 +1230,7 @@ def generar_link_pago(request):
     Admin/Gerente configura plan + add-ons y genera un link de pago único.
     Envía el link por email a correos_facturacion y lo devuelve en JSON.
     """
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         return JsonResponse({'ok': False, 'errores': ['Sin empresa asociada.']})
     if not (request.user.is_administrador() or request.user.is_gerente()):
@@ -1403,7 +1404,7 @@ def pagar_link_confirmado(request, token):
 @require_POST
 def toggle_renovacion_automatica(request):
     """Activa o desactiva la renovación automática para la empresa del usuario."""
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         return HttpResponseForbidden()
     if not (request.user.is_administrador() or request.user.is_gerente()):
@@ -1438,7 +1439,7 @@ def guardar_tarjeta_autopago(request):
     POST: Recibe el card_token (ya tokenizado en el frontend vía JS + public_key)
           y crea un payment_source en Wompi con la clave privada.
     """
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         return HttpResponseForbidden()
     if not (request.user.is_administrador() or request.user.is_gerente()):

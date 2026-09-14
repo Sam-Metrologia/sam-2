@@ -19,6 +19,7 @@ from ..utils.impersonation import (
     get_default_user_for_empresa,
     get_impersonator
 )
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +210,7 @@ def estado_modo_trabajo(request):
         'usuario_actual': {
             'id': request.user.id,
             'nombre': request.user.get_full_name() or request.user.username,
-            'empresa': request.user.empresa.nombre if request.user.empresa else None,
+            'empresa': get_empresa_activa(request).nombre if get_empresa_activa(request) else None,
             'rol': request.user.rol_usuario if hasattr(request.user, 'rol_usuario') else None
         } if impersonating else None,
         'superusuario_original': {

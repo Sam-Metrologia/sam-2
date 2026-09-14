@@ -4,6 +4,7 @@
 from .base import *
 import logging
 from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
+from ..tenancy import get_empresa_activa
 
 # Logger específico para activities
 logger = logging.getLogger('activities')
@@ -25,7 +26,7 @@ def añadir_calibracion(request, equipo_pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
 
     if request.method == 'POST':
         logger.info(f"=== POST CALIBRACIÓN - Datos recibidos ===")
@@ -108,7 +109,7 @@ def editar_calibracion(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     calibracion = get_object_or_404(Calibracion, pk=pk, equipo=equipo)
 
     if request.method == 'POST':
@@ -151,7 +152,7 @@ def eliminar_calibracion(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     calibracion = get_object_or_404(Calibracion, pk=pk, equipo=equipo)
 
     if request.method == 'POST':
@@ -192,7 +193,7 @@ def añadir_mantenimiento(request, equipo_pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
 
     if request.method == 'POST':
         logger.info(f"=== POST MANTENIMIENTO - Datos recibidos ===")
@@ -259,7 +260,7 @@ def editar_mantenimiento(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
 
     if request.method == 'POST':
@@ -304,7 +305,7 @@ def eliminar_mantenimiento(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
 
     if request.method == 'POST':
@@ -340,7 +341,7 @@ def detalle_mantenimiento(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     mantenimiento = get_object_or_404(Mantenimiento, pk=pk, equipo=equipo)
 
     # Generar URL segura del documento
@@ -372,7 +373,7 @@ def añadir_comprobacion(request, equipo_pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
 
     if request.method == 'POST':
         logger.info(f"=== POST COMPROBACIÓN - Datos recibidos ===")
@@ -439,7 +440,7 @@ def editar_comprobacion(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     comprobacion = get_object_or_404(Comprobacion, pk=pk, equipo=equipo)
 
     if request.method == 'POST':
@@ -484,7 +485,7 @@ def eliminar_comprobacion(request, equipo_pk, pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
     comprobacion = get_object_or_404(Comprobacion, pk=pk, equipo=equipo)
 
     if request.method == 'POST':
@@ -722,7 +723,7 @@ def dar_baja_equipo(request, equipo_pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
 
     # Verificar si ya está dado de baja o ya tiene un registro de baja
     if equipo.estado == ESTADO_DE_BAJA:
@@ -805,7 +806,7 @@ def inactivar_equipo(request, equipo_pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
 
     # Verificar estado actual
     if equipo.estado == ESTADO_INACTIVO:
@@ -847,7 +848,7 @@ def activar_equipo(request, equipo_pk):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, pk=equipo_pk)
     else:
-        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, pk=equipo_pk, empresa=get_empresa_activa(request))
 
     # Verificar estado actual
     if equipo.estado == ESTADO_ACTIVO:
@@ -910,9 +911,9 @@ def programmed_activities_list(request):
     scheduled_activities = []
 
     equipos_base_query = Equipo.objects.all()
-    if not request.user.is_superuser and request.user.empresa:
-        equipos_base_query = equipos_base_query.filter(empresa=request.user.empresa)
-    elif not request.user.is_superuser and not request.user.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request):
+        equipos_base_query = equipos_base_query.filter(empresa=get_empresa_activa(request))
+    elif not request.user.is_superuser and not get_empresa_activa(request):
         equipos_base_query = Equipo.objects.none()
 
     # Excluir equipos "De Baja" y "Inactivo" para esta lista

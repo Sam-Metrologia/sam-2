@@ -13,6 +13,7 @@ from django.db.models import Max
 from django.core.files.storage import default_storage
 from datetime import timedelta
 from core.models import ZipRequest, Empresa, Equipo, Proveedor, Procedimiento
+from .tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ def solicitar_zip(request):
         logger.warning(f"⚠️ Superusuario sin empresa_id especificada. Parámetros GET: {dict(request.GET)}")
         return JsonResponse({'error': 'Superusuario debe especificar empresa_id para descargar ZIP'}, status=400)
     else:
-        empresa = request.user.empresa
+        empresa = get_empresa_activa(request)
         if not empresa:
             return JsonResponse({'error': 'Usuario sin empresa asignada'}, status=400)
         logger.info(f"✅ Usuario normal usando su empresa: {empresa.nombre}")
@@ -92,8 +93,13 @@ def solicitar_zip(request):
     equipos_total_count = empresa.equipos.count()
     equipos_activos_count = empresa.equipos.filter(estado='Activo').count()
 
-    # DESCARGA DIRECTA para ≤20 equipos TOTALES (aumentamos límite ligeramente)
-    if equipos_total_count <= 20:
+    # DESCARGA DIRECTA para ≤10 equipos TOTALES
+    # Bajado de 20 a 10 (2026-08-19): sin Redis, el caché de hojas de vida cae al
+    # respaldo en base de datos (lento para PDFs pesados). Una empresa con 20 equipos
+    # y actividades/documentos abundantes por equipo puede superar el timeout de
+    # gunicorn (120s) generando el ZIP en la misma petición. >10 equipos usa la cola
+    # asíncrona (sam-zip-processor), sin límite de tiempo del worker web.
+    if equipos_total_count <= 10:
         logger.info(f"Empresa {empresa.nombre}: {equipos_total_count} equipos totales ({equipos_activos_count} activos) -> DESCARGA DIRECTA")
         return descarga_directa_rapida(request, empresa)
 
@@ -491,8 +497,8 @@ def generar_descarga_multipartes(request, empresa, equipos_count, max_equipos_po
 def descarga_directa_rapida(request, empresa):
     """
     DESCARGA DIRECTA INMEDIATA con LÍMITE de 35 EQUIPOS POR PARTE
-    Para empresas con ≤20 equipos, genera y descarga ZIP inmediatamente.
-    Para empresas >20 equipos pero usando descarga directa, implementa sistema multi-partes.
+    Para empresas con ≤10 equipos, genera y descarga ZIP inmediatamente.
+    Para empresas >10 equipos pero usando descarga directa, implementa sistema multi-partes.
     """
     try:
         MAX_EQUIPOS_POR_PARTE = 35

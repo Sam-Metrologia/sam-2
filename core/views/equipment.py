@@ -6,6 +6,7 @@ from ..constants import (
     ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_EN_CALIBRACION,
     ESTADO_EN_COMPROBACION, ESTADO_EN_MANTENIMIENTO, ESTADO_DE_BAJA,
 )
+from ..tenancy import get_empresa_activa
 
 
 def sanitize_filename(filename):
@@ -52,10 +53,11 @@ def home(request):
 
     if not user.is_superuser:
         # Los usuarios normales solo ven datos de su propia empresa
-        if user.empresa and not user.empresa.is_deleted:
-            equipos_list = equipos_list.filter(empresa=user.empresa)
-            selected_company_id = str(user.empresa.id)
-            current_company_format_info = user.empresa
+        empresa_activa_home = get_empresa_activa(request)
+        if empresa_activa_home and not empresa_activa_home.is_deleted:
+            equipos_list = equipos_list.filter(empresa=empresa_activa_home)
+            selected_company_id = str(empresa_activa_home.id)
+            current_company_format_info = empresa_activa_home
         else:
             # Si un usuario normal no tiene empresa asignada o su empresa está eliminada, no ve equipos
             equipos_list = Equipo.objects.none()
@@ -76,7 +78,7 @@ def home(request):
     limite_alcanzado = False
     empresa_para_limite = None
     if user.is_authenticated and not user.is_superuser:
-        empresa_para_limite = user.empresa
+        empresa_para_limite = get_empresa_activa(request)
     elif user.is_superuser and selected_company_id:
         try:
             empresa_para_limite = Empresa.objects.get(pk=selected_company_id)
@@ -187,7 +189,7 @@ def home(request):
     estado_choices = Equipo.ESTADO_CHOICES
 
     # Obtener próximas actividades usando las optimizaciones
-    proximas_actividades = OptimizedQueries.get_proximas_actividades(user, days_ahead=30)
+    proximas_actividades = OptimizedQueries.get_proximas_actividades(user, days_ahead=30, request=request)
 
     context = {
         'equipos': equipos,
@@ -219,7 +221,7 @@ def equipos(request):
 
     # Query base optimizada usando las optimizaciones
     from ..optimizations import OptimizedQueries
-    equipos_queryset = OptimizedQueries.get_equipos_optimized(user=user)
+    equipos_queryset = OptimizedQueries.get_equipos_optimized(user=user, request=request)
 
     # Filtros de búsqueda
     query = request.GET.get('q', '').strip()
@@ -276,7 +278,7 @@ def añadir_equipo(request):
     """
     Añade un nuevo equipo con validaciones de límites y archivos
     """
-    empresa_actual = _get_user_empresa(request.user)
+    empresa_actual = _get_user_empresa(request.user, request=request)
     limite_alcanzado = _check_equipment_limit(empresa_actual)
 
     if request.method == 'POST':
@@ -622,7 +624,7 @@ def detalle_equipo(request, pk):
 
     # Verificar permisos
     if not request.user.is_superuser:
-        if not request.user.empresa or equipo.empresa != request.user.empresa:
+        if not get_empresa_activa(request) or equipo.empresa != get_empresa_activa(request):
             messages.error(request, 'No tienes permisos para ver este equipo.')
             return redirect('core:home')
 
@@ -655,7 +657,7 @@ def detalle_equipo(request, pk):
 
 
     # NUEVO: Obtener equipos anterior y siguiente (2025-11-19)
-    empresa = request.user.empresa if not request.user.is_superuser else equipo.empresa
+    empresa = get_empresa_activa(request) if not request.user.is_superuser else equipo.empresa
     equipos_empresa = Equipo.objects.filter(empresa=empresa).order_by('codigo_interno')
     equipos_ids = list(equipos_empresa.values_list('id', flat=True))
 
@@ -774,12 +776,12 @@ def editar_equipo(request, pk):
 
     # Verificar permisos
     if not request.user.is_superuser:
-        if not request.user.empresa or equipo.empresa != request.user.empresa:
+        if not get_empresa_activa(request) or equipo.empresa != get_empresa_activa(request):
             messages.error(request, 'No tienes permisos para editar este equipo.')
             return redirect('core:home')
 
     # NUEVO: Obtener equipos anterior y siguiente de la misma empresa
-    empresa = request.user.empresa if not request.user.is_superuser else equipo.empresa
+    empresa = get_empresa_activa(request) if not request.user.is_superuser else equipo.empresa
     equipos_empresa = Equipo.objects.filter(
         empresa=empresa
     ).order_by('codigo_interno')  # Ordenar por código interno
@@ -856,7 +858,7 @@ def eliminar_equipo(request, pk):
 
     # Verificar que el equipo pertenece a la empresa del usuario
     if not request.user.is_superuser:
-        if equipo.empresa != request.user.empresa:
+        if equipo.empresa != get_empresa_activa(request):
             messages.error(request, 'No tienes permiso para eliminar este equipo.')
             return redirect('core:home')
 
@@ -891,7 +893,7 @@ def dar_baja_equipo(request, equipo_pk):
 
     # Verificar permisos
     if not request.user.is_superuser:
-        if not request.user.empresa or equipo.empresa != request.user.empresa:
+        if not get_empresa_activa(request) or equipo.empresa != get_empresa_activa(request):
             messages.error(request, 'No tienes permisos para dar de baja este equipo.')
             return redirect('core:home')
 
@@ -922,7 +924,7 @@ def inactivar_equipo(request, equipo_pk):
 
     # Verificar permisos
     if not request.user.is_superuser:
-        if not request.user.empresa or equipo.empresa != request.user.empresa:
+        if not get_empresa_activa(request) or equipo.empresa != get_empresa_activa(request):
             messages.error(request, 'No tienes permisos para inactivar este equipo.')
             return redirect('core:home')
 
@@ -950,7 +952,7 @@ def activar_equipo(request, equipo_pk):
 
     # Verificar permisos
     if not request.user.is_superuser:
-        if not request.user.empresa or equipo.empresa != request.user.empresa:
+        if not get_empresa_activa(request) or equipo.empresa != get_empresa_activa(request):
             messages.error(request, 'No tienes permisos para activar este equipo.')
             return redirect('core:home')
 
@@ -984,10 +986,15 @@ def activar_equipo(request, equipo_pk):
 # FUNCIONES AUXILIARES PRIVADAS
 # ============================================================================
 
-def _get_user_empresa(user):
-    """Obtiene la empresa del usuario si no es superusuario"""
+def _get_user_empresa(user, request=None):
+    """
+    Obtiene la empresa del usuario si no es superusuario.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+    """
     if user.is_authenticated and not user.is_superuser:
-        return user.empresa
+        return get_empresa_activa(request) if request is not None else user.empresa
     return None
 
 
@@ -1227,7 +1234,7 @@ def ver_archivo_mantenimiento(request, mantenimiento_pk):
 
     # Verificar permisos
     if not request.user.is_superuser:
-        if not request.user.empresa or mantenimiento.equipo.empresa != request.user.empresa:
+        if not get_empresa_activa(request) or mantenimiento.equipo.empresa != get_empresa_activa(request):
             raise Http404("Archivo no encontrado")
 
     if not mantenimiento.documento_mantenimiento:
@@ -1360,7 +1367,7 @@ def equipos_eliminar_masivo(request):
             return redirect('core:home')
 
         # Verificar que todos los equipos pertenecen a la empresa del usuario
-        empresa = request.user.empresa
+        empresa = get_empresa_activa(request)
 
         if request.user.is_superuser:
             equipos = Equipo.objects.filter(id__in=equipos_ids)
@@ -1387,7 +1394,7 @@ def equipos_eliminar_masivo(request):
 
     # Vista GET - Confirmación
     equipos_ids = request.GET.getlist('ids')
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
 
     if request.user.is_superuser:
         equipos = Equipo.objects.filter(id__in=equipos_ids)

@@ -33,6 +33,7 @@ from ..constants import (
     ESTADO_ACTIVO, ESTADO_DE_BAJA,
     PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO, PRESTAMO_VENCIDO, PRESTAMO_CANCELADO,
 )
+from ..tenancy import get_empresa_activa
 
 
 @access_check
@@ -46,7 +47,7 @@ def listar_prestamos(request):
     """
     prestamos = PrestamoEquipo.objects.select_related(
         'equipo', 'empresa', 'prestado_por', 'recibido_por'
-    ).filter(empresa=request.user.empresa)
+    ).filter(empresa=get_empresa_activa(request))
 
     # Filtro por estado — sin filtro muestra solo activos/vencidos (no devueltos ni cancelados)
     estado_filter = request.GET.get('estado')
@@ -103,14 +104,14 @@ def crear_prestamo(request):
     Soporta préstamo de múltiples equipos simultáneamente.
     """
     # Verificar que el usuario tenga empresa asignada
-    if not request.user.empresa:
+    if not get_empresa_activa(request):
         messages.error(request, 'Tu usuario no tiene una empresa asignada. Contacta al administrador.')
         return redirect('core:dashboard')
 
     prestamo_ref = None
 
     if request.method == 'POST':
-        form = PrestamoEquipoForm(request.POST, empresa=request.user.empresa)
+        form = PrestamoEquipoForm(request.POST, empresa=get_empresa_activa(request))
         if form.is_valid():
             # Obtener equipos seleccionados
             equipos_seleccionados = form.cleaned_data.get('equipos', [])
@@ -122,7 +123,7 @@ def crear_prestamo(request):
                 agrupacion = AgrupacionPrestamo.objects.create(
                     nombre=f"Préstamo múltiple - {form.cleaned_data.get('nombre_prestatario')}",
                     prestatario_nombre=form.cleaned_data.get('nombre_prestatario'),
-                    empresa=request.user.empresa
+                    empresa=get_empresa_activa(request)
                 )
 
                 # Crear préstamos individuales para cada equipo
@@ -138,7 +139,7 @@ def crear_prestamo(request):
 
                     prestamo = PrestamoEquipo(
                         equipo=equipo,
-                        empresa=request.user.empresa,
+                        empresa=get_empresa_activa(request),
                         agrupacion=agrupacion,
                         nombre_prestatario=form.cleaned_data.get('nombre_prestatario'),
                         cedula_prestatario=form.cleaned_data.get('cedula_prestatario', ''),
@@ -164,7 +165,7 @@ def crear_prestamo(request):
             elif equipo_individual:
                 # PRÉSTAMO INDIVIDUAL - Usar el flujo original
                 prestamo = form.save(commit=False)
-                prestamo.empresa = request.user.empresa
+                prestamo.empresa = get_empresa_activa(request)
                 prestamo.prestado_por = request.user
 
                 # Verificación funcional de salida
@@ -189,7 +190,7 @@ def crear_prestamo(request):
         if desde_pk:
             try:
                 prestamo_ref = PrestamoEquipo.objects.get(
-                    pk=desde_pk, empresa=request.user.empresa
+                    pk=desde_pk, empresa=get_empresa_activa(request)
                 )
                 initial = {
                     'nombre_prestatario': prestamo_ref.nombre_prestatario,
@@ -202,7 +203,7 @@ def crear_prestamo(request):
                 }
             except PrestamoEquipo.DoesNotExist:
                 pass
-        form = PrestamoEquipoForm(empresa=request.user.empresa, initial=initial)
+        form = PrestamoEquipoForm(empresa=get_empresa_activa(request), initial=initial)
 
     context = {
         'form': form,
@@ -228,7 +229,7 @@ def detalle_prestamo(request, pk):
     )
 
     # Verificar que el usuario pertenezca a la misma empresa
-    if not request.user.is_superuser and prestamo.empresa != request.user.empresa:
+    if not request.user.is_superuser and prestamo.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para ver este préstamo.")
 
     # Calcular información adicional
@@ -237,7 +238,7 @@ def detalle_prestamo(request, pk):
 
     # Otros préstamos del mismo prestatario (si existen)
     otros_prestamos = PrestamoEquipo.objects.filter(
-        empresa=request.user.empresa,
+        empresa=get_empresa_activa(request),
         nombre_prestatario=prestamo.nombre_prestatario,
         estado_prestamo=PRESTAMO_ACTIVO
     ).exclude(pk=prestamo.pk).select_related('equipo')[:5]
@@ -266,7 +267,7 @@ def devolver_equipo(request, pk):
     )
 
     # Verificar que el usuario pertenezca a la misma empresa
-    if not request.user.is_superuser and prestamo.empresa != request.user.empresa:
+    if not request.user.is_superuser and prestamo.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para modificar este préstamo.")
 
     # Verificar que el préstamo esté activo
@@ -325,7 +326,7 @@ def dashboard_prestamos(request):
     """
     # Préstamos activos de la empresa
     prestamos_activos = PrestamoEquipo.objects.filter(
-        empresa=request.user.empresa,
+        empresa=get_empresa_activa(request),
         estado_prestamo=PRESTAMO_ACTIVO
     ).select_related('equipo').order_by('nombre_prestatario', '-fecha_prestamo')
 
@@ -398,7 +399,7 @@ def dashboard_prestamos(request):
 
     # Estadísticas de equipos disponibles/prestados
     total_equipos = Equipo.objects.filter(
-        empresa=request.user.empresa,
+        empresa=get_empresa_activa(request),
         estado=ESTADO_ACTIVO
     ).count()
     pks_prestados = prestamos_activos.values_list('equipo_id', flat=True)
@@ -407,7 +408,7 @@ def dashboard_prestamos(request):
 
     # Equipos disponibles agrupados por tipo/familia para la tabla inferior
     equipos_disp_qs = Equipo.objects.filter(
-        empresa=request.user.empresa,
+        empresa=get_empresa_activa(request),
         estado=ESTADO_ACTIVO,
     ).exclude(
         id__in=pks_prestados,
@@ -446,7 +447,7 @@ def historial_equipo(request, equipo_id):
     equipo = get_object_or_404(Equipo, pk=equipo_id)
 
     # Verificar que el usuario pertenezca a la misma empresa
-    if not request.user.is_superuser and equipo.empresa != request.user.empresa:
+    if not request.user.is_superuser and equipo.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para ver este equipo.")
 
     # Obtener todos los préstamos del equipo (activos y devueltos)
@@ -499,7 +500,7 @@ def editar_grupo_prestamos(request, prestamo_pk):
         pk=prestamo_pk
     )
 
-    if not request.user.is_superuser and referencia.empresa != request.user.empresa:
+    if not request.user.is_superuser and referencia.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para modificar estos préstamos.")
 
     # Todos los préstamos activos del mismo prestatario en la misma empresa
@@ -556,7 +557,7 @@ def devolver_todos(request, prestamo_pk):
         pk=prestamo_pk
     )
 
-    if not request.user.is_superuser and referencia.empresa != request.user.empresa:
+    if not request.user.is_superuser and referencia.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para modificar estos préstamos.")
 
     prestamos_grupo = PrestamoEquipo.objects.filter(
@@ -614,7 +615,7 @@ def equipos_disponibles(request):
     """
     # Obtener todos los equipos activos de la empresa
     equipos_activos = Equipo.objects.filter(
-        empresa=request.user.empresa,
+        empresa=get_empresa_activa(request),
         estado=ESTADO_ACTIVO
     ).select_related('empresa').prefetch_related(
         'prestamos'
@@ -646,7 +647,7 @@ def editar_prestamo(request, pk):
         pk=pk
     )
 
-    if not request.user.is_superuser and prestamo.empresa != request.user.empresa:
+    if not request.user.is_superuser and prestamo.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para modificar este préstamo.")
 
     if prestamo.estado_prestamo not in (PRESTAMO_ACTIVO, PRESTAMO_VENCIDO):
@@ -685,7 +686,7 @@ def cancelar_prestamo(request, pk):
         pk=pk
     )
 
-    if not request.user.is_superuser and prestamo.empresa != request.user.empresa:
+    if not request.user.is_superuser and prestamo.empresa != get_empresa_activa(request):
         return HttpResponseForbidden("No tienes permiso para cancelar este préstamo.")
 
     if prestamo.estado_prestamo != PRESTAMO_ACTIVO:
@@ -718,7 +719,7 @@ def equipos_prestados(request):
     """
     # Obtener préstamos activos de la empresa
     prestamos_activos = PrestamoEquipo.objects.filter(
-        empresa=request.user.empresa,
+        empresa=get_empresa_activa(request),
         estado_prestamo=PRESTAMO_ACTIVO
     ).select_related('equipo', 'equipo__empresa').order_by('equipo__codigo_interno')
 

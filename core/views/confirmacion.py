@@ -24,6 +24,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import numpy as np
 import logging
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger('core')
 
@@ -580,7 +581,7 @@ def confirmacion_metrologica(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
     # Obtener calibración específica si se pasa por GET, sino la última
     calibracion_id = request.GET.get('calibracion_id')
@@ -723,7 +724,7 @@ def intervalos_calibracion(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
     # Obtener calibración específica si se pasa por GET
     calibracion_id = request.GET.get('calibracion_id')
@@ -974,7 +975,7 @@ def generar_pdf_confirmacion(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
     # Obtener calibración específica si se pasa por GET, sino la última
     calibracion_id = request.GET.get('calibracion_id')
@@ -1281,9 +1282,9 @@ def generar_pdf_intervalos(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
-    logger.info(f"User.empresa: {request.user.empresa} (ID: {request.user.empresa.id if request.user.empresa else None})")
+    logger.info(f"User.empresa: {get_empresa_activa(request)} (ID: {get_empresa_activa(request).id if get_empresa_activa(request) else None})")
     logger.info(f"Equipo.empresa: {equipo.empresa} (ID: {equipo.empresa.id if equipo.empresa else None})")
     logger.info(f"User.is_superuser: {request.user.is_superuser}")
 
@@ -1560,7 +1561,7 @@ def guardar_confirmacion(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
     # Obtener última calibración
     ultima_cal = Calibracion.objects.filter(equipo=equipo).order_by('-fecha_calibracion').first()
@@ -1613,7 +1614,7 @@ def actualizar_formato_empresa(request):
         datos = json.loads(request.body)
 
         # Obtener la empresa del usuario
-        empresa = request.user.empresa
+        empresa = get_empresa_activa(request)
         if not empresa:
             return JsonResponse({'success': False, 'message': 'Usuario no tiene empresa asociada'}, status=400)
 
@@ -1743,7 +1744,7 @@ def preview_grafica_confirmacion(request, equipo_id):
         if request.user.is_superuser:
             get_object_or_404(Equipo, id=equipo_id)
         else:
-            get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+            get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
         data = json.loads(request.body)
         puntos = data.get('puntos_medicion', [])

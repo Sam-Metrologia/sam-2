@@ -16,6 +16,7 @@ from ..utils.analisis_financiero import (
     calcular_presupuesto_mensual_detallado
 )
 from ..models import Empresa
+from ..tenancy import get_empresa_activa
 
 
 @login_required
@@ -113,9 +114,9 @@ def exportar_analisis_financiero_excel(request):
 
         filename = f"analisis_financiero_sam_{current_year}_{today.strftime('%Y%m%d')}.xlsx"
 
-    elif getattr(user, 'rol_usuario', None) == 'GERENCIA' and user.empresa:
+    elif getattr(user, 'rol_usuario', None) == 'GERENCIA' and get_empresa_activa(request):
         # VISTA EMPRESA: Exportar análisis de costos CON PRESUPUESTO CALENDARIO
-        empresa = user.empresa
+        empresa = get_empresa_activa(request)
 
         # Calcular análisis financiero
         analisis_financiero = calcular_analisis_financiero_empresa(empresa, current_year, today)

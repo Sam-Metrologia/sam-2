@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +291,7 @@ def chat_ayuda(request):
 
         logger.info(
             f"Chat ayuda — usuario: {request.user.username} | "
-            f"empresa: {getattr(request.user.empresa, 'nombre', 'N/A')} | "
+            f"empresa: {getattr(get_empresa_activa(request), 'nombre', 'N/A')} | "
             f"pregunta: {pregunta[:80]}"
         )
 

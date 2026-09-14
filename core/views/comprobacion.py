@@ -19,6 +19,7 @@ from weasyprint import HTML
 
 from core.models import Comprobacion, Equipo
 from core.decorators_pdf import safe_pdf_response
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def comprobacion_metrologica_view(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
     comprobacion_id = request.GET.get('comprobacion_id')
 
     # Obtener comprobación existente si se proporciona ID
@@ -162,7 +163,7 @@ def guardar_comprobacion_json(request, equipo_id):
         if request.user.is_superuser:
             equipo = get_object_or_404(Equipo, id=equipo_id)
         else:
-            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
         datos = json.loads(request.body)
 
         comprobacion_id = datos.get('comprobacion_id')
@@ -388,7 +389,7 @@ def generar_pdf_comprobacion(request, equipo_id):
         if request.user.is_superuser:
             equipo = get_object_or_404(Equipo, id=equipo_id)
         else:
-            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
         comprobacion_id = request.GET.get('comprobacion_id')
 
         if not comprobacion_id:

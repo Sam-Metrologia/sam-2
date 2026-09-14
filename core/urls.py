@@ -47,6 +47,10 @@ urlpatterns = [
     # Sesión (NUEVO 2025-11-19)
     path('session-heartbeat/', views.session_heartbeat, name='session_heartbeat'),
 
+    # Selector de sede (multi-sede, GERENCIA de empresa matriz)
+    path('sede/cambiar/', views.cambiar_sede, name='cambiar_sede'),
+    path('sede/transferir-equipos/', views.transferir_equipos, name='transferir_equipos'),
+
     # Términos y Condiciones
     path('terminos-condiciones/', views.aceptar_terminos, name='aceptar_terminos'),
     path('terminos-condiciones/rechazar/', views.rechazar_terminos, name='rechazar_terminos'),
