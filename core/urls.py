@@ -166,6 +166,7 @@ urlpatterns = [
 
     # Usuarios
     path('usuarios/', views.listar_usuarios, name='listar_usuarios'),
+    path('usuarios/por-empresa/', views.usuarios_por_empresa, name='usuarios_por_empresa'),
     path('usuarios/añadir/', views.añadir_usuario, name='añadir_usuario'),
     path('usuarios/crear/', views.crear_usuario_empresa, name='crear_usuario_empresa'),
     path('usuarios/<int:pk>/editar/', views.editar_usuario, name='editar_usuario'), 
