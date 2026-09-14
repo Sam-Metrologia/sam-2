@@ -2,12 +2,73 @@
 # Signals for cache invalidation
 
 import logging
+from django.db.models import FileField, ImageField
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
-from .models import Equipo, Calibracion, Mantenimiento, Comprobacion, CustomUser, OnboardingProgress, PrestamoEquipo
+from django.core.files.storage import default_storage
+from .models import (
+    Equipo, Calibracion, Mantenimiento, Comprobacion, CustomUser, OnboardingProgress,
+    PrestamoEquipo, BajaEquipo, Procedimiento, Empresa, Documento,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _borrar_archivos_de_instancia(instance):
+    """
+    Borra del almacenamiento (Cloudflare R2/S3, o local en dev) todos los
+    FileField/ImageField con archivo real de una instancia que se acaba de
+    eliminar de la base de datos.
+
+    Django NUNCA hace esto solo: borrar un registro no borra el archivo que
+    apuntaba en el storage -- si nadie lo hace explícito, el archivo queda
+    huérfano ahí para siempre, siguiendo consumiendo (y cobrando) espacio
+    aunque el registro ya no exista. Esto se conecta a cualquier modelo con
+    campos de archivo via post_delete, así que cubre tanto el borrado normal
+    del día a día como el borrado en cascada de una empresa completa.
+    """
+    for field in instance._meta.get_fields():
+        if isinstance(field, (FileField, ImageField)):
+            try:
+                archivo = getattr(instance, field.name, None)
+            except Exception:
+                continue
+            if archivo and archivo.name:
+                try:
+                    archivo.delete(save=False)
+                except Exception as e:
+                    logger.warning(
+                        f"No se pudo borrar del storage el archivo '{archivo.name}' "
+                        f"({instance.__class__.__name__} id={instance.pk}): {e}"
+                    )
+
+
+@receiver(post_delete, sender=Equipo)
+@receiver(post_delete, sender=Calibracion)
+@receiver(post_delete, sender=Mantenimiento)
+@receiver(post_delete, sender=Comprobacion)
+@receiver(post_delete, sender=BajaEquipo)
+@receiver(post_delete, sender=PrestamoEquipo)
+@receiver(post_delete, sender=Procedimiento)
+@receiver(post_delete, sender=Empresa)
+def borrar_archivos_al_eliminar(sender, instance, **kwargs):
+    """Limpieza de storage al borrar cualquiera de estos modelos (individual o en cascada)."""
+    _borrar_archivos_de_instancia(instance)
+
+
+@receiver(post_delete, sender=Documento)
+def borrar_archivo_documento(sender, instance, **kwargs):
+    """
+    Documento.archivo_s3_path es un CharField con la ruta (no un FileField),
+    así que no lo cubre el helper genérico de arriba -- se borra aparte.
+    """
+    if instance.archivo_s3_path:
+        try:
+            if default_storage.exists(instance.archivo_s3_path):
+                default_storage.delete(instance.archivo_s3_path)
+        except Exception as e:
+            logger.warning(f"No se pudo borrar del storage el documento '{instance.archivo_s3_path}': {e}")
 
 
 def invalidate_dashboard_cache(empresa_id=None):
