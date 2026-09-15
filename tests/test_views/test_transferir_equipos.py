@@ -182,3 +182,54 @@ class TestTransferirEquiposEjecucion:
         assert equipo.empresa_id == matriz.id  # no se movió
         mensajes = [str(m) for m in response.context['messages']]
         assert any('Ninguno de los equipos seleccionados' in m for m in mensajes)
+
+    def test_dos_equipos_con_el_mismo_codigo_nuevo_no_revientan_con_500(self, client):
+        """
+        Si el código de dos equipos choca en destino y el usuario les pone el
+        MISMO código nuevo a ambos, no debe reventar con IntegrityError/500 —
+        debe pedir que se resuelva, igual que un choque contra la base de datos.
+        """
+        matriz, sede_a, user = self._gerente_con_matriz_y_sede()
+        client.force_login(user)
+        equipo_1 = EquipoFactory(empresa=matriz, codigo_interno='EQ-DUP-A')
+        equipo_2 = EquipoFactory(empresa=matriz, codigo_interno='EQ-DUP-B')
+        EquipoFactory(empresa=sede_a, codigo_interno='EQ-DUP-A')
+        EquipoFactory(empresa=sede_a, codigo_interno='EQ-DUP-B')
+
+        response = client.post(reverse('core:transferir_equipos'), {
+            'empresa_destino': sede_a.id,
+            'equipos': [equipo_1.pk, equipo_2.pk],
+            f'codigo_nuevo_{equipo_1.pk}': 'EQ-REPETIDO',
+            f'codigo_nuevo_{equipo_2.pk}': 'EQ-REPETIDO',
+        })
+
+        assert response.status_code == 200  # nunca 500
+        equipo_1.refresh_from_db()
+        equipo_2.refresh_from_db()
+        assert equipo_1.empresa_id == matriz.id  # ninguno se movió
+        assert equipo_2.empresa_id == matriz.id
+        assert equipo_1 in response.context['conflictos'] or equipo_2 in response.context['conflictos']
+
+    def test_codigos_nuevos_distintos_para_dos_equipos_si_funciona(self, client):
+        """Caso normal: dos equipos con choque, cada uno con un código nuevo distinto."""
+        matriz, sede_a, user = self._gerente_con_matriz_y_sede()
+        client.force_login(user)
+        equipo_1 = EquipoFactory(empresa=matriz, codigo_interno='EQ-DUP-C')
+        equipo_2 = EquipoFactory(empresa=matriz, codigo_interno='EQ-DUP-D')
+        EquipoFactory(empresa=sede_a, codigo_interno='EQ-DUP-C')
+        EquipoFactory(empresa=sede_a, codigo_interno='EQ-DUP-D')
+
+        response = client.post(reverse('core:transferir_equipos'), {
+            'empresa_destino': sede_a.id,
+            'equipos': [equipo_1.pk, equipo_2.pk],
+            f'codigo_nuevo_{equipo_1.pk}': 'EQ-NUEVO-1',
+            f'codigo_nuevo_{equipo_2.pk}': 'EQ-NUEVO-2',
+        })
+
+        assert response.status_code == 302
+        equipo_1.refresh_from_db()
+        equipo_2.refresh_from_db()
+        assert equipo_1.empresa_id == sede_a.id
+        assert equipo_2.empresa_id == sede_a.id
+        assert equipo_1.codigo_interno == 'EQ-NUEVO-1'
+        assert equipo_2.codigo_interno == 'EQ-NUEVO-2'

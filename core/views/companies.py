@@ -1019,28 +1019,35 @@ def transferir_equipos(request):
                     )
                 else:
                     cambios = []  # (equipo, codigo_nuevo_o_None)
+                    # Códigos que ya va a tener empresa_destino tras esta transferencia
+                    # (los que ya tenía + los nuevos que se van asignando en este mismo
+                    # lote) — sin esto, dos equipos con el mismo código nuevo pasarían
+                    # ambos la validación (ninguno choca todavía en la BD) y el segundo
+                    # equipo.save() reventaría con IntegrityError en vez de un mensaje claro.
+                    codigos_en_destino = set(
+                        empresa_destino.equipos.values_list('codigo_interno', flat=True)
+                    )
                     for equipo in equipos:
-                        choca = Equipo.objects.filter(
-                            empresa=empresa_destino, codigo_interno=equipo.codigo_interno
-                        ).exists()
+                        choca = equipo.codigo_interno in codigos_en_destino
                         if not choca:
                             cambios.append((equipo, None))
+                            codigos_en_destino.add(equipo.codigo_interno)
                             continue
 
                         nuevo_codigo = request.POST.get(f'codigo_nuevo_{equipo.pk}', '').strip()
                         if not nuevo_codigo:
                             conflictos.append(equipo)
-                        elif Equipo.objects.filter(
-                            empresa=empresa_destino, codigo_interno=nuevo_codigo
-                        ).exists():
+                        elif nuevo_codigo in codigos_en_destino:
                             messages.error(
                                 request,
                                 f'El código "{nuevo_codigo}" para {equipo.codigo_interno} '
-                                f'también existe en {empresa_destino.nombre}.'
+                                f'también existe en {empresa_destino.nombre} (o se repite con otro '
+                                f'equipo de esta misma transferencia).'
                             )
                             conflictos.append(equipo)
                         else:
                             cambios.append((equipo, nuevo_codigo))
+                            codigos_en_destino.add(nuevo_codigo)
 
                     if conflictos:
                         messages.warning(

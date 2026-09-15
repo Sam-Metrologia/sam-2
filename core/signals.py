@@ -2,6 +2,8 @@
 # Signals for cache invalidation
 
 import logging
+import threading
+from contextlib import contextmanager
 from django.db.models import FileField, ImageField
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -13,6 +15,33 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Ver collect_file_cleanup_errors() más abajo — permite a un borrado en lote
+# (ej. la purga automática de empresas) enterarse si algún archivo no se pudo
+# borrar del storage, en vez de que quede solo como advertencia en el log.
+_file_cleanup_state = threading.local()
+
+
+@contextmanager
+def collect_file_cleanup_errors():
+    """
+    Úsalo alrededor de un borrado (normalmente dentro de una transacción)
+    para recibir la lista de archivos que no se pudieron borrar del storage.
+
+    Sin esto, un fallo al borrar un archivo (ej. R2 caído un momento) solo
+    queda como warning en el log — en un proceso automático sin revisión
+    humana (como la purga mensual de empresas), eso significa que las filas
+    de la base de datos se borran igual mientras el archivo real queda
+    huérfano para siempre, sin que nadie se entere. Con este context manager,
+    el llamador puede revisar la lista al salir y decidir, por ejemplo,
+    cancelar la transacción completa si no quedó vacía.
+    """
+    errores = []
+    _file_cleanup_state.errores = errores
+    try:
+        yield errores
+    finally:
+        _file_cleanup_state.errores = None
 
 
 def _borrar_archivos_de_instancia(instance):
@@ -42,6 +71,9 @@ def _borrar_archivos_de_instancia(instance):
                         f"No se pudo borrar del storage el archivo '{archivo.name}' "
                         f"({instance.__class__.__name__} id={instance.pk}): {e}"
                     )
+                    errores = getattr(_file_cleanup_state, 'errores', None)
+                    if errores is not None:
+                        errores.append(f"{instance.__class__.__name__} id={instance.pk}: {archivo.name} ({e})")
 
 
 @receiver(post_delete, sender=Equipo)
@@ -69,6 +101,9 @@ def borrar_archivo_documento(sender, instance, **kwargs):
                 default_storage.delete(instance.archivo_s3_path)
         except Exception as e:
             logger.warning(f"No se pudo borrar del storage el documento '{instance.archivo_s3_path}': {e}")
+            errores = getattr(_file_cleanup_state, 'errores', None)
+            if errores is not None:
+                errores.append(f"Documento id={instance.pk}: {instance.archivo_s3_path} ({e})")
 
 
 def invalidate_dashboard_cache(empresa_id=None):

@@ -5,11 +5,12 @@ empresas eliminadas hace 180+ días, junto con sus usuarios huérfanos.
 import pytest
 from datetime import timedelta
 from io import StringIO
+from unittest.mock import patch
 from django.core.management import call_command
 from django.utils import timezone
 
-from core.models import Empresa, CustomUser
-from tests.factories import EmpresaFactory, UserFactory
+from core.models import Empresa, CustomUser, Equipo
+from tests.factories import EmpresaFactory, EquipoFactory, UserFactory
 
 
 def _soft_delete_hace(empresa, dias):
@@ -90,3 +91,30 @@ class TestCleanupDeletedCompanies:
         call_command('cleanup_deleted_companies', execute=True, days=90, stdout=StringIO())
 
         assert not Empresa.objects.filter(pk=empresa.pk).exists()
+
+    def test_fallo_al_borrar_archivo_cancela_todo_el_borrado_de_esa_empresa(self, sample_image):
+        """
+        Si falla borrar un archivo del storage (ej. R2 caído un momento), no debe
+        borrarse nada de esa empresa de la base de datos tampoco -- se reintenta
+        el próximo mes en vez de perder el archivo real mientras el registro
+        desaparece silenciosamente.
+        """
+        empresa = EmpresaFactory()
+        equipo = EquipoFactory(empresa=empresa)
+        equipo.imagen_equipo = sample_image
+        equipo.save()
+        usuario = UserFactory(empresa=empresa)
+        _soft_delete_hace(empresa, 200)
+
+        with patch(
+            'django.core.files.storage.FileSystemStorage.delete',
+            side_effect=OSError('R2 no disponible'),
+        ):
+            stdout = StringIO()
+            call_command('cleanup_deleted_companies', execute=True, stdout=stdout)
+
+        # Nada se borró: ni la empresa, ni el equipo, ni el usuario.
+        assert Empresa.objects.filter(pk=empresa.pk).exists()
+        assert Equipo.objects.filter(pk=equipo.pk).exists()
+        assert CustomUser.objects.filter(pk=usuario.pk).exists()
+        assert 'ERROR' in stdout.getvalue()

@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from core.models import Empresa, CustomUser
+from core.signals import collect_file_cleanup_errors
 import logging
 
 logger = logging.getLogger(__name__)
@@ -178,11 +179,25 @@ class Command(BaseCommand):
 
         Los archivos en storage (logo de la empresa, documentos, imágenes de
         equipo, etc.) se limpian solos vía los signals post_delete registrados
-        en core/signals.py — no hace falta tocarlos aquí.
+        en core/signals.py. Si alguno falla (ej. R2 caído un momento), no se
+        silencia: se cancela TODA la transacción de esta empresa (nada se
+        borra de la base de datos tampoco) y se reintenta el próximo mes —
+        antes esto se hacía con revisión humana cada vez, así que un fallo a
+        medias nunca pasaba inadvertido; ahora que es 100% automático, más
+        vale reintentar completo que dejar archivos huérfanos sin que nadie
+        se entere.
         """
         usuario_ids = list(empresa.usuarios_empresa.values_list('id', flat=True))
         with transaction.atomic():
-            empresa.delete()
-            if usuario_ids:
-                CustomUser.objects.filter(id__in=usuario_ids).delete()
+            with collect_file_cleanup_errors() as errores_storage:
+                empresa.delete()
+                if usuario_ids:
+                    CustomUser.objects.filter(id__in=usuario_ids).delete()
+
+                if errores_storage:
+                    raise RuntimeError(
+                        f"No se pudieron borrar {len(errores_storage)} archivo(s) del storage "
+                        f"para '{empresa.nombre}' — se cancela el borrado completo, se reintentará "
+                        f"el próximo mes. Detalle: {'; '.join(errores_storage[:5])}"
+                    )
         return len(usuario_ids)

@@ -106,10 +106,28 @@ class AdminService:
                         empresas = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False)
                         output_messages.append(f'[MODO PRUEBA] Se enviarían notificaciones consolidadas a {empresas.count()} empresas')
                         empresas_processed = empresas.count()
-                    else:
+                    elif days_ahead == 0:
+                        # "Ahora mismo, solo lo que vence HOY" — se mantiene igual, es lo que
+                        # el botón siempre dijo que hacía.
                         emails_sent = NotificationScheduler.check_all_reminders()
                         empresas_processed = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False).count()
-                        output_messages.append(f'Notificaciones consolidadas enviadas: {emails_sent} emails')
+                        output_messages.append(f'Alertas de vencimiento HOY enviadas: {emails_sent} emails')
+                    else:
+                        # "Consolidado (Recomendado)" — antes barría umbrales 30/15/7/0 en un
+                        # solo llamado; ahora esa cobertura está repartida en 4 recordatorios
+                        # de calendario fijo, así que se disparan los 4 juntos para que este
+                        # botón siga siendo el envío manual "completo" que su nombre promete.
+                        enviados_semanal = NotificationScheduler.send_weekly_upcoming_digests()
+                        enviados_quincenal = NotificationScheduler.send_biweekly_upcoming_digests()
+                        enviados_mensual = NotificationScheduler.send_monthly_ahead_digests()
+                        enviados_hoy = NotificationScheduler.send_due_today_alerts()
+                        emails_sent = enviados_semanal + enviados_quincenal + enviados_mensual + enviados_hoy
+                        empresas_processed = Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False).count()
+                        output_messages.append(
+                            f'Notificaciones consolidadas enviadas: {emails_sent} emails '
+                            f'(semanal: {enviados_semanal}, quincenal: {enviados_quincenal}, '
+                            f'mensual: {enviados_mensual}, vence hoy: {enviados_hoy})'
+                        )
 
                 elif notification_type == 'weekly':
                     if dry_run:

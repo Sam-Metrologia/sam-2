@@ -161,26 +161,57 @@ class TestAdminServiceExecuteNotificacionesTodasEmpresas:
 
     @pytest.mark.django_db
     @patch('core.notifications.NotificationScheduler.check_all_reminders', return_value=5)
-    def test_consolidated_sin_dry_run_llama_check_all_reminders(self, mock_check):
-        """consolidated sin dry_run llama check_all_reminders y retorna emails_sent."""
+    def test_consolidated_con_days_ahead_cero_llama_check_all_reminders(self, mock_check):
+        """
+        consolidated con days_ahead=0 ('AHORA MISMO, solo lo que vence HOY') sigue
+        llamando check_all_reminders — ese botón siempre dijo que hacía justo eso.
+        """
         from core.admin_services import AdminService
         resultado = AdminService.execute_notifications(
-            notification_type='consolidated', dry_run=False
+            notification_type='consolidated', dry_run=False, days_ahead=0
         )
 
         assert resultado['success'] is True
         assert resultado['details']['emails_sent'] == 5
         mock_check.assert_called_once()
 
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_due_today_alerts', return_value=1)
+    @patch('core.notifications.NotificationScheduler.send_monthly_ahead_digests', return_value=2)
+    @patch('core.notifications.NotificationScheduler.send_biweekly_upcoming_digests', return_value=3)
+    @patch('core.notifications.NotificationScheduler.send_weekly_upcoming_digests', return_value=4)
+    def test_consolidated_sin_dry_run_dispara_los_4_digests(
+        self, mock_weekly, mock_biweekly, mock_monthly, mock_today
+    ):
+        """
+        consolidated sin dry_run (days_ahead != 0, el 'Recomendado') dispara los 4
+        recordatorios de calendario fijo y suma sus envíos — antes de la reescritura
+        del sistema de notificaciones, este botón hacía un solo barrido de umbrales
+        30/15/7/0; ahora esa cobertura está repartida en 4 funciones, así que el
+        botón debe seguir siendo el envío manual "completo" que su nombre promete.
+        """
+        from core.admin_services import AdminService
+        resultado = AdminService.execute_notifications(
+            notification_type='consolidated', dry_run=False, days_ahead=15
+        )
+
+        assert resultado['success'] is True
+        assert resultado['details']['emails_sent'] == 4 + 3 + 2 + 1
+        mock_weekly.assert_called_once()
+        mock_biweekly.assert_called_once()
+        mock_monthly.assert_called_once()
+        mock_today.assert_called_once()
+
     @patch('core.models.Empresa')
     def test_consolidated_con_dry_run_no_envia(self, mock_empresa_cls):
-        """consolidated con dry_run=True no llama check_all_reminders."""
+        """consolidated con dry_run=True no llama a ninguna función de envío real."""
         from core.admin_services import AdminService
         mock_qs = MagicMock()
         mock_qs.count.return_value = 3
         mock_empresa_cls.objects.filter.return_value = mock_qs
 
-        with patch('core.notifications.NotificationScheduler.check_all_reminders') as mock_check:
+        with patch('core.notifications.NotificationScheduler.check_all_reminders') as mock_check, \
+             patch('core.notifications.NotificationScheduler.send_weekly_upcoming_digests') as mock_weekly:
             resultado = AdminService.execute_notifications(
                 notification_type='consolidated', dry_run=True
             )
@@ -189,6 +220,7 @@ class TestAdminServiceExecuteNotificacionesTodasEmpresas:
         assert 'MODO PRUEBA' in resultado['output']
         assert resultado['details']['empresas_processed'] == 3
         mock_check.assert_not_called()
+        mock_weekly.assert_not_called()
 
     @pytest.mark.django_db
     @patch('core.notifications.NotificationScheduler.send_weekly_summaries', return_value=3)
@@ -294,15 +326,27 @@ class TestAdminServiceExecuteNotificacionesTodasEmpresas:
     @pytest.mark.django_db
     @patch('core.notifications.NotificationScheduler.check_all_reminders', side_effect=Exception('error de red'))
     def test_excepcion_retorna_error(self, mock_check):
-        """Si ocurre excepción, retorna success=False."""
+        """Si ocurre excepción (rama days_ahead=0), retorna success=False."""
         from core.admin_services import AdminService
         resultado = AdminService.execute_notifications(
-            notification_type='consolidated', dry_run=False
+            notification_type='consolidated', dry_run=False, days_ahead=0
         )
 
         assert resultado['success'] is False
         assert 'error de red' in resultado['error']
         assert 'timestamp' in resultado
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_weekly_upcoming_digests', side_effect=Exception('error de red'))
+    def test_excepcion_en_digest_consolidado_retorna_error(self, mock_weekly):
+        """Si ocurre excepción en cualquiera de los 4 digests (rama 'Recomendado'), retorna success=False."""
+        from core.admin_services import AdminService
+        resultado = AdminService.execute_notifications(
+            notification_type='consolidated', dry_run=False, days_ahead=15
+        )
+
+        assert resultado['success'] is False
+        assert 'error de red' in resultado['error']
 
 
 # ============================================================================
