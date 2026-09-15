@@ -1,8 +1,10 @@
 # core/management/commands/cleanup_deleted_companies.py
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.utils import timezone
-from core.models import Empresa
+from core.models import Empresa, CustomUser
+from core.signals import collect_file_cleanup_errors
 import logging
 
 logger = logging.getLogger(__name__)
@@ -81,8 +83,11 @@ class Command(BaseCommand):
 
         if days_deleted >= retention_days:
             if execute:
-                empresa.delete()
-                self.stdout.write(self.style.SUCCESS(f'OK - Empresa {empresa.nombre} eliminada permanentemente.'))
+                usuarios_count = self._eliminar_empresa_y_usuarios(empresa)
+                self.stdout.write(self.style.SUCCESS(
+                    f'OK - Empresa {empresa.nombre} eliminada permanentemente '
+                    f'(junto con {usuarios_count} usuario(s) huérfano(s)).'
+                ))
                 logger.info(f'Empresa {empresa.nombre} (ID:{company_id}) eliminada permanentemente por comando manual')
             else:
                 self.stdout.write(self.style.WARNING(f'ADVERTENCIA - Empresa {empresa.nombre} SERIA eliminada permanentemente.'))
@@ -134,8 +139,10 @@ class Command(BaseCommand):
             if execute:
                 try:
                     empresa_nombre = empresa.nombre
-                    empresa.delete()
-                    self.stdout.write(self.style.SUCCESS(f'  OK - Eliminada permanentemente'))
+                    usuarios_count = self._eliminar_empresa_y_usuarios(empresa)
+                    self.stdout.write(self.style.SUCCESS(
+                        f'  OK - Eliminada permanentemente (junto con {usuarios_count} usuario(s) huérfano(s))'
+                    ))
                     logger.info(f'Empresa {empresa_nombre} eliminada permanentemente por comando automático')
                     deleted_count += 1
                 except Exception as e:
@@ -157,3 +164,40 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f'ADVERTENCIA - Empresas que SERIAN eliminadas: {total_companies}'))
             self.stdout.write('')
             self.stdout.write(self.style.HTTP_INFO('Para ejecutar la eliminacion real, use: --execute'))
+
+    def _eliminar_empresa_y_usuarios(self, empresa):
+        """
+        Elimina la empresa permanentemente junto con sus usuarios.
+
+        CustomUser.empresa usa on_delete=SET_NULL (a propósito, para no arrastrar
+        historial de otras tablas que referencian al usuario) — Django NO borra
+        los usuarios solo al borrar la empresa, los deja huérfanos (empresa=None)
+        para siempre. Si la empresa ya no existe, sus usuarios tampoco deberían
+        seguir ahí, así que se capturan los IDs ANTES de borrar (después del
+        delete ya habrían quedado con empresa=None y no se podrían identificar)
+        y se borran aparte, en la misma transacción.
+
+        Los archivos en storage (logo de la empresa, documentos, imágenes de
+        equipo, etc.) se limpian solos vía los signals post_delete registrados
+        en core/signals.py. Si alguno falla (ej. R2 caído un momento), no se
+        silencia: se cancela TODA la transacción de esta empresa (nada se
+        borra de la base de datos tampoco) y se reintenta el próximo mes —
+        antes esto se hacía con revisión humana cada vez, así que un fallo a
+        medias nunca pasaba inadvertido; ahora que es 100% automático, más
+        vale reintentar completo que dejar archivos huérfanos sin que nadie
+        se entere.
+        """
+        usuario_ids = list(empresa.usuarios_empresa.values_list('id', flat=True))
+        with transaction.atomic():
+            with collect_file_cleanup_errors() as errores_storage:
+                empresa.delete()
+                if usuario_ids:
+                    CustomUser.objects.filter(id__in=usuario_ids).delete()
+
+                if errores_storage:
+                    raise RuntimeError(
+                        f"No se pudieron borrar {len(errores_storage)} archivo(s) del storage "
+                        f"para '{empresa.nombre}' — se cancela el borrado completo, se reintentará "
+                        f"el próximo mes. Detalle: {'; '.join(errores_storage[:5])}"
+                    )
+        return len(usuario_ids)

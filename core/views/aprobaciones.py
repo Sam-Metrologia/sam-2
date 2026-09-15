@@ -13,6 +13,7 @@ from django.db.models import Q
 import logging
 
 from ..models import Calibracion, Comprobacion
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def pagina_aprobaciones(request):
     Técnicos solo ven sus documentos pendientes/rechazados.
     """
     user = request.user
-    empresa = user.empresa
+    empresa = get_empresa_activa(request)
 
     # Verificar que el usuario tenga empresa
     if not empresa:
@@ -199,7 +200,7 @@ def aprobar_confirmacion(request, calibracion_id):
         else:
             calibracion = get_object_or_404(
                 Calibracion, id=calibracion_id,
-                equipo__empresa=request.user.empresa
+                equipo__empresa=get_empresa_activa(request)
             )
 
         # Verificar permisos
@@ -344,7 +345,7 @@ def rechazar_confirmacion(request, calibracion_id):
         else:
             calibracion = get_object_or_404(
                 Calibracion, id=calibracion_id,
-                equipo__empresa=request.user.empresa
+                equipo__empresa=get_empresa_activa(request)
             )
 
         # Verificar permisos
@@ -404,7 +405,7 @@ def aprobar_intervalos(request, calibracion_id):
         else:
             calibracion = get_object_or_404(
                 Calibracion, id=calibracion_id,
-                equipo__empresa=request.user.empresa
+                equipo__empresa=get_empresa_activa(request)
             )
 
         # Verificar permisos
@@ -630,7 +631,7 @@ def rechazar_intervalos(request, calibracion_id):
         else:
             calibracion = get_object_or_404(
                 Calibracion, id=calibracion_id,
-                equipo__empresa=request.user.empresa
+                equipo__empresa=get_empresa_activa(request)
             )
 
         # Verificar permisos
@@ -689,7 +690,7 @@ def aprobar_comprobacion(request, comprobacion_id):
         else:
             comprobacion = get_object_or_404(
                 Comprobacion, id=comprobacion_id,
-                equipo__empresa=request.user.empresa
+                equipo__empresa=get_empresa_activa(request)
             )
 
         # Verificar permisos
@@ -869,7 +870,7 @@ def rechazar_comprobacion(request, comprobacion_id):
         else:
             comprobacion = get_object_or_404(
                 Comprobacion, id=comprobacion_id,
-                equipo__empresa=request.user.empresa
+                equipo__empresa=get_empresa_activa(request)
             )
 
         # Verificar permisos

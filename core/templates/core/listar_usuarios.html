@@ -16,6 +16,9 @@
                     Añadir Nuevo Usuario
                 </a>
                 {% endif %}
+                <a href="{% url 'core:usuarios_por_empresa' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Ver agrupados por empresa
+                </a>
                 <a href="{% url 'core:dashboard' %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
                     Volver al Dashboard
                 </a>

@@ -412,43 +412,191 @@ class NotificationScheduler:
             return False
 
     @staticmethod
-    def check_all_reminders():
+    def send_periodic_digest(empresa, fecha_desde, fecha_hasta, label, urgency_level='medium'):
         """
-        Revisa TODAS las empresas y envía recordatorios consolidados.
-        Solo para días configurados: 30, 15, 7, 0 (día de vencimiento)
+        Envía UN digest consolidado con las actividades (calibraciones,
+        mantenimientos, comprobaciones) próximas a vencer entre fecha_desde
+        y fecha_hasta (ambas inclusive) — nunca más de un correo por
+        llamada, sin importar cuántos equipos caigan en la ventana.
+
+        Es la base de los 4 recordatorios de calendario fijo (semanal,
+        quincenal, mensual-adelantado y día exacto) que reemplazan el
+        antiguo sistema de umbrales relativos (30/15/7/0 días): con ese
+        sistema, una empresa con muchos equipos terminaba recibiendo el
+        consolidado casi todos los días, porque cualquier equipo cruzando
+        cualquiera de los 4 umbrales disparaba un reenvío completo.
+
+        No incluye actividades VENCIDAS — esas ya las cubre el recordatorio
+        semanal de vencidas (send_weekly_overdue_reminders, lunes), que
+        tiene su propia lógica de máximo 3 avisos por actividad.
+
+        Retorna True si mandó el correo, None si no había nada que avisar
+        (no es un error), o False si falló el envío. Los métodos que llaman
+        esto en lote (send_weekly_upcoming_digests, etc.) solo cuentan los
+        True como "enviados" — para que el conteo en los logs y en la
+        respuesta del endpoint programado refleje correos reales, no
+        empresas simplemente revisadas sin nada que decirles.
+        """
+        recipients = NotificationService._get_company_recipients(empresa)
+        if not recipients:
+            logger.warning(f"No recipients found for periodic digest: {empresa.nombre}")
+            return False
+
+        equipos_calibracion = empresa.equipos.filter(
+            proxima_calibracion__gte=fecha_desde,
+            proxima_calibracion__lte=fecha_hasta,
+            estado__in=['Activo', 'En Mantenimiento', 'En Comprobación']
+        ).select_related('empresa').order_by('proxima_calibracion')
+
+        equipos_mantenimiento = empresa.equipos.filter(
+            proximo_mantenimiento__gte=fecha_desde,
+            proximo_mantenimiento__lte=fecha_hasta,
+            estado__in=['Activo', 'En Calibración', 'En Comprobación']
+        ).select_related('empresa').order_by('proximo_mantenimiento')
+
+        equipos_comprobacion = empresa.equipos.filter(
+            proxima_comprobacion__gte=fecha_desde,
+            proxima_comprobacion__lte=fecha_hasta,
+            estado__in=[ESTADO_ACTIVO, ESTADO_EN_CALIBRACION, 'En Mantenimiento']
+        ).select_related('empresa').order_by('proxima_comprobacion')
+
+        total_proximas = (equipos_calibracion.count() + equipos_mantenimiento.count()
+                           + equipos_comprobacion.count())
+
+        if total_proximas == 0:
+            logger.info(f"Sin actividades para '{label}' en {empresa.nombre} — no se envía correo")
+            return None  # no es error — simplemente no había nada que avisar, no se envió correo
+
+        context = {
+            'empresa': empresa,
+            'equipos_calibracion_proximas': equipos_calibracion,
+            'equipos_mantenimiento_proximos': equipos_mantenimiento,
+            'equipos_comprobacion_proximas': equipos_comprobacion,
+            # Este digest es solo de próximas — lo vencido lo cubre el recordatorio semanal aparte
+            'equipos_calibracion_vencidas': Equipo.objects.none(),
+            'equipos_mantenimiento_vencidos': Equipo.objects.none(),
+            'equipos_comprobacion_vencidas': Equipo.objects.none(),
+            'total_proximas': total_proximas,
+            'total_vencidas': 0,
+            'total_actividades': total_proximas,
+            'days_ahead': (fecha_hasta - fecha_desde).days,
+            'target_date': fecha_hasta,
+            'urgency_level': urgency_level,
+            'urgency_text': label,
+            'site_name': 'SAM Metrologia',
+            'today': timezone.localdate(),
+        }
+
+        try:
+            if not configure_email_settings():
+                logger.error("Failed to configure email settings")
+                return False
+
+            subject = f"{label} - {empresa.nombre}"
+            text_content = render_to_string('emails/consolidated_reminder.txt', context)
+            html_content = render_to_string('emails/consolidated_reminder.html', context)
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=recipients
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            logger.info(f"Digest '{label}' enviado a {empresa.nombre}: {total_proximas} actividades")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send periodic digest '{label}' for {empresa.nombre}: {e}")
+            return False
+
+    @staticmethod
+    def _empresas_activas_para_digest():
+        return Empresa.objects.filter(estado_suscripcion='Activo', is_deleted=False).prefetch_related('equipos')
+
+    @staticmethod
+    def send_weekly_upcoming_digests():
+        """Cada martes: actividades que vencen esta semana (hoy + 6 días)."""
+        today = timezone.localdate()
+        sent_count = 0
+        for empresa in NotificationScheduler._empresas_activas_para_digest():
+            if NotificationScheduler.send_periodic_digest(
+                empresa, today, today + timedelta(days=6),
+                'Recordatorio semanal — actividades de esta semana'
+            ) is True:
+                sent_count += 1
+        logger.info(f"Weekly upcoming digests completed. Sent: {sent_count}")
+        return sent_count
+
+    @staticmethod
+    def send_biweekly_upcoming_digests():
+        """Día 15 de cada mes: actividades de los próximos 15 días."""
+        today = timezone.localdate()
+        sent_count = 0
+        for empresa in NotificationScheduler._empresas_activas_para_digest():
+            if NotificationScheduler.send_periodic_digest(
+                empresa, today, today + timedelta(days=15),
+                'Recordatorio quincenal — próximos 15 días'
+            ) is True:
+                sent_count += 1
+        logger.info(f"Biweekly upcoming digests completed. Sent: {sent_count}")
+        return sent_count
+
+    @staticmethod
+    def send_monthly_ahead_digests():
+        """
+        Día 1 de cada mes: actividades de TODO el mes SIGUIENTE (no el actual).
+        Mandado el día 1, esto siempre da entre 30 y 60 días de anticipación
+        — nunca menos de un mes completo, incluso para algo que vence el
+        día 2 o 3 del mes siguiente.
         """
         today = timezone.localdate()
-        reminder_days = [30, 15, 7, 0]  # Días antes del vencimiento (0 = día de vencimiento)
+        primer_dia_prox_mes = today.replace(day=1) + relativedelta(months=1)
+        ultimo_dia_prox_mes = (primer_dia_prox_mes + relativedelta(months=1)) - timedelta(days=1)
 
         sent_count = 0
-        total_companies = 0
-
-        # Obtener todas las empresas activas (excluir eliminadas)
-        empresas = Empresa.objects.filter(
-            estado_suscripcion='Activo',
-            is_deleted=False
-        ).prefetch_related('equipos')
-
-        for empresa in empresas:
-            total_companies += 1
-
-            for days in reminder_days:
-                target_date = today + timedelta(days=days)
-
-                # Verificar si hay equipos con actividades en esa fecha
-                has_activities = (
-                    empresa.equipos.filter(proxima_calibracion=target_date, estado__in=['Activo', 'En Mantenimiento', 'En Comprobación']).exists() or
-                    empresa.equipos.filter(proximo_mantenimiento=target_date, estado__in=['Activo', 'En Calibración', 'En Comprobación']).exists() or
-                    empresa.equipos.filter(proxima_comprobacion=target_date, estado__in=[ESTADO_ACTIVO, ESTADO_EN_CALIBRACION, 'En Mantenimiento']).exists()
-                )
-
-                if has_activities:
-                    if NotificationScheduler.send_consolidated_reminder(empresa, days):
-                        sent_count += 1
-                        logger.info(f"Consolidated reminder sent to {empresa.nombre} for activities due in {days} days")
-
-        logger.info(f"Consolidated reminders check completed. Sent: {sent_count} emails to {total_companies} companies")
+        for empresa in NotificationScheduler._empresas_activas_para_digest():
+            if NotificationScheduler.send_periodic_digest(
+                empresa, primer_dia_prox_mes, ultimo_dia_prox_mes,
+                f'Planeación mensual — actividades de {primer_dia_prox_mes.strftime("%B %Y")}'
+            ) is True:
+                sent_count += 1
+        logger.info(f"Monthly ahead digests completed. Sent: {sent_count}")
         return sent_count
+
+    @staticmethod
+    def send_due_today_alerts():
+        """Todos los días: alerta de lo que vence exactamente HOY."""
+        today = timezone.localdate()
+        sent_count = 0
+        for empresa in NotificationScheduler._empresas_activas_para_digest():
+            if NotificationScheduler.send_periodic_digest(
+                empresa, today, today, 'VENCE HOY', urgency_level='critical'
+            ) is True:
+                sent_count += 1
+        logger.info(f"Due-today alerts completed. Sent: {sent_count}")
+        return sent_count
+
+    @staticmethod
+    def check_all_reminders():
+        """
+        Alerta del día exacto de vencimiento.
+
+        Antes revisaba 4 umbrales relativos (30/15/7/0 días) y reenviaba el
+        consolidado completo cada vez que un equipo cruzaba cualquiera de
+        ellos — con volúmenes grandes de equipos, esto terminaba mandando
+        correo casi a diario. Ahora es solo la pieza de "día exacto" del
+        nuevo esquema de 4 recordatorios de calendario fijo: semanal
+        (send_weekly_upcoming_digests), quincenal
+        (send_biweekly_upcoming_digests), mensual-adelantado
+        (send_monthly_ahead_digests), y esta alerta puntual del día.
+
+        Se mantiene el nombre por compatibilidad — es lo que dispara el
+        cron diario existente (trigger_daily_notifications).
+        """
+        return NotificationScheduler.send_due_today_alerts()
 
     @staticmethod
     def check_calibration_reminders():

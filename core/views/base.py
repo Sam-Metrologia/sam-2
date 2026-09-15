@@ -83,6 +83,8 @@ from ..templatetags.file_tags import secure_file_url, pdf_image_url
 # Importar optimizaciones
 from ..optimizations import OptimizedQueries, CacheHelpers
 from ..monitoring import monitor_view
+from ..tenancy import get_empresa_activa, get_empresas_seleccionables, SESSION_KEY_EMPRESA_ACTIVA
+from django.utils.http import url_has_allowed_host_and_scheme
 
 
 # =============================================================================
@@ -181,7 +183,7 @@ def trial_check(view_func):
             return view_func(request, *args, **kwargs)
 
         if request.user.is_authenticated and hasattr(request.user, 'empresa'):
-            empresa = request.user.empresa
+            empresa = get_empresa_activa(request)
             if empresa:
                 estado_plan = empresa.get_estado_suscripcion_display()
             else:
@@ -220,8 +222,8 @@ def access_check(view_func):
             return view_func(request, *args, **kwargs)
 
         # Verificar estado del plan para usuarios regulares
-        if request.user.is_authenticated and hasattr(request.user, 'empresa') and request.user.empresa:
-            empresa = request.user.empresa
+        if request.user.is_authenticated and hasattr(request.user, 'empresa') and get_empresa_activa(request):
+            empresa = get_empresa_activa(request)
             estado_plan = empresa.get_estado_suscripcion_display()
 
             # Si el plan está expirado, bloquear acceso completamente
@@ -373,3 +375,39 @@ def session_heartbeat(request):
             'status': 'error',
             'message': 'Failed to extend session'
         }, status=500)
+
+
+@login_required
+@require_POST
+def cambiar_sede(request):
+    """
+    Cambia la "empresa activa" (sede) del usuario en la sesión actual.
+
+    Solo permite elegir entre las empresas que get_empresas_seleccionables
+    devuelve para ESTE usuario (su empresa, y si es GERENCIA de una matriz,
+    también sus sedes) — nunca confía ciegamente en el ID recibido por POST.
+    """
+    seleccionables = get_empresas_seleccionables(request.user)
+
+    empresa_id_raw = request.POST.get('empresa_id')
+    empresa_id = None
+    if empresa_id_raw:
+        try:
+            empresa_id = int(empresa_id_raw)
+        except (TypeError, ValueError):
+            empresa_id = None
+
+    empresa_elegida = next((e for e in seleccionables if e.id == empresa_id), None)
+
+    if empresa_elegida:
+        request.session[SESSION_KEY_EMPRESA_ACTIVA] = empresa_elegida.id
+        messages.success(request, f'Ahora estás viendo: {empresa_elegida.nombre}')
+    else:
+        messages.error(request, 'No tienes acceso a esa sede.')
+
+    siguiente = request.POST.get('next') or request.META.get('HTTP_REFERER')
+    if not siguiente or not url_has_allowed_host_and_scheme(
+        siguiente, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        siguiente = reverse('core:dashboard')
+    return redirect(siguiente)

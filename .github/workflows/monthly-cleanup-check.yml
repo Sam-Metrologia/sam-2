@@ -1,25 +1,31 @@
-# GitHub Action: Verificación Mensual de Empresas Eliminadas
-# Se ejecuta automáticamente el primer día de cada mes
-# NO ELIMINA NADA - Solo genera un reporte para revisión
+# GitHub Action: Eliminacion Automatica Mensual de Empresas
+# Se ejecuta automaticamente el primer dia de cada mes.
+# Elimina de verdad (--execute) las empresas que llevan 180+ dias eliminadas
+# sin haber sido reactivadas, junto con sus usuarios huerfanos y sus archivos
+# en el storage (Cloudflare R2) — ver core/signals.py.
+#
+# Antes esto solo generaba un reporte de "que se eliminaria" que quedaba
+# como artefacto descargable en GitHub Actions, sin avisar a nadie de verdad.
+# Ahora ejecuta la eliminacion real y manda un correo con el resultado.
 
-name: Verificación Mensual de Empresas Eliminadas
+name: Eliminacion Automatica Mensual de Empresas
 
 on:
   schedule:
-    # Primer día de cada mes a las 2:00 AM Colombia (7:00 UTC)
+    # Primer dia de cada mes a las 2:00 AM Colombia (7:00 UTC)
     - cron: '0 7 1 * *'
-  workflow_dispatch:  # Permite ejecución manual
+  workflow_dispatch:  # Permite ejecucion manual (siempre --execute)
 
 jobs:
-  check-deleted-companies:
+  cleanup-companies:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v3
+      - name: Checkout codigo
+        uses: actions/checkout@v4
 
       - name: Configurar Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -27,68 +33,56 @@ jobs:
         run: |
           pip install django python-dotenv psycopg2-binary
 
-      - name: Verificar empresas elegibles para eliminación (DRY-RUN)
+      - name: Ejecutar eliminacion real de empresas con 180+ dias
+        id: cleanup
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
         run: |
-          echo "=== VERIFICACIÓN DE EMPRESAS ELIMINADAS ==="
+          echo "=== ELIMINACION AUTOMATICA DE EMPRESAS (180+ dias) ==="
           echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S')"
           echo ""
-          echo "NOTA: Esta es solo una verificación. NO se eliminará nada."
-          echo ""
 
-          # Ejecutar comando en modo dry-run (sin --execute)
-          if python manage.py cleanup_deleted_companies --days=180 > cleanup_report.txt 2>&1; then
-            echo "✅ Verificación completada exitosamente"
-          else
-            echo "⚠️ Advertencia: Hubo un problema al ejecutar la verificación"
-            echo "Revisa los logs arriba para más detalles"
-          fi
-
-          # Mostrar reporte (incluso si hubo error)
-          if [ -f cleanup_report.txt ]; then
-            echo ""
-            echo "=== CONTENIDO DEL REPORTE ==="
-            cat cleanup_report.txt
-          else
-            echo "❌ No se pudo generar el reporte"
-          fi
+          python manage.py cleanup_deleted_companies --days=180 --execute | tee cleanup_report.txt
 
       - name: Guardar reporte como artefacto
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cleanup-report-${{ github.run_number }}
           path: cleanup_report.txt
           retention-days: 90
 
-      - name: Mostrar resumen del reporte
-        run: |
-          echo ""
-          echo "=== RESUMEN DEL REPORTE ==="
-          echo ""
-          cat cleanup_report.txt
-          echo ""
-          echo "=== INSTRUCCIONES ==="
-          echo ""
-          echo "📄 El reporte completo está guardado como artefacto en esta ejecución"
-          echo "📋 Para revisar el reporte:"
-          echo "   1. Ve a la pestaña 'Summary' de esta ejecución"
-          echo "   2. Descarga el artefacto 'cleanup-report-${{ github.run_number }}'"
-          echo ""
-          echo "✅ Si hay empresas para eliminar y estás de acuerdo:"
-          echo "   1. Ve a: https://github.com/${{ github.repository }}/actions/workflows/cleanup-execute.yml"
-          echo "   2. Click en 'Run workflow'"
-          echo "   3. Escribe 'CONFIRMO' para autorizar"
-          echo ""
-          echo "⚠️ IMPORTANTE: Esta verificación NO eliminó nada"
-
-      - name: Resumen
+      # Correo SIEMPRE (haya o no empresas eliminadas) para que quede
+      # constancia real de que el proceso corrio — no un archivo escondido.
+      - name: Enviar correo con el resultado
         if: always()
-        run: |
-          echo ""
-          echo "✅ Verificación completada"
-          echo "📄 Reporte guardado como artefacto"
-          echo "📋 Issue creado para revisión"
-          echo ""
-          echo "👉 Revisa el issue creado en GitHub para ver el reporte completo"
+        continue-on-error: true   # no fallar el workflow si el email no esta configurado
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'SAM Metrologia - Limpieza mensual de empresas eliminadas'
+          body: file://cleanup_report.txt
+          to: ${{ secrets.ADMIN_EMAIL }}
+          from: SAM Metrologia
+
+      - name: Notificar fallo por correo
+        if: failure()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'FALLO en limpieza automatica de empresas - SAM Metrologia'
+          body: |
+            La limpieza automatica mensual de empresas eliminadas fallo.
+
+            Revisa los logs en:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: ${{ secrets.ADMIN_EMAIL }}
+          from: SAM Metrologia

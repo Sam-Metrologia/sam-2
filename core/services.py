@@ -9,6 +9,7 @@ from django.db import transaction
 from django.core.cache import cache
 from django.utils import timezone
 from .models import Equipo, Empresa, Calibracion, Mantenimiento, Comprobacion
+from .tenancy import get_empresa_activa
 
 logger = logging.getLogger('core')
 
@@ -18,12 +19,18 @@ class EquipmentService:
     def __init__(self):
         self.file_service = FileUploadService()
     
-    def create_equipment(self, form_data, files, user):
-        """Crear equipo con validación completa y manejo de archivos"""
+    def create_equipment(self, form_data, files, user, request=None):
+        """
+        Crear equipo con validación completa y manejo de archivos.
+
+        Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+        (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+        """
         try:
             with transaction.atomic():
                 # Validar límites de empresa
-                empresa = user.empresa if not user.is_superuser else form_data.get('empresa')
+                empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+                empresa = empresa_activa if not user.is_superuser else form_data.get('empresa')
                 if empresa:
                     self._validate_equipment_limit(empresa)
                 

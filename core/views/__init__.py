@@ -12,7 +12,7 @@ from .reports import *
 from .admin import *
 from .base import *
 from .export_financiero import *
-from .terminos import aceptar_terminos, rechazar_terminos, ver_terminos_pdf, mi_aceptacion_terminos
+from .terminos import aceptar_terminos, rechazar_terminos, ver_terminos_pdf, ver_terminos_html, mi_aceptacion_terminos
 from .chat import chat_ayuda
 
 # Funciones ZIP que están en zip_functions
@@ -43,6 +43,9 @@ from .maintenance import (
 from .scheduled_tasks_api import (
     health_check as scheduled_health_check,
     trigger_daily_notifications,
+    trigger_weekly_upcoming_notifications,
+    trigger_biweekly_upcoming_notifications,
+    trigger_monthly_ahead_notifications,
     trigger_daily_maintenance,
     trigger_cleanup_zips,
     trigger_weekly_overdue,

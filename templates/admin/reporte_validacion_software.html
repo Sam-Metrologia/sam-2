@@ -457,9 +457,12 @@ tr, li { page-break-inside: avoid; }
                 </div>
                 <div class="bg-gray-50 rounded-lg p-4 text-center border">
                     <div class="text-2xl font-bold text-purple-600">
-                        {{ t.stats.coverage|default:"—" }}
+                        {% if cobertura_info.disponible %}{{ cobertura_info.total_pct }}%{% else %}—{% endif %}
                     </div>
                     <div class="text-xs text-gray-500 mt-1">Cobertura de código</div>
+                    {% if cobertura_info.disponible %}
+                    <div class="text-[10px] text-gray-400 mt-1">medido: {{ cobertura_info.medido_en|date:"d/m/Y H:i" }}</div>
+                    {% endif %}
                 </div>
             </div>
             <table class="text-sm w-full">
@@ -672,7 +675,7 @@ tr, li { page-break-inside: avoid; }
                 </li>
                 <li class="flex items-start gap-3">
                     <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-02</span>
-                    <div><strong>Inline scripts (CSP):</strong> 52 bloques <code>&lt;script&gt;</code> inline en plantillas; requieren <code>unsafe-inline</code> en la política CSP. Mitigación planificada: nonces por solicitud.</div>
+                    <div><strong>Inline scripts (CSP):</strong> {{ scripts_inline_count|default:"—" }} bloques <code>&lt;script&gt;</code> inline en plantillas; requieren <code>unsafe-inline</code> en la política CSP. Mitigación planificada: nonces por solicitud.</div>
                 </li>
                 <li class="flex items-start gap-3">
                     <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-03</span>
@@ -680,7 +683,21 @@ tr, li { page-break-inside: avoid; }
                 </li>
                 <li class="flex items-start gap-3">
                     <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded mt-0.5 flex-shrink-0">L-04</span>
-                    <div><strong>Cobertura de pruebas:</strong> módulos de pagos (63.4%) y ZIP (55.0%) tienen cobertura por debajo del objetivo individual del 70%. Confirmación metrológica alcanza 69.9%. La cobertura total del sistema es 71.4%, superando la meta general. Flujos críticos de los módulos por debajo del objetivo están cubiertos con pruebas manuales.</div>
+                    <div>
+                        <strong>Cobertura de pruebas:</strong>
+                        {% if cobertura_info.disponible %}
+                            la cobertura total del sistema es {{ cobertura_info.total_pct }}%
+                            (medido {{ cobertura_info.medido_en|date:"d/m/Y" }}).
+                            {% for etiqueta, pct in cobertura_info.por_modulo.items %}
+                                {{ etiqueta }}: {{ pct }}%{% if not forloop.last %}, {% else %}.{% endif %}
+                            {% endfor %}
+                            Los módulos por debajo del objetivo individual del 70% tienen sus flujos críticos
+                            cubiertos con pruebas manuales adicionales.
+                        {% else %}
+                            no hay una medición de cobertura disponible en este momento — corre la suite con
+                            <code>pytest --cov=core</code> para generarla.
+                        {% endif %}
+                    </div>
                 </li>
             </ul>
         </div>

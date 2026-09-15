@@ -3,6 +3,7 @@
 from django.db.models import Count, Q
 from django.contrib.auth.models import AnonymousUser
 from .models import Equipo, Mantenimiento, Calibracion, Comprobacion, Empresa
+from .tenancy import get_empresa_activa, get_empresas_seleccionables
 
 def company_data(request):
     """
@@ -52,12 +53,12 @@ def aprobaciones_pendientes_count(request):
         # Determinar si es aprobador (gerente, admin o superuser)
         es_aprobador = user.is_superuser or (hasattr(user, 'rol_usuario') and user.rol_usuario in ['ADMINISTRADOR', 'GERENCIA'])
 
-        if user.empresa or user.is_superuser:
+        if get_empresa_activa(request) or user.is_superuser:
             # Filtro base por empresa
             if user.is_superuser:
                 empresa_filter = Q()  # Sin filtro, ve todas las empresas
             else:
-                empresa_filter = Q(equipo__empresa=user.empresa)
+                empresa_filter = Q(equipo__empresa=get_empresa_activa(request))
 
             if es_aprobador:
                 # Aprobador ve pendientes de otros usuarios
@@ -164,8 +165,29 @@ def modo_trabajo_context(request):
         'superusuario_original': impersonator,
         'empresas_disponibles': empresas_disponibles,
         'puede_usar_modo_trabajo': puede_usar_modo_trabajo,
-        'empresa_trabajo': request.user.empresa if impersonating else None,
+        'empresa_trabajo': get_empresa_activa(request) if impersonating else None,
         'usuario_impersonado': request.user if impersonating else None,
+    }
+
+
+def sede_context(request):
+    """
+    Expone el selector de sede (empresa matriz / sedes) al navbar.
+
+    Solo GERENCIA de una empresa matriz con sedes tiene algo entre qué
+    elegir; para el resto (99% de usuarios) `empresas_seleccionables`
+    queda vacío y el selector no se muestra en el template.
+    """
+    if isinstance(request.user, AnonymousUser) or not request.user.is_authenticated:
+        return {'empresas_seleccionables': [], 'sede_activa': None}
+
+    seleccionables = get_empresas_seleccionables(request.user)
+    if len(seleccionables) < 2:
+        return {'empresas_seleccionables': [], 'sede_activa': None}
+
+    return {
+        'empresas_seleccionables': seleccionables,
+        'sede_activa': get_empresa_activa(request),
     }
 
 

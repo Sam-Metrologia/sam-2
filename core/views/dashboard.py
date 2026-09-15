@@ -304,7 +304,7 @@ def dashboard(request):
 
     # Cache del dashboard (5 min, invalidado por signals vía versioning)
     # El version_key permite invalidar sin delete_pattern ni cache.clear()
-    empresa = user.empresa if not user.is_superuser else None
+    empresa = get_empresa_activa(request) if not user.is_superuser else None
     _empresa_id_para_version = selected_company_id or (str(empresa.id) if empresa else 'all')
     _version_key = (
         f"dashboard_version_{_empresa_id_para_version}"
@@ -333,14 +333,14 @@ def dashboard(request):
     )
 
     # Obtener queryset de equipos según permisos
-    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
+    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles, request=request)
 
     # Datos de almacenamiento, límites y plan (siempre se calculan igual)
-    storage_data = _get_storage_data(user, selected_company_id)
-    equipment_limits_data = _get_equipment_limits_data(user, selected_company_id, equipos_queryset)
-    plan_info_data = _get_plan_info(user, selected_company_id)
-    latest_corrective_maintenances = _get_latest_corrective_maintenances(user, selected_company_id)
-    prestamos_data = _get_prestamos_data(user, selected_company_id)
+    storage_data = _get_storage_data(user, selected_company_id, request=request)
+    equipment_limits_data = _get_equipment_limits_data(user, selected_company_id, equipos_queryset, request=request)
+    plan_info_data = _get_plan_info(user, selected_company_id, request=request)
+    latest_corrective_maintenances = _get_latest_corrective_maintenances(user, selected_company_id, request=request)
+    prestamos_data = _get_prestamos_data(user, selected_company_id, request=request)
 
     if usar_stats_cached:
         # ── Path rápido: stats pre-computadas desde la BD ──────────────────────
@@ -413,8 +413,9 @@ def dashboard(request):
 
     # Onboarding (NO se cachea - es específico por usuario y cambia frecuentemente)
     onboarding_progress = None
-    if (user.empresa
-            and getattr(user.empresa, 'es_periodo_prueba', False)):
+    empresa_activa_usuario = get_empresa_activa(request)
+    if (empresa_activa_usuario
+            and getattr(empresa_activa_usuario, 'es_periodo_prueba', False)):
         try:
             onboarding_progress = user.onboarding_progress
         except Exception:
@@ -425,8 +426,8 @@ def dashboard(request):
     # Solo mostrar a ADMINISTRADOR, GERENCIA o superusuario — TECNICO no puede gestionar usuarios
     setup_usuarios = None
     puede_gestionar_setup = user.is_superuser or user.is_administrador() or user.is_gerente()
-    if puede_gestionar_setup and user.empresa and user.empresa.tiene_setup_usuarios_pendiente:
-        empresa_obj = user.empresa
+    if puede_gestionar_setup and empresa_activa_usuario and empresa_activa_usuario.tiene_setup_usuarios_pendiente:
+        empresa_obj = empresa_activa_usuario
         setup_usuarios = {
             'configurar_plan': empresa_obj.configurar_usuarios_plan_pendiente,
             'slots': empresa_obj.slots_usuarios_pendientes or {},
@@ -441,7 +442,7 @@ def dashboard(request):
     return render(request, 'core/dashboard.html', context)
 
 
-def _get_equipos_queryset(user, selected_company_id, empresas_disponibles):
+def _get_equipos_queryset(user, selected_company_id, empresas_disponibles, request=None):
     """
     Obtiene el queryset de equipos con optimización de queries mediante prefetch.
 
@@ -449,6 +450,9 @@ def _get_equipos_queryset(user, selected_company_id, empresas_disponibles):
     - select_related para ForeignKey (empresa)
     - prefetch_related para relaciones inversas (calibraciones, mantenimientos, comprobaciones)
     - to_attr para acceso directo a datos prefetched
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
     """
     from django.db.models import Prefetch
 
@@ -479,9 +483,10 @@ def _get_equipos_queryset(user, selected_company_id, empresas_disponibles):
     )
 
     if not user.is_superuser:
-        if user.empresa and not user.empresa.is_deleted:
-            equipos_queryset = equipos_queryset.filter(empresa=user.empresa)
-            selected_company_id = str(user.empresa.id)
+        empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+        if empresa_activa and not empresa_activa.is_deleted:
+            equipos_queryset = equipos_queryset.filter(empresa=empresa_activa)
+            selected_company_id = str(empresa_activa.id)
         else:
             # Si el usuario no tiene empresa o su empresa está eliminada, no ve equipos
             equipos_queryset = Equipo.objects.none()
@@ -507,8 +512,13 @@ def _get_estadisticas_equipos(equipos_queryset):
     return estadisticas
 
 
-def _get_storage_data(user, selected_company_id):
-    """Obtiene datos de almacenamiento"""
+def _get_storage_data(user, selected_company_id, request=None):
+    """
+    Obtiene datos de almacenamiento.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+    """
     storage_data = {
         'storage_usage_mb': 0,
         'storage_limit_mb': 0,
@@ -518,14 +528,15 @@ def _get_storage_data(user, selected_company_id):
     }
 
     empresa_objetivo = None
+    empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
 
     if user.is_superuser and selected_company_id:
         try:
             empresa_objetivo = Empresa.objects.get(id=selected_company_id)
         except Empresa.DoesNotExist:
             pass
-    elif user.empresa:
-        empresa_objetivo = user.empresa
+    elif empresa_activa:
+        empresa_objetivo = empresa_activa
 
     if empresa_objetivo:
         storage_usage_mb = empresa_objetivo.get_total_storage_used_mb()
@@ -555,8 +566,13 @@ def _get_storage_data(user, selected_company_id):
     return storage_data
 
 
-def _get_equipment_limits_data(user, selected_company_id, equipos_queryset):
-    """Obtiene datos de límites de equipos"""
+def _get_equipment_limits_data(user, selected_company_id, equipos_queryset, request=None):
+    """
+    Obtiene datos de límites de equipos.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+    """
     limits_data = {
         'equipos_limite': 0,
         'equipos_actuales_count': 0,
@@ -567,14 +583,15 @@ def _get_equipment_limits_data(user, selected_company_id, equipos_queryset):
     }
 
     empresa_objetivo = None
+    empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
 
     if user.is_superuser and selected_company_id:
         try:
             empresa_objetivo = Empresa.objects.get(id=selected_company_id)
         except Empresa.DoesNotExist:
             pass
-    elif user.empresa:
-        empresa_objetivo = user.empresa
+    elif empresa_activa:
+        empresa_objetivo = empresa_activa
 
     if empresa_objetivo:
         equipos_limite = empresa_objetivo.get_limite_equipos()
@@ -1150,14 +1167,20 @@ def _build_pie_data_from_empresa_stats(empresa, equipos_queryset):
     return pie_data
 
 
-def _get_latest_corrective_maintenances(user, selected_company_id):
-    """Obtiene los mantenimientos correctivos más recientes"""
+def _get_latest_corrective_maintenances(user, selected_company_id, request=None):
+    """
+    Obtiene los mantenimientos correctivos más recientes.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+    """
 
     query = Mantenimiento.objects.filter(tipo_mantenimiento='Correctivo').order_by('-fecha_mantenimiento')
 
     if not user.is_superuser:
-        if user.empresa:
-            query = query.filter(equipo__empresa=user.empresa)
+        empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+        if empresa_activa:
+            query = query.filter(equipo__empresa=empresa_activa)
         else:
             query = Mantenimiento.objects.none()
     elif selected_company_id:
@@ -1166,12 +1189,17 @@ def _get_latest_corrective_maintenances(user, selected_company_id):
     return list(query[:5])  # Últimos 5 (list() para serialización en cache)
 
 
-def _get_plan_info(user, selected_company_id):
-    """Obtiene información del plan de la empresa"""
+def _get_plan_info(user, selected_company_id, request=None):
+    """
+    Obtiene información del plan de la empresa.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+    """
     empresa = None
 
     if not user.is_superuser:
-        empresa = user.empresa
+        empresa = get_empresa_activa(request) if request is not None else user.empresa
     elif selected_company_id:
         try:
             empresa = Empresa.objects.get(id=selected_company_id)
@@ -1218,12 +1246,15 @@ def _get_plan_info(user, selected_company_id):
     return {'plan_info': plan_info}
 
 
-def _get_prestamos_data(user, selected_company_id):
+def _get_prestamos_data(user, selected_company_id, request=None):
     """
     Obtiene datos de préstamos de equipos (NUEVO - NO modifica lógica existente)
 
     Esta función es completamente independiente y solo agrega nuevas estadísticas
     al dashboard sin afectar ninguna funcionalidad existente.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
     """
     from core.models import PrestamoEquipo
     from datetime import timedelta
@@ -1232,8 +1263,9 @@ def _get_prestamos_data(user, selected_company_id):
     prestamos_queryset = PrestamoEquipo.objects.select_related('equipo', 'empresa')
 
     if not user.is_superuser:
-        if user.empresa:
-            prestamos_queryset = prestamos_queryset.filter(empresa=user.empresa)
+        empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+        if empresa_activa:
+            prestamos_queryset = prestamos_queryset.filter(empresa=empresa_activa)
         else:
             prestamos_queryset = PrestamoEquipo.objects.none()
     elif selected_company_id:
@@ -1295,7 +1327,7 @@ def get_chart_details(request):
     # Filtrado por empresa
     selected_company_id = request.GET.get('empresa_id')
     empresas_disponibles = Empresa.objects.filter(is_deleted=False)
-    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
+    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles, request=request)
 
     # Para proyecciones anuales (tortas): incluir TODOS los equipos
     # Optimización: Prefetch del registro de baja para evitar N+1 queries
@@ -1739,7 +1771,7 @@ def tortas_rango(request):
 
     selected_company_id = request.GET.get('empresa_id')
     empresas_disponibles = Empresa.objects.filter(is_deleted=False)
-    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles)
+    equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles, request=request)
     equipos_para_dashboard = equipos_queryset.select_related('baja_registro')
 
     projected_cal = get_projected_activities_for_range(equipos_para_dashboard, 'calibracion', start_date, end_date, today)

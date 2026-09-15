@@ -1,5 +1,5 @@
 # core/models/equipment.py
-# Modelos: Equipo, BajaEquipo, NotificacionVencimiento
+# Modelos: Equipo, BajaEquipo, NotificacionVencimiento, TransferenciaEquipo
 
 from django.db import models
 from django.conf import settings
@@ -346,6 +346,45 @@ class BajaEquipo(models.Model):
 
     def __str__(self):
         return f"Baja de {self.equipo.nombre} ({self.fecha_baja})"
+
+
+class TransferenciaEquipo(models.Model):
+    """
+    Registro de auditoría de traslado de un equipo entre sedes de la misma
+    empresa matriz (multi-sede). Se crea uno por cada equipo movido, aunque
+    la transferencia se haya hecho en un lote de varios equipos a la vez.
+    """
+    equipo = models.ForeignKey(
+        'Equipo', on_delete=models.CASCADE, related_name='transferencias', verbose_name="Equipo"
+    )
+    empresa_origen = models.ForeignKey(
+        'Empresa', on_delete=models.SET_NULL, null=True, related_name='transferencias_salida',
+        verbose_name="Empresa de Origen"
+    )
+    empresa_destino = models.ForeignKey(
+        'Empresa', on_delete=models.SET_NULL, null=True, related_name='transferencias_entrada',
+        verbose_name="Empresa de Destino"
+    )
+    codigo_interno_anterior = models.CharField(max_length=100, blank=True, null=True)
+    codigo_interno_nuevo = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text="Solo se llena si el código chocaba con uno existente en la sede destino."
+    )
+    realizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Realizado por"
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Transferencia de Equipo"
+        verbose_name_plural = "Transferencias de Equipo"
+        ordering = ['-fecha']
+
+    def __str__(self):
+        origen = self.empresa_origen.nombre if self.empresa_origen else "N/A"
+        destino = self.empresa_destino.nombre if self.empresa_destino else "N/A"
+        return f"{self.codigo_interno_anterior}: {origen} → {destino}"
 
 
 class NotificacionVencimiento(models.Model):

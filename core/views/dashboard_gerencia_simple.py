@@ -11,6 +11,7 @@ import json
 
 from ..models import Empresa, Equipo, Calibracion, Mantenimiento, Comprobacion, MetricasEficienciaMetrologica
 from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
+from ..tenancy import get_empresa_activa
 import logging
 
 logger = logging.getLogger('core')
@@ -192,7 +193,7 @@ def dashboard_gerencia(request):
         selected_company_id = request.GET.get('empresa_id')
         empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
 
-        if user.is_superuser or (getattr(user, 'rol_usuario', None) == 'GERENCIA' and user.empresa):
+        if user.is_superuser or (getattr(user, 'rol_usuario', None) == 'GERENCIA' and get_empresa_activa(request)):
             # Vista SAM - Para superusuarios y usuarios GERENCIA
             if user.is_superuser:
                 # Superusuarios pueden ver todas las empresas
@@ -201,8 +202,8 @@ def dashboard_gerencia(request):
                     empresas_queryset = empresas_queryset.filter(id=selected_company_id)
             else:
                 # GERENCIA - Solo pueden ver su propia empresa pero en formato SAM
-                empresas_queryset = empresas_disponibles.filter(id=user.empresa.id)
-                selected_company_id = str(user.empresa.id)
+                empresas_queryset = empresas_disponibles.filter(id=get_empresa_activa(request).id)
+                selected_company_id = str(get_empresa_activa(request).id)
 
             # Cálculos básicos
             num_empresas_activas = empresas_queryset.count()
@@ -415,9 +416,9 @@ def dashboard_gerencia(request):
 
             template = 'core/dashboard_simple_inline.html'
 
-        elif user.empresa and getattr(user, 'rol_usuario', None) != 'GERENCIA':
+        elif get_empresa_activa(request) and getattr(user, 'rol_usuario', None) != 'GERENCIA':
             # Vista Cliente (usuarios normales, no GERENCIA)
-            empresa = user.empresa
+            empresa = get_empresa_activa(request)
             if not empresa:
                 context = {'error': 'Usuario sin empresa asignada'}
                 template = 'core/dashboard_gerencia_cliente.html'

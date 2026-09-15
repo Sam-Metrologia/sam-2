@@ -23,6 +23,7 @@ from .constants import (
     ESTADO_EN_PRESTAMO,
     PRESTAMO_ACTIVO, PRESTAMO_DEVUELTO, PRESTAMO_VENCIDO, PRESTAMO_CANCELADO,
 )
+from .tenancy import get_empresa_activa
 
 logger = logging.getLogger('core')
 
@@ -88,9 +89,9 @@ class CustomUserCreationForm(UserCreationForm):
         self.fields['email'].required = True
 
         if request and not request.user.is_superuser:
-            self.fields['empresa'].queryset = Empresa.objects.filter(pk=request.user.empresa.pk)
+            self.fields['empresa'].queryset = Empresa.objects.filter(pk=get_empresa_activa(request).pk)
             self.fields['empresa'].empty_label = None
-            self.fields['empresa'].initial = request.user.empresa
+            self.fields['empresa'].initial = get_empresa_activa(request)
             self.fields['empresa'].widget.attrs['disabled'] = 'disabled'
             self.fields['is_staff'].widget.attrs['disabled'] = 'disabled'
             self.fields['is_superuser'].widget.attrs['disabled'] = 'disabled'
@@ -253,9 +254,11 @@ class EmpresaForm(forms.ModelForm):
             'es_periodo_prueba', 'duracion_prueba_dias', 'fecha_inicio_plan',
             'limite_equipos_empresa', 'limite_almacenamiento_mb', 'duracion_suscripcion_meses',
             'acceso_manual_activo', 'estado_suscripcion',
+            'empresa_matriz',
         ]
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-input'}),
+            'empresa_matriz': forms.Select(attrs={'class': 'form-select'}),
             'nit': forms.TextInput(attrs={'class': 'form-input'}),
             'direccion': forms.TextInput(attrs={'class': 'form-input'}),
             'telefono': forms.TextInput(attrs={'class': 'form-input'}),
@@ -289,6 +292,16 @@ class EmpresaForm(forms.ModelForm):
         
         # Hacer email obligatorio
         self.fields['email'].required = True
+
+        # Multi-sede: el dropdown de matriz solo debe ofrecer empresas que no
+        # sean ya sede de otra (jerarquía de un solo nivel), y nunca la propia
+        # instancia si se está editando (una empresa no puede ser su propia matriz).
+        matriz_qs = Empresa.objects.filter(empresa_matriz__isnull=True).order_by('nombre')
+        if self.instance and self.instance.pk:
+            matriz_qs = matriz_qs.exclude(pk=self.instance.pk)
+        self.fields['empresa_matriz'].queryset = matriz_qs
+        self.fields['empresa_matriz'].required = False
+        self.fields['empresa_matriz'].empty_label = "— Ninguna (empresa independiente) —"
 
         if self.instance and self.instance.fecha_inicio_plan:
             if isinstance(self.instance.fecha_inicio_plan, datetime):
@@ -415,12 +428,12 @@ class EquipoForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.all()
                 self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
                 self.fields['empresa'].required = True
-            elif self.request.user.empresa:
+            elif get_empresa_activa(self.request):
                 # USUARIO NORMAL: Campo oculto, solo su empresa
-                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=get_empresa_activa(self.request).id)
                 self.fields['empresa'].widget = forms.HiddenInput()
                 if not self.instance.pk:
-                    self.fields['empresa'].initial = self.request.user.empresa
+                    self.fields['empresa'].initial = get_empresa_activa(self.request)
                 else:
                     self.fields['empresa'].initial = self.instance.empresa
                 self.fields['empresa'].required = False
@@ -449,9 +462,9 @@ class EquipoForm(forms.ModelForm):
                 if self.instance and self.instance.pk:
                     # Al editar, mantener la empresa actual
                     return self.instance.empresa
-                elif self.request.user.empresa:
+                elif get_empresa_activa(self.request):
                     # Al crear, asignar empresa del usuario
-                    return self.request.user.empresa
+                    return get_empresa_activa(self.request)
         return self.cleaned_data.get('empresa')
 
     def clean_codigo_interno(self):
@@ -779,12 +792,12 @@ class UbicacionForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.all()
                 self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
                 self.fields['empresa'].required = True
-            elif self.request.user.empresa:
+            elif get_empresa_activa(self.request):
                 # USUARIO NORMAL: Campo oculto, solo su empresa
-                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=get_empresa_activa(self.request).id)
                 self.fields['empresa'].widget = forms.HiddenInput()
                 if not self.instance.pk:
-                    self.fields['empresa'].initial = self.request.user.empresa
+                    self.fields['empresa'].initial = get_empresa_activa(self.request)
                 else:
                     self.fields['empresa'].initial = self.instance.empresa
                 self.fields['empresa'].required = False
@@ -817,8 +830,8 @@ class UbicacionForm(forms.ModelForm):
                 # Usuario normal: siempre su empresa
                 if self.instance and self.instance.pk:
                     return self.instance.empresa
-                elif self.request.user.empresa:
-                    return self.request.user.empresa
+                elif get_empresa_activa(self.request):
+                    return get_empresa_activa(self.request)
         return self.cleaned_data.get('empresa')
 
 
@@ -853,12 +866,12 @@ class ProcedimientoForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.all()
                 self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
                 self.fields['empresa'].required = True
-            elif self.request.user.empresa:
+            elif get_empresa_activa(self.request):
                 # USUARIO NORMAL: Campo oculto, solo su empresa
-                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=get_empresa_activa(self.request).id)
                 self.fields['empresa'].widget = forms.HiddenInput()
                 if not self.instance.pk:
-                    self.fields['empresa'].initial = self.request.user.empresa
+                    self.fields['empresa'].initial = get_empresa_activa(self.request)
                 else:
                     self.fields['empresa'].initial = self.instance.empresa
                 self.fields['empresa'].required = False
@@ -873,7 +886,7 @@ class ProcedimientoForm(forms.ModelForm):
 
     def clean_codigo(self):
         codigo = self.cleaned_data.get('codigo')
-        empresa = self.cleaned_data.get('empresa') or (self.request.user.empresa if self.request else None)
+        empresa = self.cleaned_data.get('empresa') or (get_empresa_activa(self.request) if self.request else None)
         
         if codigo and empresa:
             # Verificar unicidad por empresa
@@ -888,8 +901,8 @@ class ProcedimientoForm(forms.ModelForm):
         if self.request and not self.request.user.is_superuser:
             if self.instance and self.instance.pk:
                 return self.instance.empresa
-            elif self.request.user.empresa:
-                return self.request.user.empresa
+            elif get_empresa_activa(self.request):
+                return get_empresa_activa(self.request)
         return self.cleaned_data.get('empresa')
 
 
@@ -920,12 +933,12 @@ class ProveedorForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.all()
                 self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
                 self.fields['empresa'].required = True
-            elif self.request.user.empresa:
+            elif get_empresa_activa(self.request):
                 # USUARIO NORMAL: Campo oculto, solo su empresa
-                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=get_empresa_activa(self.request).id)
                 self.fields['empresa'].widget = forms.HiddenInput()
                 if not self.instance.pk:
-                    self.fields['empresa'].initial = self.request.user.empresa
+                    self.fields['empresa'].initial = get_empresa_activa(self.request)
                 else:
                     self.fields['empresa'].initial = self.instance.empresa
                 self.fields['empresa'].required = False
@@ -937,7 +950,7 @@ class ProveedorForm(forms.ModelForm):
 
     def clean_nombre_empresa(self):
         nombre_empresa = self.cleaned_data.get('nombre_empresa')
-        empresa = self.cleaned_data.get('empresa') or (self.request.user.empresa if self.request else None)
+        empresa = self.cleaned_data.get('empresa') or (get_empresa_activa(self.request) if self.request else None)
         
         if nombre_empresa and empresa:
             # Verificar unicidad por empresa
@@ -960,8 +973,8 @@ class ProveedorForm(forms.ModelForm):
         if self.request and not self.request.user.is_superuser:
             if self.instance and self.instance.pk:
                 return self.instance.empresa
-            elif self.request.user.empresa:
-                return self.request.user.empresa
+            elif get_empresa_activa(self.request):
+                return get_empresa_activa(self.request)
         return self.cleaned_data.get('empresa')
 
 
@@ -1007,12 +1020,12 @@ class DocumentoForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.all()
                 self.fields['empresa'].widget = forms.Select(attrs={'class': 'form-select'})
                 self.fields['empresa'].required = True
-            elif self.request.user.empresa:
+            elif get_empresa_activa(self.request):
                 # USUARIO NORMAL: Campo oculto, solo su empresa
-                self.fields['empresa'].queryset = Empresa.objects.filter(id=self.request.user.empresa.id)
+                self.fields['empresa'].queryset = Empresa.objects.filter(id=get_empresa_activa(self.request).id)
                 self.fields['empresa'].widget = forms.HiddenInput()
                 if not self.instance.pk:
-                    self.fields['empresa'].initial = self.request.user.empresa
+                    self.fields['empresa'].initial = get_empresa_activa(self.request)
                 else:
                     self.fields['empresa'].initial = self.instance.empresa
                 self.fields['empresa'].required = False
@@ -1032,8 +1045,8 @@ class DocumentoForm(forms.ModelForm):
                 # Usuario normal: siempre su empresa
                 if self.instance and self.instance.pk:
                     return self.instance.empresa
-                elif self.request.user.empresa:
-                    return self.request.user.empresa
+                elif get_empresa_activa(self.request):
+                    return get_empresa_activa(self.request)
         return self.cleaned_data.get('empresa')
 
 

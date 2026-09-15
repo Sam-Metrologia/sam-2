@@ -6,16 +6,21 @@ from django.db.models import Count, Prefetch, Q
 from datetime import date, timedelta
 from .models import Equipo, Calibracion, Mantenimiento, Comprobacion, Empresa
 from .constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
+from .tenancy import get_empresa_activa
 
 
 class OptimizedQueries:
     """Clase con queries optimizadas para evitar N+1 y mejorar performance"""
 
     @staticmethod
-    def get_equipos_optimized(empresa=None, user=None):
+    def get_equipos_optimized(empresa=None, user=None, request=None):
         """
         Obtiene equipos con todos los relacionados prefetcheados
         para evitar queries N+1. Solo equipos de empresas activas.
+
+        Si se pasa `request`, la empresa del usuario se resuelve vía
+        get_empresa_activa(request) (sede-aware); si no se pasa, se usa
+        user.empresa directamente (comportamiento histórico, sin cambios).
         """
         queryset = Equipo.objects.select_related(
             'empresa'
@@ -41,9 +46,11 @@ class OptimizedQueries:
         )
 
         # Aplicar filtros según empresa y usuario
-        if user and not user.is_superuser:
-            if user.empresa:
-                queryset = queryset.filter(empresa=user.empresa)
+        effective_user = request.user if request is not None else user
+        if effective_user and not effective_user.is_superuser:
+            empresa_activa = get_empresa_activa(request) if request is not None else effective_user.empresa
+            if empresa_activa:
+                queryset = queryset.filter(empresa=empresa_activa)
             else:
                 queryset = Equipo.objects.none()
         elif empresa:
@@ -124,10 +131,13 @@ class OptimizedQueries:
         return queryset.order_by('codigo_interno')
 
     @staticmethod
-    def get_proximas_actividades(user, days_ahead=30):
+    def get_proximas_actividades(user, days_ahead=30, request=None):
         """
         Obtiene actividades próximas de forma optimizada.
         SOLO incluye actividades futuras (no vencidas).
+
+        Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+        (sede-aware); si no, se usa user.empresa (comportamiento histórico).
         """
         today = date.today()
         fecha_limite = today + timedelta(days=days_ahead)
@@ -138,8 +148,9 @@ class OptimizedQueries:
             estado__in=[ESTADO_DE_BAJA, ESTADO_INACTIVO]
         )
 
-        if not user.is_superuser and user.empresa:
-            base_query = base_query.filter(empresa=user.empresa)
+        empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+        if not user.is_superuser and empresa_activa:
+            base_query = base_query.filter(empresa=empresa_activa)
         elif not user.is_superuser:
             base_query = Equipo.objects.none()
 

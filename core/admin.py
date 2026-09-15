@@ -222,16 +222,16 @@ class ProveedorAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         # Filtrar por la empresa del usuario actual si no es superusuario
-        return qs.filter(empresa=request.user.empresa)
+        return qs.filter(empresa=get_empresa_activa(request))
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "empresa" and not request.user.is_superuser:
-            kwargs["queryset"] = Empresa.objects.filter(pk=request.user.empresa.pk)
+            kwargs["queryset"] = Empresa.objects.filter(pk=get_empresa_activa(request).pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         if not request.user.is_superuser:
-            obj.empresa = request.user.empresa # Asegurar que se asigne la empresa del usuario actual
+            obj.empresa = get_empresa_activa(request) # Asegurar que se asigne la empresa del usuario actual
         super().save_model(request, obj, form, change)
 
 
@@ -287,8 +287,8 @@ class ZipRequestAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         """Filtrar por empresa para usuarios no superuser."""
         qs = super().get_queryset(request)
-        if not request.user.is_superuser and hasattr(request.user, 'empresa') and request.user.empresa:
-            return qs.filter(empresa=request.user.empresa)
+        if not request.user.is_superuser and hasattr(request.user, 'empresa') and get_empresa_activa(request):
+            return qs.filter(empresa=get_empresa_activa(request))
         return qs
 
     def has_add_permission(self, request):
@@ -307,6 +307,7 @@ admin.site.register(MetricasEficienciaMetrologica)
 
 # Registro del modelo de Notificaciones de Vencimiento
 from .models import NotificacionVencimiento
+from .tenancy import get_empresa_activa
 
 @admin.register(NotificacionVencimiento)
 class NotificacionVencimientoAdmin(admin.ModelAdmin):
@@ -420,16 +421,16 @@ class AgrupacionPrestamoAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         # Filtrar por la empresa del usuario actual
-        return qs.filter(empresa=request.user.empresa)
+        return qs.filter(empresa=get_empresa_activa(request))
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "empresa" and not request.user.is_superuser:
-            kwargs["queryset"] = Empresa.objects.filter(pk=request.user.empresa.pk)
+            kwargs["queryset"] = Empresa.objects.filter(pk=get_empresa_activa(request).pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         if not request.user.is_superuser:
-            obj.empresa = request.user.empresa
+            obj.empresa = get_empresa_activa(request)
         super().save_model(request, obj, form, change)
 
 
@@ -505,23 +506,23 @@ class PrestamoEquipoAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         # Filtrar por la empresa del usuario actual
-        return qs.filter(empresa=request.user.empresa)
+        return qs.filter(empresa=get_empresa_activa(request))
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "empresa" and not request.user.is_superuser:
-            kwargs["queryset"] = Empresa.objects.filter(pk=request.user.empresa.pk)
+            kwargs["queryset"] = Empresa.objects.filter(pk=get_empresa_activa(request).pk)
         if db_field.name == "equipo" and not request.user.is_superuser:
             # Solo equipos de la empresa del usuario
-            kwargs["queryset"] = Equipo.objects.filter(empresa=request.user.empresa)
+            kwargs["queryset"] = Equipo.objects.filter(empresa=get_empresa_activa(request))
         if db_field.name == "agrupacion" and not request.user.is_superuser:
             # Solo agrupaciones de la empresa del usuario
             from .models import AgrupacionPrestamo
-            kwargs["queryset"] = AgrupacionPrestamo.objects.filter(empresa=request.user.empresa)
+            kwargs["queryset"] = AgrupacionPrestamo.objects.filter(empresa=get_empresa_activa(request))
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         if not request.user.is_superuser:
-            obj.empresa = request.user.empresa
+            obj.empresa = get_empresa_activa(request)
         if not change:  # Solo en creación
             obj.prestado_por = request.user
         super().save_model(request, obj, form, change)

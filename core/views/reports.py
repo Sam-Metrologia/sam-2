@@ -6,6 +6,7 @@ import zipfile
 import threading
 import time
 from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
+from ..tenancy import get_empresa_activa
 
 # =============================================================================
 # API ENDPOINTS FOR PROGRESS TRACKING (Fase 3)
@@ -245,13 +246,14 @@ def informes(request):
     empresas_disponibles = OptimizedQueries.get_empresas_with_stats().order_by('nombre')
 
     # Obtener equipos base usando queries optimizadas
-    equipos_queryset = OptimizedQueries.get_equipos_optimized(user=user if not user.is_superuser else None)
+    equipos_queryset = OptimizedQueries.get_equipos_optimized(user=user if not user.is_superuser else None, request=request)
 
     # Filtrar por empresa para usuarios normales
     if not user.is_superuser:
-        if user.empresa:
-            equipos_queryset = equipos_queryset.filter(empresa=user.empresa)
-            selected_company_id = str(user.empresa.id)
+        empresa_activa_informes = get_empresa_activa(request)
+        if empresa_activa_informes:
+            equipos_queryset = equipos_queryset.filter(empresa=empresa_activa_informes)
+            selected_company_id = str(empresa_activa_informes.id)
         else:
             equipos_queryset = Equipo.objects.none()
             empresas_disponibles = Empresa.objects.none()
@@ -318,7 +320,7 @@ def generar_informe_zip(request):
         empresa = get_object_or_404(Empresa, pk=empresa_id)
 
         # Verificar permisos
-        if not request.user.is_superuser and request.user.empresa != empresa:
+        if not request.user.is_superuser and get_empresa_activa(request) != empresa:
             messages.error(request, 'No tienes permisos para generar informes de esta empresa.')
             return redirect('core:informes')
 
@@ -359,8 +361,8 @@ def generar_informe_dashboard_excel(request):
         selected_company_id = request.GET.get('empresa_id')
 
         if not selected_company_id and not request.user.is_superuser:
-            if request.user.empresa:
-                selected_company_id = str(request.user.empresa.id)
+            if get_empresa_activa(request):
+                selected_company_id = str(get_empresa_activa(request).id)
             else:
                 messages.error(request, "No tiene una empresa asignada para generar el informe Excel.")
                 return redirect('core:informes')
@@ -420,11 +422,11 @@ def exportar_equipos_excel(request):
 
     try:
         # Obtener equipos según permisos
-        equipos = OptimizedQueries.get_equipos_optimized(user=request.user if not request.user.is_superuser else None)
+        equipos = OptimizedQueries.get_equipos_optimized(user=request.user if not request.user.is_superuser else None, request=request)
 
-        if not request.user.is_superuser and request.user.empresa:
-            equipos = equipos.filter(empresa=request.user.empresa)
-        elif not request.user.is_superuser and not request.user.empresa:
+        if not request.user.is_superuser and get_empresa_activa(request):
+            equipos = equipos.filter(empresa=get_empresa_activa(request))
+        elif not request.user.is_superuser and not get_empresa_activa(request):
             equipos = Equipo.objects.none()
 
         # Generar contenido Excel
@@ -464,12 +466,13 @@ def informe_vencimientos_pdf(request):
 
         # Obtener equipos base según permisos
         equipos_base_query = OptimizedQueries.get_equipos_optimized(
-            user=request.user if not request.user.is_superuser else None
+            user=request.user if not request.user.is_superuser else None,
+            request=request
         )
 
-        if not request.user.is_superuser and request.user.empresa:
-            equipos_base_query = equipos_base_query.filter(empresa=request.user.empresa)
-        elif not request.user.is_superuser and not request.user.empresa:
+        if not request.user.is_superuser and get_empresa_activa(request):
+            equipos_base_query = equipos_base_query.filter(empresa=get_empresa_activa(request))
+        elif not request.user.is_superuser and not get_empresa_activa(request):
             equipos_base_query = Equipo.objects.none()
 
         # Excluir equipos inactivos
@@ -488,7 +491,7 @@ def informe_vencimientos_pdf(request):
         context = {
             'activities': relevant_activities,
             'today': today,
-            'empresa': request.user.empresa if not request.user.is_superuser else None,
+            'empresa': get_empresa_activa(request) if not request.user.is_superuser else None,
             'is_superuser': request.user.is_superuser
         }
 
@@ -518,7 +521,7 @@ def generar_hoja_vida_pdf(request, pk):
         equipo = get_object_or_404(Equipo.objects.select_related('empresa'), pk=pk)
 
         # Verificar permisos
-        if not request.user.is_superuser and request.user.empresa != equipo.empresa:
+        if not request.user.is_superuser and get_empresa_activa(request) != equipo.empresa:
             messages.error(request, 'No tienes permiso para generar la hoja de vida de este equipo.')
             return redirect('core:informes')
 
@@ -630,7 +633,7 @@ def importar_equipos_excel(request):
                 excel_file = request.FILES['excel_file']
 
                 # Procesar importación con transacciones
-                result = _process_excel_import(excel_file, request.user)
+                result = _process_excel_import(excel_file, request.user, request=request)
 
                 if result['success']:
                     # Crear mensaje detallado de importación
@@ -762,8 +765,8 @@ def _add_template_validations(sheet, request=None):
     estados_equipo = [choice[0] for choice in Equipo.ESTADO_CHOICES]
 
     # Filtrar empresa: solo la del usuario (o todas si es superusuario)
-    if request and not request.user.is_superuser and request.user.empresa:
-        empresas_disponibles = [request.user.empresa.nombre]
+    if request and not request.user.is_superuser and get_empresa_activa(request):
+        empresas_disponibles = [get_empresa_activa(request).nombre]
     else:
         empresas_disponibles = list(Empresa.objects.values_list('nombre', flat=True))
 
@@ -829,8 +832,8 @@ def _add_template_example_row(sheet, request=None):
     ubicacion_ejemplo = "Laboratorio Principal"
     responsable_ejemplo = "Técnico Responsable"
 
-    if request and not request.user.is_superuser and request.user.empresa:
-        empresa = request.user.empresa
+    if request and not request.user.is_superuser and get_empresa_activa(request):
+        empresa = get_empresa_activa(request)
         empresa_nombre = empresa.nombre
         # Usar datos reales de un equipo existente si hay alguno
         equipo_real = Equipo.objects.filter(empresa=empresa).first()
@@ -3462,13 +3465,15 @@ def _crear_actividades_desde_excel(equipo, dates_dict, row_data, user):
             logger.info(f"Comprobación creada para {equipo.codigo_interno} ({fecha_comp}) — proveedor: {nombre_prov}")
 
 
-def _process_excel_import(excel_file, user):
+def _process_excel_import(excel_file, user, request=None):
     """
     Procesa el archivo Excel importado y crea los equipos.
 
     Args:
         excel_file: Archivo Excel subido
         user: Usuario que realiza la importación
+        request: si se pasa, la empresa se resuelve vía get_empresa_activa
+            (sede-aware); si no, se usa user.empresa (comportamiento histórico)
 
     Returns:
         dict: Resultado con success, imported, errors
@@ -3500,8 +3505,9 @@ def _process_excel_import(excel_file, user):
 
         # Obtener empresa del usuario si no es superusuario
         user_empresa = None
-        if not user.is_superuser and user.empresa:
-            user_empresa = user.empresa
+        empresa_activa_import = get_empresa_activa(request) if request is not None else user.empresa
+        if not user.is_superuser and empresa_activa_import:
+            user_empresa = empresa_activa_import
 
         # Validar capacidad del plan antes de procesar
         capacidad = _validar_capacidad_plan(sheet, column_mapping, user_empresa)

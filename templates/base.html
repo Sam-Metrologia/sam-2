@@ -374,6 +374,33 @@
             background-color: var(--bg-tertiary);
             color: var(--accent-primary);
         }
+        .sede-dropdown-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .sede-dropdown-item:hover {
+            background-color: var(--bg-tertiary);
+            color: var(--accent-primary);
+        }
+        .sede-dropdown-item.sede-activa {
+            color: var(--accent-primary);
+            font-weight: 700;
+        }
+        .sede-dropdown-item i {
+            font-size: 0.8rem;
+        }
 
         /* Alertas - adaptadas para dark mode */
         .alert {
@@ -574,6 +601,29 @@
             </button>
 
             <div class="user-menu">
+                {% if empresas_seleccionables %}
+                <div class="user-menu" style="position: relative;">
+                    <button id="sede-menu-button" class="user-menu-button" title="Cambiar de sede">
+                        <i class="fas fa-building"></i>
+                        <span>{{ sede_activa.nombre }}</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="sede-dropdown" class="user-dropdown">
+                        {% for empresa in empresas_seleccionables %}
+                        <form method="post" action="{% url 'core:cambiar_sede' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="empresa_id" value="{{ empresa.id }}">
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" class="sede-dropdown-item{% if empresa.id == sede_activa.id %} sede-activa{% endif %}">
+                                {{ empresa.nombre }}
+                                {% if empresa.id == sede_activa.id %}<i class="fas fa-check"></i>{% endif %}
+                            </button>
+                        </form>
+                        {% endfor %}
+                        <a href="{% url 'core:transferir_equipos' %}"><i class="fas fa-right-left"></i> Transferir equipos</a>
+                    </div>
+                </div>
+                {% endif %}
                 <!-- Toggle de Tema (interruptor inline) -->
                 <div class="theme-toggle theme-toggle-navbar" title="Cambiar tema">
                     <i class="fas fa-moon theme-toggle-icon"></i>
@@ -679,6 +729,8 @@
             const menuToggle = document.getElementById('menu-toggle');
             const userMenuButton = document.getElementById('user-menu-button');
             const userDropdown = document.getElementById('user-dropdown');
+            const sedeMenuButton = document.getElementById('sede-menu-button');
+            const sedeDropdown = document.getElementById('sede-dropdown');
             
             // Function to toggle sidebar visibility and main content adjustment
             function toggleSidebar() {
@@ -720,12 +772,24 @@
             // Toggle user dropdown
             userMenuButton.addEventListener('click', function() {
                 userDropdown.classList.toggle('show');
+                if (sedeDropdown) sedeDropdown.classList.remove('show');
             });
+
+            // Toggle selector de sede
+            if (sedeMenuButton) {
+                sedeMenuButton.addEventListener('click', function() {
+                    sedeDropdown.classList.toggle('show');
+                    userDropdown.classList.remove('show');
+                });
+            }
 
             // Close dropdowns and sidebar if clicked outside
             window.addEventListener('click', function(event) {
                 if (!userMenuButton.contains(event.target) && !userDropdown.contains(event.target)) {
                     userDropdown.classList.remove('show');
+                }
+                if (sedeMenuButton && !sedeMenuButton.contains(event.target) && !sedeDropdown.contains(event.target)) {
+                    sedeDropdown.classList.remove('show');
                 }
                 // Close sidebar if clicked outside on mobile (and overlay is not clicked, which is handled separately)
                 if (window.innerWidth <= 768 && sidebar.classList.contains('show') && 

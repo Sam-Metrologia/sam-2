@@ -2,6 +2,7 @@
 # Views administrativas: usuarios, proveedores, procedimientos, autenticación
 
 from .base import *
+from ..tenancy import get_empresa_activa
 
 # =============================================================================
 # AUTHENTICATION VIEWS
@@ -243,6 +244,107 @@ def listar_usuarios(request):
     return render(request, 'core/listar_usuarios.html', context)
 
 
+def _estado_empresa_para_usuarios(empresa):
+    """
+    Clasifica una empresa para la vista de usuarios agrupados:
+    activa, eliminada-en-gracia (aún dentro de los 180 días de retención,
+    con los días restantes), o eliminada-pendiente-de-purga (ya pasó el
+    plazo pero el cron mensual todavía no corrió).
+    """
+    if not empresa.is_deleted:
+        return {'clave': 'activa', 'label': 'Activa', 'color': 'green'}
+
+    dias_desde_borrado = (timezone.now() - empresa.deleted_at).days if empresa.deleted_at else 0
+    dias_restantes = 180 - dias_desde_borrado
+
+    if dias_restantes > 0:
+        return {
+            'clave': 'gracia',
+            'label': f'Eliminada — se purga en {dias_restantes} día(s)',
+            'color': 'amber',
+        }
+    return {
+        'clave': 'purga',
+        'label': 'Eliminada — pendiente de purga automática',
+        'color': 'red',
+    }
+
+
+@monitor_view
+@access_check
+@login_required
+@superuser_required
+def usuarios_por_empresa(request):
+    """
+    Lista usuarios agrupados por empresa (en vez de una lista plana), con el
+    estado de cada empresa (activa / eliminada en gracia / pendiente de
+    purga) para identificar de un vistazo cuentas de clientes que ya se
+    fueron o que están a punto de perder sus datos.
+
+    También muestra aparte los usuarios sin empresa asignada (huérfanos) —
+    hoy esto ya no debería crecer más (el borrado de una empresa se lleva
+    a sus usuarios con ella), pero pueden existir huérfanos de antes de
+    ese arreglo.
+    """
+    query = request.GET.get('q', '')
+    estado_filtro = request.GET.get('estado', '')  # '', 'activa', 'gracia', 'purga', 'sin_empresa'
+
+    empresas_qs = Empresa.objects.prefetch_related(
+        Prefetch('usuarios_empresa', queryset=CustomUser.objects.order_by('-last_login', 'username'))
+    ).order_by('is_deleted', 'nombre')
+
+    if query:
+        empresas_qs = empresas_qs.filter(
+            Q(nombre__icontains=query) |
+            Q(usuarios_empresa__username__icontains=query) |
+            Q(usuarios_empresa__email__icontains=query)
+        ).distinct()
+
+    grupos = []
+    if estado_filtro != 'sin_empresa':
+        for empresa in empresas_qs:
+            usuarios = list(empresa.usuarios_empresa.all())
+            if not usuarios:
+                continue
+            estado = _estado_empresa_para_usuarios(empresa)
+            if estado_filtro and estado['clave'] != estado_filtro:
+                continue
+            grupos.append({'empresa': empresa, 'usuarios': usuarios, 'estado': estado})
+
+    # Usuarios huérfanos (sin empresa) — se muestran aparte, no agrupados.
+    # Solo se calculan si no hay filtro de estado, o si el filtro es justo 'sin_empresa'.
+    huerfanos = []
+    if not estado_filtro or estado_filtro == 'sin_empresa':
+        huerfanos_qs = CustomUser.objects.filter(empresa__isnull=True, is_superuser=False)
+        if query:
+            huerfanos_qs = huerfanos_qs.filter(
+                Q(username__icontains=query) | Q(email__icontains=query)
+            )
+        huerfanos = list(huerfanos_qs.order_by('-last_login', 'username'))
+
+    # Paginación por empresa (cada "página" agrupa varias empresas, no usuarios sueltos)
+    paginator = Paginator(grupos, 15)
+    page_number = request.GET.get('page')
+    try:
+        pagina_grupos = paginator.page(page_number)
+    except PageNotAnInteger:
+        pagina_grupos = paginator.page(1)
+    except EmptyPage:
+        pagina_grupos = paginator.page(paginator.num_pages)
+
+    mostrar_huerfanos = huerfanos and (not pagina_grupos.has_previous())
+
+    context = {
+        'pagina_grupos': pagina_grupos,
+        'huerfanos': huerfanos if mostrar_huerfanos else [],
+        'total_huerfanos': len(huerfanos),
+        'query': query,
+        'estado_filtro': estado_filtro,
+        'titulo_pagina': 'Usuarios por Empresa',
+    }
+    return render(request, 'core/usuarios_por_empresa.html', context)
+
+
 @monitor_view
 @access_check
 @login_required
@@ -481,9 +583,9 @@ def listar_procedimientos(request):
     procedimientos = Procedimiento.objects.all().select_related('empresa')
 
     # Filtrar por empresa si no es superusuario
-    if not request.user.is_superuser and request.user.empresa:
-        procedimientos = procedimientos.filter(empresa=request.user.empresa)
-    elif not request.user.is_superuser and not request.user.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request):
+        procedimientos = procedimientos.filter(empresa=get_empresa_activa(request))
+    elif not request.user.is_superuser and not get_empresa_activa(request):
         procedimientos = Procedimiento.objects.none()
 
     procedimientos = procedimientos.order_by('codigo')
@@ -511,7 +613,7 @@ def añadir_procedimiento(request):
 
                 # Asignar empresa automáticamente para usuarios no-superusuarios
                 if not request.user.is_superuser and not procedimiento.empresa:
-                    procedimiento.empresa = request.user.empresa
+                    procedimiento.empresa = get_empresa_activa(request)
 
                 procedimiento.save()
                 messages.success(request, 'Procedimiento añadido exitosamente.')
@@ -543,7 +645,7 @@ def editar_procedimiento(request, pk):
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != procedimiento.empresa:
         messages.error(request, 'No tienes permiso para editar este procedimiento.')
         return redirect('core:listar_procedimientos')
 
@@ -582,7 +684,7 @@ def eliminar_procedimiento(request, pk):
     procedimiento = get_object_or_404(Procedimiento, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != procedimiento.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != procedimiento.empresa:
         messages.error(request, 'No tienes permiso para eliminar este procedimiento.')
         return redirect('core:listar_procedimientos')
 
@@ -625,9 +727,9 @@ def listar_proveedores(request):
     proveedores = Proveedor.objects.all().select_related('empresa')
 
     # Filtrar por empresa si no es superusuario
-    if not request.user.is_superuser and request.user.empresa:
-        proveedores = proveedores.filter(empresa=request.user.empresa)
-    elif not request.user.is_superuser and not request.user.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request):
+        proveedores = proveedores.filter(empresa=get_empresa_activa(request))
+    elif not request.user.is_superuser and not get_empresa_activa(request):
         proveedores = Proveedor.objects.none()
 
     # Aplicar filtro de búsqueda
@@ -676,7 +778,7 @@ def añadir_proveedor(request):
 
                 # Asignar empresa automáticamente para usuarios no-superusuarios
                 if not request.user.is_superuser and not proveedor.empresa:
-                    proveedor.empresa = request.user.empresa
+                    proveedor.empresa = get_empresa_activa(request)
 
                 proveedor.save()
                 messages.success(request, 'Proveedor añadido exitosamente.')
@@ -708,7 +810,7 @@ def editar_proveedor(request, pk):
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != proveedor.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != proveedor.empresa:
         messages.error(request, 'No tienes permiso para editar este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -747,7 +849,7 @@ def eliminar_proveedor(request, pk):
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != proveedor.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != proveedor.empresa:
         messages.error(request, 'No tienes permiso para eliminar este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -784,7 +886,7 @@ def detalle_proveedor(request, pk):
     proveedor = get_object_or_404(Proveedor, pk=pk)
 
     # Verificar permisos por empresa
-    if not request.user.is_superuser and request.user.empresa != proveedor.empresa:
+    if not request.user.is_superuser and get_empresa_activa(request) != proveedor.empresa:
         messages.error(request, 'No tienes permiso para ver este proveedor.')
         return redirect('core:listar_proveedores')
 
@@ -847,8 +949,8 @@ def subir_pdf(request):
                 documento.archivo_s3_path = ruta_s3
                 documento.subido_por = request.user
 
-                if not request.user.is_superuser and request.user.empresa:
-                    documento.empresa = request.user.empresa
+                if not request.user.is_superuser and get_empresa_activa(request):
+                    documento.empresa = get_empresa_activa(request)
 
                 documento.save()
 
@@ -1094,7 +1196,7 @@ def configurar_usuarios_setup(request):
     from django.http import HttpResponseForbidden
     from .registro import asignar_permisos_por_rol
 
-    empresa = request.user.empresa
+    empresa = get_empresa_activa(request)
     if not empresa:
         return redirect('core:dashboard')
 

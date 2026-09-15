@@ -131,6 +131,108 @@ class TestTriggerDailyNotifications:
 
 
 # ---------------------------------------------------------------------------
+# trigger_weekly_upcoming_notifications
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestTriggerWeeklyUpcomingNotifications:
+
+    URL = 'trigger_weekly_upcoming_notifications'
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    def test_no_token_returns_401(self):
+        client = Client()
+        response = client.post(reverse(f'core:{self.URL}'))
+        assert response.status_code == 401
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    @patch('core.views.scheduled_tasks_api.NotificationScheduler.send_weekly_upcoming_digests', return_value=4)
+    def test_valid_token_returns_200(self, mock_notif):
+        response = _post_with_token(self.URL)
+        assert response.status_code == 200
+        data = json.loads(response.content)
+        assert data['success'] is True
+        assert data['sent_count'] == 4
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    @patch('core.views.scheduled_tasks_api.NotificationScheduler.send_weekly_upcoming_digests',
+           side_effect=Exception('DB error'))
+    def test_exception_returns_500(self, mock_notif):
+        response = _post_with_token(self.URL)
+        assert response.status_code == 500
+        data = json.loads(response.content)
+        assert data['success'] is False
+
+
+# ---------------------------------------------------------------------------
+# trigger_biweekly_upcoming_notifications
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestTriggerBiweeklyUpcomingNotifications:
+
+    URL = 'trigger_biweekly_upcoming_notifications'
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    def test_no_token_returns_401(self):
+        client = Client()
+        response = client.post(reverse(f'core:{self.URL}'))
+        assert response.status_code == 401
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    @patch('core.views.scheduled_tasks_api.NotificationScheduler.send_biweekly_upcoming_digests', return_value=2)
+    def test_valid_token_returns_200(self, mock_notif):
+        response = _post_with_token(self.URL)
+        assert response.status_code == 200
+        data = json.loads(response.content)
+        assert data['success'] is True
+        assert data['sent_count'] == 2
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    @patch('core.views.scheduled_tasks_api.NotificationScheduler.send_biweekly_upcoming_digests',
+           side_effect=Exception('DB error'))
+    def test_exception_returns_500(self, mock_notif):
+        response = _post_with_token(self.URL)
+        assert response.status_code == 500
+        data = json.loads(response.content)
+        assert data['success'] is False
+
+
+# ---------------------------------------------------------------------------
+# trigger_monthly_ahead_notifications
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestTriggerMonthlyAheadNotifications:
+
+    URL = 'trigger_monthly_ahead_notifications'
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    def test_no_token_returns_401(self):
+        client = Client()
+        response = client.post(reverse(f'core:{self.URL}'))
+        assert response.status_code == 401
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    @patch('core.views.scheduled_tasks_api.NotificationScheduler.send_monthly_ahead_digests', return_value=6)
+    def test_valid_token_returns_200(self, mock_notif):
+        response = _post_with_token(self.URL)
+        assert response.status_code == 200
+        data = json.loads(response.content)
+        assert data['success'] is True
+        assert data['sent_count'] == 6
+
+    @patch('core.views.scheduled_tasks_api.SCHEDULED_TASKS_TOKEN', VALID_TOKEN)
+    @patch('core.views.scheduled_tasks_api.NotificationScheduler.send_monthly_ahead_digests',
+           side_effect=Exception('DB error'))
+    def test_exception_returns_500(self, mock_notif):
+        response = _post_with_token(self.URL)
+        assert response.status_code == 500
+        data = json.loads(response.content)
+        assert data['success'] is False
+
+
+# ---------------------------------------------------------------------------
 # trigger_daily_maintenance
 # ---------------------------------------------------------------------------
 

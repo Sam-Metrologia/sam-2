@@ -1,0 +1,36 @@
+# GitHub Action: Recordatorio Quincenal de Actividades Próximas
+# Se ejecuta el día 15 de cada mes a las 8:00 AM (hora Colombia = UTC-5 = 13:00 UTC)
+# Parte del esquema de 4 recordatorios de calendario fijo que reemplaza el
+# antiguo sistema de umbrales relativos (30/15/7/0 días).
+
+name: Recordatorio Quincenal de Próximas
+
+on:
+  schedule:
+    # Día 15 de cada mes, 13:00 UTC = 8:00 AM Colombia
+    - cron: '0 13 15 * *'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  send-biweekly-upcoming:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar recordatorio quincenal de actividades próximas
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/notifications/biweekly-upcoming/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Recordatorio quincenal enviado exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al enviar recordatorio quincenal"
+          exit 1

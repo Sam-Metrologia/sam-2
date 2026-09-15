@@ -11,6 +11,7 @@ from django.shortcuts import render
 from ..models import Equipo, Calibracion, Mantenimiento, Comprobacion
 from ..monitoring import monitor_view
 from .base import access_check
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +44,17 @@ def _build_event(title, start_date, color, extra=None):
     return event
 
 
-def _get_equipos_qs(user):
-    """Retorna el queryset de equipos filtrado por empresa, excluyendo De Baja e Inactivo."""
+def _get_equipos_qs(user, request=None):
+    """
+    Retorna el queryset de equipos filtrado por empresa, excluyendo De Baja e Inactivo.
+
+    Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+    (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+    """
     qs = Equipo.objects.exclude(estado__in=['De Baja', 'Inactivo'])
     if not user.is_superuser:
-        qs = qs.filter(empresa=user.empresa)
+        empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+        qs = qs.filter(empresa=empresa_activa)
     return qs
 
 
@@ -59,7 +66,7 @@ def _get_equipos_qs(user):
 @login_required
 def calendario_actividades(request):
     """Renderiza la página del calendario de actividades."""
-    equipos_qs = _get_equipos_qs(request.user)
+    equipos_qs = _get_equipos_qs(request.user, request=request)
     responsables = (
         equipos_qs
         .exclude(responsable__isnull=True)
@@ -99,7 +106,7 @@ def calendario_eventos_api(request):
     except (ValueError, IndexError):
         end_date = start_date + timedelta(days=42)
 
-    equipos_qs = _get_equipos_qs(request.user)
+    equipos_qs = _get_equipos_qs(request.user, request=request)
     if responsable:
         equipos_qs = equipos_qs.filter(responsable=responsable)
 
@@ -224,7 +231,7 @@ def calendario_exportar_ical(request):
     tipo = request.GET.get('tipo', '')
     responsable = request.GET.get('responsable', '')
 
-    equipos_qs = _get_equipos_qs(request.user)
+    equipos_qs = _get_equipos_qs(request.user, request=request)
     if responsable:
         equipos_qs = equipos_qs.filter(responsable=responsable)
 

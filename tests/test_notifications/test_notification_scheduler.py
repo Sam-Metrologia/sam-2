@@ -15,6 +15,7 @@ Notas técnicas:
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 
 from core.models import Equipo, Empresa
@@ -278,35 +279,51 @@ class TestCheckAllReminders:
         assert resultado == 0
 
     @pytest.mark.django_db
-    @patch('core.notifications.NotificationScheduler.send_consolidated_reminder', return_value=True)
-    def test_empresa_con_actividades_proximas_llama_send_consolidated(
+    def test_es_alias_de_send_due_today_alerts(self, empresa_activa):
+        """
+        check_all_reminders() ya no revisa umbrales relativos (30/15/7/0) —
+        ahora es solo la alerta del día exacto (send_due_today_alerts),
+        se mantiene el nombre por compatibilidad con el cron diario existente.
+        """
+        from core.notifications import NotificationScheduler
+
+        with patch(
+            'core.notifications.NotificationScheduler.send_due_today_alerts', return_value=3
+        ) as mock_due_today:
+            resultado = NotificationScheduler.check_all_reminders()
+
+        mock_due_today.assert_called_once()
+        assert resultado == 3
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=True)
+    def test_empresa_con_actividad_hoy_llama_send_periodic_digest_con_hoy(
             self, mock_send, empresa_activa, usuario_empresa, equipo_activo):
-        """Con empresa y equipo con actividad en fecha de recordatorio, llama send_consolidated_reminder."""
+        """check_all_reminders() delega en send_periodic_digest con fecha_desde=fecha_hasta=hoy."""
         from core.notifications import NotificationScheduler
 
         today = timezone.localdate()
-        # Poner fecha en un día de recordatorio (7 días)
         Equipo.objects.filter(pk=equipo_activo.pk).update(
-            proxima_calibracion=today + timedelta(days=7),
+            proxima_calibracion=today,
             estado='Activo'
         )
 
         resultado = NotificationScheduler.check_all_reminders()
 
-        assert mock_send.called
-        # Retorna el número de emails enviados (al menos 1 por el mock)
+        mock_send.assert_called_once_with(
+            empresa_activa, today, today, 'VENCE HOY', urgency_level='critical'
+        )
         assert resultado >= 1
 
     @pytest.mark.django_db
-    @patch('core.notifications.NotificationScheduler.send_consolidated_reminder')
-    def test_empresa_sin_actividades_no_llama_send_consolidated(self, mock_send, empresa_activa):
-        """Sin actividades en fechas de recordatorio, no llama send_consolidated_reminder."""
+    def test_empresa_sin_actividades_no_cuenta_como_enviado(self, empresa_activa, usuario_empresa):
+        """Sin actividades que venzan hoy, no se manda correo y no cuenta en el total."""
         from core.notifications import NotificationScheduler
 
         resultado = NotificationScheduler.check_all_reminders()
 
-        # Sin actividades en los días de recordatorio, no se llama send_consolidated
-        mock_send.assert_not_called()
+        # send_periodic_digest se evalúa igual (una vez por empresa activa), pero al no
+        # haber nada que avisar retorna None, no True — así que no cuenta como enviado.
         assert resultado == 0
 
 
@@ -739,3 +756,216 @@ class TestSendWeeklyOverdueEmail:
         )
 
         assert resultado is False
+
+
+# ============================================================================
+# send_periodic_digest — base del nuevo esquema de 4 recordatorios
+# ============================================================================
+
+class TestSendPeriodicDigest:
+    """Tests para NotificationScheduler.send_periodic_digest()."""
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationService._get_company_recipients', return_value=[])
+    def test_sin_destinatarios_retorna_false(self, mock_recip, empresa_activa):
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        resultado = NotificationScheduler.send_periodic_digest(
+            empresa_activa, today, today + timedelta(days=6), 'Recordatorio semanal'
+        )
+
+        assert resultado is False
+
+    @pytest.mark.django_db
+    def test_sin_actividades_en_la_ventana_retorna_none(self, empresa_activa, usuario_empresa):
+        """Sin nada que avisar en la ventana, no manda correo (retorna None, no error)."""
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        resultado = NotificationScheduler.send_periodic_digest(
+            empresa_activa, today, today + timedelta(days=6), 'Recordatorio semanal'
+        )
+
+        assert resultado is None
+
+    @pytest.mark.django_db
+    @patch('core.notifications.configure_email_settings', return_value=True)
+    @patch('core.notifications.render_to_string', return_value='contenido')
+    @patch('core.notifications.EmailMultiAlternatives')
+    def test_actividad_dentro_de_la_ventana_envia_correo(
+        self, mock_email_cls, mock_render, mock_config, empresa_activa, usuario_empresa, equipo_activo
+    ):
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        Equipo.objects.filter(pk=equipo_activo.pk).update(
+            proxima_calibracion=today + timedelta(days=3), estado='Activo'
+        )
+        mock_email_cls.return_value = MagicMock()
+
+        resultado = NotificationScheduler.send_periodic_digest(
+            empresa_activa, today, today + timedelta(days=6), 'Recordatorio semanal'
+        )
+
+        assert resultado is True
+        context = mock_render.call_args[0][1]
+        assert context['total_proximas'] == 1
+        assert context['total_vencidas'] == 0  # este digest nunca incluye vencidas
+
+    @pytest.mark.django_db
+    def test_actividad_fuera_de_la_ventana_no_se_incluye(self, empresa_activa, usuario_empresa, equipo_activo):
+        """Una actividad más allá de fecha_hasta no debe disparar el envío."""
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        Equipo.objects.filter(pk=equipo_activo.pk).update(
+            proxima_calibracion=today + timedelta(days=20), estado='Activo'
+        )
+
+        resultado = NotificationScheduler.send_periodic_digest(
+            empresa_activa, today, today + timedelta(days=6), 'Recordatorio semanal'
+        )
+
+        assert resultado is None  # 20 días > ventana de 6 días, no cuenta
+
+
+# ============================================================================
+# Los 4 recordatorios de calendario fijo (reemplazan 30/15/7/0)
+# ============================================================================
+
+class TestDigestsDeCalendarioFijo:
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=True)
+    def test_weekly_upcoming_usa_ventana_de_7_dias(self, mock_send, empresa_activa):
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        resultado = NotificationScheduler.send_weekly_upcoming_digests()
+
+        mock_send.assert_called_once_with(
+            empresa_activa, today, today + timedelta(days=6),
+            'Recordatorio semanal — actividades de esta semana'
+        )
+        assert resultado == 1
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=True)
+    def test_biweekly_upcoming_usa_ventana_de_15_dias(self, mock_send, empresa_activa):
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        resultado = NotificationScheduler.send_biweekly_upcoming_digests()
+
+        mock_send.assert_called_once_with(
+            empresa_activa, today, today + timedelta(days=15),
+            'Recordatorio quincenal — próximos 15 días'
+        )
+        assert resultado == 1
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=True)
+    def test_monthly_ahead_usa_todo_el_mes_siguiente(self, mock_send, empresa_activa):
+        """
+        Enviado el día 1, debe cubrir TODO el mes siguiente (no el actual) —
+        para garantizar al menos un mes completo de anticipación, incluso
+        para algo que vence el día 2 o 3 del mes siguiente.
+        """
+        from core.notifications import NotificationScheduler
+
+        resultado = NotificationScheduler.send_monthly_ahead_digests()
+
+        assert mock_send.call_count == 1
+        args, kwargs = mock_send.call_args
+        empresa_arg, fecha_desde, fecha_hasta, label = args
+
+        today = timezone.localdate()
+        primer_dia_prox_mes = today.replace(day=1) + relativedelta(months=1)
+        ultimo_dia_prox_mes = (primer_dia_prox_mes + relativedelta(months=1)) - timedelta(days=1)
+
+        assert empresa_arg == empresa_activa
+        assert fecha_desde == primer_dia_prox_mes
+        assert fecha_hasta == ultimo_dia_prox_mes
+        assert fecha_desde.day == 1  # siempre arranca en el primer día del mes siguiente
+        assert resultado == 1
+
+    @pytest.mark.django_db
+    def test_monthly_ahead_da_al_menos_un_mes_de_anticipacion_para_inicio_de_mes(
+        self, empresa_activa, usuario_empresa
+    ):
+        """
+        El caso concreto que motivó este diseño: un equipo que vence el
+        día 2 o 3 del mes siguiente debe aparecer en el digest mensual
+        (mandado el día 1), dando al menos ~1 mes de anticipación real.
+        """
+        from core.notifications import NotificationScheduler
+        from tests.factories import EquipoFactory
+
+        today = timezone.localdate()
+        primer_dia_prox_mes = today.replace(day=1) + relativedelta(months=1)
+        vence_a_inicio_del_prox_mes = primer_dia_prox_mes + timedelta(days=2)
+
+        equipo = EquipoFactory(empresa=empresa_activa)
+        Equipo.objects.filter(pk=equipo.pk).update(
+            proxima_calibracion=vence_a_inicio_del_prox_mes, estado='Activo'
+        )
+
+        with patch('core.notifications.configure_email_settings', return_value=True), \
+             patch('core.notifications.render_to_string', return_value='contenido') as mock_render, \
+             patch('core.notifications.EmailMultiAlternatives') as mock_email_cls:
+            mock_email_cls.return_value = MagicMock()
+            resultado = NotificationScheduler.send_monthly_ahead_digests()
+
+        assert resultado == 1
+        context = mock_render.call_args[0][1]
+        assert context['total_proximas'] == 1
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=True)
+    def test_due_today_usa_hoy_como_unica_fecha_y_urgencia_critica(self, mock_send, empresa_activa):
+        from core.notifications import NotificationScheduler
+
+        today = timezone.localdate()
+        resultado = NotificationScheduler.send_due_today_alerts()
+
+        mock_send.assert_called_once_with(
+            empresa_activa, today, today, 'VENCE HOY', urgency_level='critical'
+        )
+        assert resultado == 1
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=None)
+    def test_nada_que_avisar_no_cuenta_en_ningun_digest(self, mock_send, empresa_activa):
+        """None (nada que avisar) nunca debe contarse como enviado, en ninguno de los 4."""
+        from core.notifications import NotificationScheduler
+
+        assert NotificationScheduler.send_weekly_upcoming_digests() == 0
+        assert NotificationScheduler.send_biweekly_upcoming_digests() == 0
+        assert NotificationScheduler.send_monthly_ahead_digests() == 0
+        assert NotificationScheduler.send_due_today_alerts() == 0
+
+    @pytest.mark.django_db
+    @patch('core.notifications.NotificationScheduler.send_periodic_digest', return_value=False)
+    def test_fallo_de_envio_no_cuenta_en_ningun_digest(self, mock_send, empresa_activa):
+        """False (falló el envío) tampoco debe contarse como enviado."""
+        from core.notifications import NotificationScheduler
+
+        assert NotificationScheduler.send_weekly_upcoming_digests() == 0
+        assert NotificationScheduler.send_biweekly_upcoming_digests() == 0
+        assert NotificationScheduler.send_monthly_ahead_digests() == 0
+        assert NotificationScheduler.send_due_today_alerts() == 0
+
+    @pytest.mark.django_db
+    def test_no_incluye_empresas_eliminadas_ni_inactivas(self, empresa_activa):
+        from core.notifications import NotificationScheduler
+        from tests.factories import EmpresaFactory
+
+        empresa_eliminada = EmpresaFactory(is_deleted=True)
+        empresa_expirada = EmpresaFactory(estado_suscripcion='Expirado')
+
+        empresas = list(NotificationScheduler._empresas_activas_para_digest())
+
+        assert empresa_activa in empresas
+        assert empresa_eliminada not in empresas
+        assert empresa_expirada not in empresas

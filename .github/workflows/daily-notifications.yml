@@ -1,7 +1,12 @@
-# GitHub Action: Notificaciones Diarias
+# GitHub Action: Notificaciones Diarias — alerta del día exacto de vencimiento
 # Se ejecuta todos los días a las 8:00 AM (hora Colombia = UTC-5 = 13:00 UTC)
+#
+# Ya NO revisa umbrales relativos (30/15/7 días) — eso ahora lo cubren los
+# recordatorios de calendario fijo (weekly-upcoming-notifications.yml,
+# biweekly-upcoming-notifications.yml, monthly-ahead-notifications.yml).
+# Este solo manda la alerta puntual de lo que vence HOY.
 
-name: Notificaciones Diarias
+name: Notificaciones Diarias (vence hoy)
 
 on:
   schedule:

@@ -1312,6 +1312,58 @@ def reporte_validacion_software(request):
         except Exception:
             pass
 
+    # ── Cobertura de pruebas (calculada en vivo, nunca texto fijo) ────────────
+    # El archivo .coverage solo se regenera cuando alguien corre pytest con
+    # --cov, así que puede tener semanas o meses. Por eso siempre se muestra
+    # junto con la fecha real de esa medición — nunca se presenta como si
+    # fuera de "ahora" cuando puede no serlo.
+    cobertura_info = {'disponible': False, 'total_pct': None, 'medido_en': None, 'por_modulo': {}}
+    coverage_file = BASE_DIR / '.coverage'
+    if coverage_file.exists():
+        try:
+            import coverage as _cov_mod
+            import io as _io, contextlib as _ctx
+            from datetime import datetime as _dt
+
+            _cov = _cov_mod.Coverage(data_file=str(coverage_file))
+            _cov.load()
+
+            def _pct(morfs=None):
+                buf = _io.StringIO()
+                with _ctx.redirect_stdout(buf), _ctx.redirect_stderr(_io.StringIO()):
+                    return round(_cov.report(morfs=morfs, show_missing=False), 1)
+
+            cobertura_info['total_pct'] = _pct()
+            cobertura_info['medido_en'] = _dt.fromtimestamp(coverage_file.stat().st_mtime)
+
+            modulos = {
+                'Pagos (core/views/pagos.py)': BASE_DIR / 'core' / 'views' / 'pagos.py',
+                'ZIP (core/zip_functions.py)': BASE_DIR / 'core' / 'zip_functions.py',
+                'Confirmación metrológica (core/views/confirmacion.py)': BASE_DIR / 'core' / 'views' / 'confirmacion.py',
+            }
+            for etiqueta, ruta in modulos.items():
+                try:
+                    cobertura_info['por_modulo'][etiqueta] = _pct(morfs=[str(ruta)])
+                except Exception:
+                    pass
+
+            cobertura_info['disponible'] = True
+        except Exception:
+            pass
+
+    # ── Scripts inline en plantillas (para CSP) — conteo en vivo, no de memoria ─
+    scripts_inline_count = 0
+    try:
+        for _templates_dir in (BASE_DIR / 'templates', BASE_DIR / 'core' / 'templates'):
+            if _templates_dir.exists():
+                for _html_file in _templates_dir.rglob('*.html'):
+                    try:
+                        scripts_inline_count += _html_file.read_text(encoding='utf-8', errors='ignore').count('<script nonce')
+                    except Exception:
+                        pass
+    except Exception:
+        scripts_inline_count = None
+
     # ── Dependencias de software ──────────────────────────────────────────────
     paquetes = [
         ('django',             'Framework web',                          'Crítico'),
@@ -1457,6 +1509,8 @@ def reporte_validacion_software(request):
         'migraciones_pendientes': migraciones_pendientes,
         'ultimo_test': ultimo_test,
         'test_desde_archivo': test_desde_archivo,
+        'cobertura_info': cobertura_info,
+        'scripts_inline_count': scripts_inline_count,
         'dependencias': dependencias,
         'stats': stats,
         'funciones_validadas': funciones_validadas,

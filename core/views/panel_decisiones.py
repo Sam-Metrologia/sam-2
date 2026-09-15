@@ -78,7 +78,7 @@ def panel_decisiones(request):
         else:
             # PERSPECTIVA SAM: Vista estratégica multi-empresa
             return _panel_decisiones_sam(request, today, current_year)
-    elif user.puede_ver_panel_decisiones() and user.empresa:
+    elif user.puede_ver_panel_decisiones() and get_empresa_activa(request):
         # PERSPECTIVA EMPRESA: Vista táctica single-empresa
         return _panel_decisiones_empresa(request, today, current_year)
     else:
@@ -478,7 +478,7 @@ def _panel_decisiones_empresa(request, today, current_year, empresa_override=Non
     empresa_override: Permite al superusuario ver el panel de una empresa específica
     """
     user = request.user
-    empresa = empresa_override if empresa_override else user.empresa
+    empresa = empresa_override if empresa_override else get_empresa_activa(request)
 
     # Cache de 5 min, invalidado por las mismas señales del dashboard
     cache_key = f"panel_decisiones_{empresa.id}_{date.today().year}"
@@ -1265,9 +1265,9 @@ def get_equipos_salud_detalles(request):
     empresa_id = request.GET.get('empresa_id')
 
     if not user.is_superuser:
-        if not user.empresa:
+        if not get_empresa_activa(request):
             return JsonResponse({'error': 'Usuario sin empresa asignada'}, status=400)
-        empresa = user.empresa
+        empresa = get_empresa_activa(request)
     else:
         if not empresa_id:
             return JsonResponse({'error': 'empresa_id requerido'}, status=400)

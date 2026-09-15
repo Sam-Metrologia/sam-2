@@ -47,10 +47,15 @@ urlpatterns = [
     # Sesión (NUEVO 2025-11-19)
     path('session-heartbeat/', views.session_heartbeat, name='session_heartbeat'),
 
+    # Selector de sede (multi-sede, GERENCIA de empresa matriz)
+    path('sede/cambiar/', views.cambiar_sede, name='cambiar_sede'),
+    path('sede/transferir-equipos/', views.transferir_equipos, name='transferir_equipos'),
+
     # Términos y Condiciones
     path('terminos-condiciones/', views.aceptar_terminos, name='aceptar_terminos'),
     path('terminos-condiciones/rechazar/', views.rechazar_terminos, name='rechazar_terminos'),
     path('terminos-condiciones/pdf/', views.ver_terminos_pdf, name='ver_terminos_pdf'),
+    path('terminos-condiciones/ver/', views.ver_terminos_html, name='ver_terminos_html'),
     path('mi-aceptacion-terminos/', views.mi_aceptacion_terminos, name='mi_aceptacion_terminos'),
 
     # Perfil de usuario
@@ -161,6 +166,7 @@ urlpatterns = [
 
     # Usuarios
     path('usuarios/', views.listar_usuarios, name='listar_usuarios'),
+    path('usuarios/por-empresa/', views.usuarios_por_empresa, name='usuarios_por_empresa'),
     path('usuarios/añadir/', views.añadir_usuario, name='añadir_usuario'),
     path('usuarios/crear/', views.crear_usuario_empresa, name='crear_usuario_empresa'),
     path('usuarios/<int:pk>/editar/', views.editar_usuario, name='editar_usuario'), 
@@ -262,6 +268,9 @@ urlpatterns = [
     # ==============================================================================
     path('api/scheduled/health/', views.scheduled_health_check, name='scheduled_health_check'),
     path('api/scheduled/notifications/daily/', views.trigger_daily_notifications, name='trigger_daily_notifications'),
+    path('api/scheduled/notifications/weekly-upcoming/', views.trigger_weekly_upcoming_notifications, name='trigger_weekly_upcoming_notifications'),
+    path('api/scheduled/notifications/biweekly-upcoming/', views.trigger_biweekly_upcoming_notifications, name='trigger_biweekly_upcoming_notifications'),
+    path('api/scheduled/notifications/monthly-ahead/', views.trigger_monthly_ahead_notifications, name='trigger_monthly_ahead_notifications'),
     path('api/scheduled/maintenance/daily/', views.trigger_daily_maintenance, name='trigger_daily_maintenance'),
     path('api/scheduled/cleanup/zips/', views.trigger_cleanup_zips, name='trigger_cleanup_zips'),
     path('api/scheduled/notifications/weekly-overdue/', views.trigger_weekly_overdue, name='trigger_weekly_overdue'),

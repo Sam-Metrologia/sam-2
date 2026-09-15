@@ -1,0 +1,36 @@
+# GitHub Action: Recordatorio Semanal de Actividades Próximas
+# Se ejecuta todos los martes a las 8:00 AM (hora Colombia = UTC-5 = 13:00 UTC)
+# Parte del esquema de 4 recordatorios de calendario fijo que reemplaza el
+# antiguo sistema de umbrales relativos (30/15/7/0 días).
+
+name: Recordatorio Semanal de Próximas
+
+on:
+  schedule:
+    # Martes 13:00 UTC = Martes 8:00 AM Colombia
+    - cron: '0 13 * * 2'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  send-weekly-upcoming:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar recordatorio semanal de actividades próximas
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULED_TASKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.APP_URL }}/core/api/scheduled/notifications/weekly-upcoming/" \
+            --fail-with-body \
+            --max-time 300
+
+      - name: Verificar resultado
+        if: success()
+        run: echo "✅ Recordatorio semanal enviado exitosamente"
+
+      - name: Reportar error
+        if: failure()
+        run: |
+          echo "❌ Error al enviar recordatorio semanal"
+          exit 1

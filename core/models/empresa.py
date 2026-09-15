@@ -437,6 +437,18 @@ class Empresa(models.Model):
     stats_fecha_calculo = models.DateField(null=True, blank=True)
     # ────────────────────────────────────────────────────────────────────────────
 
+    # Multi-sede: si esta empresa es una sede, apunta a la empresa matriz (holding/casa principal).
+    # Un usuario GERENCIA de la matriz puede operar en la matriz y en todas sus sedes.
+    empresa_matriz = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='sedes',
+        verbose_name="Empresa Matriz",
+        help_text="Si esta empresa es una sede, selecciona aquí la empresa matriz (holding) a la que pertenece."
+    )
+
     class Meta:
         verbose_name = "Empresa"
         verbose_name_plural = "Empresas"

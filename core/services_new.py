@@ -16,6 +16,7 @@ from django.db.models import Sum, Count, Prefetch, Q
 from django.db import models
 from .models import Equipo, Empresa, Calibracion, Mantenimiento, Comprobacion, Documento
 from .security import SecureFileValidator, StorageQuotaManager
+from .tenancy import get_empresa_activa
 
 logger = logging.getLogger('core')
 
@@ -303,11 +304,17 @@ class OptimizedEquipmentService:
             })
             raise
 
-    def create_equipment_with_files(self, form_data, files, user):
-        """Crear equipo con archivos usando el servicio seguro"""
+    def create_equipment_with_files(self, form_data, files, user, request=None):
+        """
+        Crear equipo con archivos usando el servicio seguro.
+
+        Si se pasa `request`, la empresa se resuelve vía get_empresa_activa
+        (sede-aware); si no, se usa user.empresa (comportamiento histórico).
+        """
         try:
             with transaction.atomic():
-                empresa = user.empresa if not user.is_superuser else form_data.get('empresa')
+                empresa_activa = get_empresa_activa(request) if request is not None else user.empresa
+                empresa = empresa_activa if not user.is_superuser else form_data.get('empresa')
 
                 if empresa:
                     self._validate_equipment_limit(empresa)

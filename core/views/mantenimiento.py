@@ -18,6 +18,7 @@ from weasyprint import HTML
 
 from core.models import Mantenimiento, Equipo
 from core.decorators_pdf import safe_pdf_response
+from ..tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def mantenimiento_actividades_view(request, equipo_id):
     if request.user.is_superuser:
         equipo = get_object_or_404(Equipo, id=equipo_id)
     else:
-        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+        equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
     mantenimiento_id = request.GET.get('mantenimiento_id')
 
@@ -140,7 +141,7 @@ def guardar_mantenimiento_json(request, equipo_id):
         if request.user.is_superuser:
             equipo = get_object_or_404(Equipo, id=equipo_id)
         else:
-            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
         datos = json.loads(request.body)
         mantenimiento_id = datos.get('mantenimiento_id')
@@ -226,7 +227,7 @@ def generar_pdf_mantenimiento(request, equipo_id):
         if request.user.is_superuser:
             equipo = get_object_or_404(Equipo, id=equipo_id)
         else:
-            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=request.user.empresa)
+            equipo = get_object_or_404(Equipo, id=equipo_id, empresa=get_empresa_activa(request))
 
         mantenimiento_id = request.GET.get('mantenimiento_id')
 

@@ -13,6 +13,7 @@ from django.db.models import Max
 from django.core.files.storage import default_storage
 from datetime import timedelta
 from core.models import ZipRequest, Empresa, Equipo, Proveedor, Procedimiento
+from .tenancy import get_empresa_activa
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ def solicitar_zip(request):
         logger.warning(f"⚠️ Superusuario sin empresa_id especificada. Parámetros GET: {dict(request.GET)}")
         return JsonResponse({'error': 'Superusuario debe especificar empresa_id para descargar ZIP'}, status=400)
     else:
-        empresa = request.user.empresa
+        empresa = get_empresa_activa(request)
         if not empresa:
             return JsonResponse({'error': 'Usuario sin empresa asignada'}, status=400)
         logger.info(f"✅ Usuario normal usando su empresa: {empresa.nombre}")
