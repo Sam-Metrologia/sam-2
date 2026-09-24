@@ -18,102 +18,80 @@
         <!-- Aviso: ya está adentro -->
         <div class="bg-green-50 border border-green-300 rounded-md p-4 mb-6 text-sm text-green-800">
             <p class="font-semibold"><i class="fas fa-check mr-1"></i> Ya iniciaste sesión</p>
-            <p>Entraste automáticamente con el usuario Administrador — no necesitas volver a escribir usuario y clave ahora. Además, te acabamos de enviar estas credenciales a <strong>{{ credenciales.admin.email }}</strong> como respaldo.</p>
+            <p>Entraste automáticamente con el usuario Administrador — no necesitas volver a escribir usuario y clave ahora.</p>
         </div>
 
-        <!-- Advertencia -->
-        <div class="bg-yellow-50 border border-yellow-300 rounded-md p-4 mb-6 text-sm text-yellow-800">
-            <p class="font-semibold"><i class="fas fa-exclamation-triangle mr-1"></i> Guarda estas credenciales</p>
-            <p>Esta es la única vez que se muestran en pantalla. Ya las tienes también en tu correo.</p>
-        </div>
-
-        <!-- Tabla de credenciales -->
-        <div class="overflow-x-auto mb-6">
-            <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rol</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Usuario</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Contraseña</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Permisos</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    <!-- Administrador -->
-                    <tr class="bg-blue-50">
-                        <td class="px-4 py-3">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                <i class="fas fa-user-shield mr-1"></i> ADMINISTRADOR
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 font-mono text-sm">{{ credenciales.admin.username }}</td>
-                        <td class="px-4 py-3 font-mono text-sm">{{ credenciales.admin.password }}</td>
-                        <td class="px-4 py-3 text-xs text-gray-600">Gestión completa, descargar informes, eliminar equipos</td>
-                    </tr>
-                    <!-- Gerencia -->
-                    <tr>
-                        <td class="px-4 py-3">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                <i class="fas fa-chart-line mr-1"></i> GERENCIA
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 font-mono text-sm">{{ credenciales.gerente.username }}</td>
-                        <td class="px-4 py-3 font-mono text-sm">{{ credenciales.gerente.password }}</td>
-                        <td class="px-4 py-3 text-xs text-gray-600">Todo lo del admin + panel de decisiones (métricas financieras)</td>
-                    </tr>
-                    <!-- Técnico -->
-                    <tr class="bg-gray-50">
-                        <td class="px-4 py-3">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <i class="fas fa-tools mr-1"></i> TECNICO
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 font-mono text-sm">{{ credenciales.tecnico.username }}</td>
-                        <td class="px-4 py-3 font-mono text-sm">{{ credenciales.tecnico.password }}</td>
-                        <td class="px-4 py-3 text-xs text-gray-600">Operaciones básicas (registrar calibraciones, comprobaciones)</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        {% if set_password_form %}
-        <!-- Configurar clave propia del Administrador -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5 text-sm">
-            <p class="font-semibold text-blue-800 mb-2">
-                <i class="fas fa-key mr-1"></i> Reemplaza tu clave temporal por una que recuerdes
-            </p>
-            <p class="text-blue-700 mb-3">
-                La clave del Administrador de arriba es generada al azar. Pon aquí la que tú quieras
-                para que la próxima vez entres con tu correo (<strong>{{ credenciales.admin.email }}</strong>) y esta clave.
-            </p>
-            <form method="post" action="{% url 'core:trial_exitoso' %}" class="space-y-3">
-                {% csrf_token %}
-                {% if set_password_form.non_field_errors %}
-                    <div class="text-red-600 text-xs">{{ set_password_form.non_field_errors }}</div>
-                {% endif %}
-                <div>
-                    <label for="id_new_password1" class="block text-gray-700 text-xs font-semibold mb-1">Nueva contraseña</label>
-                    <input type="password" name="new_password1" id="id_new_password1"
-                           class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input" required>
-                    {% if set_password_form.new_password1.errors %}
-                        <div class="text-red-600 text-xs mt-1">{{ set_password_form.new_password1.errors }}</div>
+        <!-- Paso a paso -->
+        <div class="mb-6 space-y-3">
+            <!-- Paso 1: configurar clave -->
+            <div class="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <span class="flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+                <div class="text-sm flex-1">
+                    <p class="font-semibold text-blue-800 mb-1">
+                        <i class="fas fa-key mr-1"></i> Configura tu contraseña
+                    </p>
+                    {% if password_configurada %}
+                        <p class="text-blue-700">
+                            Listo — ya puedes volver a entrar con tu correo (<strong>{{ credenciales.admin.email }}</strong>) y la clave que configuraste.
+                        </p>
+                    {% elif set_password_form %}
+                        <p class="text-blue-700 mb-3">
+                            Tu acceso quedará vinculado a este correo. Verifica que esté correcto — puedes
+                            corregirlo aquí si es necesario — y define la contraseña con la que vas a ingresar
+                            de ahora en adelante.
+                        </p>
+                        <form method="post" action="{% url 'core:trial_exitoso' %}" class="space-y-3">
+                            {% csrf_token %}
+                            {% if set_password_form.non_field_errors %}
+                                <div class="text-red-600 text-xs">{{ set_password_form.non_field_errors }}</div>
+                            {% endif %}
+                            <div>
+                                <label for="id_email" class="block text-gray-700 text-xs font-semibold mb-1">Correo</label>
+                                <input type="email" name="email" id="id_email" value="{{ set_password_form.email.value|default:'' }}"
+                                       class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input" required>
+                                {% if set_password_form.email.errors %}
+                                    <div class="text-red-600 text-xs mt-1">{{ set_password_form.email.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <label for="id_new_password1" class="block text-gray-700 text-xs font-semibold mb-1">Nueva contraseña</label>
+                                <input type="password" name="new_password1" id="id_new_password1"
+                                       class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input" required>
+                                {% if set_password_form.new_password1.errors %}
+                                    <div class="text-red-600 text-xs mt-1">{{ set_password_form.new_password1.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <label for="id_new_password2" class="block text-gray-700 text-xs font-semibold mb-1">Confirmar contraseña</label>
+                                <input type="password" name="new_password2" id="id_new_password2"
+                                       class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input" required>
+                                {% if set_password_form.new_password2.errors %}
+                                    <div class="text-red-600 text-xs mt-1">{{ set_password_form.new_password2.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <button type="submit"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md w-full transition duration-300 ease-in-out">
+                                Guardar mi contraseña
+                            </button>
+                        </form>
                     {% endif %}
                 </div>
-                <div>
-                    <label for="id_new_password2" class="block text-gray-700 text-xs font-semibold mb-1">Confirmar contraseña</label>
-                    <input type="password" name="new_password2" id="id_new_password2"
-                           class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input" required>
-                    {% if set_password_form.new_password2.errors %}
-                        <div class="text-red-600 text-xs mt-1">{{ set_password_form.new_password2.errors }}</div>
-                    {% endif %}
+            </div>
+
+            <!-- Paso 2: correo con Gerencia y Técnico -->
+            <div class="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <span class="flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-500 text-white text-xs font-bold">2</span>
+                <div class="text-sm">
+                    <p class="font-semibold text-gray-800 mb-1">
+                        <i class="fas fa-envelope mr-1"></i> Revisa tu correo
+                    </p>
+                    <p class="text-gray-600">
+                        A <strong>{{ credenciales.admin.email }}</strong> te enviamos los usuarios de <strong>Gerencia</strong> y
+                        <strong>Técnico</strong>, para cuando quieras darle acceso al resto de tu equipo.
+                    </p>
                 </div>
-                <button type="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md w-full transition duration-300 ease-in-out">
-                    Guardar mi contraseña
-                </button>
-            </form>
+            </div>
         </div>
-        {% endif %}
 
         <!-- Completar perfil (CTA) -->
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5 text-sm">

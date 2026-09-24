@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.core.mail import mail_admins
 from django.db import models
 from core.models import Empresa
+from core.notifications import NotificationScheduler
 import logging
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,8 @@ class Command(BaseCommand):
             'warned': 0,
             'suspended': 0,
             'deleted': 0,
-            'errors': 0
+            'errors': 0,
+            'recordatorios_inactividad': 0,
         }
 
         # Buscar empresas que tengan algún plan configurado (trial o pagado)
@@ -80,6 +82,10 @@ class Command(BaseCommand):
 
         # Cleanup: eliminar trials expirados > 15 días
         self.cleanup_expired_trials(dry_run, stats)
+
+        # Recordatorios de reenganche (día 3 / día 7 sin volver a entrar)
+        if not dry_run:
+            stats['recordatorios_inactividad'] = NotificationScheduler.send_trial_inactivity_reminders()
 
         # Mostrar resumen
         self.show_summary(stats, dry_run)
@@ -199,6 +205,7 @@ class Command(BaseCommand):
         self.stdout.write(f'- Trials expirados: {stats["expired"]}')
         self.stdout.write(f'- Avisos enviados: {stats["warned"]}')
         self.stdout.write(f'- Trials eliminados (>{TRIAL_RETENCION_DIAS}d): {stats["deleted"]}')
+        self.stdout.write(f'- Recordatorios de reenganche enviados (día 3/7): {stats["recordatorios_inactividad"]}')
         self.stdout.write(f'- Errores: {stats["errors"]}')
 
         if dry_run:

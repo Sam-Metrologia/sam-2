@@ -580,6 +580,76 @@ class NotificationScheduler:
         return sent_count
 
     @staticmethod
+    def send_trial_inactivity_reminders():
+        """
+        Recordatorio de reenganche para trials que no han vuelto a entrar por
+        su cuenta desde que se crearon: día 3 y día 7.
+
+        "No volver a entrar" se mide comparando `last_login` del Administrador
+        contra su `date_joined` — el auto-login automático del momento de
+        creación del trial deja ambos casi iguales (mismo día); si nunca
+        regresó por su cuenta, `last_login` sigue siendo del mismo día que
+        `date_joined`. Si volvió a entrar cualquier otro día, ya no aplica.
+        """
+        today = timezone.localdate()
+        sent_count = 0
+
+        for dias in (3, 7):
+            fecha_objetivo = today - timedelta(days=dias)
+            empresas = Empresa.objects.filter(
+                es_periodo_prueba=True,
+                is_deleted=False,
+                fecha_inicio_plan=fecha_objetivo,
+            )
+            for empresa in empresas:
+                admin = empresa.usuarios_empresa.filter(
+                    rol_usuario='ADMINISTRADOR', is_active=True
+                ).first()
+                if not admin or not admin.email or not admin.last_login or not admin.date_joined:
+                    continue
+                if admin.last_login.date() != admin.date_joined.date():
+                    continue  # sí volvió a entrar por su cuenta
+
+                if NotificationScheduler._send_trial_inactivity_email(empresa, admin, dias):
+                    sent_count += 1
+
+        logger.info(f"Trial inactivity reminders completed. Sent: {sent_count}")
+        return sent_count
+
+    @staticmethod
+    def _send_trial_inactivity_email(empresa, admin, dias):
+        try:
+            if not configure_email_settings():
+                logger.error("Failed to configure email settings")
+                return False
+
+            context = {
+                'empresa': empresa,
+                'admin': admin,
+                'dias': dias,
+                'site_name': 'SAM Metrologia',
+            }
+            subject = f"Tu Trial de SAM Metrología sigue activo — {empresa.nombre}"
+            text_content = render_to_string('emails/trial_inactivity_reminder.txt', context)
+            html_content = render_to_string('emails/trial_inactivity_reminder.html', context)
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[admin.email],
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            logger.info(f"Trial inactivity reminder (día {dias}) enviado a {admin.email} ({empresa.nombre})")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send trial inactivity reminder for {empresa.nombre}: {e}")
+            return False
+
+    @staticmethod
     def check_all_reminders():
         """
         Alerta del día exacto de vencimiento.

@@ -1,0 +1,12 @@
+Hola {{ empresa.nombre }},
+
+Notamos que no has vuelto a entrar a tu Trial de SAM Metrología desde que lo creaste hace {{ dias }} días.
+
+Tu cuenta sigue activa y lista para usar — ya tienes un equipo de demostración cargado para que pruebes calibraciones, mantenimientos y comprobaciones sin configurar nada primero.
+
+Ingresa aquí: https://app.sammetrologia.com/core/login/
+Usuario: tu correo ({{ admin.email }})
+
+Si tuviste algún problema para entrar o tienes dudas, escríbenos por WhatsApp: +57 324 799 0534
+
+SAM Metrología S.A.S — comercial@sammetrologia.com

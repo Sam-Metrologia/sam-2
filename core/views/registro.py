@@ -7,6 +7,7 @@ import logging
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django import forms
 from django.shortcuts import render, redirect
 from django.db import transaction
 from django.utils.crypto import get_random_string
@@ -319,11 +320,29 @@ def solicitar_trial(request):
     return render(request, 'registration/solicitar_trial.html', {'form': form})
 
 
+class ConfigurarAccesoTrialForm(SetPasswordForm):
+    """
+    SetPasswordForm + un campo de correo editable. Se usa en trial_exitoso para
+    que el Administrador ponga su propia clave y, de paso, corrija el correo si
+    al registrarse usó uno de relleno solo para pasar el formulario rápido.
+    """
+    email = forms.EmailField(label='Correo', required=True)
+
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        self.fields['email'].initial = user.email
+
+    def save(self, commit=True):
+        self.user.email = self.cleaned_data['email']
+        return super().save(commit=commit)
+
+
 def trial_exitoso(request):
     """
     Muestra las credenciales de los 3 usuarios creados tras el registro de Trial.
     El Administrador ya entró con sesión automática (ver solicitar_trial) y aquí
-    puede reemplazar su contraseña generada al azar por una que él elija.
+    puede reemplazar su contraseña generada al azar por una que él elija, y
+    corregir su correo si el que puso al registrarse no era el real.
     """
     credenciales = request.session.get('trial_credenciales')
     if not credenciales:
@@ -339,11 +358,25 @@ def trial_exitoso(request):
     set_password_form = None
     if puede_configurar:
         if request.method == 'POST':
-            set_password_form = SetPasswordForm(request.user, request.POST)
+            set_password_form = ConfigurarAccesoTrialForm(request.user, request.POST)
             if set_password_form.is_valid():
-                set_password_form.save()
-                update_session_auth_hash(request, request.user)
+                correo_anterior = request.user.email
+                usuario = set_password_form.save()
+                update_session_auth_hash(request, usuario)
                 request.session['trial_password_configurada'] = True
+
+                correo_cambio = usuario.email != correo_anterior
+                if correo_cambio and usuario.empresa:
+                    usuario.empresa.email = usuario.email
+                    usuario.empresa.save(update_fields=['email'])
+
+                credenciales['admin']['email'] = usuario.email
+                request.session['trial_credenciales'] = credenciales
+                request.session.modified = True
+
+                if correo_cambio and usuario.empresa:
+                    _reenviar_credenciales_trial(usuario.empresa, usuario, credenciales)
+
                 messages.success(
                     request,
                     'Listo, tu contraseña quedó configurada. Para volver a entrar usa tu '
@@ -351,13 +384,35 @@ def trial_exitoso(request):
                 )
                 return redirect('core:dashboard')
         else:
-            set_password_form = SetPasswordForm(request.user)
+            set_password_form = ConfigurarAccesoTrialForm(request.user)
 
     return render(request, 'registration/trial_exitoso.html', {
         'credenciales': credenciales,
         'set_password_form': set_password_form,
         'password_configurada': password_configurada,
     })
+
+
+def _reenviar_credenciales_trial(empresa, admin_user, credenciales):
+    """
+    Si el Administrador corrigió su correo en trial_exitoso, reenvía las
+    credenciales de Gerencia y Técnico (y la clave temporal original del
+    Administrador, por si aún no configuró la propia) al correo correcto —
+    las que se mandaron al momento del registro quedaron en un correo que
+    puede que nunca haya sido suyo.
+    """
+    try:
+        gerente_user = CustomUser.objects.get(empresa=empresa, rol_usuario='GERENCIA')
+        tecnico_user = CustomUser.objects.get(empresa=empresa, rol_usuario='TECNICO')
+    except CustomUser.DoesNotExist:
+        return
+
+    _enviar_email_bienvenida_trial(
+        empresa, admin_user, gerente_user, tecnico_user,
+        credenciales['admin']['password'],
+        credenciales['gerente']['password'],
+        credenciales['tecnico']['password'],
+    )
 
 
 def _enviar_email_bienvenida_trial(empresa, admin_user, gerente_user, tecnico_user,
