@@ -472,6 +472,12 @@ MESSAGE_TAGS = {
 # ==============================================================================
 AUTH_USER_MODEL = 'core.CustomUser'
 
+# Permite iniciar sesión con el username generado o con el correo electrónico
+AUTHENTICATION_BACKENDS = [
+    'core.auth_backends.EmailOrUsernameBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # ==============================================================================
 # CONFIGURACIONES DE SEGURIDAD MEJORADAS
 # ==============================================================================

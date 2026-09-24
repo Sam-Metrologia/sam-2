@@ -332,11 +332,12 @@ class TestRateLimiting:
 
     def test_cooldown_24h_tras_registro_exitoso(self, client):
         """Tras un registro exitoso, la misma IP no puede registrar en 24h."""
-        # Primer registro: exitoso
+        # Primer registro: exitoso (deja al cliente con sesión iniciada como Admin)
         client.post(get_trial_url(), data=VALID_TRIAL_DATA)
         assert Empresa.objects.count() == 1
 
-        # Segundo intento: debe ser bloqueado por cooldown
+        # Segundo intento desde la misma IP pero otro navegador/sesión
+        # (sin la cookie de sesión autenticada): debe ser bloqueado por cooldown
         data2 = {
             **VALID_TRIAL_DATA,
             'nombre_empresa': 'Otra Empresa S.A.S.',
@@ -345,7 +346,8 @@ class TestRateLimiting:
             'username': 'otro_user',
             'email_usuario': 'otro@empresa.com',
         }
-        response = client.post(get_trial_url(), data=data2)
+        otro_navegador = Client()
+        response = otro_navegador.post(get_trial_url(), data=data2)
         assert response.status_code == 200  # Muestra form con error
         assert Empresa.objects.count() == 1  # No se creó la segunda
 

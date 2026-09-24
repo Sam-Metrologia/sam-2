@@ -11,10 +11,14 @@ from django.shortcuts import render, redirect
 from django.db import transaction
 from django.utils.crypto import get_random_string
 from django.contrib.auth.models import Permission
+from django.contrib.auth import login as auth_login, update_session_auth_hash
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib import messages
 from django.core.cache import cache
 
 from ..forms import RegistroTrialForm
 from ..models import Empresa, CustomUser, Equipo
+from .pagos import _send_html_email, _EMAIL_STYLE, SAM_FROM_LABEL
 
 logger = logging.getLogger('core')
 
@@ -291,6 +295,19 @@ def solicitar_trial(request):
                         f"admin='{admin_user.username}', nit='{data['nit']}', ip={client_ip}"
                     )
 
+                # 10. Iniciar sesión automáticamente con el Administrador.
+                #     Así el cliente entra directo a la plataforma sin depender
+                #     de que recuerde/guarde las credenciales para hacer login.
+                auth_login(request, admin_user, backend='django.contrib.auth.backends.ModelBackend')
+
+                # 11. Correo de respaldo con las credenciales (por si no las
+                #     guarda en pantalla) y aviso de que el usuario Administrador
+                #     ya quedó dentro de la plataforma.
+                _enviar_email_bienvenida_trial(
+                    empresa, admin_user, gerente_user, tecnico_user,
+                    admin_password, gerente_password, tecnico_password,
+                )
+
                 return redirect('core:trial_exitoso')
 
             except Exception as e:
@@ -305,11 +322,116 @@ def solicitar_trial(request):
 def trial_exitoso(request):
     """
     Muestra las credenciales de los 3 usuarios creados tras el registro de Trial.
+    El Administrador ya entró con sesión automática (ver solicitar_trial) y aquí
+    puede reemplazar su contraseña generada al azar por una que él elija.
     """
     credenciales = request.session.get('trial_credenciales')
     if not credenciales:
         return redirect('core:solicitar_trial')
 
+    password_configurada = request.session.get('trial_password_configurada', False)
+    puede_configurar = (
+        request.user.is_authenticated
+        and request.user.username == credenciales['admin']['username']
+        and not password_configurada
+    )
+
+    set_password_form = None
+    if puede_configurar:
+        if request.method == 'POST':
+            set_password_form = SetPasswordForm(request.user, request.POST)
+            if set_password_form.is_valid():
+                set_password_form.save()
+                update_session_auth_hash(request, request.user)
+                request.session['trial_password_configurada'] = True
+                messages.success(
+                    request,
+                    'Listo, tu contraseña quedó configurada. Para volver a entrar usa tu '
+                    'correo y esta clave.'
+                )
+                return redirect('core:dashboard')
+        else:
+            set_password_form = SetPasswordForm(request.user)
+
     return render(request, 'registration/trial_exitoso.html', {
         'credenciales': credenciales,
+        'set_password_form': set_password_form,
+        'password_configurada': password_configurada,
     })
+
+
+def _enviar_email_bienvenida_trial(empresa, admin_user, gerente_user, tecnico_user,
+                                    admin_password, gerente_password, tecnico_password):
+    """
+    Envía por correo las credenciales de los 3 usuarios del trial, como respaldo
+    de la pantalla (que solo se muestra una vez). El Administrador ya quedó con
+    sesión iniciada en la plataforma al momento del registro.
+    """
+    destinatario = empresa.email
+    if not destinatario:
+        return
+
+    asunto = f"Tu Trial de SAM Metrología está listo — {empresa.nombre}"
+
+    html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">{_EMAIL_STYLE}</head>
+<body><div class="wrap"><div class="card">
+  <div class="hdr">
+    <h1>SAM METROLOGÍA</h1>
+    <p>Control Digital e Inteligencia Metrológica</p>
+  </div>
+  <div class="body">
+    <span class="badge">✅ Trial de 30 días activo</span>
+    <p>Cordial saludo, estimado(a) <strong>{empresa.nombre}</strong>:</p>
+    <p>Tu cuenta de prueba ya está lista. Ya iniciamos sesión por ti con el usuario
+       <strong>Administrador</strong> en esta misma solicitud — si sigues en esa
+       pantalla, ya estás adentro de la plataforma.</p>
+    <p>Guarda este correo: aquí quedan tus accesos por si necesitas volver a entrar
+       más adelante.</p>
+    <table class="det">
+      <tr><td>Administrador — usuario</td><td>{admin_user.username}</td></tr>
+      <tr><td>Administrador — clave temporal</td><td style="font-family:monospace">{admin_password}</td></tr>
+      <tr><td>Gerencia — usuario</td><td>{gerente_user.username}</td></tr>
+      <tr><td>Gerencia — clave</td><td style="font-family:monospace">{gerente_password}</td></tr>
+      <tr><td>Técnico — usuario</td><td>{tecnico_user.username}</td></tr>
+      <tr><td>Técnico — clave</td><td style="font-family:monospace">{tecnico_password}</td></tr>
+    </table>
+    <p><strong>Importante:</strong> si en tu primer ingreso configuraste tu propia
+       contraseña para el Administrador, usa esa en vez de la clave temporal de
+       arriba. Con el Administrador puedes entrar con tu correo
+       (<strong>{admin_user.email}</strong>) o con el usuario, junto con tu clave.</p>
+    <a href="https://app.sammetrologia.com" class="btn">Ir a la plataforma →</a>
+    <p>Si tienes alguna duda no dudes en contactarnos.</p>
+    <p>Atentamente,</p>
+    <div class="sig-name">Equipo Comercial SAM Metrología</div>
+    <div class="sig-info">
+      SAM Metrología S.A.S<br>
+      <a href="https://sammetrologia.com">sammetrologia.com</a><br>
+      WhatsApp: +57 324 799 0534 &nbsp;|&nbsp; comercial@sammetrologia.com
+    </div>
+  </div>
+  <div class="ftr"><strong>SAM Metrología | Gestión Metrológica 4.0</strong><br>
+    Colombia — Soluciones Avanzadas en Medición</div>
+</div></div></body></html>"""
+
+    texto = (
+        f"Hola {empresa.nombre},\n\n"
+        f"Tu Trial de 30 días de SAM Metrología ya está activo. Ya iniciamos sesión "
+        f"por ti con el usuario Administrador.\n\n"
+        f"Guarda estos accesos por si necesitas volver a entrar:\n\n"
+        f"  Administrador - usuario: {admin_user.username}\n"
+        f"  Administrador - clave temporal: {admin_password}\n"
+        f"  Gerencia - usuario: {gerente_user.username}\n"
+        f"  Gerencia - clave: {gerente_password}\n"
+        f"  Técnico - usuario: {tecnico_user.username}\n"
+        f"  Técnico - clave: {tecnico_password}\n\n"
+        f"Si configuraste tu propia clave al entrar, úsala en vez de la temporal. "
+        f"Puedes entrar con tu correo ({admin_user.email}) o con el usuario.\n\n"
+        f"Ingresa en: https://app.sammetrologia.com\n\n"
+        f"SAM Metrología S.A.S — comercial@sammetrologia.com"
+    )
+
+    ok = _send_html_email(asunto, texto, html, [destinatario], from_label=SAM_FROM_LABEL)
+    if ok:
+        logger.info(f"Email de bienvenida de trial enviado a {destinatario} (empresa='{empresa.nombre}')")
+    else:
+        logger.error(f"No se pudo enviar el correo de bienvenida de trial a {destinatario}")

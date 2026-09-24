@@ -1225,6 +1225,12 @@ def configurar_usuarios_setup(request):
                     usuario.save()
                     asignar_permisos_por_rol(usuario)
 
+                    # Si el usuario cambió su propia clave, hay que refrescar el
+                    # hash de sesión — si no, Django lo desconecta en la
+                    # siguiente petición sin ningún aviso.
+                    if nueva_password and usuario.pk == request.user.pk:
+                        update_session_auth_hash(request, usuario)
+
             empresa.configurar_usuarios_plan_pendiente = False
             empresa.save(update_fields=['configurar_usuarios_plan_pendiente'])
 

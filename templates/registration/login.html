@@ -22,10 +22,10 @@
             {% csrf_token %} {# ¡Importante para seguridad en formularios POST! #}
             
             <div class="mb-4">
-                <label for="id_username" class="block text-gray-700 text-sm font-bold mb-2">Nombre de usuario:</label>
-                <input type="text" id="id_username" name="username" 
+                <label for="id_username" class="block text-gray-700 text-sm font-bold mb-2">Usuario o correo electrónico:</label>
+                <input type="text" id="id_username" name="username"
                        class="shadow-none rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline form-input"
-                       placeholder="Tu nombre de usuario" required>
+                       placeholder="Tu usuario o tu correo" required>
             </div>
             
             <div class="mb-6">
@@ -43,10 +43,17 @@
             
             <div class="text-center mt-4 text-gray-600 text-sm">
                 <p>¿Olvidaste tu contraseña?
+                    <a href="{% url 'core:password_reset' %}"
+                       class="text-blue-600 hover:text-blue-700 font-semibold underline">
+                        Recupérala aquí
+                    </a>
+                </p>
+                <p class="mt-1">
+                    ¿Sigue sin funcionar?
                     <a href="https://wa.me/573247990534?text=Hola,%20necesito%20ayuda%20con%20mi%20contrase%C3%B1a%20de%20la%20plataforma%20SAM"
                        target="_blank"
                        class="text-green-600 hover:text-green-700 font-semibold underline">
-                        Contáctanos por WhatsApp
+                        Escríbenos por WhatsApp
                     </a>
                 </p>
             </div>
