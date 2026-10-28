@@ -203,7 +203,7 @@
         <tr><td><strong>Responsable:</strong> {{ equipo.responsable|default:"N/A" }}</td><td><strong>Estado:</strong> {{ equipo.estado|default:"N/A" }}</td></tr>
         <tr><td><strong>Fecha de Adquisición:</strong> {{ equipo.fecha_adquisicion|date:"Y-m"|default:"N/A" }}</td><td><strong>Proveedor:</strong> {{ equipo.proveedor|default:"N/A" }}</td></tr>
         <tr><td><strong>Rango de Medida:</strong> {{ equipo.rango_medida|default:"N/A" }}</td><td><strong>Resolución:</strong> {{ equipo.resolucion|default:"N/A" }}</td></tr>
-        <tr><td colspan="2"><strong>Error Máximo Permisible:</strong> {{ equipo.error_maximo_permisible|floatformat:"5"|default:"N/A" }}</td></tr>
+        <tr><td colspan="2"><strong>Error Máximo Permisible:</strong> {{ equipo.error_maximo_permisible|default:"N/A" }}</td></tr>
         <tr><td colspan="2"><strong>Puntos de Calibración o Rango de Calibración:</strong> {{ equipo.puntos_calibracion|linebreaksbr|default:"N/A" }}</td></tr>
     </table>
 
@@ -256,7 +256,7 @@
             {% for cal in calibraciones %}
             <tr>
                 <td>{{ cal.fecha_calibracion|date:"Y-m-d"|default:"N/A" }}</td>
-                <td>{{ cal.nombre_proveedor|default:"N/A" }}</td>
+                <td>{{ cal.proveedor_display|default:"N/A" }}</td>
                 <td>{{ cal.resultado|default:"N/A" }}</td>
                 <td>{{ cal.numero_certificado|default:"N/A" }}</td>
                 <td>{{ cal.observaciones|default:"N/A" }}</td>
@@ -277,7 +277,7 @@
             <tr>
                 <td>{{ m.fecha_mantenimiento|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{{ m.get_tipo_mantenimiento_display|default:"N/A" }}</td>
-                <td>{{ m.nombre_proveedor|default:"N/A" }}</td>
+                <td>{{ m.proveedor_display|default:"N/A" }}</td>
                 <td>{{ m.responsable|default:"N/A" }}</td>
                 <td>{{ m.costo|floatformat:"2"|default:"N/A" }}</td>
                 <td>
@@ -302,7 +302,7 @@
             <tr>
                 <td>{{ comp.fecha_comprobacion|date:"Y-m-d"|default:"N/A" }}</td>
                 <td>{% if comp.datos_comprobacion %}{{ comp.consecutivo_texto|default:"—" }}{% else %}—{% endif %}</td>
-                <td>{{ comp.nombre_proveedor|default:"N/A" }}</td>
+                <td>{{ comp.proveedor_display|default:"N/A" }}</td>
                 <td>{{ comp.responsable|default:"N/A" }}</td>
                 <td>{{ comp.resultado|default:"N/A" }}</td>
                 <td>{{ comp.observaciones|default:"N/A" }}</td>

@@ -220,6 +220,13 @@ class Calibracion(models.Model):
         return f"Calibración de {self.equipo.nombre} ({self.fecha_calibracion})"
 
     @property
+    def proveedor_display(self):
+        """Nombre del proveedor: el escrito a mano o, si no hay, el elegido de la lista."""
+        if self.nombre_proveedor:
+            return self.nombre_proveedor
+        return self.proveedor.nombre_empresa if self.proveedor_id else ''
+
+    @property
     def proxima_actividad_para_este_registro(self):
         """
         Calcula la próxima fecha de calibración basada en la fecha de esta calibración
@@ -316,6 +323,13 @@ class Mantenimiento(models.Model):
 
     def __str__(self):
         return f"Mantenimiento de {self.equipo.nombre} ({self.fecha_mantenimiento})"
+
+    @property
+    def proveedor_display(self):
+        """Nombre del proveedor: el escrito a mano o, si no hay, el elegido de la lista."""
+        if self.nombre_proveedor:
+            return self.nombre_proveedor
+        return self.proveedor.nombre_empresa if self.proveedor_id else ''
 
     @property
     def proxima_actividad_para_este_registro(self):
@@ -555,6 +569,13 @@ class Comprobacion(models.Model):
 
     def __str__(self):
         return f"Comprobación de {self.equipo.nombre} ({self.fecha_comprobacion})"
+
+    @property
+    def proveedor_display(self):
+        """Nombre del proveedor: el escrito a mano o, si no hay, el elegido de la lista."""
+        if self.nombre_proveedor:
+            return self.nombre_proveedor
+        return self.proveedor.nombre_empresa if self.proveedor_id else ''
 
     @property
     def consecutivo_formateado(self):

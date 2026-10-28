@@ -1261,7 +1261,7 @@
                             <a href="{% url 'core:detalle_mantenimiento' maintenance.equipo.pk maintenance.pk %}" class="text-blue-500 hover:underline">
                                 Equipo: {{ maintenance.equipo.nombre }} ({{ maintenance.equipo.codigo_interno }}) - 
                                 Fecha: {{ maintenance.fecha_mantenimiento|date:"Y-m-d" }} - 
-                                Proveedor: {{ maintenance.nombre_proveedor|default:"N/A" }}
+                                Proveedor: {{ maintenance.proveedor_display|default:"N/A" }}
                             </a>
                         </li>
                     {% endfor %}

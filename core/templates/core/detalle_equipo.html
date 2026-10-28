@@ -269,7 +269,7 @@
                         {% for cal in calibraciones %}
                         <tr class="border-b border-gray-200 hover:bg-gray-50">
                             <td class="py-3 px-6 text-left whitespace-nowrap">{{ cal.fecha_calibracion|date:"Y-m-d" }}</td>
-                            <td class="py-3 px-6 text-left">{{ cal.nombre_proveedor|default:"N/A" }}</td> 
+                            <td class="py-3 px-6 text-left">{{ cal.proveedor_display|default:"N/A" }}</td> 
                             <td class="py-3 px-6 text-left">{{ cal.resultado }}</td>
                             <td class="py-3 px-6 text-left">{{ cal.numero_certificado|default:"N/A" }}</td>
                             <td class="py-3 px-6 text-left">
@@ -405,7 +405,7 @@
                         <tr class="border-b border-gray-200 hover:bg-gray-50">
                             <td class="py-3 px-6 text-left whitespace-nowrap">{{ mant.fecha_mantenimiento|date:"Y-m-d" }}</td>
                             <td class="py-3 px-6 text-left">{{ mant.get_tipo_mantenimiento_display }}</td>
-                            <td class="py-3 px-6 text-left">{{ mant.nombre_proveedor|default:"N/A" }}</td> 
+                            <td class="py-3 px-6 text-left">{{ mant.proveedor_display|default:"N/A" }}</td> 
                             <td class="py-3 px-6 text-left">{{ mant.responsable|default:"N/A" }}</td>
                             <td class="py-3 px-6 text-left">${{ mant.costo|floatformat:2|default:"0.00" }}</td>
                             <td class="py-3 px-6 text-left">
@@ -496,7 +496,7 @@
                         {% for comp in comprobaciones %}
                         <tr class="border-b border-gray-200 hover:bg-gray-50">
                             <td class="py-3 px-6 text-left whitespace-nowrap">{{ comp.fecha_comprobacion|date:"Y-m-d" }}</td>
-                            <td class="py-3 px-6 text-left">{{ comp.nombre_proveedor|default:"N/A" }}</td> 
+                            <td class="py-3 px-6 text-left">{{ comp.proveedor_display|default:"N/A" }}</td> 
                             <td class="py-3 px-6 text-left">{{ comp.responsable|default:"N/A" }}</td>
                             <td class="py-3 px-6 text-left">{{ comp.resultado }}</td>
                             <td class="py-3 px-6 text-left">

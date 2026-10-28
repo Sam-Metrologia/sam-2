@@ -641,7 +641,8 @@ def _calcular_deriva_variable(puntos_actual, puntos_anterior, emp_info, fecha_ac
                 'nominal': nominal_actual,
                 'desviacion_actual': p_actual.get('desviacion_abs', 0),
                 'desviacion_anterior': mejor_match.get('desviacion_abs', 0),
-                'cambio_desviacion': abs(p_actual.get('desviacion_abs', 0) - mejor_match.get('desviacion_abs', 0)),
+                # round: evita ruido de punto flotante en el PDF (ej. 0.42000000000000004)
+                'cambio_desviacion': round(abs(p_actual.get('desviacion_abs', 0) - mejor_match.get('desviacion_abs', 0)), 6),
             })
 
     if not puntos_coincidentes:
