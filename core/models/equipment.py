@@ -106,9 +106,22 @@ class Equipo(models.Model):
         Para equipos nuevos, primero se guarda y luego se calculan las fechas.
         """
         is_new = self.pk is None
+        frecuencia_anterior = None
+        if not is_new:
+            frecuencia_anterior = Equipo.objects.filter(pk=self.pk).values_list(
+                'frecuencia_calibracion_meses', flat=True
+            ).first()
 
         # Primero guardar el objeto
         super().save(*args, **kwargs)
+
+        # Si cambió el intervalo, solo lo hereda la última calibración (las anteriores conservan el suyo)
+        if not is_new and frecuencia_anterior != self.frecuencia_calibracion_meses:
+            ultima = self.calibraciones.order_by('-fecha_calibracion').values_list('pk', flat=True).first()
+            if ultima:
+                self.calibraciones.filter(pk=ultima).update(
+                    frecuencia_calibracion_meses=self.frecuencia_calibracion_meses
+                )
 
         # Después calcular las próximas fechas (solo si el objeto ya tiene pk)
         if self.pk:

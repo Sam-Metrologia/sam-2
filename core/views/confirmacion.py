@@ -1489,6 +1489,8 @@ def generar_pdf_intervalos(request, equipo_id):
 
             # ============ GUARDAR DATOS DE INTERVALOS PARA REGENERACIÓN ============
             calibracion_actual.intervalos_calibracion_datos = datos_intervalos
+            # El nuevo intervalo aplica solo a esta calibración, no a las anteriores
+            calibracion_actual.frecuencia_calibracion_meses = nuevo_intervalo
 
             # ============ SISTEMA DE APROBACIÓN ============
             # Establecer creado_por y estado pendiente para INTERVALOS

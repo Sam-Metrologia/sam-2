@@ -31,6 +31,14 @@ class Calibracion(models.Model):
         verbose_name="Datos de Intervalos de Calibración",
         help_text="Datos JSON con método, cálculos y decisión de intervalos"
     )
+    frecuencia_calibracion_meses = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name="Intervalo aplicado (meses)",
+        help_text="Intervalo vigente para esta calibración; no cambia si luego se ajusta el del equipo"
+    )
     observaciones = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
@@ -230,11 +238,18 @@ class Calibracion(models.Model):
     def proxima_actividad_para_este_registro(self):
         """
         Calcula la próxima fecha de calibración basada en la fecha de esta calibración
-        y la frecuencia de calibración del equipo.
+        y el intervalo que quedó guardado en ella (o el del equipo si no tiene).
         """
-        if not self.equipo.frecuencia_calibracion_meses or not self.fecha_calibracion:
+        frecuencia = self.frecuencia_calibracion_meses or self.equipo.frecuencia_calibracion_meses
+        if not frecuencia or not self.fecha_calibracion:
             return None
-        return self.fecha_calibracion + meses_decimales_a_relativedelta(self.equipo.frecuencia_calibracion_meses)
+        return self.fecha_calibracion + meses_decimales_a_relativedelta(frecuencia)
+
+    def save(self, *args, **kwargs):
+        # Congelar el intervalo vigente al registrar la calibración
+        if self.pk is None and self.frecuencia_calibracion_meses is None and self.equipo_id:
+            self.frecuencia_calibracion_meses = self.equipo.frecuencia_calibracion_meses
+        super().save(*args, **kwargs)
 
 class Mantenimiento(models.Model):
     """Modelo para registrar los mantenimientos de un equipo."""

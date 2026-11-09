@@ -564,7 +564,7 @@ class CalibracionForm(forms.ModelForm):
             'intervalos_fecha_aprobacion_ajustable',
             # Campos internos
             'creado_por', 'confirmacion_metrologica_datos', 'intervalos_calibracion_datos',
-            'tiempo_empleado_horas', 'tecnico_asignado_sam',
+            'tiempo_empleado_horas', 'tecnico_asignado_sam', 'frecuencia_calibracion_meses',
         )
         widgets = {
             'proveedor': forms.Select(attrs={'class': 'form-select'}),
