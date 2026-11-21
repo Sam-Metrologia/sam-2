@@ -547,6 +547,9 @@
                 <li><a href="{% url 'core:listar_empresas' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'listar_empresas' %}active{% endif %}">
                     <i class="fas fa-building"></i> Empresas
                 </a></li>
+                <li><a href="{% url 'core:lectura_certificados_indice' %}" class="{% if request.resolver_match and request.resolver_match.url_name == 'lectura_certificados_indice' or request.resolver_match.url_name == 'lectura_masiva_empresa' %}active{% endif %}">
+                    <i class="fas fa-magic"></i> Lectura de certificados IA
+                </a></li>
                 {% endif %}
                 {% if user.is_superuser %}
                 <li><a href="{% url 'core:listar_usuarios' %}" class="{% if request.resolver_match and 'usuario' in request.resolver_match.url_name %}active{% endif %}">

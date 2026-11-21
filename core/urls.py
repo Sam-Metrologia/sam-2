@@ -5,6 +5,7 @@ from . import views
 from . import admin_views
 from . import zip_functions  # Import for ZIP system
 from .views import confirmacion  # Import confirmacion module
+from .views import lectura_ia  # Lectura automática de certificados (IA)
 from .views import prestamos  # Import prestamos module
 from .views import impersonation  # Import impersonation module for Modo Trabajo
 # Eliminadas importaciones de debug (views_debug, views_debug_logo, views_fix_logos)
@@ -120,6 +121,13 @@ urlpatterns = [
     path('equipos/<int:equipo_id>/confirmacion-metrologica/guardar/', views.guardar_confirmacion, name='guardar_confirmacion'),
     path('equipos/<int:equipo_id>/confirmacion-metrologica/preview-grafica/', confirmacion.preview_grafica_confirmacion, name='preview_grafica_confirmacion'),
     path('empresas/actualizar-formato/', confirmacion.actualizar_formato_empresa, name='actualizar_formato_empresa'),
+
+    # Lectura automática de certificados con IA (2026-11)
+    path('calibracion/<int:calibracion_id>/lectura-ia/solicitar/', lectura_ia.solicitar_lectura_certificado, name='solicitar_lectura_certificado'),
+    path('calibracion/<int:calibracion_id>/lectura-ia/estado/', lectura_ia.estado_lectura_certificado, name='estado_lectura_certificado'),
+    path('calibracion/<int:calibracion_id>/lectura-ia/descartar/', lectura_ia.descartar_lectura_certificado, name='descartar_lectura_certificado'),
+    path('empresas/<int:empresa_id>/lectura-certificados/', lectura_ia.lectura_masiva_empresa, name='lectura_masiva_empresa'),
+    path('lectura-certificados/', lectura_ia.lectura_certificados_indice, name='lectura_certificados_indice'),
 
     # Sistema de Aprobaciones
     path('aprobaciones/', views.pagina_aprobaciones, name='aprobaciones'),

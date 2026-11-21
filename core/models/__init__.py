@@ -9,6 +9,7 @@ from .users import CustomUser, OnboardingProgress
 from .catalogs import Unidad, Ubicacion, Procedimiento, Proveedor
 from .equipment import Equipo, BajaEquipo, NotificacionVencimiento, TransferenciaEquipo
 from .activities import Calibracion, Mantenimiento, Comprobacion
+from .lectura_ia import LecturaCertificado
 from .loans import AgrupacionPrestamo, PrestamoEquipo
 from .documents import Documento, ZipRequest, NotificacionZip
 from .payments import TerminosYCondiciones, AceptacionTerminos, TransaccionPago, LinkPago
@@ -30,6 +31,7 @@ __all__ = [
     'Unidad', 'Ubicacion', 'Procedimiento', 'Proveedor',
     'Equipo', 'BajaEquipo', 'NotificacionVencimiento', 'TransferenciaEquipo',
     'Calibracion', 'Mantenimiento', 'Comprobacion',
+    'LecturaCertificado',
     'AgrupacionPrestamo', 'PrestamoEquipo',
     'Documento', 'ZipRequest', 'NotificacionZip',
     'TerminosYCondiciones', 'AceptacionTerminos', 'TransaccionPago', 'LinkPago',

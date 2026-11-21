@@ -599,8 +599,66 @@ def confirmacion_metrologica(request, equipo_id):
 
     # Preparar contexto usando función helper
     context = _preparar_contexto_confirmacion(request, equipo, ultima_calibracion)
+    context.update(_contexto_lectura_ia(ultima_calibracion))
 
     return render(request, 'core/confirmacion_metrologica.html', context)
+
+
+def _resultado_magnitud(puntos):
+    """APTO si todos los puntos evaluables cumplen. Los puntos 'N/A' (cero con EMP en %) no cuentan."""
+    if not puntos:
+        return 'APTO'  # comportamiento previo (all([]) == True); no se cambia aquí
+    evaluables = [p for p in puntos if p.get('conformidad') != 'N/A']
+    if evaluables and all(p.get('conformidad', '') in ('Cumple', 'CUMPLE') for p in evaluables):
+        return 'APTO'
+    return 'NO APTO'
+
+
+def _json_para_script(datos):
+    """JSON seguro para incrustar dentro de <script> (el texto viene de un PDF externo)."""
+    return (json.dumps(datos, ensure_ascii=False)
+            .replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026'))
+
+
+def _contexto_lectura_ia(calibracion):
+    """
+    Estado de la lectura automática del certificado para la pantalla de confirmación.
+    Si hay una lectura lista y la calibración aún no tiene confirmación guardada,
+    la propuesta reemplaza a los datos previos para precargar el formulario.
+    """
+    from core.models import LecturaCertificado
+
+    if calibracion is None:
+        return {'lectura_ia_puede_leer': False, 'lectura_ia': None}
+
+    tiene_confirmacion = bool(calibracion.confirmacion_metrologica_datos)
+    lectura = LecturaCertificado.objects.filter(calibracion=calibracion).first()
+    contexto = {
+        'lectura_ia': lectura,
+        'lectura_ia_puede_leer': bool(calibracion.documento_calibracion) and not tiene_confirmacion,
+        'lectura_ia_precargada': False,
+        'lectura_ia_avisos': [],
+    }
+    if (lectura and lectura.estado == LecturaCertificado.ESTADO_LISTO
+            and lectura.propuesta and not tiene_confirmacion):
+        contexto['datos_previos_json'] = _json_para_script(lectura.propuesta)
+        contexto['lectura_ia_precargada'] = True
+        contexto['lectura_ia_avisos'] = (lectura.propuesta.get('lectura_ia') or {}).get('avisos') or []
+
+    # "Siguiente pendiente": la próxima lectura lista de la misma empresa que aún no tiene confirmación.
+    siguiente = (LecturaCertificado.objects
+                 .filter(empresa_id=calibracion.equipo.empresa_id, estado=LecturaCertificado.ESTADO_LISTO,
+                         calibracion__confirmacion_metrologica_datos__isnull=True)
+                 .exclude(calibracion_id=calibracion.id)
+                 .select_related('calibracion__equipo')
+                 .order_by('calibracion__equipo__codigo_interno', 'calibracion_id'))
+    pendientes = list(siguiente.values_list('calibracion__equipo__codigo_interno', flat=True))
+    actual = calibracion.equipo.codigo_interno or ''
+    proxima = next((l for l in siguiente if (l.calibracion.equipo.codigo_interno or '') > actual), None) \
+        or siguiente.first()
+    contexto['lectura_ia_siguiente'] = proxima
+    contexto['lectura_ia_pendientes'] = len(pendientes)
+    return contexto
 
 
 def _calcular_deriva_variable(puntos_actual, puntos_anterior, emp_info, fecha_actual, fecha_anterior):
@@ -1128,6 +1186,9 @@ def generar_pdf_confirmacion(request, equipo_id):
                     p['emp_tipo'] = punto['emp_tipo']
                 if punto.get('emp_absoluto') is not None:
                     p['emp_absoluto'] = safe_float(punto['emp_absoluto'], 0)
+                # Error tal como lo reporta el certificado (lectura IA): al reabrir se sigue usando ese.
+                if punto.get('error_certificado') not in (None, ''):
+                    p['error_certificado'] = safe_float(punto['error_certificado'], 0)
                 puntos_procesados.append(p)
             return puntos_procesados, desviacion_maxima
 
@@ -1161,9 +1222,7 @@ def generar_pdf_confirmacion(request, equipo_id):
                     'emp': safe_float(mag.get('emp', 0), 0),
                     'emp_unidad': mag.get('emp_unidad', '%'),
                     'puntos_medicion': puntos_mag,
-                    'resultado': 'APTO' if all(
-                        p.get('conformidad', '') in ('Cumple', 'CUMPLE') for p in puntos_mag
-                    ) else 'NO APTO',
+                    'resultado': _resultado_magnitud(puntos_mag),
                 })
             # Primera magnitud como referencia legacy (usada por intervalos de calibración)
             primera = magnitudes_procesadas[0] if magnitudes_procesadas else {}

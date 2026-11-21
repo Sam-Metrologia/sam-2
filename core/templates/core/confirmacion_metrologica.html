@@ -138,6 +138,63 @@
     </div>
     {% endif %}
 
+    <!-- Lectura automática del certificado (IA) -->
+    {% if calibracion_id and lectura_ia_puede_leer or lectura_ia_precargada %}
+    <div id="lectura-ia-panel" class="no-print mb-6 rounded-lg border-l-4 p-4
+         {% if lectura_ia_precargada %}bg-amber-50 border-amber-500{% elif lectura_ia.estado == 'fallo' %}bg-red-50 border-red-500{% else %}bg-indigo-50 border-indigo-500{% endif %}"
+         data-estado="{% if lectura_ia %}{{ lectura_ia.estado }}{% else %}ninguna{% endif %}"
+         data-url-solicitar="{% url 'core:solicitar_lectura_certificado' calibracion_id %}"
+         data-url-estado="{% url 'core:estado_lectura_certificado' calibracion_id %}"
+         data-url-descartar="{% url 'core:descartar_lectura_certificado' calibracion_id %}">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-robot text-xl mt-0.5 flex-shrink-0 {% if lectura_ia_precargada %}text-amber-600{% elif lectura_ia.estado == 'fallo' %}text-red-500{% else %}text-indigo-600{% endif %}"></i>
+            <div class="flex-grow">
+                {% if lectura_ia_precargada %}
+                <p class="font-semibold text-amber-900">Datos precargados desde el certificado — revísalos antes de guardar</p>
+                <p class="text-xs text-amber-800 mt-1">
+                    La IA leyó el PDF de la calibración. Compara contra el certificado, sobre todo las celdas
+                    <span class="px-1 bg-yellow-200 rounded">amarillas</span>. El error marcado con <strong>cert.</strong>
+                    es el que trae el certificado (si cambias la lectura o el patrón, se vuelve a calcular).
+                </p>
+                {% if lectura_ia_avisos %}
+                <ul class="text-xs text-amber-900 mt-2 list-disc ml-5 space-y-0.5">
+                    {% for aviso in lectura_ia_avisos %}<li>{{ aviso }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" id="lectura-ia-descartar" class="text-xs px-3 py-1.5 bg-white border border-amber-400 text-amber-800 rounded hover:bg-amber-100">
+                        <i class="fas fa-eraser mr-1"></i> Descartar y llenar a mano
+                    </button>
+                    {% if lectura_ia_siguiente %}
+                    <a href="{% url 'core:confirmacion_metrologica' equipo_id=lectura_ia_siguiente.calibracion.equipo_id %}?calibracion_id={{ lectura_ia_siguiente.calibracion_id }}"
+                       class="text-xs px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700">
+                        Saltar al siguiente pendiente ({{ lectura_ia_siguiente.calibracion.equipo.codigo_interno }}) →
+                    </a>
+                    <span class="text-xs text-amber-800">Quedan {{ lectura_ia_pendientes }} por revisar en esta empresa. Al guardar este PDF pasarás al siguiente.</span>
+                    {% endif %}
+                </div>
+                {% elif lectura_ia.en_curso %}
+                <p class="font-semibold text-indigo-900"><i class="fas fa-spinner fa-spin mr-1"></i> Leyendo el certificado…</p>
+                <p class="text-xs text-indigo-800 mt-1">Suele tardar menos de un minuto. Puedes seguir trabajando en otra pantalla; esta página se actualizará sola cuando termine.</p>
+                {% elif lectura_ia.estado == 'fallo' %}
+                <p class="font-semibold text-red-800">No se pudo leer el certificado</p>
+                <p class="text-xs text-red-700 mt-1">{{ lectura_ia.mensaje_error }}</p>
+                <button type="button" id="lectura-ia-solicitar" class="mt-3 text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700">
+                    <i class="fas fa-redo mr-1"></i> Reintentar
+                </button>
+                {% else %}
+                <p class="font-semibold text-indigo-900">¿Leer el certificado automáticamente?</p>
+                <p class="text-xs text-indigo-800 mt-1">La IA lee el PDF del certificado de esta calibración y precarga patrón, lectura, incertidumbre y error. Tú lo revisas antes de guardar.</p>
+                <button type="button" id="lectura-ia-solicitar" class="mt-3 text-sm px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    <i class="fas fa-magic mr-1"></i> Leer certificado con IA
+                </button>
+                {% endif %}
+                <p id="lectura-ia-mensaje" class="text-xs mt-2 hidden"></p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Objetivo -->
     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
         <p class="text-sm text-gray-700">
@@ -526,7 +583,13 @@
         const regla = document.getElementById('regla-decision');
         if (regla && datosPrevios.regla_decision) regla.value = datosPrevios.regla_decision;
 
-        // Decisión (radio button)
+        // Decisión (radio button). Una lectura automática no decide: la decisión la toma el técnico.
+        if (datosPrevios.lectura_ia) {
+            setTimeout(() => {
+                if (typeof recalcularTodasFilas === 'function') recalcularTodasFilas();
+            }, 300);
+            return;
+        }
         const decision = (datosPrevios.conclusion && datosPrevios.conclusion.decision
             ? datosPrevios.conclusion.decision
             : datosPrevios.decision || 'APTO'
@@ -641,6 +704,30 @@
             </td>
         `;
 
+        // Lectura IA: error que trae el certificado y celdas a revisar.
+        if (datos && datos.error_certificado !== undefined && datos.error_certificado !== null && datos.error_certificado !== '') {
+            fila.dataset.errorCertificado = String(datos.error_certificado);
+        }
+        const columnaPorCampo = {nominal: 1, lectura: 2, incertidumbre: 3, error: 7};
+        const marcarRevisar = (col, activo) => {
+            const celda = fila.cells[col];
+            const campo = celda.querySelector('input');
+            [celda, campo].forEach(el => el && el.classList.toggle('bg-yellow-200', activo));
+        };
+        (datos && Array.isArray(datos.revisar) ? datos.revisar : []).forEach(campo => {
+            const col = columnaPorCampo[campo];
+            if (col !== undefined) marcarRevisar(col, true);
+        });
+        if (datos && datos.nota) fila.title = datos.nota;
+        // Si el técnico cambia el patrón o la lectura, el error del certificado deja de aplicar.
+        [1, 2].forEach(col => {
+            fila.cells[col].querySelector('input').addEventListener('input', () => {
+                delete fila.dataset.errorCertificado;
+                marcarRevisar(col, false);
+            });
+        });
+        fila.cells[3].querySelector('input').addEventListener('input', () => marcarRevisar(3, false));
+
         if (referenciaFila) {
             tbody.insertBefore(fila, referenciaFila);
         } else {
@@ -655,6 +742,17 @@
 
     function insertarFilaAntes(btn) {
         agregarFila(null, btn.closest('tr'));
+    }
+
+    /** Quita ruido de coma flotante sin perder decimales reales (0.598 - 0.59996 = -0.00196). */
+    function redondearSignificativo(valor) {
+        return parseFloat(Number(valor).toPrecision(10));
+    }
+
+    /** 3 decimales, o 3 cifras significativas si el valor es muy pequeño (no mostrar -0.002 por -0.00196). */
+    function formatearValor(valor) {
+        if (valor !== 0 && Math.abs(valor) < 0.01) return String(parseFloat(valor.toPrecision(3)));
+        return valor.toFixed(3);
     }
 
     // Calcular error y conformidad según regla ILAC G8
@@ -677,7 +775,13 @@
 
         const regla = document.getElementById('regla-decision').value;
 
-        if (nominal === 0) {
+        // Se vuelven a fijar más abajo solo si la fila se puede calcular.
+        delete fila.dataset.error;
+        delete fila.dataset.errorMasU;
+        delete fila.dataset.errorMenosU;
+
+        // Fila vacía (sin patrón). Un patrón en 0 o negativo SÍ es un punto válido.
+        if (cells[1].querySelector('input').value.trim() === '') {
             cells[6].textContent = '-'; // EMP Absoluto
             cells[7].textContent = '-'; // Error
             cells[8].textContent = '-'; // Factor de Corrección
@@ -713,19 +817,43 @@
         // Mostrar EMP absoluto calculado
         cells[6].textContent = empAbsoluto.toFixed(3);
 
-        // Calcular error (signo correcto: lectura - nominal, según convención metrológica)
-        const error = parseFloat((lectura - nominal).toFixed(3));
-        const errorMasU = parseFloat((error + incertidumbre).toFixed(3));
-        const errorMenosU = parseFloat((error - incertidumbre).toFixed(3));
+        // Error: si el certificado lo trae, se usa ese (los laboratorios redondean y
+        // recalcularlo daría un valor distinto al del certificado). Si no, lectura - nominal.
+        const errorCert = fila.dataset.errorCertificado;
+        const usaErrorCert = errorCert !== undefined && errorCert !== '' && !isNaN(parseFloat(errorCert));
+        const error = usaErrorCert ? parseFloat(errorCert) : redondearSignificativo(lectura - nominal);
+        const errorMasU = redondearSignificativo(error + incertidumbre);
+        const errorMenosU = redondearSignificativo(error - incertidumbre);
+        // Valores completos para guardar (la celda muestra una versión corta).
+        fila.dataset.error = String(error);
+        fila.dataset.errorMasU = String(errorMasU);
+        fila.dataset.errorMenosU = String(errorMenosU);
 
         // Calcular factor de corrección: FC = nominal / lectura (adimensional)
         const factorCorreccion = lectura !== 0 ? nominal / lectura : 0;
 
         // Mostrar en tabla (valores absolutos)
-        cells[7].textContent = error.toFixed(3);
+        cells[7].textContent = formatearValor(error);
+        if (usaErrorCert) {
+            const marca = document.createElement('span');
+            marca.className = 'ml-1 text-[10px] text-amber-700 font-sans';
+            marca.title = 'Error tomado del certificado';
+            marca.textContent = 'cert.';
+            cells[7].appendChild(marca);
+        }
         cells[8].textContent = factorCorreccion.toFixed(6); // Factor de Corrección (6 decimales para precisión)
-        cells[9].textContent = errorMasU.toFixed(3);
-        cells[10].textContent = errorMenosU.toFixed(3);
+        cells[9].textContent = formatearValor(errorMasU);
+        cells[10].textContent = formatearValor(errorMenosU);
+
+        // Punto en cero con EMP en %: no hay "% de cero", la conformidad no aplica.
+        if (nominal === 0 && empEsPorcentaje) {
+            cells[6].textContent = 'N/A';
+            cells[11].textContent = 'N/A';
+            cells[11].className = 'border border-gray-300 px-2 py-2 text-center font-semibold text-xs text-gray-500';
+            cells[11].title = 'Con EMP en % no se puede evaluar un punto en cero. Usa EMP absoluto para evaluarlo.';
+            actualizarGraficaDespues();
+            return;
+        }
 
         let cumple, textoConformidad, claseConformidad;
 
@@ -1523,8 +1651,10 @@
             badge.textContent = '— Sin datos —';
             return;
         }
-        const todas = puntos.every(p => p.conformidad && (p.conformidad === 'Cumple' || p.conformidad === 'CUMPLE'));
-        const alguna_no = puntos.some(p => p.conformidad && (p.conformidad === 'No Cumple' || p.conformidad === 'NO CUMPLE'));
+        // Los puntos donde la conformidad no aplica (cero con EMP en %) no cuentan para el resultado.
+        const evaluables = puntos.filter(p => p.conformidad !== 'N/A');
+        const todas = evaluables.length > 0 && evaluables.every(p => p.conformidad && (p.conformidad === 'Cumple' || p.conformidad === 'CUMPLE'));
+        const alguna_no = evaluables.some(p => p.conformidad && (p.conformidad === 'No Cumple' || p.conformidad === 'NO CUMPLE'));
         if (todas) {
             badge.className = 'px-3 py-1.5 rounded text-sm font-bold text-center bg-green-100 text-green-800';
             badge.textContent = '✓ APTO';
@@ -1674,9 +1804,15 @@
                     alert(data.message);
                 }
 
-                // Redirigir al detalle del equipo después de 1 segundo
+                // Redirigir después de 1 segundo: si se está revisando la lectura IA de una empresa,
+                // al siguiente equipo pendiente; si no, al detalle del equipo.
+                {% if lectura_ia_precargada and lectura_ia_siguiente %}
+                const siguientePendiente = "{% url 'core:confirmacion_metrologica' equipo_id=lectura_ia_siguiente.calibracion.equipo_id %}?calibracion_id={{ lectura_ia_siguiente.calibracion_id }}";
+                {% else %}
+                const siguientePendiente = '';
+                {% endif %}
                 setTimeout(() => {
-                    window.location.href = data.redirect_url || '{% url "core:detalle_equipo" equipo.pk %}';
+                    window.location.href = siguientePendiente || data.redirect_url || '{% url "core:detalle_equipo" equipo.pk %}';
                 }, 1000);
             } else {
                 // Mostrar error
@@ -1721,20 +1857,28 @@
             const errorMenosUText = cells[10].textContent.trim();
             const conformidadText = cells[11].textContent.trim();
 
-            if (nominal > 0) {
-                datos.push({
+            // Se guardan también los puntos en 0 y negativos (−5,4 V, 0 ppm, 0°); solo se omiten filas sin patrón.
+            if (cells[1].querySelector('input').value.trim() !== '') {
+                const ds = filas[i].dataset;
+                const leer = (valorDataset, texto) => valorDataset !== undefined
+                    ? parseFloat(valorDataset)
+                    : (texto !== '-' ? parseFloat(texto) : 0);
+                const punto = {
                     nominal: nominal,
                     lectura: lectura,
                     incertidumbre: incertidumbre,
                     emp_valor: empValor,
                     emp_tipo: empTipo,
-                    emp_absoluto: empAbsolutoText !== '-' && !empAbsolutoText.includes('⚠') ? parseFloat(empAbsolutoText) : 0,
-                    error: errorText !== '-' ? parseFloat(errorText) : 0,
+                    emp_absoluto: empAbsolutoText !== '-' && empAbsolutoText !== 'N/A' && !empAbsolutoText.includes('⚠') ? parseFloat(empAbsolutoText) : 0,
+                    error: leer(ds.error, errorText),
                     factor_correccion: factorCorreccionText !== '-' ? parseFloat(factorCorreccionText) : 0,
-                    error_mas_u: errorMasUText !== '-' ? parseFloat(errorMasUText) : 0,
-                    error_menos_u: errorMenosUText !== '-' ? parseFloat(errorMenosUText) : 0,
+                    error_mas_u: leer(ds.errorMasU, errorMasUText),
+                    error_menos_u: leer(ds.errorMenosU, errorMenosUText),
                     conformidad: conformidadText !== '-' && !conformidadText.includes('⚠') ? conformidadText : ''
-                });
+                };
+                // Se conserva para que al volver a abrir la confirmación siga usando el error del certificado.
+                if (ds.errorCertificado !== undefined) punto.error_certificado = parseFloat(ds.errorCertificado);
+                datos.push(punto);
             }
         }
 
@@ -1868,7 +2012,9 @@
         _preLlenarFormulario(); // Pre-llenar campos (emp, unidad, etc.) antes de inicializar tabs
         inicializarMagnitudes(); // Inicializar tabs y tabla (soporta v1 y v2 — reemplaza inicializarTabla)
         setupKeyboardNavigation(); // Activar navegación con flechas
-        actualizarEncabezadosTabla(); // Actualizar unidades en tabla
+        // Unidades de los encabezados = las de la pestaña activa (antes se usaba la unidad general del
+        // equipo y la primera pestaña quedaba con 'lx' hasta cambiar de pestaña).
+        sincronizarUnidadGlobal();
         sincronizarDatosCertificado(); // Sincronizar certificado
 
         const fechaActual = document.getElementById('fecha-actual');
@@ -1889,6 +2035,76 @@
             numeroCertificado.addEventListener('input', sincronizarDatosCertificado);
         }
     });
+</script>
+
+<script nonce="{{ csp_nonce }}">
+    // ========== LECTURA AUTOMÁTICA DEL CERTIFICADO (IA) ==========
+    (function () {
+        const panel = document.getElementById('lectura-ia-panel');
+        if (!panel) return;
+        const csrf = '{{ csrf_token }}';
+        const mensaje = document.getElementById('lectura-ia-mensaje');
+
+        function mostrarMensaje(texto, esError) {
+            mensaje.textContent = texto;
+            mensaje.className = 'text-xs mt-2 ' + (esError ? 'text-red-700' : 'text-indigo-800');
+        }
+
+        function post(url) {
+            return fetch(url, {method: 'POST', headers: {'X-CSRFToken': csrf}})
+                .then(r => r.json().then(data => ({ok: r.ok, data})));
+        }
+
+        let intentosConsulta = 0;
+        function consultarEstado() {
+            fetch(panel.dataset.urlEstado, {headers: {'Accept': 'application/json'}})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.estado === 'listo' || data.estado === 'fallo') {
+                        window.location.reload();
+                    } else if (data.estado === 'pendiente' || data.estado === 'procesando') {
+                        intentosConsulta++;
+                        // Cada 5 s el primer minuto, luego cada 15 s.
+                        setTimeout(consultarEstado, intentosConsulta < 12 ? 5000 : 15000);
+                    }
+                })
+                .catch(() => setTimeout(consultarEstado, 15000));
+        }
+
+        const btnSolicitar = document.getElementById('lectura-ia-solicitar');
+        if (btnSolicitar) {
+            btnSolicitar.addEventListener('click', () => {
+                btnSolicitar.disabled = true;
+                btnSolicitar.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Enviando…';
+                post(panel.dataset.urlSolicitar).then(({ok, data}) => {
+                    if (!ok) {
+                        mostrarMensaje(data.mensaje || 'No se pudo solicitar la lectura.', true);
+                        btnSolicitar.disabled = false;
+                        btnSolicitar.innerHTML = '<i class="fas fa-magic mr-1"></i> Leer certificado con IA';
+                        return;
+                    }
+                    btnSolicitar.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Leyendo el certificado…';
+                    mostrarMensaje('Suele tardar menos de un minuto. La página se actualizará sola cuando termine.', false);
+                    consultarEstado();
+                }).catch(() => {
+                    mostrarMensaje('No hubo conexión con el servidor. Intenta de nuevo.', true);
+                    btnSolicitar.disabled = false;
+                });
+            });
+        }
+
+        const btnDescartar = document.getElementById('lectura-ia-descartar');
+        if (btnDescartar) {
+            btnDescartar.addEventListener('click', () => {
+                if (!confirm('¿Descartar los datos leídos del certificado y llenar la tabla a mano?')) return;
+                post(panel.dataset.urlDescartar).then(() => window.location.reload());
+            });
+        }
+
+        if (panel.dataset.estado === 'pendiente' || panel.dataset.estado === 'procesando') {
+            consultarEstado();
+        }
+    })();
 </script>
 
 {% endblock %}

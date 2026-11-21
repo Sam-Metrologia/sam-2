@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Lectura de certificados — {{ empresa.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+    <div class="flex justify-between items-start mb-6 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">🤖 Lectura de certificados con IA</h1>
+            <p class="text-gray-600 mt-1">{{ empresa.nombre }}</p>
+        </div>
+        <a href="{% url 'core:detalle_empresa' pk=empresa.pk %}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">
+            <i class="fas fa-arrow-left mr-2"></i> Volver a la empresa
+        </a>
+    </div>
+
+    {% if messages %}
+    <ul class="mb-4">
+        {% for message in messages %}
+        <li class="p-3 mb-2 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-blue-100 text-blue-800{% endif %}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Pendientes por leer -->
+    <div class="border rounded-lg p-4 mb-6 bg-indigo-50 border-indigo-200">
+        <p class="text-gray-800">
+            <strong class="text-2xl text-indigo-700">{{ candidatas|length }}</strong>
+            certificado{{ candidatas|length|pluralize }} por leer
+            <span class="text-sm text-gray-600">(última calibración de cada equipo, con PDF y sin confirmación metrológica)</span>
+        </p>
+        {% if candidatas %}
+        <p class="text-xs text-gray-600 mt-2">
+            Costo aproximado en Gemini: USD 0,02 a 0,04 por certificado (máximo ≈ USD {% widthratio candidatas|length 25 1 %} en total).
+            Los datos quedan como borrador: cada confirmación la revisa y guarda el técnico.
+        </p>
+        <form method="post" class="mt-3">
+            {% csrf_token %}
+            <button type="submit"
+                    onclick="return confirm('¿Leer {{ candidatas|length }} certificado(s) de {{ empresa.nombre|escapejs }}?')"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md">
+                <i class="fas fa-magic mr-1"></i> Leer {{ candidatas|length }} certificado{{ candidatas|length|pluralize }}
+            </button>
+        </form>
+        <details class="mt-3 text-sm">
+            <summary class="cursor-pointer text-indigo-700">Ver cuáles</summary>
+            <ul class="mt-2 ml-5 list-disc text-gray-700">
+                {% for cal in candidatas %}
+                <li>{{ cal.equipo.codigo_interno }} — {{ cal.equipo.nombre }} (calibración {{ cal.fecha_calibracion|date:"Y-m-d" }})</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </div>
+
+    <!-- Resumen -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-center">
+        <div class="p-3 rounded bg-gray-100"><div class="text-xl font-bold">{{ conteo.pendiente }}</div><div class="text-xs text-gray-600">En cola</div></div>
+        <div class="p-3 rounded bg-blue-100"><div class="text-xl font-bold">{{ conteo.procesando }}</div><div class="text-xs text-gray-600">Leyendo</div></div>
+        <div class="p-3 rounded bg-green-100"><div class="text-xl font-bold">{{ conteo.listo }}</div><div class="text-xs text-gray-600">Listas para revisar</div></div>
+        <div class="p-3 rounded bg-red-100"><div class="text-xl font-bold">{{ conteo.fallo }}</div><div class="text-xs text-gray-600">Fallaron</div></div>
+    </div>
+    {% if en_curso %}
+    <p class="text-sm text-blue-700 mb-4"><i class="fas fa-spinner fa-spin mr-1"></i> Leyendo certificados… esta página se actualiza sola cada 15 segundos. Puedes cerrarla: la lectura sigue.</p>
+    {% endif %}
+
+    <!-- Detalle -->
+    {% if lecturas %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm border">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-3 py-2 text-left">Equipo</th>
+                    <th class="px-3 py-2 text-left">Calibración</th>
+                    <th class="px-3 py-2 text-left">Estado</th>
+                    <th class="px-3 py-2 text-left">Detalle</th>
+                    <th class="px-3 py-2"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lectura in lecturas %}
+                <tr class="border-t">
+                    <td class="px-3 py-2">{{ lectura.calibracion.equipo.codigo_interno }} — {{ lectura.calibracion.equipo.nombre }}</td>
+                    <td class="px-3 py-2">{{ lectura.calibracion.fecha_calibracion|date:"Y-m-d" }}</td>
+                    <td class="px-3 py-2">
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold
+                            {% if lectura.estado == 'listo' %}bg-green-100 text-green-800{% elif lectura.estado == 'fallo' %}bg-red-100 text-red-800{% elif lectura.estado == 'procesando' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {{ lectura.get_estado_display }}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 text-xs text-gray-600">
+                        {% if lectura.estado == 'listo' %}
+                            {{ lectura.propuesta.magnitudes|length }} variable(s){% if lectura.calibracion.confirmacion_metrologica_datos %} · confirmación ya guardada{% endif %}
+                        {% elif lectura.estado == 'fallo' %}{{ lectura.mensaje_error }}{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        {% if lectura.estado == 'listo' %}
+                        <a href="{% url 'core:confirmacion_metrologica' equipo_id=lectura.calibracion.equipo_id %}?calibracion_id={{ lectura.calibracion_id }}"
+                           class="text-indigo-600 hover:underline text-xs">Revisar confirmación →</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+{% if en_curso %}
+<script nonce="{{ csp_nonce }}">
+    setTimeout(() => window.location.reload(), 15000);
+</script>
+{% endif %}
+{% endblock %}

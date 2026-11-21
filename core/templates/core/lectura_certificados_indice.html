@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Lectura de certificados con IA{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 bg-white rounded-lg shadow-md mt-6">
+    <h1 class="text-2xl font-bold text-gray-800">🤖 Lectura de certificados con IA</h1>
+    <p class="text-gray-600 mt-1 mb-6 text-sm">
+        Empresas con certificados cargados. <strong>Por leer</strong>: última calibración de cada equipo con PDF y sin confirmación.
+        <strong>Por revisar</strong>: ya leídas por la IA, esperando que alguien revise y guarde la confirmación.
+    </p>
+
+    {% if filas %}
+    <p class="text-xs text-gray-500 mb-2">Nada se lee desde esta lista: entra a una empresa con "Abrir" y allí se leen solo los certificados de esa empresa.</p>
+    <input type="search" id="buscar-empresa" placeholder="Buscar empresa…"
+           class="mb-3 w-full md:w-80 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500">
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm border">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-3 py-2 text-left">Empresa</th>
+                    <th class="px-3 py-2 text-center">Por leer</th>
+                    <th class="px-3 py-2 text-center">Leyendo</th>
+                    <th class="px-3 py-2 text-center">Por revisar</th>
+                    <th class="px-3 py-2 text-center">Fallaron</th>
+                    <th class="px-3 py-2"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in filas %}
+                <tr class="border-t fila-empresa" data-nombre="{{ fila.empresa.nombre|lower }}">
+                    <td class="px-3 py-2 font-medium">{{ fila.empresa.nombre }}</td>
+                    <td class="px-3 py-2 text-center {% if fila.por_leer %}font-bold text-indigo-700{% else %}text-gray-400{% endif %}">{{ fila.por_leer }}</td>
+                    <td class="px-3 py-2 text-center {% if fila.en_curso %}text-blue-700{% else %}text-gray-400{% endif %}">{{ fila.en_curso }}</td>
+                    <td class="px-3 py-2 text-center {% if fila.por_revisar %}font-bold text-green-700{% else %}text-gray-400{% endif %}">{{ fila.por_revisar }}</td>
+                    <td class="px-3 py-2 text-center {% if fila.fallidas %}text-red-700{% else %}text-gray-400{% endif %}">{{ fila.fallidas }}</td>
+                    <td class="px-3 py-2 text-right">
+                        <a href="{% url 'core:lectura_masiva_empresa' empresa_id=fila.empresa.id %}"
+                           class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded">
+                            Abrir →
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500">Ninguna empresa tiene todavía certificados (PDF) cargados en sus calibraciones.</p>
+    {% endif %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+    (function () {
+        const buscar = document.getElementById('buscar-empresa');
+        if (!buscar) return;
+        const quitarTildes = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '');
+        buscar.addEventListener('input', () => {
+            const texto = quitarTildes(buscar.value.trim().toLowerCase());
+            document.querySelectorAll('.fila-empresa').forEach(fila => {
+                fila.style.display = quitarTildes(fila.dataset.nombre).includes(texto) ? '' : 'none';
+            });
+        });
+    })();
+</script>
+{% endblock %}
