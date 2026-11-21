@@ -61,6 +61,28 @@ class TestChatAyuda:
         assert response.status_code == 200
         assert 'respuesta' in response.json()
 
+    def test_usa_modelo_configurado_y_no_el_deprecado(self, authenticated_client):
+        """gemini-2.5-flash sale de servicio el 2026-12-01: el chat usa settings.GEMINI_MODEL."""
+        mock_response = MagicMock()
+        mock_response.text = 'ok'
+        mock_client_instance = MagicMock()
+        mock_client_instance.models.generate_content.return_value = mock_response
+
+        with patch('core.views.chat.settings') as mock_settings, \
+             patch('google.genai.Client', return_value=mock_client_instance):
+            mock_settings.GEMINI_API_KEY = 'fake-key'
+            mock_settings.GEMINI_MODEL = 'gemini-3.8-flash'
+            authenticated_client.post(URL, data=json.dumps({'pregunta': 'hola'}),
+                                      content_type='application/json')
+
+        modelo = mock_client_instance.models.generate_content.call_args.kwargs['model']
+        assert modelo == 'gemini-3.8-flash'
+
+    def test_default_settings_no_usa_modelo_deprecado(self):
+        from django.conf import settings
+        assert settings.GEMINI_MODEL
+        assert settings.GEMINI_MODEL != 'gemini-2.5-flash'
+
     def test_error_gemini_retorna_fallback(self, authenticated_client):
         with patch('core.views.chat.settings') as mock_settings:
             mock_settings.GEMINI_API_KEY = 'fake-key'

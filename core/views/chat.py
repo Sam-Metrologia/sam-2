@@ -285,7 +285,7 @@ def chat_ayuda(request):
             prompt = f"{CONTEXTO_SAM}\n\nUsuario: {pregunta}"
 
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=getattr(settings, 'GEMINI_MODEL', '') or 'gemini-3.8-flash',
             contents=prompt,
         )
 

@@ -608,6 +608,9 @@ RATE_LIMIT_CONFIG = {
 # Producción: obtener en https://dashboard.wompi.co → modo producción
 # Gemini API (chatbot de soporte) — obtener en https://aistudio.google.com/apikey
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+# Modelo de Gemini. gemini-2.5-flash queda fuera de servicio el 2026-12-01.
+# Se puede cambiar sin desplegar código con la variable de entorno GEMINI_MODEL.
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.8-flash')
 
 WOMPI_PUBLIC_KEY = os.environ.get('WOMPI_PUBLIC_KEY', '')
 WOMPI_PRIVATE_KEY = os.environ.get('WOMPI_PRIVATE_KEY', '')

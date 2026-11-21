@@ -31,7 +31,7 @@ SAM Metrologia is a Django-based metrology management system for ISO/IEC 17020:2
 - **Dependencies:** Actualizadas 2026-02-19 (32 CVEs corregidos)
 - **Plan Trial/Onboarding/Pagos:** 98% completo (`docs/PLAN_TRIAL_ONBOARDING_PAGOS.md`)
 - **Dashboard Pre-computado:** Opcion E implementada — stats guardados en Empresa, cron diario 2am
-- **Chatbot IA "Señor SAM":** Gemini 2.5 Flash integrado como burbuja flotante (`core/views/chat.py`). Contexto en `CONTEXTO_SAM`. Historial persiste en localStorage por usuario; se borra al cerrar sesión. Requiere `GEMINI_API_KEY` en entorno.
+- **Chatbot IA "Señor SAM":** Gemini 3.8 Flash (configurable con GEMINI_MODEL) integrado como burbuja flotante (`core/views/chat.py`). Contexto en `CONTEXTO_SAM`. Historial persiste en localStorage por usuario; se borra al cerrar sesión. Requiere `GEMINI_API_KEY` en entorno.
 - **Perfil Empresa + Onboarding:** Vista `editar_perfil_empresa` para Admin/Gerencia. Validación en pagos requiere `correos_facturacion`. Banner en dashboard si perfil incompleto.
 - **UX:** Toggle modo oscuro en navbar (junto al username). Formulario trial simplificado (3 campos requeridos + sección colapsable).
 
@@ -82,7 +82,7 @@ sam-2/
       maintenance.py         # Maintenance views
       admin.py               # Admin views
       scheduled_tasks_api.py # API for scheduled tasks
-      chat.py                # Chatbot IA "Señor SAM" (Gemini 2.5 Flash)
+      chat.py                # Chatbot IA "Señor SAM" (Gemini 3.8 Flash (configurable con GEMINI_MODEL))
       terminos.py            # Terms & conditions
     services.py              # Business logic services
     services_new.py          # Optimized services (cache, file upload)
