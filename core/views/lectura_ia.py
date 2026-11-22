@@ -123,6 +123,29 @@ def lectura_certificados_indice(request):
 
 
 @login_required
+@require_POST
+def detener_lectura_masiva(request, empresa_id):
+    """
+    Solo superusuario: cancela la lectura masiva en espera de una empresa. Las que están en
+    cola vuelven a quedar "por leer"; la que se está leyendo en ese momento termina (la
+    llamada a Gemini ya está hecha). No toca las lecturas individuales que pidieron los técnicos.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Solo el administrador de SAM puede usar la lectura masiva.')
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    canceladas, _ = LecturaCertificado.objects.filter(
+        empresa=empresa, origen=LecturaCertificado.ORIGEN_MASIVA,
+        estado=LecturaCertificado.ESTADO_PENDIENTE).delete()
+    procesando = LecturaCertificado.objects.filter(
+        empresa=empresa, estado=LecturaCertificado.ESTADO_PROCESANDO).count()
+    mensaje = f'Lectura detenida: se cancelaron {canceladas} certificado(s) en espera.'
+    if procesando:
+        mensaje += f' {procesando} que ya se estaba(n) leyendo terminará(n) en unos segundos.'
+    messages.success(request, mensaje)
+    return redirect('core:lectura_masiva_empresa', empresa_id=empresa.id)
+
+
+@login_required
 @require_http_methods(['GET', 'POST'])
 def lectura_masiva_empresa(request, empresa_id):
     """Solo superusuario: lee de una vez los certificados pendientes de una empresa."""

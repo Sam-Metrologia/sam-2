@@ -379,6 +379,49 @@ class TestEmpYDatosGenerales:
         assert prop['magnitudes'][0]['puntos_medicion'][0]['emp_valor'] == ''
         assert any('EMP' in a for a in prop['lectura_ia']['avisos'])
 
+    def test_emp_del_punto_maximo_es_el_mismo_absoluto_en_todos_los_puntos(self):
+        # Hoja de vida: "±5% Punto Maximo Calibracion"; puntos 10, 30 y 50 -> ±2,5 en todos.
+        prop = lc.construir_propuesta(
+            resultado(('Presión', [punto(10, 10.1, 0.1, u=0.1), punto(30, 30.2, 0.2, u=0.1),
+                                   punto(50, 50.3, 0.3, u=0.1)])),
+            equipo=EquipoFalso('±5% Punto Maximo Calibracion'))
+        mag = prop['magnitudes'][0]
+        # Modo de la pantalla "% punto máx.": la pantalla calcula ±2,5 en todos y lo guarda absoluto.
+        assert (mag['emp'], mag['emp_unidad']) == (5, '%max')
+        assert all((p['emp_valor'], p['emp_tipo']) == (5, '%max') for p in mag['puntos_medicion'])
+        assert any('±2.5' in a and 'punto de calibración más alto' in a for a in prop['lectura_ia']['avisos'])
+
+    def test_emp_del_fondo_de_escala_usa_el_rango_de_la_hoja_de_vida(self):
+        equipo = EquipoFalso('±1 % F.E.')
+        equipo.rango_medida = '0 a 2000 N'
+        prop = lc.construir_propuesta(resultado(('Fuerza', [punto(500, 498, -2, u=1, unidad='N')])), equipo=equipo)
+        p = prop['magnitudes'][0]['puntos_medicion'][0]
+        assert (p['emp_valor'], p['emp_tipo']) == (1, '%fe')
+        assert any('±20' in a and 'rango' in a for a in prop['lectura_ia']['avisos'])
+
+    @pytest.mark.parametrize('texto,base', [
+        ('±5% Punto Maximo Calibracion', 'punto_maximo'), ('5 % del valor máximo', 'punto_maximo'),
+        ('±1 % F.E.', 'fondo_escala'), ('2% del fondo de escala', 'fondo_escala'), ('0,5 % FS', 'fondo_escala'),
+        ('5 %', 'lectura'), ('0,2 mm', 'lectura'),
+    ])
+    def test_interpreta_el_emp_de_la_hoja_de_vida(self, texto, base):
+        assert lc.emp_del_equipo(EquipoFalso(texto))['base'] == base
+
+    def test_emp_porcentaje_simple_sigue_siendo_de_cada_lectura(self):
+        prop = lc.construir_propuesta(resultado(('T', [punto(50, 50.1, 0.1, u=0.1)])), equipo=EquipoFalso('5 %'))
+        p = prop['magnitudes'][0]['puntos_medicion'][0]
+        assert (p['emp_valor'], p['emp_tipo']) == (5, '%')
+
+    def test_emp_absoluto_se_pasa_a_la_unidad_de_la_tabla(self):
+        prop = lc.construir_propuesta(resultado(('Longitud', [punto(10, 10.01, 10, u=6, unidad='µm')])),
+                                      equipo=EquipoFalso('0,02 mm'))
+        assert prop['magnitudes'][0]['puntos_medicion'][0]['emp_valor'] == pytest.approx(20)
+
+    def test_emp_por_tramos_avisa(self):
+        prop = lc.construir_propuesta(resultado(('Iluminancia', [punto(5, 5.1, 0.1, u=0.1, unidad='lx')])),
+                                      equipo=EquipoFalso('<10 lx: 45 %, >10 lx: 20 %'))
+        assert any('tramos' in a for a in prop['lectura_ia']['avisos'])
+
     def test_datos_del_certificado(self):
         prop = lc.construir_propuesta(resultado(('T', [punto(10, 10.1, 0.1, u=0.1)]), numero='P-303-24', fecha='2024-10-31'))
         assert prop['numero_certificado'] == 'P-303-24'
@@ -462,6 +505,22 @@ class TestCola:
             lc.procesar_pendientes()
         assert LecturaCertificado.objects.get(calibracion=cal).propuesta['magnitudes'][0]['nombre'] == 'Presión del manómetro'
 
+    def test_comando_rearma_propuestas_sin_llamar_a_gemini(self):
+        from django.core.management import call_command
+        equipo = _equipo(_empresa(), emp='±5% Punto Maximo Calibracion')
+        pendiente = _calibracion(equipo, dias=10)
+        confirmada = _calibracion(_equipo(equipo.empresa, 'X'), confirmacion={'version': 2, 'magnitudes': []})
+        for cal in (pendiente, confirmada):
+            LecturaCertificado.objects.create(calibracion=cal, empresa=cal.equipo.empresa, estado='listo',
+                                              resultado_crudo=RESULTADO_OK, propuesta={'vieja': True})
+        with patch('core.lectura_certificados.leer_pdf_con_gemini') as gemini:
+            call_command('reconstruir_lecturas_ia', empresa=equipo.empresa_id)
+        gemini.assert_not_called()
+        nueva = LecturaCertificado.objects.get(calibracion=pendiente).propuesta
+        p = nueva['magnitudes'][0]['puntos_medicion'][0]
+        assert (p['emp_valor'], p['emp_tipo']) == (5, '%max')
+        assert LecturaCertificado.objects.get(calibracion=confirmada).propuesta == {'vieja': True}
+
     def test_una_lectura_solo_se_reserva_una_vez(self):
         lc.solicitar_lectura(_calibracion(_equipo(_empresa())))
         assert lc.tomar_siguiente() is not None
@@ -481,6 +540,55 @@ class TestCola:
             estado='procesando', intentos=3, iniciado_en=timezone.now() - timedelta(minutes=30))
         assert lc.tomar_siguiente() is None
         assert LecturaCertificado.objects.get(pk=lectura.pk).estado == 'fallo'
+
+    def test_falla_pasajera_del_almacenamiento_se_reintenta_ahi_mismo(self, monkeypatch):
+        monkeypatch.setattr(lc, 'ESPERAS_DESCARGA_PDF', (0, 0))
+        cal = _calibracion(_equipo(_empresa()))
+        lc.solicitar_lectura(cal)
+        abrir_real = type(cal.documento_calibracion).open
+        llamadas = {'n': 0}
+
+        def abrir(self, mode='rb'):
+            llamadas['n'] += 1
+            if llamadas['n'] == 1:
+                raise RuntimeError('An error occurred (500) when calling the HeadObject operation')
+            return abrir_real(self, mode)
+
+        with patch.object(type(cal.documento_calibracion), 'open', abrir), \
+                patch('core.lectura_certificados.leer_pdf_con_gemini', return_value=(RESULTADO_OK, INFO_OK)):
+            lc.procesar_pendientes()
+        assert LecturaCertificado.objects.get(calibracion=cal).estado == 'listo'
+
+    def test_almacenamiento_caido_devuelve_a_la_cola_y_luego_falla(self, monkeypatch):
+        monkeypatch.setattr(lc, 'ESPERAS_DESCARGA_PDF', (0, 0))
+        empresa = _empresa()
+        caida = _calibracion(_equipo(empresa, 'A'))
+        otra = _calibracion(_equipo(empresa, 'B'))
+        lc.solicitar_lectura(caida)
+        lc.solicitar_lectura(otra)
+        error = RuntimeError('An error occurred (500) when calling the HeadObject operation')
+        with patch.object(type(caida.documento_calibracion), 'open', side_effect=error):
+            assert lc.procesar_pendientes(maximo=1) == 1
+        lectura = LecturaCertificado.objects.get(calibracion=caida)
+        assert lectura.estado == 'pendiente' and lectura.intentos == 1
+        # Quedó al final de la cola: la siguiente que se toma es la otra.
+        assert lc.tomar_siguiente().calibracion_id == otra.id
+        with patch.object(type(caida.documento_calibracion), 'open', side_effect=error):
+            lc.procesar_pendientes()
+        lectura.refresh_from_db()
+        assert lectura.estado == 'fallo' and lectura.intentos == lc.MAX_INTENTOS
+        assert 'almacenamiento' in lectura.mensaje_error
+
+    def test_pdf_inexistente_falla_sin_reintentar(self, monkeypatch):
+        monkeypatch.setattr(lc, 'ESPERAS_DESCARGA_PDF', (0, 0))
+        cal = _calibracion(_equipo(_empresa()))
+        lc.solicitar_lectura(cal)
+        with patch.object(type(cal.documento_calibracion), 'open',
+                          side_effect=FileNotFoundError('no existe')) as abrir:
+            lc.procesar_pendientes()
+        assert abrir.call_count == 1
+        lectura = LecturaCertificado.objects.get(calibracion=cal)
+        assert lectura.estado == 'fallo' and 'No se encuentra el PDF' in lectura.mensaje_error
 
     def test_volver_a_solicitar_reinicia_una_fallida(self):
         cal = _calibracion(_equipo(_empresa()))
@@ -575,6 +683,31 @@ class TestVistas:
         resp = _cliente(_usuario(_empresa())).get(reverse('core:lectura_certificados_indice'))
         assert resp.status_code == 403
 
+    def test_detener_cancela_las_que_esperan_pero_no_las_individuales(self):
+        empresa = _empresa()
+        en_espera = _calibracion(_equipo(empresa, 'A'))
+        leyendo = _calibracion(_equipo(empresa, 'B'))
+        individual = _calibracion(_equipo(empresa, 'C'))
+        lc.solicitar_lectura(en_espera, origen='masiva')
+        lc.solicitar_lectura(leyendo, origen='masiva')
+        lc.solicitar_lectura(individual)
+        LecturaCertificado.objects.filter(calibracion=leyendo).update(estado='procesando', iniciado_en=timezone.now())
+        cliente = _cliente(_usuario(_empresa(), superusuario=True))
+
+        resp = cliente.post(reverse('core:detener_lectura_masiva', args=[empresa.id]), follow=True)
+        assert resp.status_code == 200
+        assert not LecturaCertificado.objects.filter(calibracion=en_espera).exists()
+        assert LecturaCertificado.objects.get(calibracion=leyendo).estado == 'procesando'
+        assert LecturaCertificado.objects.get(calibracion=individual).estado == 'pendiente'
+        # La cancelada vuelve a estar por leer.
+        assert en_espera.id in [c.id for c in lc.candidatas_masivas(empresa)]
+        assert 'se cancelaron 1' in resp.content.decode()
+
+    def test_detener_solo_superusuario(self):
+        empresa = _empresa()
+        resp = _cliente(_usuario(empresa)).post(reverse('core:detener_lectura_masiva', args=[empresa.id]))
+        assert resp.status_code == 403
+
     def test_masiva_solo_superusuario(self):
         empresa = _empresa()
         resp = _cliente(_usuario(empresa)).get(reverse('core:lectura_masiva_empresa', args=[empresa.id]))
@@ -656,6 +789,55 @@ class TestPrecargaEnConfirmacion:
         assert 'error_certificado' not in guardados[1]
         # El punto en cero con EMP en % ("N/A") no vuelve NO APTA la variable.
         assert mag['resultado'] == 'APTO'
+
+    def test_guardar_emp_punto_maximo_queda_absoluto_y_recuerda_el_modo(self):
+        empresa = _empresa()
+        equipo = _equipo(empresa, emp='±5% Punto Maximo Calibracion')
+        cal = _calibracion(equipo)
+        puntos = [{'nominal': n, 'lectura': n + 0.1, 'incertidumbre': 0.1, 'error': 0.1, 'conformidad': 'Cumple',
+                   'emp_valor': 2.5, 'emp_tipo': 'abs', 'emp_absoluto': 2.5, 'emp_modo': '%max', 'emp_porcentaje': 5}
+                  for n in (10, 30, 50)]
+        datos = {'version': 2, 'magnitudes': [{'nombre': 'Presión', 'unidad': 'psi', 'emp': 5, 'emp_unidad': '%',
+                                               'emp_modo': '%max', 'puntos_medicion': puntos}],
+                 'equipo': {'fecha_analisis': '2026-11-21'}, 'conclusion': {'decision': 'apto'}}
+        cliente = _cliente(_usuario(empresa))
+        with patch('weasyprint.HTML') as html:
+            html.return_value.write_pdf.return_value = b'%PDF-1.4 conf'
+            resp = cliente.post(reverse('core:generar_pdf_confirmacion', args=[equipo.id]) + f'?calibracion_id={cal.id}',
+                                data=json.dumps(datos), content_type='application/json')
+        assert resp.status_code == 200
+        cal.refresh_from_db()
+        mag = cal.confirmacion_metrologica_datos['magnitudes'][0]
+        assert mag['emp_modo'] == '%max'
+        assert all((p['emp_tipo'], p['emp_absoluto'], p['emp_modo'], p['emp_porcentaje']) == ('abs', 2.5, '%max', 5)
+                   for p in mag['puntos_medicion'])
+
+    def test_confirmacion_manual_toma_el_modo_de_la_hoja_de_vida(self):
+        empresa = _empresa()
+        equipo = _equipo(empresa, emp='±5% Punto Maximo Calibracion')
+        equipo.rango_medida = '0 a 100 psi'
+        equipo.save()
+        cal = _calibracion(equipo)
+        resp = _cliente(_usuario(empresa)).get(
+            reverse('core:confirmacion_metrologica', args=[equipo.id]) + f'?calibracion_id={cal.id}')
+        html = resp.content.decode()
+        import re
+        assert "const EMP_MODO_HOJA_VIDA = '%max'" in html
+        linea = re.search(r'const EMP_RANGO_MAX = ([^;]*);', html).group(1)
+        # Debe ser un número JavaScript válido (con punto decimal, no con la coma del formato colombiano).
+        assert float(linea) == 100, linea
+
+    def test_emp_con_decimales_llega_a_la_pantalla_con_punto(self):
+        # Con formato colombiano "0,5" se leía como 0 en JavaScript (filas nuevas quedaban "Sin EMP").
+        empresa = _empresa()
+        equipo = _equipo(empresa, emp='0.5%')
+        cal = _calibracion(equipo)
+        cliente = _cliente(_usuario(empresa))
+        html = cliente.get(reverse('core:confirmacion_metrologica', args=[equipo.id])
+                           + f'?calibracion_id={cal.id}').content.decode()
+        assert '<input type="hidden" id="emp" value="0.5">' in html
+        html = cliente.get(reverse('core:intervalos_calibracion', args=[equipo.id])).content.decode()
+        assert 'id="emp" value="0.5"' in html
 
     def test_siguiente_pendiente_de_la_misma_empresa(self):
         empresa = _empresa()

@@ -223,16 +223,91 @@ def _limpio(valor):
     return float(f"{v:.10g}") + 0.0  # + 0.0 convierte -0.0 en 0.0
 
 
+_EMP_PUNTO_MAXIMO = re.compile(r'punto\s+m[aá]x|m[aá]x(imo)?\s+(punto|de\s+calibraci|medid|calibrad)|valor\s+m[aá]x',
+                               re.IGNORECASE)
+_EMP_FONDO_ESCALA = re.compile(r'fondo\s+de\s+escala|\bF\.?\s?E\.?(?=\W|$)|full\s*scale|\bFS\b|span|del\s+rango|'
+                               r'del\s+alcance|de\s+la\s+escala', re.IGNORECASE)
+_NUMERO = re.compile(r'(\d+(?:[.,]\d+)?)')
+
+
+def _numero(texto):
+    return float(texto.replace(',', '.'))
+
+
 def emp_del_equipo(equipo):
-    """(valor, tipo) del EMP de la hoja de vida, o ('', '%') si no hay uno usable."""
+    """
+    Interpreta el EMP de la hoja de vida. Devuelve un dict:
+        valor, tipo ('%' o 'abs'), unidad (si es absoluto y la trae),
+        base: 'lectura' (% de cada punto), 'punto_maximo' (% del punto de calibración más alto),
+              'fondo_escala' (% del máximo del rango del equipo)
+        tramos: True si el texto trae varios valores (EMP por tramos: no se puede aplicar solo).
+    valor '' si no hay EMP usable.
+    """
     texto = (getattr(equipo, 'error_maximo_permisible', '') or '').strip()
+    vacio = {'valor': '', 'tipo': '%', 'unidad': '', 'base': 'lectura', 'tramos': False, 'texto': texto}
     if not texto:
-        return '', '%'
-    m = re.search(r'([\d]+(?:[.,]\d+)?)\s*(%)?', texto)
+        return vacio
+    m = re.search(r'(\d+(?:[.,]\d+)?)\s*(%|[^\W\d_][\wµΩ°/]*)?', texto)
     if not m:
-        return '', '%'
-    valor = float(m.group(1).replace(',', '.'))
-    return valor, ('%' if m.group(2) else 'abs')
+        return vacio
+    es_porcentaje = m.group(2) == '%'
+    base = 'lectura'
+    if es_porcentaje and _EMP_PUNTO_MAXIMO.search(texto):
+        base = 'punto_maximo'
+    elif es_porcentaje and _EMP_FONDO_ESCALA.search(texto):
+        base = 'fondo_escala'
+    return {
+        'valor': _numero(m.group(1)),
+        'tipo': '%' if es_porcentaje else 'abs',
+        'unidad': '' if es_porcentaje else _normalizar_unidad(m.group(2) or ''),
+        'base': base,
+        'tramos': len(_NUMERO.findall(texto)) > 1,
+        'texto': texto,
+    }
+
+
+def _maximo_del_rango(equipo):
+    """Máximo del rango de medida de la hoja de vida ('0 a 2000 N' -> 2000), o None."""
+    numeros = _NUMERO.findall(getattr(equipo, 'rango_medida', '') or '')
+    return max(_numero(n) for n in numeros) if numeros else None
+
+
+def _aplicar_emp(magnitudes, emp, equipo, avisos):
+    """
+    Pone el EMP de la hoja de vida en cada variable. Un EMP '% del punto máximo' o '% del fondo
+    de escala' es el MISMO valor absoluto para todos los puntos (5 % de 50 = ±2,5 en cada punto),
+    así que se convierte a absoluto; no es 5 % de cada lectura.
+    """
+    if emp['valor'] == '':
+        return
+    if emp['tramos']:
+        avisos.append(f'El EMP de la hoja de vida ("{emp["texto"]}") tiene varios valores (¿por tramos?): '
+                      'revisa el EMP de cada punto.')
+    for mag in magnitudes:
+        valor, tipo = emp['valor'], emp['tipo']
+        if emp['base'] in ('punto_maximo', 'fondo_escala'):
+            # Se usa el modo de la pantalla ('%max' / '%fe'): calcula el mismo absoluto para todos
+            # los puntos y se recalcula si el técnico cambia un patrón. Al guardar queda absoluto.
+            if emp['base'] == 'fondo_escala' and _maximo_del_rango(equipo) is not None:
+                referencia, de_que = _maximo_del_rango(equipo), 'el máximo del rango de la hoja de vida'
+            else:
+                referencia = max((abs(p['nominal']) for p in mag['puntos_medicion']), default=0)
+                de_que = 'el punto de calibración más alto'
+            tipo = '%max' if (emp['base'] == 'punto_maximo' or de_que.startswith('el punto')) else '%fe'
+            if referencia:
+                avisos.append(f'"{mag["nombre"] or "Variable"}": EMP {emp["texto"]} = '
+                              f'±{_limpio(emp["valor"] / 100 * referencia)} {mag["unidad"]} en todos los puntos '
+                              f'({emp["valor"]} % de {_limpio(referencia)}, {de_que}).')
+        elif tipo == 'abs' and emp['unidad'] and mag['unidad'] and emp['unidad'] != _normalizar_unidad(mag['unidad']):
+            f = factor_conversion(emp['unidad'], mag['unidad'])
+            if f is None:
+                avisos.append(f'"{mag["nombre"]}": el EMP está en {emp["unidad"]} y la tabla en {mag["unidad"]}: '
+                              'revisa el EMP.')
+            else:
+                valor = _limpio(valor * f)
+        mag['emp'], mag['emp_unidad'] = valor, tipo
+        for p in mag['puntos_medicion']:
+            p['emp_valor'], p['emp_tipo'] = valor, tipo
 
 
 def _texto_comparable(texto):
@@ -518,9 +593,10 @@ def construir_propuesta(resultado, equipo=None, calibracion=None, nombres_previo
         avisos.append(f'El PDF trae {len(certificados)} certificados: se cargaron todos, '
                       'cada pestaña indica la fecha de su certificado.')
 
-    emp_valor, emp_tipo = emp_del_equipo(equipo) if equipo is not None else ('', '%')
-    if emp_valor == '':
+    emp = emp_del_equipo(equipo) if equipo is not None else {'valor': ''}
+    if emp['valor'] == '':
         avisos.append('El equipo no tiene EMP en la hoja de vida: complétalo para calcular la conformidad.')
+    emp_valor, emp_tipo = '', '%'  # se fija por variable al final (_aplicar_emp)
 
     magnitudes = []
     descartados_por_motivo = {}
@@ -561,6 +637,8 @@ def construir_propuesta(resultado, equipo=None, calibracion=None, nombres_previo
                           'anteriores, para que siga en la misma gráfica histórica.')
     for m in magnitudes:
         m.pop('_titulo', None)
+    if equipo is not None:
+        _aplicar_emp(magnitudes, emp, equipo, avisos)
 
     for motivo, n in descartados_por_motivo.items():
         avisos.append(f'Se omitieron {n} punto(s) {motivo}.')
@@ -679,6 +757,57 @@ def tomar_siguiente():
     return None
 
 
+class ErrorAlmacenamiento(Exception):
+    """El almacenamiento (Cloudflare R2) no entregó el PDF por una falla pasajera."""
+
+
+# Esperas (segundos) entre reintentos al descargar el PDF del almacenamiento.
+ESPERAS_DESCARGA_PDF = (3, 10)
+
+
+def _es_archivo_inexistente(exc):
+    """True si el error dice que el archivo no existe (no tiene sentido reintentar)."""
+    if isinstance(exc, FileNotFoundError):
+        return True
+    respuesta = getattr(exc, 'response', None)
+    if isinstance(respuesta, dict):
+        codigo = str(respuesta.get('Error', {}).get('Code', ''))
+        return codigo in ('404', 'NoSuchKey', 'NotFound')
+    return False
+
+
+def _descargar_pdf(calibracion):
+    """
+    Descarga el PDF del certificado. Reintenta ante fallas pasajeras del almacenamiento
+    (p. ej. R2 respondiendo 500); si el archivo no existe falla de una vez.
+    """
+    intentos = len(ESPERAS_DESCARGA_PDF) + 1
+    for numero in range(intentos):
+        try:
+            with calibracion.documento_calibracion.open('rb') as archivo:
+                return archivo.read()
+        except Exception as exc:  # noqa: BLE001 — errores de boto/almacenamiento son variados
+            if _es_archivo_inexistente(exc):
+                raise ErrorLectura('No se encuentra el PDF del certificado en el almacenamiento. '
+                                   'Vuelve a subirlo en la calibración.') from exc
+            if numero == intentos - 1:
+                raise ErrorAlmacenamiento(str(exc)) from exc
+            logger.warning(f'Descarga del PDF falló (calibración {calibracion.id}), '
+                           f'reintento {numero + 1}: {exc}')
+            time.sleep(ESPERAS_DESCARGA_PDF[numero])
+
+
+def _devolver_a_la_cola(lectura, mensaje):
+    """Falla pasajera: la lectura vuelve al final de la cola (o falla si ya agotó intentos)."""
+    from core.models import LecturaCertificado
+
+    if lectura.intentos >= MAX_INTENTOS:
+        lectura.marcar_fallo(mensaje)
+        return
+    LecturaCertificado.objects.filter(id=lectura.id).update(
+        estado=LecturaCertificado.ESTADO_PENDIENTE, creado=timezone.now(), iniciado_en=None)
+
+
 def procesar_lectura(lectura):
     """Lee el PDF de una lectura ya reservada y guarda el resultado. Nunca lanza excepción."""
     from core.models import LecturaCertificado
@@ -687,8 +816,7 @@ def procesar_lectura(lectura):
     try:
         if not calibracion.documento_calibracion:
             raise ErrorLectura('La calibración ya no tiene el PDF del certificado.')
-        with calibracion.documento_calibracion.open('rb') as archivo:
-            pdf_bytes = archivo.read()
+        pdf_bytes = _descargar_pdf(calibracion)
 
         datos, info = leer_pdf_con_gemini(pdf_bytes)
         propuesta = construir_propuesta(datos, equipo=calibracion.equipo, calibracion=calibracion,
@@ -708,6 +836,12 @@ def procesar_lectura(lectura):
                     f"{len(propuesta['magnitudes'])} variables")
     except ErrorLectura as exc:
         lectura.marcar_fallo(str(exc))
+    except ErrorAlmacenamiento as exc:
+        logger.error(f'Lectura IA: no se pudo descargar el PDF (calibración {calibracion.id}, '
+                     f'intento {lectura.intentos}): {exc}')
+        _devolver_a_la_cola(
+            lectura, 'No se pudo descargar el PDF del almacenamiento (falla del servicio de archivos). '
+                     'Intenta de nuevo más tarde.')
     except Exception as exc:  # noqa: BLE001 — una lectura que falla no debe tumbar la cola
         logger.error(f'Lectura IA falló (calibración {calibracion.id}): {exc}', exc_info=True)
         mensaje = str(exc)

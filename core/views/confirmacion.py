@@ -450,7 +450,11 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
             v = p.get('emp_valor', '')
             t = p.get('emp_tipo', '%')
             if v and v != 0:
-                label = f"{v} {t if t == '%' else 'Abs'}"
+                if p.get('emp_modo') in ('%max', '%fe'):
+                    base = 'punto máx.' if p['emp_modo'] == '%max' else 'F.E.'
+                    label = f"{p.get('emp_porcentaje')} % {base} (±{v})"
+                else:
+                    label = f"{v} {t if t == '%' else 'Abs'}"
                 if label not in seen:
                     seen.add(label)
                     vistos.append(label)
@@ -524,9 +528,18 @@ def _preparar_contexto_confirmacion(request, equipo, ultima_calibracion, datos_c
         },
     }
 
+    # EMP "% del punto máximo" / "% del fondo de escala": la pantalla lo calcula como el mismo
+    # absoluto en todos los puntos (5 % de 50 = ±2,5), no como 5 % de cada lectura.
+    from core.lectura_certificados import emp_del_equipo, _maximo_del_rango
+    emp_hv = emp_del_equipo(equipo)
+    emp_modo_hoja_vida = {'punto_maximo': '%max', 'fondo_escala': '%fe'}.get(emp_hv['base'], '')
+
     context = {
         'equipo': equipo,
         'ultima_calibracion': ultima_calibracion,
+        'emp_modo_hoja_vida': emp_modo_hoja_vida,
+        # JSON: con el formato colombiano la plantilla escribiría "100,0" y rompería el JavaScript.
+        'emp_rango_max_json': json.dumps(_maximo_del_rango(equipo)),
         'calibraciones_historicas': calibraciones_historicas,
         'fecha_actual': datetime.now().date(),
 
@@ -1189,6 +1202,10 @@ def generar_pdf_confirmacion(request, equipo_id):
                 # Error tal como lo reporta el certificado (lectura IA): al reabrir se sigue usando ese.
                 if punto.get('error_certificado') not in (None, ''):
                     p['error_certificado'] = safe_float(punto['error_certificado'], 0)
+                # EMP calculado como "% del punto máx." / "% F.E." (guardado como absoluto).
+                if punto.get('emp_modo') in ('%max', '%fe'):
+                    p['emp_modo'] = punto['emp_modo']
+                    p['emp_porcentaje'] = safe_float(punto.get('emp_porcentaje'), 0)
                 puntos_procesados.append(p)
             return puntos_procesados, desviacion_maxima
 
@@ -1223,6 +1240,7 @@ def generar_pdf_confirmacion(request, equipo_id):
                     'emp_unidad': mag.get('emp_unidad', '%'),
                     'puntos_medicion': puntos_mag,
                     'resultado': _resultado_magnitud(puntos_mag),
+                    **({'emp_modo': mag['emp_modo']} if mag.get('emp_modo') in ('%max', '%fe') else {}),
                 })
             # Primera magnitud como referencia legacy (usada por intervalos de calibración)
             primera = magnitudes_procesadas[0] if magnitudes_procesadas else {}

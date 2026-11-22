@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load l10n %}
 
 {% block title %}Confirmación Metrológica - {{ equipo.nombre }}{% endblock %}
 
@@ -237,7 +238,7 @@
             </div>
             <!-- Campos ocultos: unidad y EMP global (manejados por tabs de variables) -->
             <input type="hidden" id="unidad-equipo" value="{{ emp_info.unidad|default:'lx' }}">
-            <input type="hidden" id="emp" value="{{ emp_info.valor|default:'8' }}">
+            <input type="hidden" id="emp" value="{{ emp_info.valor|default:'8'|unlocalize }}">
             <input type="hidden" id="emp-unidad" value="{{ emp_info.unidad|default:'%' }}">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Laboratorio</label>
@@ -423,6 +424,8 @@
                                     onchange="guardarCamposMagActual()">
                                 <option value="%">%</option>
                                 <option value="abs">Abs</option>
+                                <option value="%max" title="Porcentaje del punto de calibración más alto: el mismo valor absoluto en todos los puntos">% punto máx.</option>
+                                <option value="%fe" title="Porcentaje del fondo de escala (máximo del rango de la hoja de vida): el mismo valor absoluto en todos los puntos">% F.E.</option>
                             </select>
                         </div>
                         <p class="text-xs text-indigo-600 mt-0.5">Se usa al añadir nuevas filas</p>
@@ -551,6 +554,10 @@
     // Datos previos guardados (confirmación anterior — para pre-llenar el formulario)
     const datosPrevios = {{ datos_previos_json|safe }};
 
+    // EMP de la hoja de vida cuando es "% del punto máximo" o "% del fondo de escala".
+    const EMP_MODO_HOJA_VIDA = '{{ emp_modo_hoja_vida|default:"" }}';      // '', '%max' o '%fe'
+    const EMP_RANGO_MAX = {{ emp_rango_max_json|default:"null"|safe }};     // máximo del rango de medida
+
     // Pre-llenar formulario con datos previos si existen
     function _preLlenarFormulario() {
         if (!datosPrevios) return;
@@ -652,8 +659,11 @@
         // Si no hay datos, usar EMP del tab activo como default
         const defaultEmp = document.getElementById('mag-emp-val') ? document.getElementById('mag-emp-val').value : '';
         const defaultEmpTipo = document.getElementById('mag-emp-tipo') ? document.getElementById('mag-emp-tipo').value : '%';
-        const empValor = datos ? (datos.emp_valor !== undefined ? datos.emp_valor : '') : defaultEmp;
-        const empTipo = datos ? (datos.emp_tipo || '%') : defaultEmpTipo;
+        // emp_modo: el punto se guardó como absoluto pero venía de "% del punto máx." o "% F.E."
+        const empValor = datos
+            ? (datos.emp_modo ? datos.emp_porcentaje : (datos.emp_valor !== undefined ? datos.emp_valor : ''))
+            : defaultEmp;
+        const empTipo = datos ? (datos.emp_modo || datos.emp_tipo || '%') : defaultEmpTipo;
 
         fila.innerHTML = `
             <td class="border border-gray-300 px-2 py-2 text-center font-semibold">0</td>
@@ -682,6 +692,8 @@
                 <select onchange="calcularFila(this)" class="w-full px-1 py-1 text-xs border-0 focus:ring-2 focus:ring-blue-500 rounded">
                     <option value="%" ${empTipo === '%' ? 'selected' : ''}>%</option>
                     <option value="abs" ${empTipo === 'abs' ? 'selected' : ''}>Absoluto</option>
+                    <option value="%max" ${empTipo === '%max' ? 'selected' : ''} title="% del punto de calibración más alto">% punto máx.</option>
+                    <option value="%fe" ${empTipo === '%fe' ? 'selected' : ''} title="% del fondo de escala (rango de la hoja de vida)">% F.E.</option>
                 </select>
             </td>
             <td class="border border-gray-300 px-2 py-2 text-center formula-cell font-mono text-xs bg-yellow-50" data-tipo="emp-absoluto">-</td>
@@ -727,6 +739,12 @@
             });
         });
         fila.cells[3].querySelector('input').addEventListener('input', () => marcarRevisar(3, false));
+        // Con EMP "% del punto máx.", cambiar un patrón cambia el EMP de todas las filas.
+        fila.cells[1].querySelector('input').addEventListener('change', () => {
+            if (document.querySelector('#tbody-mediciones select option[value="%max"]:checked')) {
+                setTimeout(recalcularTodasFilas, 0);
+            }
+        });
 
         if (referenciaFila) {
             tbody.insertBefore(fila, referenciaFila);
@@ -742,6 +760,16 @@
 
     function insertarFilaAntes(btn) {
         agregarFila(null, btn.closest('tr'));
+    }
+
+    /** Máximo |patrón| de la tabla activa (base del EMP "% del punto máx."). */
+    function maximoNominalTabla() {
+        let maximo = 0;
+        document.querySelectorAll('#tbody-mediciones tr').forEach(tr => {
+            const v = Math.abs(parseFloat(tr.cells[1].querySelector('input').value));
+            if (!isNaN(v) && v > maximo) maximo = v;
+        });
+        return maximo;
     }
 
     /** Quita ruido de coma flotante sin perder decimales reales (0.598 - 0.59996 = -0.00196). */
@@ -776,6 +804,7 @@
         const regla = document.getElementById('regla-decision').value;
 
         // Se vuelven a fijar más abajo solo si la fila se puede calcular.
+        delete fila.dataset.empAbsoluto;
         delete fila.dataset.error;
         delete fila.dataset.errorMasU;
         delete fila.dataset.errorMenosU;
@@ -806,7 +835,11 @@
 
         // Calcular EMP absoluto en unidades del equipo
         let empAbsoluto;
-        if (empEsPorcentaje) {
+        if (empTipoPunto === '%max' || empTipoPunto === '%fe') {
+            // Mismo valor absoluto en todos los puntos: 5 % de 50 = ±2,5 (no 5 % de cada lectura).
+            const base = (empTipoPunto === '%fe' && EMP_RANGO_MAX) ? EMP_RANGO_MAX : maximoNominalTabla();
+            empAbsoluto = base * (empValorPunto / 100);
+        } else if (empEsPorcentaje) {
             // EMP en porcentaje: EMP_abs = nominal * (EMP% / 100)
             empAbsoluto = Math.abs(nominal) * (empValorPunto / 100);
         } else {
@@ -815,7 +848,8 @@
         }
 
         // Mostrar EMP absoluto calculado
-        cells[6].textContent = empAbsoluto.toFixed(3);
+        cells[6].textContent = formatearValor(empAbsoluto);
+        fila.dataset.empAbsoluto = String(redondearSignificativo(empAbsoluto));
 
         // Error: si el certificado lo trae, se usa ese (los laboratorios redondean y
         // recalcularlo daría un valor distinto al del certificado). Si no, lectura - nominal.
@@ -1098,8 +1132,10 @@
             document.getElementById('mag-emp-val')?.value ||
             document.getElementById('emp')?.value || 1
         );
-        const empUnidad = document.getElementById('mag-emp-tipo')?.value ||
-                          document.getElementById('emp-unidad')?.value || '%';
+        // Los modos "% punto máx." / "% F.E." no los conoce el servidor; allí manda el EMP absoluto de cada punto.
+        const empUnidadTab = document.getElementById('mag-emp-tipo')?.value ||
+                             document.getElementById('emp-unidad')?.value || '%';
+        const empUnidad = (empUnidadTab === '%max' || empUnidadTab === '%fe') ? '%' : empUnidadTab;
         const unidadEquipo = document.getElementById('mag-unidad')?.value ||
                              document.getElementById('unidad-equipo')?.value || '';
 
@@ -1120,11 +1156,16 @@
             const empPunto = parseFloat(cells[4]?.querySelector('input')?.value) || 0;
             const empTipo = cells[5]?.querySelector('select')?.value || '%';
             const empAbsText = cells[6]?.textContent?.trim();
-            const empAbsoluto = (empAbsText && empAbsText !== '-') ? parseFloat(empAbsText) : 0;
+            const empAbsoluto = fila.dataset.empAbsoluto !== undefined
+                ? parseFloat(fila.dataset.empAbsoluto)
+                : ((empAbsText && empAbsText !== '-') ? parseFloat(empAbsText) : 0);
             if (nominal === 0) return;
+            // El mismo error que muestra la tabla (incluido el del certificado si lo hay).
+            const error = fila.dataset.error !== undefined ? parseFloat(fila.dataset.error) : lectura - nominal;
             puntos.push({
-                nominal, lectura, error: lectura - nominal,
-                incertidumbre, emp_valor: empPunto, emp_tipo: empTipo,
+                nominal, lectura, error,
+                incertidumbre, emp_valor: empPunto,
+                emp_tipo: (empTipo === '%max' || empTipo === '%fe') ? 'abs' : empTipo,
                 emp_absoluto: empAbsoluto || 0,
             });
         });
@@ -1594,7 +1635,7 @@
         document.getElementById('mag-nombre').value   = mag.nombre   || '';
         document.getElementById('mag-unidad').value   = mag.unidad   || '';
         document.getElementById('mag-emp-val').value  = mag.emp_val  || '';
-        document.getElementById('mag-emp-tipo').value = mag.emp_tipo || '%';
+        document.getElementById('mag-emp-tipo').value = mag.emp_tipo || EMP_MODO_HOJA_VIDA || '%';
 
         // Actualizar encabezados de tabla
         sincronizarUnidadGlobal();
@@ -1677,7 +1718,7 @@
             nombre: '',
             unidad: unidadDefault,
             emp_val: empDefault,
-            emp_tipo: empTipoDefault === '%' ? '%' : 'abs',
+            emp_tipo: EMP_MODO_HOJA_VIDA || (empTipoDefault === '%' ? '%' : 'abs'),
             puntos: []
         });
         cargarTab(magnitudesData.length - 1);
@@ -1707,17 +1748,22 @@
                 nombre:   m.nombre   || '',
                 unidad:   m.unidad   || unidadDefault,
                 emp_val:  m.emp      != null ? String(m.emp) : empDefault,
-                emp_tipo: m.emp_unidad === '%' ? '%' : 'abs',
+                emp_tipo: m.emp_modo || (m.emp_unidad === '%' ? '%' : (m.emp_unidad || 'abs')),
                 puntos:   m.puntos_medicion || []
             }));
         } else {
-            // Formato v1 o sin datos previos: una sola magnitud con los puntos actuales
+            // Formato v1 o sin datos previos: una sola magnitud con los puntos actuales.
+            // Si la hoja de vida dice "% del punto máximo" o "% F.E.", ese es el modo por defecto.
+            const puntosIniciales = (puntosMedicionDjango || []).map(p => (
+                EMP_MODO_HOJA_VIDA && (p.emp_valor === undefined || p.emp_valor === '')
+                    ? {...p, emp_valor: empDefault, emp_tipo: EMP_MODO_HOJA_VIDA}
+                    : p));
             magnitudesData = [{
                 nombre:   '',
                 unidad:   unidadDefault,
                 emp_val:  empDefault,
-                emp_tipo: empTipoDefault,
-                puntos:   puntosMedicionDjango || []
+                emp_tipo: EMP_MODO_HOJA_VIDA || empTipoDefault,
+                puntos:   puntosIniciales
             }];
         }
 
@@ -1748,13 +1794,19 @@
             version: 2,
             magnitudes: (() => {
                 guardarTabActual(); // Guardar tab activo antes de recopilar
-                return magnitudesData.map(m => ({
-                    nombre: m.nombre || '',
-                    unidad: m.unidad || '',
-                    emp: parseFloat(m.emp_val) || 0,
-                    emp_unidad: m.emp_tipo || '%',
-                    puntos_medicion: m.puntos || []
-                }));
+                return magnitudesData.map(m => {
+                    const modo = (m.emp_tipo === '%max' || m.emp_tipo === '%fe') ? m.emp_tipo : null;
+                    const mag = {
+                        nombre: m.nombre || '',
+                        unidad: m.unidad || '',
+                        emp: parseFloat(m.emp_val) || 0,
+                        // El servidor solo conoce '%' y 'abs'; cada punto ya lleva su EMP absoluto.
+                        emp_unidad: modo ? '%' : (m.emp_tipo || '%'),
+                        puntos_medicion: m.puntos || []
+                    };
+                    if (modo) mag.emp_modo = modo;
+                    return mag;
+                });
             })(),
             regla_decision: document.getElementById('regla-decision').value,
             checklist: obtenerChecklist(),
@@ -1863,13 +1915,19 @@
                 const leer = (valorDataset, texto) => valorDataset !== undefined
                     ? parseFloat(valorDataset)
                     : (texto !== '-' ? parseFloat(texto) : 0);
+                const empAbs = ds.empAbsoluto !== undefined
+                    ? parseFloat(ds.empAbsoluto)
+                    : (empAbsolutoText !== '-' && empAbsolutoText !== 'N/A' && !empAbsolutoText.includes('⚠') ? parseFloat(empAbsolutoText) : 0);
+                // "% del punto máx." y "% F.E." se guardan como absoluto (lo que entienden PDF,
+                // gráficas e intervalos) y se recuerda el modo para mostrarlo igual al reabrir.
+                const esModoMaximo = (empTipo === '%max' || empTipo === '%fe');
                 const punto = {
                     nominal: nominal,
                     lectura: lectura,
                     incertidumbre: incertidumbre,
-                    emp_valor: empValor,
-                    emp_tipo: empTipo,
-                    emp_absoluto: empAbsolutoText !== '-' && empAbsolutoText !== 'N/A' && !empAbsolutoText.includes('⚠') ? parseFloat(empAbsolutoText) : 0,
+                    emp_valor: esModoMaximo ? empAbs : empValor,
+                    emp_tipo: esModoMaximo ? 'abs' : empTipo,
+                    emp_absoluto: empAbs,
                     error: leer(ds.error, errorText),
                     factor_correccion: factorCorreccionText !== '-' ? parseFloat(factorCorreccionText) : 0,
                     error_mas_u: leer(ds.errorMasU, errorMasUText),
@@ -1878,6 +1936,10 @@
                 };
                 // Se conserva para que al volver a abrir la confirmación siga usando el error del certificado.
                 if (ds.errorCertificado !== undefined) punto.error_certificado = parseFloat(ds.errorCertificado);
+                if (esModoMaximo) {
+                    punto.emp_modo = empTipo;
+                    punto.emp_porcentaje = empValor;
+                }
                 datos.push(punto);
             }
         }

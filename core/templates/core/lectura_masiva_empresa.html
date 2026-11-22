@@ -61,7 +61,17 @@
         <div class="p-3 rounded bg-red-100"><div class="text-xl font-bold">{{ conteo.fallo }}</div><div class="text-xs text-gray-600">Fallaron</div></div>
     </div>
     {% if en_curso %}
-    <p class="text-sm text-blue-700 mb-4"><i class="fas fa-spinner fa-spin mr-1"></i> Leyendo certificados… esta página se actualiza sola cada 15 segundos. Puedes cerrarla: la lectura sigue.</p>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 p-3 rounded bg-blue-50 border border-blue-200">
+        <p class="text-sm text-blue-700"><i class="fas fa-spinner fa-spin mr-1"></i> Leyendo certificados… esta página se actualiza sola cada 15 segundos. Puedes cerrarla: la lectura sigue.</p>
+        <form method="post" action="{% url 'core:detener_lectura_masiva' empresa_id=empresa.id %}">
+            {% csrf_token %}
+            <button type="submit"
+                    onclick="return confirm('¿Detener la lectura? Los certificados en espera se cancelan y vuelven a quedar por leer. El que se esté leyendo en este momento termina.')"
+                    class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-md">
+                <i class="fas fa-stop mr-1"></i> Detener lectura
+            </button>
+        </form>
+    </div>
     {% endif %}
 
     <!-- Detalle -->
