@@ -13,6 +13,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .busqueda_equipos import ESTADOS_FUERA_DE_SERVICIO, normalizar
+from .tenancy import get_empresa_formato
 
 AZUL_OSCURO, AZUL = '1F4E79', '4F81BD'
 FILA_TITULOS = 5  # los títulos de columna van siempre en esta fila
@@ -74,15 +75,16 @@ def _hoja(libro, nombre, titulos, encabezado, anchos=None):
     return hoja
 
 
-def _encabezado(empresas, titulo):
-    """Líneas 2 y 3: de quién es el listado y el formato (el de la matriz si son varias sedes)."""
+def _encabezado(empresa, titulo, parcial=''):
+    """Líneas 2 a 4: de quién es el listado, el formato y, si no son todas, qué sedes incluye."""
     lineas = [f'{titulo} — Generado el {timezone.localtime():%Y-%m-%d %H:%M}']
-    empresa = empresas[0] if empresas else None
     if empresa:
         fecha = empresa.listado_fecha_formato_display or (
             empresa.listado_fecha_formato.strftime('%Y-%m-%d') if empresa.listado_fecha_formato else 'N/A')
         lineas.append(f'FORMATO: Código: {empresa.listado_codigo or "N/A"} | '
                       f'Versión: {empresa.listado_version or "N/A"} | Fecha: {fecha}')
+    if parcial:
+        lineas.append(parcial)
     return lineas
 
 
@@ -146,18 +148,26 @@ def _hoja_dashboard(libro, equipos, encabezado):
 
 
 def construir_excel(equipos, proveedores=(), procedimientos=(), prestamos=None, empresas=None, titulo=None,
-                    con_formato=True):
+                    grupo=None, con_formato=True):
     """
-    Arma el Excel y devuelve sus bytes. `empresas`: la primera es la del formato del
-    encabezado (la matriz, si el listado es de todo el grupo). prestamos=None omite esa hoja.
+    Arma el Excel y devuelve sus bytes. `grupo`: [matriz, sedes...] completo cuando
+    `empresas` son sedes de un grupo: si son varias el formato es el de la matriz, y si no son
+    todas el encabezado dice cuáles. prestamos=None omite esa hoja.
     """
     equipos = list(equipos)
     empresas = list(empresas) if empresas is not None else list({e.empresa_id: e.empresa for e in equipos}.values())
     if titulo is None:
         titulo = empresas[0].nombre if len(empresas) == 1 else 'Listado de equipos'
-        if len(empresas) > 1:
-            titulo = f'GRUPO {empresas[0].nombre} (matriz y {len(empresas) - 1} sedes)'
-    encabezado = _encabezado(empresas if con_formato else [], titulo)
+    grupo = grupo or empresas
+    parcial = ''
+    if con_formato and len(empresas) > 1:
+        titulo = f'GRUPO {grupo[0].nombre} (matriz y {len(grupo) - 1} sedes)'
+        if len(empresas) < len(grupo):
+            titulo = f'GRUPO {grupo[0].nombre}'
+            parcial = (f'LISTADO PARCIAL: {len(empresas)} de {len(grupo)} sedes — '
+                       + ', '.join(e.nombre for e in empresas))
+    formato = get_empresa_formato(empresas, grupo) if con_formato else None
+    encabezado = _encabezado(formato, titulo, parcial)
     libro = Workbook()
     libro.remove(libro.active)
 
@@ -169,7 +179,7 @@ def construir_excel(equipos, proveedores=(), procedimientos=(), prestamos=None, 
         fila = por_sede.get(empresa.id, [empresa.nombre, 0, 0, 0, 0])
         _fila(hoja, fila)
         totales = [a + b for a, b in zip(totales, fila[1:])]
-    _fila(hoja, ['TOTAL'] + totales)
+    _fila(hoja, [f'TOTAL PARCIAL ({len(empresas)} de {len(grupo)} sedes)' if parcial else 'TOTAL'] + totales)
     for celda in hoja[hoja.max_row]:
         celda.font = Font(bold=True)
     _fila(hoja, ['"Activos" incluye los que están en mantenimiento, calibración o comprobación.'])
@@ -226,8 +236,8 @@ def construir_excel(equipos, proveedores=(), procedimientos=(), prestamos=None, 
     return salida.getvalue()
 
 
-def excel_de_empresas(empresas, con_prestamos, titulo=None):
-    """Excel de una o varias empresas (empresas[0] = matriz). empresas=None: todas las activas."""
+def excel_de_empresas(empresas, con_prestamos, titulo=None, grupo=None):
+    """Excel de una o varias empresas (de `grupo`). empresas=None: todas las activas."""
     from .models import Empresa, Equipo, PrestamoEquipo, Procedimiento, Proveedor
     todas = empresas is None
     if todas:
@@ -243,4 +253,4 @@ def excel_de_empresas(empresas, con_prestamos, titulo=None):
         Proveedor.objects.filter(empresa_id__in=ids).select_related('empresa').order_by('empresa__nombre', 'nombre_empresa'),
         Procedimiento.objects.filter(empresa_id__in=ids).select_related('empresa').order_by('empresa__nombre', 'codigo'),
         # Con todas las empresas de la plataforma no hay un formato único que mostrar.
-        prestamos, empresas=empresas, titulo=titulo, con_formato=not todas)
+        prestamos, empresas=empresas, titulo=titulo, grupo=grupo, con_formato=not todas)

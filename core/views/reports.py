@@ -8,8 +8,8 @@ import time
 from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
 from ..excel_equipos import construir_excel, excel_de_empresas
 from ..tenancy import (
-    get_empresa_activa, get_empresa_id_filtro, get_empresas_consulta, get_empresas_seleccionables,
-    get_grupo, get_matrices,
+    get_empresa_activa, get_empresa_id_filtro, get_empresas_consulta, get_grupo, get_grupo_consulta,
+    get_matrices,
 )
 
 # =============================================================================
@@ -235,28 +235,36 @@ def system_monitor_dashboard(request):
 # =============================================================================
 
 def _opciones_excel(request, selected_company_id):
-    """(parámetro, [(valor, texto)]) de lo que este usuario puede descargar en el Excel de equipos."""
+    """
+    Qué puede descargar este usuario en el Excel de equipos:
+    - Gerente de matriz: casillas con las sedes de su grupo (sedes_excel).
+    - Superusuario: empresa o grupo (opciones_excel) y, por cada grupo, sus sedes (grupos_excel).
+    """
+    vacio = {'sedes_excel': [], 'sedes_excel_marcadas': [], 'opciones_excel': [], 'grupos_excel': []}
     if not request.user.is_superuser:
-        sedes = [e for e in get_empresas_seleccionables(request.user) if not e.is_deleted]
         activa = get_empresa_activa(request)
-        if len(sedes) < 2 or not activa:
-            return 'sede', []
-        opciones = [('todas', f'Todas las sedes ({len(sedes)})')]
-        return 'sede', [(str(activa.id), f'Esta sede: {activa.nombre}')] + opciones + [
-            (str(e.id), e.nombre) for e in sedes if e.id != activa.id]
+        sedes = get_grupo_consulta(request)
+        if not sedes or not activa:
+            return vacio
+        return {**vacio, 'sedes_excel': sedes, 'sedes_excel_marcadas': [activa.id]}
 
-    grupos = {m.id: m for m in get_matrices()}
+    matrices = {m.id: m for m in get_matrices()}
     if not selected_company_id:
-        return 'empresa_id', [('', 'Todas las empresas')] + [
-            (f'grupo-{m.id}', f'Grupo {m.nombre} (todas sus sedes)') for m in grupos.values()]
-    empresa = Empresa.objects.filter(pk=selected_company_id).first()
-    if not empresa:
-        return 'empresa_id', [('', 'Todas las empresas')]
-    opciones = [(str(empresa.id), f'Solo {empresa.nombre}')]
-    matriz = grupos.get(empresa.empresa_matriz_id or empresa.id)
-    if matriz:
-        opciones.append((f'grupo-{matriz.id}', f'Grupo {matriz.nombre} (matriz y {len(get_grupo(matriz)) - 1} sedes)'))
-    return 'empresa_id', opciones
+        opciones, del_grupo = [('', 'Todas las empresas')], list(matrices.values())
+    else:
+        empresa = Empresa.objects.filter(pk=selected_company_id).first()
+        if not empresa:
+            return {**vacio, 'opciones_excel': [('', 'Todas las empresas')]}
+        opciones = [(str(empresa.id), f'Solo {empresa.nombre}')]
+        matriz = matrices.get(empresa.empresa_matriz_id or empresa.id)
+        del_grupo = [matriz] if matriz else []
+    grupos = [(f'grupo-{m.id}', get_grupo(m)) for m in del_grupo]
+    opciones += [(valor, f'Grupo {sedes[0].nombre}') for valor, sedes in grupos]
+    return {
+        **vacio, 'opciones_excel': opciones,
+        'grupos_excel': [
+            {'valor': valor, 'sedes': sedes, 'marcadas': [e.id for e in sedes]} for valor, sedes in grupos],
+    }
 
 
 @monitor_view
@@ -300,12 +308,9 @@ def informes(request):
     # Información de paginación para ZIPs
     zip_info = _get_zip_pagination_info(selected_company_id, user.is_superuser) if selected_company_id else None
 
-    parametro_excel, opciones_excel = _opciones_excel(request, selected_company_id)
-
     context = {
         'titulo_pagina': 'Informes y Actividades',
-        'parametro_excel': parametro_excel,
-        'opciones_excel': opciones_excel,
+        **_opciones_excel(request, selected_company_id),
         'is_superuser': user.is_superuser,
         'empresas_disponibles': empresas_disponibles,
         'selected_company_id': selected_company_id,
@@ -387,7 +392,7 @@ def generar_informe_zip(request):
 def exportar_equipos_excel(request):
     """
     Excel único de equipos (ver core/excel_equipos.py): de una sede o, para el gerente de
-    la matriz y el superusuario, de todo el grupo.
+    la matriz y el superusuario, de varias sedes o de todo el grupo.
     """
     # Verificar permisos de descarga basados en roles
     if not request.user.puede_descargar_informes():
@@ -396,6 +401,7 @@ def exportar_equipos_excel(request):
 
     try:
         empresas, _ = get_empresas_consulta(request)
+        grupo = get_grupo_consulta(request)
         if empresas is not None and not empresas:
             messages.error(request, 'No hay una empresa válida para exportar.')
             return redirect('core:informes')
@@ -403,12 +409,15 @@ def exportar_equipos_excel(request):
         # Los préstamos traen datos personales (cédula, teléfono): solo con permiso de verlos.
         con_prestamos = request.user.is_superuser or request.user.has_perm('core.can_view_prestamo')
         response = HttpResponse(
-            excel_de_empresas(empresas, con_prestamos),
+            excel_de_empresas(empresas, con_prestamos, grupo=grupo),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        nombre = 'listado_equipos.xlsx' if empresas and len(empresas) == 1 else 'listado_equipos_todas_las_sedes.xlsx'
+        nombre = 'listado_equipos.xlsx'
         if empresas is None:
             nombre = 'listado_equipos_todas_las_empresas.xlsx'
+        elif len(empresas) > 1:
+            nombre = ('listado_equipos_todas_las_sedes.xlsx' if len(empresas) == len(grupo)
+                      else f'listado_equipos_{len(empresas)}_sedes.xlsx')
         response['Content-Disposition'] = f'attachment; filename="{nombre}"'
         logger.info(f"Excel de equipos exportado por {request.user.username}: "
                     f"{'todas las empresas' if empresas is None else [e.id for e in empresas]}")

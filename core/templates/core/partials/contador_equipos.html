@@ -31,7 +31,7 @@
     .resumen-equipos[open] > summary.resumen-titulo i { transform: rotate(90deg); }
 </style>
 <details class="resumen-equipos" id="contador-equipos">
-    <summary class="resumen-titulo"><i class="fas fa-chevron-right"></i>{% if busqueda %}Equipos que coinciden con "{{ busqueda }}"{% else %}Cantidad de equipos{% endif %}{% if resumen_sedes %} en todas las sedes{% endif %}</summary>
+    <summary class="resumen-titulo"><i class="fas fa-chevron-right"></i>{% if busqueda %}Equipos que coinciden con "{{ busqueda }}"{% else %}Cantidad de equipos{% endif %}{% if resumen_sedes %} en {% if resumen_sedes|length == total_sedes %}todas las sedes{% else %}{{ resumen_sedes|length }} de {{ total_sedes }} sedes{% endif %}{% endif %}</summary>
     <div class="resumen-tarjetas">
         <a href="?{% if qs_sin_estado %}{{ qs_sin_estado }}&amp;{% endif %}estado=activos" class="resumen-tarjeta activos{% if estado_actual == 'activos' %} elegida{% endif %}"><i class="fas fa-check-circle"></i><div><strong>{{ conteo.activos }}</strong><span>Activos</span></div></a>
         <a href="?{% if qs_sin_estado %}{{ qs_sin_estado }}&amp;{% endif %}estado=Inactivo" class="resumen-tarjeta inactivos{% if estado_actual == 'Inactivo' %} elegida{% endif %}"><i class="fas fa-pause-circle"></i><div><strong>{{ conteo.inactivos }}</strong><span>Inactivos</span></div></a>
@@ -46,10 +46,10 @@
             <thead><tr><th>Sede</th><th>Activos</th><th>Inactivos</th><th>De baja</th><th>Total</th></tr></thead>
             <tbody>
                 {% for fila in resumen_sedes %}
-                <tr><td><a href="?{% if qs_sin_sede %}{{ qs_sin_sede }}&amp;{% endif %}{% if is_superuser %}empresa_id{% else %}sede{% endif %}={{ fila.empresa.id }}">{{ fila.empresa.nombre }}</a>{% if forloop.first %}<span class="resumen-etiqueta">Matriz</span>{% endif %}</td><td>{{ fila.activos }}</td><td>{{ fila.inactivos }}</td><td>{{ fila.de_baja }}</td><td>{{ fila.total }}</td></tr>
+                <tr><td><a href="?{% if qs_sin_sede %}{{ qs_sin_sede }}&amp;{% endif %}{% if is_superuser %}empresa_id{% else %}sede{% endif %}={{ fila.empresa.id }}">{{ fila.empresa.nombre }}</a>{% if not fila.empresa.empresa_matriz_id %}<span class="resumen-etiqueta">Matriz</span>{% endif %}</td><td>{{ fila.activos }}</td><td>{{ fila.inactivos }}</td><td>{{ fila.de_baja }}</td><td>{{ fila.total }}</td></tr>
                 {% endfor %}
             </tbody>
-            <tfoot><tr><td>Total de todas las sedes</td><td>{{ conteo.activos }}</td><td>{{ conteo.inactivos }}</td><td>{{ conteo.de_baja }}</td><td>{{ conteo.total }}</td></tr></tfoot>
+            <tfoot><tr><td>{% if resumen_sedes|length == total_sedes %}Total de todas las sedes{% else %}Total parcial ({{ resumen_sedes|length }} de {{ total_sedes }} sedes){% endif %}</td><td>{{ conteo.activos }}</td><td>{{ conteo.inactivos }}</td><td>{{ conteo.de_baja }}</td><td>{{ conteo.total }}</td></tr></tfoot>
         </table>
     </div>
     {% endif %}

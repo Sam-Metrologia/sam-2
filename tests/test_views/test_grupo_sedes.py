@@ -169,15 +169,20 @@ class TestExcelUnico:
     def test_informes_ofrece_las_opciones_segun_el_usuario(self, client, datos):
         matriz, sede = datos
 
-        def opciones(user, **params):
+        def contexto(user, **params):
             client.force_login(user)
             r = client.get(reverse('core:informes'), params)
             assert 'Dashboard Excel Completo' not in r.content.decode()
-            return [v for v, _ in r.context['opciones_excel']]
-        assert opciones(_gerente(matriz)) == [str(matriz.id), 'todas', str(sede.id)]
-        assert opciones(_gerente(sede)) == []
-        assert opciones(_super()) == ['', f'grupo-{matriz.id}']
-        assert opciones(_super(), empresa_id=sede.id) == [str(sede.id), f'grupo-{matriz.id}']
+            return r.context
+        c = contexto(_gerente(matriz))
+        assert c['sedes_excel'] == [matriz, sede] and c['sedes_excel_marcadas'] == [matriz.id]
+        c = contexto(_gerente(sede))
+        assert c['sedes_excel'] == [] and c['opciones_excel'] == []
+        c = contexto(_super())
+        assert [v for v, _ in c['opciones_excel']] == ['', f'grupo-{matriz.id}']
+        assert c['grupos_excel'][0]['sedes'] == [matriz, sede]
+        c = contexto(_super(), empresa_id=sede.id)
+        assert [v for v, _ in c['opciones_excel']] == [str(sede.id), f'grupo-{matriz.id}']
 
 
 @pytest.mark.django_db
@@ -400,7 +405,7 @@ class TestTodasLasSedesEnElListado:
         for pedido in ('todas', datos[1 - indice].id):
             r, codigos = self._ver(client, sede=pedido, estado='todos')
             assert codigos == [{'M1', 'M2'}, {'S1', 'S2'}][indice]
-            assert 'Todas las sedes</option>' not in r.content.decode()
+            assert 'name="sede"' not in r.content.decode()
 
     def test_sede_ajena_en_la_url_se_ignora(self, client, datos):
         client.force_login(_gerente(datos[0]))
@@ -449,3 +454,90 @@ class TestDashboardCuentaIgualQueElListado:
         html = client.get(reverse('core:home'), {'empresa_id': '999999'}).content.decode()
         assert 'class="alert alert-error ' in html and 'alert-alert-' not in html
         assert '--color-error: var(--color-error)' not in html
+
+
+@pytest.mark.django_db
+class TestElegirVariasSedes:
+    @pytest.fixture
+    def grupo5(self):
+        matriz = EmpresaFactory(nombre='MATRIZ', listado_codigo='COD-MATRIZ')
+        sedes = [EmpresaFactory(nombre=f'SEDE {i}', empresa_matriz=matriz, listado_codigo=f'COD-{i}')
+                 for i in range(1, 6)]
+        for i, empresa in enumerate([matriz] + sedes):
+            EquipoFactory(empresa=empresa, codigo_interno=f'E{i}', nombre='Cinta')
+        return matriz, sedes
+
+    def _ver(self, client, **params):
+        r = client.get(reverse('core:home'), params)
+        return r, {e.codigo_interno for e in r.context['equipos']}
+
+    def test_tres_de_cinco_sedes(self, client, grupo5):
+        matriz, sedes = grupo5
+        client.force_login(_gerente(matriz))
+        r, codigos = self._ver(client, sede=[sedes[0].id, sedes[2].id, sedes[4].id])
+        assert codigos == {'E1', 'E3', 'E5'}
+        assert r.context['conteo']['total'] == 3
+        assert [f['empresa'].nombre for f in r.context['resumen_sedes']] == ['SEDE 1', 'SEDE 3', 'SEDE 5']
+        html = r.content.decode()
+        assert 'en 3 de 6 sedes' in html and 'Total parcial (3 de 6 sedes)' in html
+        assert 'resumen-etiqueta">Matriz' not in html  # la matriz no está entre las elegidas
+        assert r.context['current_company_format_info'] == matriz
+
+    def test_al_ordenar_o_filtrar_se_conservan_las_sedes(self, client, grupo5):
+        matriz, sedes = grupo5
+        client.force_login(_gerente(matriz))
+        r, _ = self._ver(client, sede=[sedes[0].id, sedes[1].id])
+        for clave in ('qs_sin_orden', 'qs_sin_estado', 'qs_sin_pagina'):
+            assert f'sede={sedes[0].id}&sede={sedes[1].id}' in r.context[clave]
+
+    def test_marcar_todas_equivale_al_grupo(self, client, grupo5):
+        matriz, sedes = grupo5
+        client.force_login(_gerente(matriz))
+        html = self._ver(client, sede=[e.id for e in [matriz] + sedes])[0].content.decode()
+        assert 'en todas las sedes' in html and 'Total parcial' not in html
+
+    def test_una_sede_ajena_mezclada_se_ignora(self, client, grupo5):
+        matriz, sedes = grupo5
+        ajeno = EquipoFactory(empresa=EmpresaFactory(), codigo_interno='X')
+        client.force_login(_con_permiso(_gerente(matriz)))
+        params = {'sede': [sedes[0].id, sedes[1].id, ajeno.empresa_id]}
+        assert self._ver(client, **params)[1] == {'E1', 'E2'}
+        assert _codigos_excel(_excel(client, **params)) == {'E1', 'E2'}
+
+    @pytest.mark.parametrize('rol', ['TECNICO', 'ADMINISTRADOR'])
+    def test_sin_ser_gerente_de_la_matriz_no_aplica(self, client, grupo5, rol):
+        matriz, sedes = grupo5
+        client.force_login(UserFactory(empresa=matriz, rol_usuario=rol))
+        assert self._ver(client, sede=[sedes[0].id, sedes[1].id])[1] == {'E0'}
+
+    def test_excel_parcial_dice_que_sedes_incluye(self, client, grupo5):
+        matriz, sedes = grupo5
+        client.force_login(_con_permiso(_gerente(matriz)))
+        params = {'sede': [sedes[0].id, sedes[2].id, sedes[4].id]}
+        r = client.get(reverse('core:exportar_equipos_excel'), params)
+        assert 'listado_equipos_3_sedes.xlsx' in r['Content-Disposition']
+        libro = _excel(client, **params)
+        assert _codigos_excel(libro) == {'E1', 'E3', 'E5'}
+        hoja = libro['Equipos']
+        assert 'COD-MATRIZ' in hoja['A3'].value
+        assert hoja['A4'].value == 'LISTADO PARCIAL: 3 de 6 sedes — SEDE 1, SEDE 3, SEDE 5'
+        assert hoja['A5'].value == 'Código Interno'
+        totales = [f[0] for f in libro['Resumen'].iter_rows(min_row=6, values_only=True)]
+        assert 'TOTAL PARCIAL (3 de 6 sedes)' in totales and 'TOTAL' not in totales
+
+    def test_excel_completo_no_dice_parcial(self, client, grupo5):
+        matriz, sedes = grupo5
+        client.force_login(_con_permiso(_gerente(matriz)))
+        hoja = _excel(client, sede='todas')['Equipos']
+        assert 'matriz y 5 sedes' in hoja['A2'].value and hoja['A4'].value is None
+
+    def test_superusuario_elige_sedes_dentro_del_grupo(self, client, grupo5):
+        matriz, sedes = grupo5
+        otro = EmpresaFactory(empresa_matriz=EmpresaFactory())
+        client.force_login(_super())
+        base = {'empresa_id': f'grupo-{matriz.id}'}
+        r, codigos = self._ver(client, **base, sede=[matriz.id, sedes[1].id])
+        assert codigos == {'E0', 'E2'} and r.context['sedes_filtro'] == [matriz] + sedes
+        assert _codigos_excel(_excel(client, **base, sede=[matriz.id, sedes[1].id])) == {'E0', 'E2'}
+        # Casillas que quedaron de otro grupo: se ignoran y se ve el grupo elegido completo
+        assert self._ver(client, **base, sede=[otro.id])[1] == {f'E{i}' for i in range(6)}

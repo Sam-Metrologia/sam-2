@@ -59,14 +59,38 @@ def get_empresa_id_filtro(request):
     return None
 
 
+def get_grupo_consulta(request):
+    """
+    Grupo completo [matriz, sedes...] del que se puede elegir en el listado y en su Excel:
+    el propio para el gerente de la matriz; el de ?empresa_id=grupo-<id matriz> para el
+    superusuario. [] si no hay un grupo entre el cual elegir.
+    """
+    if request.user.is_superuser:
+        elegida = get_empresa_id_filtro(request) or ''
+        matriz = next((m for m in get_matrices() if f'grupo-{m.id}' == elegida), None) \
+            if elegida.startswith('grupo-') else None
+        return get_grupo(matriz) if matriz else []
+    grupo = [e for e in get_empresas_seleccionables(request.user) if not e.is_deleted]
+    return grupo if len(grupo) > 1 else []
+
+
+def _sedes_marcadas(request, grupo):
+    """Sedes del grupo pedidas en la URL (?sede=8&sede=24 o ?sede=todas). Ids ajenos se ignoran."""
+    pedidas = set(request.GET.getlist('sede'))
+    if 'todas' in pedidas:
+        return grupo
+    return [e for e in grupo if str(e.id) in pedidas]
+
+
 def get_empresas_consulta(request):
     """
     Empresas que se están consultando en el listado de equipos o en su Excel:
         (empresas, seleccion)
-    - Gerente de matriz: ?sede=todas (matriz + sedes) o ?sede=<id de su grupo>; si no, su sede activa.
-    - Superusuario: ?empresa_id=<id>, ?empresa_id=grupo-<id matriz>, o vacío = todas (empresas=None).
+    - Gerente de matriz: una o varias sedes de su grupo (?sede=...); si no, su sede activa.
+    - Superusuario: ?empresa_id=<id>, vacío = todas (empresas=None), o ?empresa_id=grupo-<id matriz>
+      (todo el grupo, o solo las sedes marcadas con ?sede=...).
     - Los demás: siempre su empresa. Un id ajeno en la URL se ignora.
-    empresas[0] es la matriz cuando se consulta el grupo completo. [] = nada que mostrar.
+    Conserva el orden del grupo (la matriz primero). [] = nada que mostrar.
     """
     from .models import Empresa
     if request.user.is_superuser:
@@ -74,8 +98,8 @@ def get_empresas_consulta(request):
         if not elegida:
             return None, ''
         if elegida.startswith('grupo-'):
-            matriz = next((m for m in get_matrices() if f'grupo-{m.id}' == elegida), None)
-            return (get_grupo(matriz), elegida) if matriz else ([], elegida)
+            grupo = get_grupo_consulta(request)
+            return _sedes_marcadas(request, grupo) or grupo, elegida
         if not elegida.isdigit():
             return [], elegida
         return list(Empresa.objects.filter(pk=elegida, is_deleted=False)), elegida
@@ -83,15 +107,17 @@ def get_empresas_consulta(request):
     activa = get_empresa_activa(request)
     if not activa or activa.is_deleted:
         return [], ''
-    pedida = request.GET.get('sede') or ''
-    if pedida:
-        grupo = [e for e in get_empresas_seleccionables(request.user) if not e.is_deleted]
-        if pedida == 'todas' and len(grupo) > 1:
-            return grupo, 'todas'
-        sede = next((e for e in grupo if str(e.id) == pedida), None)
-        if sede:
-            return [sede], str(sede.id)
-    return [activa], str(activa.id)
+    marcadas = _sedes_marcadas(request, get_grupo_consulta(request))
+    if len(marcadas) > 1:
+        return marcadas, ''
+    return (marcadas or [activa]), str((marcadas or [activa])[0].id)
+
+
+def get_empresa_formato(empresas, grupo):
+    """Empresa cuyo formato encabeza el listado: la matriz si son varias sedes; si no, la única."""
+    if not empresas:
+        return None
+    return grupo[0] if grupo and len(empresas) > 1 else empresas[0]
 
 
 def get_empresa_activa(request):

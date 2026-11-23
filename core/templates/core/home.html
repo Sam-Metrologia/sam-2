@@ -216,7 +216,7 @@
                     {% if grupos_filtro %}
                     <optgroup label="Grupos (matriz y sedes)">
                         {% for matriz in grupos_filtro %}{% with id_texto=matriz.id|stringformat:'s' %}{% with valor='grupo-'|add:id_texto %}
-                        <option value="{{ valor }}" {% if selected_company_id == valor %}selected{% endif %}>{{ matriz.nombre }} — todas las sedes</option>
+                        <option value="{{ valor }}" {% if selected_company_id == valor %}selected{% endif %}>{{ matriz.nombre }} (grupo)</option>
                         {% endwith %}{% endwith %}{% endfor %}
                     </optgroup>
                     {% endif %}
@@ -229,15 +229,11 @@
                     </optgroup>
                 </select>
             </div>
-            {% elif sedes_filtro|length > 1 %}
+            {% endif %}
+            {% if sedes_filtro|length > 1 %}
             <div class="flex items-center gap-2">
-                <label for="sede" class="text-gray-700 font-bold">Sede:</label>
-                <select name="sede" id="sede" class="form-select">
-                    <option value="todas" {% if selected_company_id == 'todas' %}selected{% endif %}>Todas las sedes</option>
-                    {% for empresa in sedes_filtro %}
-                        <option value="{{ empresa.id }}" {% if selected_company_id == empresa.id|stringformat:"s" %}selected{% endif %}>{{ empresa.nombre }}{% if not empresa.empresa_matriz_id %} (matriz){% endif %}</option>
-                    {% endfor %}
-                </select>
+                <span class="text-gray-700 font-bold">Sedes:</span>
+                {% include 'core/partials/selector_sedes.html' with sedes=sedes_filtro marcadas=sedes_marcadas %}
             </div>
             {% endif %}
 
@@ -250,6 +246,7 @@
         </form>
     </div>
 
+    {% if sedes_filtro|length > 1 %}{% include 'core/partials/selector_sedes_recursos.html' %}{% endif %}
     {% include 'core/partials/contador_equipos.html' with estado_actual=estado_filter busqueda=query %}
 
     {% if solo_consulta %}

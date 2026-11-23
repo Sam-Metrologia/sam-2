@@ -1,0 +1,13 @@
+{# Casillas para elegir una o varias sedes. Espera: sedes, marcadas (ids), y opcional grupo (valor del selector de empresa al que pertenecen) #}
+<details class="sedes-multi"{% if grupo %} data-grupo="{{ grupo }}"{% endif %}>
+    <summary><span class="sedes-multi-texto">Sedes</span> <i class="fas fa-chevron-down"></i></summary>
+    <div class="sedes-multi-panel">
+        <div class="sedes-multi-botones">
+            <button type="button" data-marcar="1">Todas</button>
+            <button type="button" data-marcar="0">Ninguna</button>
+        </div>
+        {% for empresa in sedes %}
+        <label><input type="checkbox" name="sede" value="{{ empresa.id|stringformat:'s' }}"{% if empresa.id in marcadas %} checked{% endif %}> <span>{{ empresa.nombre }}{% if not empresa.empresa_matriz_id %} (matriz){% endif %}</span></label>
+        {% endfor %}
+    </div>
+</details>

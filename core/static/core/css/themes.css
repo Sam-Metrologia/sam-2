@@ -2438,3 +2438,38 @@
 [data-theme="dark"] .fc .fc-list-event-title a {
     color: var(--text-primary) !important;
 }
+
+/* ============================================
+   ETIQUETAS PEQUENAS (estado de equipo, badges): fondo suave.
+   El borde izquierdo es para cajas; en una pildora sale como una medialuna.
+   ============================================ */
+[data-theme="dark"] span.bg-green-50,
+[data-theme="dark"] .rounded-full.bg-green-50,
+[data-theme="dark"] span.bg-green-100,
+[data-theme="dark"] .rounded-full.bg-green-100,
+[data-theme="dark"] span.bg-green-200,
+[data-theme="dark"] .rounded-full.bg-green-200 {
+    border-left: 0 !important;
+    background-color: rgba(52, 211, 153, 0.25) !important;
+}
+[data-theme="dark"] span.bg-yellow-50,
+[data-theme="dark"] .rounded-full.bg-yellow-50,
+[data-theme="dark"] span.bg-yellow-100,
+[data-theme="dark"] .rounded-full.bg-yellow-100,
+[data-theme="dark"] span.bg-yellow-200,
+[data-theme="dark"] .rounded-full.bg-yellow-200 {
+    border-left: 0 !important;
+    background-color: rgba(251, 191, 36, 0.25) !important;
+}
+[data-theme="dark"] span.bg-red-50,
+[data-theme="dark"] .rounded-full.bg-red-50,
+[data-theme="dark"] span.bg-red-100,
+[data-theme="dark"] .rounded-full.bg-red-100,
+[data-theme="dark"] span.bg-red-200,
+[data-theme="dark"] .rounded-full.bg-red-200 {
+    border-left: 0 !important;
+    background-color: rgba(248, 113, 113, 0.25) !important;
+}
+[data-theme="dark"] .rounded-full[class*="bg-"]:not(.animate-spin):not(#_) {
+    border-left-width: 1px !important;
+}

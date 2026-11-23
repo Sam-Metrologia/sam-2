@@ -54,14 +54,21 @@
             <h3 class="text-xl font-semibold text-gray-700 mb-3">Listado General Equipos (Excel)</h3>
             <p class="text-gray-600 mb-4">Excel completo: resumen, conteo por equipo, equipos, proveedores, procedimientos, préstamos y dashboard.</p>
             <form method="get" action="{% url 'core:exportar_equipos_excel' %}" class="flex flex-col items-center gap-3 w-full">
-                {% if opciones_excel|length > 1 %}
+                {% if sedes_excel %}
+                <span class="text-gray-700 text-sm font-bold">¿Qué sedes quieres descargar?</span>
+                {% include 'core/partials/selector_sedes.html' with sedes=sedes_excel marcadas=sedes_excel_marcadas %}
+                {% elif opciones_excel|length > 1 %}
                 <label for="excel-alcance" class="text-gray-700 text-sm font-bold">¿Qué quieres descargar?</label>
-                <select name="{{ parametro_excel }}" id="excel-alcance" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-md text-sm">
+                <select name="empresa_id" id="excel-alcance" data-controla-sedes class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-md text-sm">
                     {% for valor, texto in opciones_excel %}<option value="{{ valor }}">{{ texto }}</option>{% endfor %}
                 </select>
+                {% for g in grupos_excel %}
+                {% include 'core/partials/selector_sedes.html' with sedes=g.sedes marcadas=g.marcadas grupo=g.valor %}
+                {% endfor %}
                 {% else %}{% for valor, texto in opciones_excel %}
-                <input type="hidden" name="{{ parametro_excel }}" value="{{ valor }}">
+                <input type="hidden" name="empresa_id" value="{{ valor }}">
                 {% endfor %}{% endif %}
+                {% if sedes_excel or grupos_excel %}{% include 'core/partials/selector_sedes_recursos.html' %}{% endif %}
                 <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">
                     <i class="fas fa-file-excel mr-2"></i> Exportar Excel
                 </button>

@@ -6,7 +6,9 @@ from ..constants import (
     ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_EN_CALIBRACION,
     ESTADO_EN_COMPROBACION, ESTADO_EN_MANTENIMIENTO, ESTADO_DE_BAJA,
 )
-from ..tenancy import get_empresa_activa, get_empresas_consulta, get_empresas_seleccionables, get_matrices
+from ..tenancy import (
+    get_empresa_activa, get_empresa_formato, get_empresas_consulta, get_grupo_consulta, get_matrices,
+)
 from ..busqueda_equipos import (
     OPCIONES_ESTADO, contar, estado_valido, filtrar_por_estado, filtrar_por_texto, querystring_sin,
 )
@@ -47,6 +49,7 @@ def home(request):
 
     # Empresa(s) que se están viendo: la sede activa, otra sede del grupo, o todas juntas.
     empresas_vista, selected_company_id = get_empresas_consulta(request)
+    grupo_consulta = get_grupo_consulta(request)
     empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
     empresa_activa_home = get_empresa_activa(request)
 
@@ -58,8 +61,8 @@ def home(request):
         if user.is_superuser and not empresas_vista:
             messages.error(request, 'La empresa seleccionada no existe o está eliminada.')
 
-    # Con el grupo completo se muestra el formato de la matriz (la primera).
-    current_company_format_info = empresas_vista[0] if empresas_vista else None
+    # Con varias sedes se muestra el formato de la matriz.
+    current_company_format_info = get_empresa_formato(empresas_vista, grupo_consulta)
     viendo_grupo = bool(empresas_vista) and len(empresas_vista) > 1
     if viendo_grupo:
         equipos_list = equipos_list.order_by('empresa__nombre', 'codigo_interno')
@@ -191,7 +194,9 @@ def home(request):
         'viendo_grupo': viendo_grupo,
         'solo_consulta': solo_consulta,
         'empresa_activa_home': empresa_activa_home,
-        'sedes_filtro': [] if user.is_superuser else get_empresas_seleccionables(user),
+        'sedes_filtro': grupo_consulta,
+        'sedes_marcadas': [e.id for e in empresas_vista or []],
+        'total_sedes': len(grupo_consulta),
         'grupos_filtro': get_matrices() if user.is_superuser else [],
         'qs_sin_sede': querystring_sin(request, 'page', 'sede', 'empresa_id'),
         'qs_sin_pagina': querystring_sin(request, 'page'),
