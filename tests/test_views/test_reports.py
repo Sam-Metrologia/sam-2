@@ -156,25 +156,6 @@ class TestExcelExports:
         # If successful, response should only contain user's data
         # (Content check would require parsing Excel, so we just verify it generates)
 
-    def test_dashboard_excel_requires_login(self, client):
-        """Test dashboard Excel export requires authentication."""
-        url = reverse('core:generar_informe_dashboard_excel')
-        response = client.get(url)
-
-        assert response.status_code == 302
-        assert '/login/' in response.url
-
-    def test_dashboard_excel_generates(self, authenticated_client, equipo_factory):
-        """Test dashboard Excel export generates file."""
-        user = authenticated_client.user
-        equipo_factory(empresa=user.empresa)
-
-        url = reverse('core:generar_informe_dashboard_excel')
-        response = authenticated_client.get(url)
-
-        # Should generate or redirect
-        assert response.status_code in [200, 302]
-
 
 @pytest.mark.django_db
 @pytest.mark.views

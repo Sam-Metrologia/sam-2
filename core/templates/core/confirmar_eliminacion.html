@@ -10,7 +10,7 @@
     {% if messages %}
         <div class="mb-4">
             {% for message in messages %}
-                <div class="p-3 rounded-md shadow-sm mb-2 {{ message.tags }}" role="alert">
+                <div class="p-3 rounded-md shadow-sm mb-2 alert alert-{{ message.tags }}" role="alert">
                     {{ message }}
                 </div>
             {% endfor %}

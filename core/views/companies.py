@@ -9,7 +9,8 @@ from django.template.loader import render_to_string
 from .base import *
 from ..constants import ESTADO_ACTIVO, ESTADO_DE_BAJA
 from ..models import EmpresaFormatoLog, PrestamoEquipo, TransferenciaEquipo
-from ..tenancy import get_empresa_activa, get_empresas_seleccionables
+from ..signals import invalidate_dashboard_cache
+from ..tenancy import get_empresa_activa, get_empresas_seleccionables, get_grupo, get_matrices
 
 # =============================================================================
 # MAIN COMPANY VIEWS
@@ -971,16 +972,33 @@ def transferir_equipos(request):
     no se bloquea la transferencia por préstamos activos (se mueven junto con
     el equipo).
     """
-    seleccionables = get_empresas_seleccionables(request.user)
+    if request.user.is_superuser:
+        # El superusuario puede mover equipos dentro de cualquier grupo de clientes.
+        seleccionables = [e for matriz in get_matrices() for e in get_grupo(matriz)]
+    else:
+        seleccionables = get_empresas_seleccionables(request.user)
     if len(seleccionables) < 2:
         messages.error(request, 'No tienes sedes entre las cuales transferir equipos.')
         return redirect('core:dashboard')
 
-    empresa_origen = get_empresa_activa(request)
-    if empresa_origen not in seleccionables:
-        empresa_origen = seleccionables[0]
+    # La sede de origen se puede elegir en la misma pantalla (así un equipo puede
+    # devolverse a la matriz sin depender de la sede que se esté viendo).
+    origen_id = request.POST.get('empresa_origen') or request.GET.get('origen')
+    if origen_id:
+        empresa_origen = next((e for e in seleccionables if str(e.id) == origen_id), None)
+        if empresa_origen is None:
+            messages.error(request, 'No tienes acceso a esa sede.')
+            return redirect('core:transferir_equipos')
+    else:
+        empresa_origen = get_empresa_activa(request)
+        if empresa_origen not in seleccionables:
+            empresa_origen = seleccionables[0]
 
-    destinos_posibles = [e for e in seleccionables if e.id != empresa_origen.id]
+    # Solo se mueve dentro del mismo grupo, nunca entre clientes distintos.
+    ids_seleccionables = {e.id for e in seleccionables}
+    destinos_posibles = [
+        e for e in get_grupo(empresa_origen) if e.id != empresa_origen.id and e.id in ids_seleccionables
+    ]
     equipos_origen = Equipo.objects.filter(empresa=empresa_origen).exclude(
         estado=ESTADO_DE_BAJA
     ).order_by('codigo_interno')
@@ -1083,9 +1101,16 @@ def transferir_equipos(request):
                             request,
                             f'{len(cambios)} equipo(s) transferido(s) a {empresa_destino.nombre}.'
                         )
-                        return redirect('core:transferir_equipos')
+                        # Los signals solo recalculan la sede destino; la de origen quedaba inflada.
+                        invalidate_dashboard_cache(empresa_origen.id)
+                        try:
+                            empresa_origen.recalcular_stats_dashboard()
+                        except Exception as e:
+                            logger.error(f"Error recalculando stats de '{empresa_origen.nombre}': {e}")
+                        return redirect(f"{reverse('core:transferir_equipos')}?origen={empresa_origen.id}")
 
     return render(request, 'core/transferir_equipos.html', {
+        'origenes_posibles': seleccionables,
         'empresa_origen': empresa_origen,
         'destinos_posibles': destinos_posibles,
         'equipos': equipos_origen,

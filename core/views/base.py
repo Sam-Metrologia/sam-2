@@ -83,8 +83,13 @@ from ..templatetags.file_tags import secure_file_url, pdf_image_url
 # Importar optimizaciones
 from ..optimizations import OptimizedQueries, CacheHelpers
 from ..monitoring import monitor_view
-from ..tenancy import get_empresa_activa, get_empresas_seleccionables, SESSION_KEY_EMPRESA_ACTIVA
+from ..tenancy import (
+    get_empresa_activa, get_empresa_id_filtro, get_empresas_seleccionables, get_grupo, get_matrices,
+    SESSION_KEY_EMPRESA_ACTIVA,
+)
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.urls import Resolver404, resolve
+from urllib.parse import urlsplit
 
 
 # =============================================================================
@@ -399,7 +404,10 @@ def cambiar_sede(request):
 
     empresa_elegida = next((e for e in seleccionables if e.id == empresa_id), None)
 
-    if empresa_elegida:
+    if request.user.is_superuser and empresa_id_raw == 'todas':
+        request.session.pop(SESSION_KEY_EMPRESA_ACTIVA, None)
+        messages.success(request, 'Ahora estás viendo: todas las empresas')
+    elif empresa_elegida:
         request.session[SESSION_KEY_EMPRESA_ACTIVA] = empresa_elegida.id
         messages.success(request, f'Ahora estás viendo: {empresa_elegida.nombre}')
     else:
@@ -410,4 +418,12 @@ def cambiar_sede(request):
         siguiente, allowed_hosts={request.get_host()}, require_https=request.is_secure()
     ):
         siguiente = reverse('core:dashboard')
+
+    # Si estaba en la página de un equipo/calibración puntual, ese registro es de la
+    # sede anterior: volver ahí daría un error de permisos. Se va al panel.
+    try:
+        if resolve(urlsplit(siguiente).path).kwargs:
+            siguiente = reverse('core:dashboard')
+    except Resolver404:
+        pass
     return redirect(siguiente)

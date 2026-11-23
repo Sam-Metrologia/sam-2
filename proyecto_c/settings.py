@@ -459,12 +459,13 @@ LOGIN_REDIRECT_URL = 'core:dashboard'
 LOGIN_URL = 'core:login'
 LOGOUT_REDIRECT_URL = 'core:login'
 
+# Las plantillas comparan con 'success'/'error' o arman la clase 'alert-<tag>': el tag va sin 'alert-'.
 MESSAGE_TAGS = {
-    messages.DEBUG: 'alert-secondary',
-    messages.INFO: 'alert-info',
-    messages.SUCCESS: 'alert-success',
-    messages.WARNING: 'alert-warning',
-    messages.ERROR: 'alert-danger',
+    messages.DEBUG: 'debug',
+    messages.INFO: 'info',
+    messages.SUCCESS: 'success',
+    messages.WARNING: 'warning',
+    messages.ERROR: 'error',
 }
 
 # ==============================================================================

@@ -6,7 +6,10 @@ from ..constants import (
     ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_EN_CALIBRACION,
     ESTADO_EN_COMPROBACION, ESTADO_EN_MANTENIMIENTO, ESTADO_DE_BAJA,
 )
-from ..tenancy import get_empresa_activa
+from ..tenancy import get_empresa_activa, get_empresas_consulta, get_empresas_seleccionables, get_matrices
+from ..busqueda_equipos import (
+    OPCIONES_ESTADO, contar, estado_valido, filtrar_por_estado, filtrar_por_texto, querystring_sin,
+)
 
 
 def sanitize_filename(filename):
@@ -38,52 +41,39 @@ def home(request):
     user = request.user
     query = request.GET.get('q')
     tipo_equipo_filter = request.GET.get('tipo_equipo')
-    estado_filter = request.GET.get('estado')
+    # Predeterminado: solo activos. 'todos' incluye inactivos y de baja.
+    estado_filter = estado_valido(request.GET.get('estado'))
     orden_filter = request.GET.get('orden')
 
-    # Lógica para el filtro de empresa para superusuarios y obtener info de formato
-    selected_company_id = request.GET.get('empresa_id')
+    # Empresa(s) que se están viendo: la sede activa, otra sede del grupo, o todas juntas.
+    empresas_vista, selected_company_id = get_empresas_consulta(request)
     empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
+    empresa_activa_home = get_empresa_activa(request)
 
     # OPTIMIZACIÓN: select_related para evitar consultas N+1 en listado de equipos
     # IMPORTANTE: Solo mostrar equipos de empresas activas (no eliminadas)
     equipos_list = Equipo.objects.select_related('empresa').filter(empresa__is_deleted=False).order_by('codigo_interno')
+    if empresas_vista is not None:
+        equipos_list = equipos_list.filter(empresa__in=empresas_vista)
+        if user.is_superuser and not empresas_vista:
+            messages.error(request, 'La empresa seleccionada no existe o está eliminada.')
 
-    current_company_format_info = None
-
-    if not user.is_superuser:
-        # Los usuarios normales solo ven datos de su propia empresa
-        empresa_activa_home = get_empresa_activa(request)
-        if empresa_activa_home and not empresa_activa_home.is_deleted:
-            equipos_list = equipos_list.filter(empresa=empresa_activa_home)
-            selected_company_id = str(empresa_activa_home.id)
-            current_company_format_info = empresa_activa_home
-        else:
-            # Si un usuario normal no tiene empresa asignada o su empresa está eliminada, no ve equipos
-            equipos_list = Equipo.objects.none()
-            empresas_disponibles = Empresa.objects.none()
-
-    else: # If user is superuser
-        if selected_company_id:
-            try:
-                # Get the selected company object for format info (solo empresas activas)
-                current_company_format_info = Empresa.objects.get(pk=selected_company_id, is_deleted=False)
-                equipos_list = equipos_list.filter(empresa_id=selected_company_id)
-            except Empresa.DoesNotExist:
-                # Handle case where selected_company_id is invalid or company is deleted
-                messages.error(request, 'La empresa seleccionada no existe o está eliminada.')
-                equipos_list = Equipo.objects.none()
+    # Con el grupo completo se muestra el formato de la matriz (la primera).
+    current_company_format_info = empresas_vista[0] if empresas_vista else None
+    viendo_grupo = bool(empresas_vista) and len(empresas_vista) > 1
+    if viendo_grupo:
+        equipos_list = equipos_list.order_by('empresa__nombre', 'codigo_interno')
+    # Un usuario normal solo edita en su sede activa; las demás son de consulta.
+    solo_consulta = not user.is_superuser and (
+        viendo_grupo or (bool(empresas_vista) and empresas_vista[0] != empresa_activa_home))
 
     # Lógica de validación de límite de equipos
     limite_alcanzado = False
     empresa_para_limite = None
-    if user.is_authenticated and not user.is_superuser:
-        empresa_para_limite = get_empresa_activa(request)
-    elif user.is_superuser and selected_company_id:
-        try:
-            empresa_para_limite = Empresa.objects.get(pk=selected_company_id)
-        except Empresa.DoesNotExist:
-            empresa_para_limite = None
+    if not user.is_superuser:
+        empresa_para_limite = empresa_activa_home
+    elif empresas_vista and not viendo_grupo:
+        empresa_para_limite = empresas_vista[0]
 
     if empresa_para_limite:
         # Obtener el límite de equipos usando el método del modelo Empresa
@@ -98,27 +88,17 @@ def home(request):
 
     # Filtrar por query de búsqueda
     if query:
-        equipos_list = equipos_list.filter(
-            Q(codigo_interno__icontains=query) |
-            Q(nombre__icontains=query) |
-            Q(marca__icontains=query) |
-            Q(modelo__icontains=query) |
-            Q(numero_serie__icontains=query) |
-            Q(responsable__icontains=query) |
-            Q(ubicacion__icontains=query)
-        )
+        equipos_list = filtrar_por_texto(equipos_list, query)
 
     # Filtrar por tipo de equipo
     if tipo_equipo_filter:
         equipos_list = equipos_list.filter(tipo_equipo=tipo_equipo_filter)
 
+    # Contador (antes de filtrar por estado, para mostrar activos, inactivos y de baja)
+    conteos = contar(equipos_list)
+
     # Filtro por estado
-    if estado_filter:
-        equipos_list = equipos_list.filter(estado=estado_filter)
-    else:
-        # Por defecto, no mostrar "De Baja" a menos que se filtre explícitamente por él
-        if not user.is_superuser or (user.is_superuser and not selected_company_id):
-            equipos_list = equipos_list.exclude(estado=ESTADO_DE_BAJA).exclude(estado=ESTADO_INACTIVO)
+    equipos_list = filtrar_por_estado(equipos_list, estado_filter)
 
     # Ordenamiento por fecha de próxima actividad (nulls al final)
     from django.db.models import F
@@ -186,16 +166,37 @@ def home(request):
         equipos = paginator.page(paginator.num_pages)
 
     tipo_equipo_choices = Equipo.TIPO_EQUIPO_CHOICES
-    estado_choices = Equipo.ESTADO_CHOICES
 
     # Obtener próximas actividades usando las optimizaciones
-    proximas_actividades = OptimizedQueries.get_proximas_actividades(user, days_ahead=30, request=request)
+    # (son de la sede activa: no se muestran si se está consultando otra sede o el grupo)
+    proximas_actividades = None
+    if not solo_consulta:
+        proximas_actividades = OptimizedQueries.get_proximas_actividades(user, days_ahead=30, request=request)
+
+    # Resumen por sede (solo cuando se ven varias juntas)
+    vacio = {'activos': 0, 'inactivos': 0, 'de_baja': 0, 'total': 0}
+    resumen_sedes = [
+        {'empresa': e, **conteos['por_empresa'].get(e.id, vacio)} for e in empresas_vista
+    ] if viendo_grupo else []
 
     context = {
         'equipos': equipos,
         'query': query,
         'tipo_equipo_choices': tipo_equipo_choices,
-        'estado_choices': estado_choices,
+        'opciones_estado': OPCIONES_ESTADO,
+        'estado_filter': estado_filter,
+        'conteo': conteos['total'],
+        'por_nombre': conteos['por_nombre'],
+        'resumen_sedes': resumen_sedes,
+        'viendo_grupo': viendo_grupo,
+        'solo_consulta': solo_consulta,
+        'empresa_activa_home': empresa_activa_home,
+        'sedes_filtro': [] if user.is_superuser else get_empresas_seleccionables(user),
+        'grupos_filtro': get_matrices() if user.is_superuser else [],
+        'qs_sin_sede': querystring_sin(request, 'page', 'sede', 'empresa_id'),
+        'qs_sin_pagina': querystring_sin(request, 'page'),
+        'qs_sin_orden': querystring_sin(request, 'page', 'orden'),
+        'qs_sin_estado': querystring_sin(request, 'page', 'estado'),
         'titulo_pagina': 'Listado de Equipos',
         'is_superuser': user.is_superuser,
         'empresas_disponibles': empresas_disponibles,

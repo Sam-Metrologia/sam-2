@@ -472,7 +472,7 @@ class Empresa(models.Model):
         Se llama desde señales (post_save/post_delete de Equipo, Calibracion,
         Mantenimiento, Comprobacion) y desde el comando de gestión diario.
         """
-        from django.db.models import Count, Case, When, IntegerField as IntF
+        from django.db.models import Count, Case, When, IntegerField as IntF, Q
         from django.utils import timezone
         from datetime import date, timedelta
         from core.views.dashboard import (
@@ -489,7 +489,8 @@ class Empresa(models.Model):
         # Conteos básicos — 1 query agregada
         counts = equipos.aggregate(
             total=Count('id'),
-            activos=Count(Case(When(estado='Activo', then=1), output_field=IntF())),
+            # Igual que el listado: activo = todo lo que no está inactivo ni de baja
+            activos=Count('id', filter=~Q(estado__in=['De Baja', 'Inactivo'])),
             inactivos=Count(Case(When(estado='Inactivo', then=1), output_field=IntF())),
             de_baja=Count(Case(When(estado='De Baja', then=1), output_field=IntF())),
         )

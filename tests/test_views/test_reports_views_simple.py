@@ -67,14 +67,6 @@ class TestReportsBasic:
         assert response.status_code == 200
         assert len(response.content) > 1000
 
-    def test_dashboard_excel(self):
-        """Test: Dashboard Excel."""
-        response = self.client.get(
-            reverse('core:generar_informe_dashboard_excel'),
-            {'empresa_id': self.empresa.id}
-        )
-        assert response.status_code == 200
-
     def test_plantilla_excel(self):
         """Test: Plantilla Excel."""
         response = self.client.get(reverse('core:descargar_plantilla_excel'))

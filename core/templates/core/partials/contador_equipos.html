@@ -1,0 +1,84 @@
+{# Tarjetas por estado, resumen por sede y conteo por nombre. Espera: conteo, por_nombre, resumen_sedes, estado_actual, busqueda, qs_sin_estado, qs_sin_sede #}
+<style>
+    .resumen-equipos { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 0.75rem; box-shadow: var(--shadow-md); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .resumen-equipos .nota { color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.75rem; }
+    .resumen-tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+    .resumen-tarjeta { --tono: var(--accent-primary); display: flex; align-items: center; gap: 0.9rem; padding: 1rem; border-radius: 0.6rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-left: 5px solid var(--tono); text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .resumen-tarjeta:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .resumen-tarjeta.elegida { box-shadow: 0 0 0 2px var(--tono); background: var(--bg-card); }
+    .resumen-tarjeta i { font-size: 1.5rem; color: var(--tono) !important; width: 1.8rem; text-align: center; }
+    .resumen-tarjeta strong { display: block; font-size: 1.7rem; line-height: 1.1; color: var(--text-primary); }
+    .resumen-tarjeta span { color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; }
+    .resumen-tarjeta.activos { --tono: var(--color-success); }
+    .resumen-tarjeta.inactivos { --tono: var(--color-warning); }
+    .resumen-tarjeta.de-baja { --tono: var(--color-error); }
+    .resumen-tabla { width: 100%; border-collapse: collapse; font-size: 0.875rem; color: var(--text-primary); }
+    .resumen-tabla th { background: var(--bg-sidebar); color: #ffffff; text-align: center; padding: 0.6rem 0.9rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; position: sticky; top: 0; }
+    .resumen-tabla td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--border-color); text-align: center; }
+    .resumen-tabla th:first-child, .resumen-tabla td:first-child { text-align: left; }
+    .resumen-tabla tbody tr:hover td { background: var(--bg-tertiary); }
+    .resumen-tabla a { color: var(--accent-primary); font-weight: 600; text-decoration: none; }
+    .resumen-tabla a:hover { text-decoration: underline; }
+    .resumen-tabla tfoot td { font-weight: 700; background: var(--accent-subtle); color: var(--text-primary); }
+    .resumen-marco { border: 1px solid var(--border-color); border-radius: 0.6rem; overflow: auto; max-height: 340px; margin-top: 1rem; }
+    .resumen-equipos summary { cursor: pointer; color: var(--accent-primary); font-weight: 600; margin-top: 1rem; }
+    .resumen-etiqueta { background: var(--accent-subtle); color: var(--accent-primary); border-radius: 999px; font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.5rem; margin-left: 0.4rem; }
+    .solo-consulta-aviso { background: var(--accent-subtle); border-left: 4px solid var(--accent-primary); color: var(--text-primary); border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.875rem; }
+    .resumen-equipos > summary.resumen-titulo { display: flex; align-items: center; gap: 0.7rem; margin: 0; list-style: none; color: var(--text-primary); font-weight: 700; font-size: 1.1rem; }
+    .resumen-equipos > summary.resumen-titulo::-webkit-details-marker { display: none; }
+    .resumen-equipos > summary.resumen-titulo i { color: var(--accent-primary); font-size: 0.9rem; transition: transform 0.2s ease; }
+    .resumen-equipos[open] > summary.resumen-titulo { margin-bottom: 1rem; }
+    .resumen-equipos[open] > summary.resumen-titulo i { transform: rotate(90deg); }
+</style>
+<details class="resumen-equipos" id="contador-equipos">
+    <summary class="resumen-titulo"><i class="fas fa-chevron-right"></i>{% if busqueda %}Equipos que coinciden con "{{ busqueda }}"{% else %}Cantidad de equipos{% endif %}{% if resumen_sedes %} en todas las sedes{% endif %}</summary>
+    <div class="resumen-tarjetas">
+        <a href="?{% if qs_sin_estado %}{{ qs_sin_estado }}&amp;{% endif %}estado=activos" class="resumen-tarjeta activos{% if estado_actual == 'activos' %} elegida{% endif %}"><i class="fas fa-check-circle"></i><div><strong>{{ conteo.activos }}</strong><span>Activos</span></div></a>
+        <a href="?{% if qs_sin_estado %}{{ qs_sin_estado }}&amp;{% endif %}estado=Inactivo" class="resumen-tarjeta inactivos{% if estado_actual == 'Inactivo' %} elegida{% endif %}"><i class="fas fa-pause-circle"></i><div><strong>{{ conteo.inactivos }}</strong><span>Inactivos</span></div></a>
+        <a href="?{% if qs_sin_estado %}{{ qs_sin_estado }}&amp;{% endif %}estado=De+Baja" class="resumen-tarjeta de-baja{% if estado_actual == 'De Baja' %} elegida{% endif %}"><i class="fas fa-minus-circle"></i><div><strong>{{ conteo.de_baja }}</strong><span>De baja</span></div></a>
+        <a href="?{% if qs_sin_estado %}{{ qs_sin_estado }}&amp;{% endif %}estado=todos" class="resumen-tarjeta total{% if estado_actual == 'todos' %} elegida{% endif %}"><i class="fas fa-boxes"></i><div><strong>{{ conteo.total }}</strong><span>Total</span></div></a>
+    </div>
+    <p class="nota">"Activos" incluye los que están en mantenimiento, calibración o comprobación. Haz clic en una tarjeta para ver solo esos equipos.</p>
+
+    {% if resumen_sedes %}
+    <div class="resumen-marco">
+        <table class="resumen-tabla">
+            <thead><tr><th>Sede</th><th>Activos</th><th>Inactivos</th><th>De baja</th><th>Total</th></tr></thead>
+            <tbody>
+                {% for fila in resumen_sedes %}
+                <tr><td><a href="?{% if qs_sin_sede %}{{ qs_sin_sede }}&amp;{% endif %}{% if is_superuser %}empresa_id{% else %}sede{% endif %}={{ fila.empresa.id }}">{{ fila.empresa.nombre }}</a>{% if forloop.first %}<span class="resumen-etiqueta">Matriz</span>{% endif %}</td><td>{{ fila.activos }}</td><td>{{ fila.inactivos }}</td><td>{{ fila.de_baja }}</td><td>{{ fila.total }}</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot><tr><td>Total de todas las sedes</td><td>{{ conteo.activos }}</td><td>{{ conteo.inactivos }}</td><td>{{ conteo.de_baja }}</td><td>{{ conteo.total }}</td></tr></tfoot>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if por_nombre %}
+    <details>
+        <summary>Ver cuántos hay de cada equipo ({{ por_nombre|length }} nombre{{ por_nombre|length|pluralize }} distinto{{ por_nombre|length|pluralize }})</summary>
+        <div class="resumen-marco">
+            <table class="resumen-tabla">
+                <thead><tr><th>Nombre</th><th>Activos</th><th>Inactivos</th><th>De baja</th><th>Total</th></tr></thead>
+                <tbody>
+                    {% for n in por_nombre %}
+                    <tr><td>{{ n.nombre }}</td><td>{{ n.activos }}</td><td>{{ n.inactivos }}</td><td>{{ n.de_baja }}</td><td>{{ n.total }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
+</details>
+<script nonce="{{ csp_nonce }}">
+    // Cerrado por defecto. Si se abre, sigue abierto en esta pestaña al filtrar o cambiar de
+    // página, para que no se cierre cada vez que se hace clic en una tarjeta.
+    (function () {
+        const caja = document.getElementById('contador-equipos');
+        const clave = 'sam_resumen_equipos_abierto';
+        try { caja.open = sessionStorage.getItem(clave) === '1'; } catch (e) {}
+        caja.addEventListener('toggle', function () {
+            try { sessionStorage.setItem(clave, caja.open ? '1' : '0'); } catch (e) {}
+        });
+    })();
+</script>

@@ -3,7 +3,7 @@
 from django.db.models import Count, Q
 from django.contrib.auth.models import AnonymousUser
 from .models import Equipo, Mantenimiento, Calibracion, Comprobacion, Empresa
-from .tenancy import get_empresa_activa, get_empresas_seleccionables
+from .tenancy import SESSION_KEY_EMPRESA_ACTIVA, get_empresa_activa, get_empresas_seleccionables
 
 def company_data(request):
     """
@@ -185,9 +185,15 @@ def sede_context(request):
     if len(seleccionables) < 2:
         return {'empresas_seleccionables': [], 'sede_activa': None}
 
+    sede_activa = get_empresa_activa(request)
+    viendo_todas = request.user.is_superuser and not request.session.get(SESSION_KEY_EMPRESA_ACTIVA)
+    matriz = seleccionables[0]
     return {
         'empresas_seleccionables': seleccionables,
-        'sede_activa': get_empresa_activa(request),
+        'sede_activa': sede_activa,
+        'sede_viendo_todas': viendo_todas,
+        # Botón directo "Volver a <matriz>": solo si ahora está parado en una sede.
+        'matriz_para_volver': matriz if (not viendo_todas and sede_activa and sede_activa.id != matriz.id) else None,
     }
 
 

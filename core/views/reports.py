@@ -6,7 +6,11 @@ import zipfile
 import threading
 import time
 from ..constants import ESTADO_ACTIVO, ESTADO_INACTIVO, ESTADO_DE_BAJA
-from ..tenancy import get_empresa_activa
+from ..excel_equipos import construir_excel, excel_de_empresas
+from ..tenancy import (
+    get_empresa_activa, get_empresa_id_filtro, get_empresas_consulta, get_empresas_seleccionables,
+    get_grupo, get_matrices,
+)
 
 # =============================================================================
 # API ENDPOINTS FOR PROGRESS TRACKING (Fase 3)
@@ -230,6 +234,31 @@ def system_monitor_dashboard(request):
 # MAIN REPORTS DASHBOARD
 # =============================================================================
 
+def _opciones_excel(request, selected_company_id):
+    """(parámetro, [(valor, texto)]) de lo que este usuario puede descargar en el Excel de equipos."""
+    if not request.user.is_superuser:
+        sedes = [e for e in get_empresas_seleccionables(request.user) if not e.is_deleted]
+        activa = get_empresa_activa(request)
+        if len(sedes) < 2 or not activa:
+            return 'sede', []
+        opciones = [('todas', f'Todas las sedes ({len(sedes)})')]
+        return 'sede', [(str(activa.id), f'Esta sede: {activa.nombre}')] + opciones + [
+            (str(e.id), e.nombre) for e in sedes if e.id != activa.id]
+
+    grupos = {m.id: m for m in get_matrices()}
+    if not selected_company_id:
+        return 'empresa_id', [('', 'Todas las empresas')] + [
+            (f'grupo-{m.id}', f'Grupo {m.nombre} (todas sus sedes)') for m in grupos.values()]
+    empresa = Empresa.objects.filter(pk=selected_company_id).first()
+    if not empresa:
+        return 'empresa_id', [('', 'Todas las empresas')]
+    opciones = [(str(empresa.id), f'Solo {empresa.nombre}')]
+    matriz = grupos.get(empresa.empresa_matriz_id or empresa.id)
+    if matriz:
+        opciones.append((f'grupo-{matriz.id}', f'Grupo {matriz.nombre} (matriz y {len(get_grupo(matriz)) - 1} sedes)'))
+    return 'empresa_id', opciones
+
+
 @monitor_view
 @access_check
 @login_required
@@ -242,7 +271,7 @@ def informes(request):
     today = date.today()
 
     # Gestión de empresas y filtros
-    selected_company_id = request.GET.get('empresa_id')
+    selected_company_id = get_empresa_id_filtro(request)
     empresas_disponibles = OptimizedQueries.get_empresas_with_stats().order_by('nombre')
 
     # Obtener equipos base usando queries optimizadas
@@ -271,8 +300,12 @@ def informes(request):
     # Información de paginación para ZIPs
     zip_info = _get_zip_pagination_info(selected_company_id, user.is_superuser) if selected_company_id else None
 
+    parametro_excel, opciones_excel = _opciones_excel(request, selected_company_id)
+
     context = {
         'titulo_pagina': 'Informes y Actividades',
+        'parametro_excel': parametro_excel,
+        'opciones_excel': opciones_excel,
         'is_superuser': user.is_superuser,
         'empresas_disponibles': empresas_disponibles,
         'selected_company_id': selected_company_id,
@@ -350,70 +383,11 @@ def generar_informe_zip(request):
 @monitor_view
 @access_check
 @login_required
-@user_passes_test(lambda u: u.is_superuser or u.has_perm('core.can_export_reports'), login_url='/core/access_denied/')
-def generar_informe_dashboard_excel(request):
-    """
-    Genera un Excel consolidado con Dashboard.
-    Incluye 4 hojas: Equipos, Proveedores, Procedimientos, Dashboard.
-    """
-    try:
-        # Obtener empresa objetivo
-        selected_company_id = request.GET.get('empresa_id')
-
-        if not selected_company_id and not request.user.is_superuser:
-            if get_empresa_activa(request):
-                selected_company_id = str(get_empresa_activa(request).id)
-            else:
-                messages.error(request, "No tiene una empresa asignada para generar el informe Excel.")
-                return redirect('core:informes')
-
-        if not selected_company_id:
-            messages.error(request, "Por favor, selecciona una empresa para generar el informe Excel.")
-            return redirect('core:informes')
-
-        empresa = get_object_or_404(Empresa, pk=selected_company_id)
-
-        # Cargar datos optimizados
-        equipos_empresa = OptimizedQueries.get_equipos_optimized(empresa=empresa).order_by('codigo_interno')
-        proveedores_empresa = Proveedor.objects.filter(empresa=empresa).order_by('nombre_empresa')
-        procedimientos_empresa = Procedimiento.objects.filter(empresa=empresa).order_by('codigo')
-
-        logger.info(f"Generando Excel Dashboard para empresa {empresa.nombre}: {equipos_empresa.count()} equipos")
-
-        # Generar contenido del Excel
-        excel_content = _generate_dashboard_excel_content_local(equipos_empresa, empresa)
-
-        # Crear respuesta HTTP optimizada
-        response = HttpResponse(
-            excel_content,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-
-        # Headers de descarga
-        filename_safe = sanitize_filename(f"Dashboard_{empresa.nombre}.xlsx")
-        response['Content-Disposition'] = f'attachment; filename="{filename_safe}"'
-        response['Content-Length'] = len(excel_content)
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
-
-        logger.info(f"Excel Dashboard generado: {len(excel_content)} bytes")
-        return response
-
-    except Exception as e:
-        logger.error(f"Error generando Excel Dashboard: {e}")
-        messages.error(request, f'Error al generar el informe Dashboard: {e}')
-        return redirect('core:informes')
-
-
-@monitor_view
-@access_check
-@login_required
 @permission_required('core.view_equipo', raise_exception=True)
 def exportar_equipos_excel(request):
     """
-    Exporta una lista general de equipos a un archivo Excel.
-    Filtrada por permisos de usuario y roles.
+    Excel único de equipos (ver core/excel_equipos.py): de una sede o, para el gerente de
+    la matriz y el superusuario, de todo el grupo.
     """
     # Verificar permisos de descarga basados en roles
     if not request.user.puede_descargar_informes():
@@ -421,25 +395,23 @@ def exportar_equipos_excel(request):
         return redirect('core:informes')
 
     try:
-        # Obtener equipos según permisos
-        equipos = OptimizedQueries.get_equipos_optimized(user=request.user if not request.user.is_superuser else None, request=request)
+        empresas, _ = get_empresas_consulta(request)
+        if empresas is not None and not empresas:
+            messages.error(request, 'No hay una empresa válida para exportar.')
+            return redirect('core:informes')
 
-        if not request.user.is_superuser and get_empresa_activa(request):
-            equipos = equipos.filter(empresa=get_empresa_activa(request))
-        elif not request.user.is_superuser and not get_empresa_activa(request):
-            equipos = Equipo.objects.none()
-
-        # Generar contenido Excel
-        excel_content = _generate_general_equipment_list_excel_content_local(equipos)
-
-        # Crear respuesta
+        # Los préstamos traen datos personales (cédula, teléfono): solo con permiso de verlos.
+        con_prestamos = request.user.is_superuser or request.user.has_perm('core.can_view_prestamo')
         response = HttpResponse(
+            excel_de_empresas(empresas, con_prestamos),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = 'attachment; filename="listado_equipos.xlsx"'
-        response.write(excel_content)
-
-        logger.info(f"Lista de equipos exportada: {equipos.count()} equipos")
+        nombre = 'listado_equipos.xlsx' if empresas and len(empresas) == 1 else 'listado_equipos_todas_las_sedes.xlsx'
+        if empresas is None:
+            nombre = 'listado_equipos_todas_las_empresas.xlsx'
+        response['Content-Disposition'] = f'attachment; filename="{nombre}"'
+        logger.info(f"Excel de equipos exportado por {request.user.username}: "
+                    f"{'todas las empresas' if empresas is None else [e.id for e in empresas]}")
         return response
 
     except Exception as e:
@@ -1998,55 +1970,6 @@ def _add_actividades_correctivas_section(sheet, empresa, row):
     return row
 
 
-def _generate_dashboard_excel_content(equipos_queryset, empresa):
-    """
-    Genera un Excel profesional para el dashboard con formato mejorado y secciones completas.
-    Usado cuando se descarga desde el botón del dashboard.
-
-    Refactorizada: 171 líneas → 43 líneas (usa 3 helpers)
-    """
-    import io
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Reporte Dashboard"
-
-    # Añadir encabezado profesional
-    row = _add_excel_header(sheet, empresa)
-
-    # Preparar datos
-    equipos_list = list(equipos_queryset)
-
-    # Añadir sección de resumen general
-    row = _add_excel_resumen_section(sheet, equipos_list, row)
-
-    # Añadir sección de códigos internos
-    row += 2
-    row = _add_codigos_internos_section(sheet, equipos_list, row)
-
-    # Añadir sección de actividades programadas
-    row += 2
-    row = _add_actividades_programadas_section(sheet, equipos_list, empresa, row)
-
-    # Añadir sección de actividades correctivas
-    row += 2
-    row = _add_actividades_correctivas_section(sheet, empresa, row)
-
-    # Ajustar anchos de columnas
-    for col in ['A', 'B', 'C', 'D', 'E', 'F']:
-        sheet.column_dimensions[col].width = 20
-
-    # Ajustar altura de filas del encabezado
-    sheet.row_dimensions[1].height = 40
-    sheet.row_dimensions[2].height = 25
-
-    # Retornar bytes del Excel
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
 def _add_professional_sheet_header(sheet, title_text, merge_range, generation_date):
     """
     Helper: Agrega header profesional a una hoja Excel.
@@ -2372,173 +2295,10 @@ def _add_prestamos_sheet(workbook, prestamos_queryset, generation_date):
 
 def _generate_consolidated_excel_content(equipos_queryset, proveedores_queryset, procedimientos_queryset, prestamos_queryset=None):
     """
-    Genera un Excel consolidado con 5 hojas: Equipos, Proveedores, Procedimientos, Préstamos y Reporte Dashboard.
-    Usado para el ZIP completo con todas las funcionalidades.
-
-    Refactorizada: 201 líneas → 25 líneas (usa 7 helpers)
+    Excel que va dentro de los ZIP: el mismo Excel único del listado de Informes.
     """
-    from django.utils import timezone
-    import io
-
-    workbook = Workbook()
-    generation_date = timezone.now()
-
-    # Crear las 5 hojas usando helpers
-    _add_equipos_sheet(workbook, equipos_queryset, generation_date)
-    _add_proveedores_sheet(workbook, proveedores_queryset, generation_date)
-    _add_procedimientos_sheet(workbook, procedimientos_queryset, generation_date)
-
-    # Agregar hoja de préstamos si se proporciona el queryset
-    if prestamos_queryset is not None:
-        _add_prestamos_sheet(workbook, prestamos_queryset, generation_date)
-
-    _add_dashboard_sheet(workbook, equipos_queryset, generation_date)
-
-    # Retornar bytes del Excel
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
-def _generate_general_equipment_list_excel_content(equipos_queryset):
-    """
-    Generates an Excel file with the general list of equipment including visual charts.
-    """
-    from openpyxl.chart.series import DataPoint
-    from collections import Counter
-    from openpyxl.styles import Alignment, Border, Side
-    from datetime import datetime
-    import io
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Listado de Equipos"
-
-    # ==============================================
-    # ENCABEZADO PROFESIONAL SAM METROLOGÍA
-    # ==============================================
-
-    # Título principal profesional
-    sheet.merge_cells('A1:AB2')
-    sheet['A1'] = 'INFORMES GENERADOS POR SAM METROLOGÍA SAS'
-    sheet['A1'].font = Font(bold=True, size=20, color="FFFFFF")
-    sheet['A1'].fill = PatternFill(start_color="1f4e79", end_color="1f4e79", fill_type="solid")
-    sheet['A1'].alignment = Alignment(horizontal="center", vertical="center")
-
-    # Información de generación
-    hoy = datetime.now()
-    sheet.merge_cells('A3:AB3')
-    sheet['A3'] = f'LISTADO GENERAL DE EQUIPOS - Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
-    sheet['A3'].font = Font(bold=True, size=12, color="1f4e79")
-    sheet['A3'].alignment = Alignment(horizontal="center")
-
-    # INFORMACIÓN DEL FORMATO (común para todos los equipos) - Fila 4
-    primer_equipo = equipos_queryset.first()
-    if primer_equipo:
-        sheet.merge_cells('A4:AB4')
-        formato_info = f'FORMATO: Código: {primer_equipo.codificacion_formato or "N/A"} | Versión: {primer_equipo.version_formato or "N/A"}'
-        if primer_equipo.fecha_version_formato:
-            formato_info += f' | Fecha Versión: {primer_equipo.fecha_version_formato.strftime("%Y-%m-%d")}'
-        sheet['A4'] = formato_info
-        sheet['A4'].font = Font(bold=True, size=10, color="FFFFFF")
-        sheet['A4'].fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
-        sheet['A4'].alignment = Alignment(horizontal="center", vertical="center")
-
-    headers = [
-        "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
-        "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración",
-        "Observaciones", "Último Certificado Calibración", "Fecha Última Calibración", "Próxima Calibración",
-        "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
-        "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
-        "Próxima Comprobación", "Frecuencia Comprobación (meses)"
-    ]
-
-    # Colocar headers en la fila 6 (después del título y espacios)
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-    header_alignment = Alignment(horizontal="center", vertical="center")
-    header_border = Border(left=Side(style='thin'),
-                           right=Side(style='thin'),
-                           top=Side(style='thin'),
-                           bottom=Side(style='thin'))
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=6, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = header_border
-        sheet.column_dimensions[cell.column_letter].width = 25
-
-    # Agregar datos de equipos empezando desde la fila 7
-    current_row = 7
-    for equipo in equipos_queryset:
-        # Obtener el último certificado de calibración
-        ultima_calibracion = equipo.calibraciones.order_by('-fecha_calibracion').first()
-        ultimo_certificado = ultima_calibracion.numero_certificado if ultima_calibracion else 'N/A'
-
-        row_data = [
-            equipo.codigo_interno,
-            equipo.nombre,
-            equipo.empresa.nombre if equipo.empresa else "N/A",
-            equipo.get_tipo_equipo_display(),
-            equipo.marca,
-            equipo.modelo,
-            equipo.numero_serie,
-            equipo.ubicacion,
-            equipo.responsable,
-            equipo.estado,
-            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-            equipo.rango_medida,
-            equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-            equipo.puntos_calibracion if equipo.puntos_calibracion is not None else '',
-            equipo.observaciones,
-            ultimo_certificado,  # NUEVA COLUMNA
-            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-        ]
-        for col_num, value in enumerate(row_data, 1):
-            sheet.cell(row=current_row, column=col_num, value=value)
-        current_row += 1
-
-    # Ajustar anchos de columna
-    from openpyxl.utils import get_column_letter
-    for col_num in range(1, len(headers) + 1):
-        column_letter = get_column_letter(col_num)
-        sheet.column_dimensions[column_letter].width = 25
-
-    # Crear hoja de estadísticas simple
-    stats_sheet = workbook.create_sheet("Estadísticas")
-    equipos_list = list(equipos_queryset)
-
-    if equipos_list:
-        # Estadísticas por empresa
-        empresas_count = Counter(eq.empresa.nombre if eq.empresa else "Sin empresa" for eq in equipos_list)
-
-        stats_sheet['A1'] = 'DISTRIBUCIÓN POR EMPRESA'
-        stats_sheet['A2'] = 'Empresa'
-        stats_sheet['B2'] = 'Cantidad de Equipos'
-
-        row = 3
-        for empresa, count in empresas_count.items():
-            stats_sheet[f'A{row}'] = empresa
-            stats_sheet[f'B{row}'] = count
-            row += 1
-
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
+    return construir_excel(
+        equipos_queryset, proveedores_queryset, procedimientos_queryset, prestamos_queryset)
 
 
 def _generate_equipment_general_info_excel_content(equipo):
@@ -2640,192 +2400,10 @@ def _generate_equipment_general_info_excel_content(equipo):
 # LOCAL HELPER FUNCTIONS FOR EXCEL GENERATION
 # =============================================================================
 
-def _generate_dashboard_excel_content_local(equipos_queryset, empresa):
-    """
-    Local version of dashboard Excel generator to avoid import issues.
-    """
-    import io
-    from collections import Counter
-    from datetime import datetime, timedelta
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Reporte Dashboard"
-
-    # Encabezado profesional
-    sheet.merge_cells('A1:F2')
-    sheet['A1'] = 'INFORMES GENERADOS POR SAM METROLOGÍA SAS'
-    sheet['A1'].font = Font(bold=True, size=20, color="FFFFFF")
-    sheet['A1'].fill = PatternFill(start_color="1f4e79", end_color="1f4e79", fill_type="solid")
-
-    # Información de la empresa
-    sheet.merge_cells('A3:F3')
-    sheet['A3'] = f'EMPRESA: {empresa.nombre.upper()}'
-    sheet['A3'].font = Font(bold=True, size=14, color="1f4e79")
-
-    sheet.merge_cells('A4:F4')
-    hoy = datetime.now()
-    sheet['A4'] = f'Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
-    sheet['A4'].font = Font(bold=True, size=12)
-
-    # Datos estadísticos básicos
-    equipos_list = list(equipos_queryset)
-    total_equipos = len(equipos_list)
-
-    # Resumen básico
-    row = 6
-    sheet[f'A{row}'] = 'RESUMEN GENERAL DE EQUIPOS'
-    sheet[f'A{row}'].font = Font(bold=True, size=16, color="1f4e79")
-    row += 2
-
-    sheet.cell(row=row, column=1, value='Total de Equipos')
-    sheet.cell(row=row, column=2, value=total_equipos)
-    row += 2
-
-    # Listado de equipos
-    sheet[f'A{row}'] = 'LISTADO DE EQUIPOS'
-    sheet[f'A{row}'].font = Font(bold=True, size=14, color="1f4e79")
-    row += 1
-
-    # Headers
-    headers = ['Código', 'Nombre', 'Estado', 'Tipo']
-    for col, header in enumerate(headers, 1):
-        cell = sheet.cell(row=row, column=col, value=header)
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    row += 1
-
-    # Datos
-    for equipo in equipos_list[:20]:  # Limitar a 20 equipos
-        sheet.cell(row=row, column=1, value=equipo.codigo_interno)
-        sheet.cell(row=row, column=2, value=equipo.nombre)
-        sheet.cell(row=row, column=3, value=equipo.estado)
-        sheet.cell(row=row, column=4, value=equipo.get_tipo_equipo_display())
-        row += 1
-
-    # Ajustar columnas
-    for col in ['A', 'B', 'C', 'D', 'E', 'F']:
-        sheet.column_dimensions[col].width = 25
-
-    # Guardar y retornar
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
-
 # =============================================================================
 # ZIP SYSTEM FUNCTIONS - AVOID CIRCULAR IMPORT
 # =============================================================================
 # ZIP functions are handled directly in zip_functions.py to avoid circular imports
-
-
-def _generate_general_equipment_list_excel_content_local(equipos_queryset):
-    """
-    Local version of general equipment list Excel generator to avoid import issues.
-    """
-    import io
-    from datetime import datetime
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Listado de Equipos"
-
-    # Encabezado profesional
-    sheet.merge_cells('A1:AB2')
-    sheet['A1'] = 'INFORMES GENERADOS POR SAM METROLOGÍA SAS'
-    sheet['A1'].font = Font(bold=True, size=20, color="FFFFFF")
-    sheet['A1'].fill = PatternFill(start_color="1f4e79", end_color="1f4e79", fill_type="solid")
-
-    # Información de generación
-    hoy = datetime.now()
-    sheet.merge_cells('A3:AB3')
-    sheet['A3'] = f'LISTADO GENERAL DE EQUIPOS - Generado el: {hoy.strftime("%d de %B de %Y a las %H:%M")}'
-    sheet['A3'].font = Font(bold=True, size=12, color="1f4e79")
-
-    # INFORMACIÓN DEL FORMATO (desde la empresa - campos de Listado de Equipos) - Fila 4 y 5
-    primer_equipo = equipos_queryset.first()
-    if primer_equipo and primer_equipo.empresa:
-        empresa = primer_equipo.empresa
-        codigo_fmt = empresa.listado_codigo or "N/A"
-        version_fmt = empresa.listado_version or "N/A"
-        fecha_fmt = empresa.listado_fecha_formato_display or (
-            empresa.listado_fecha_formato.strftime("%Y-%m-%d") if empresa.listado_fecha_formato else "N/A"
-        )
-        sheet.merge_cells('A4:AB4')
-        formato_info = f'FORMATO: Código: {codigo_fmt} | Versión: {version_fmt} | Fecha: {fecha_fmt}'
-        sheet['A4'] = formato_info
-        sheet['A4'].font = Font(bold=True, size=10, color="FFFFFF")
-        sheet['A4'].fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
-        from openpyxl.styles import Alignment
-        sheet['A4'].alignment = Alignment(horizontal="center", vertical="center")
-
-    # Headers principales (sin columnas de formato que ya están arriba)
-    headers = [
-        "Código Interno", "Nombre", "Empresa", "Tipo de Equipo", "Marca", "Modelo",
-        "Número de Serie", "Ubicación", "Responsable", "Estado", "Fecha de Adquisición",
-        "Rango de Medida", "Resolución", "Error Máximo Permisible", "Puntos de Calibración",
-        "Observaciones", "Último Certificado Calibración", "Fecha Última Calibración", "Próxima Calibración",
-        "Frecuencia Calibración (meses)", "Fecha Último Mantenimiento", "Próximo Mantenimiento",
-        "Frecuencia Mantenimiento (meses)", "Fecha Última Comprobación",
-        "Próxima Comprobación", "Frecuencia Comprobación (meses)"
-    ]
-
-    # Aplicar headers en fila 6
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
-
-    for col_num, header_text in enumerate(headers, 1):
-        cell = sheet.cell(row=6, column=col_num, value=header_text)
-        cell.font = header_font
-        cell.fill = header_fill
-        sheet.column_dimensions[cell.column_letter].width = 25
-
-    # Datos de equipos
-    current_row = 7
-    for equipo in equipos_queryset:
-        # Obtener el último certificado de calibración
-        ultima_calibracion = equipo.calibraciones.order_by('-fecha_calibracion').first()
-        ultimo_certificado = ultima_calibracion.numero_certificado if ultima_calibracion else 'N/A'
-
-        row_data = [
-            equipo.codigo_interno,
-            equipo.nombre,
-            equipo.empresa.nombre if equipo.empresa else "N/A",
-            equipo.get_tipo_equipo_display(),
-            equipo.marca,
-            equipo.modelo,
-            equipo.numero_serie,
-            equipo.ubicacion,
-            equipo.responsable,
-            equipo.estado,
-            equipo.fecha_adquisicion.strftime('%Y-%m-%d') if equipo.fecha_adquisicion else '',
-            equipo.rango_medida,
-            equipo.resolucion,
-            equipo.error_maximo_permisible if equipo.error_maximo_permisible is not None else '',
-            equipo.puntos_calibracion if equipo.puntos_calibracion is not None else '',
-            equipo.observaciones,
-            ultimo_certificado,  # NUEVA COLUMNA
-            equipo.fecha_ultima_calibracion.strftime('%Y-%m-%d') if equipo.fecha_ultima_calibracion else '',
-            equipo.proxima_calibracion.strftime('%Y-%m-%d') if equipo.proxima_calibracion else '',
-            float(equipo.frecuencia_calibracion_meses) if equipo.frecuencia_calibracion_meses is not None else '',
-            equipo.fecha_ultimo_mantenimiento.strftime('%Y-%m-%d') if equipo.fecha_ultimo_mantenimiento else '',
-            equipo.proximo_mantenimiento.strftime('%Y-%m-%d') if equipo.proximo_mantenimiento is not None else '',
-            float(equipo.frecuencia_mantenimiento_meses) if equipo.frecuencia_mantenimiento_meses is not None else '',
-            equipo.fecha_ultima_comprobacion.strftime('%Y-%m-%d') if equipo.fecha_ultima_comprobacion else '',
-            equipo.proxima_comprobacion.strftime('%Y-%m-%d') if equipo.proxima_comprobacion is not None else '',
-            float(equipo.frecuencia_comprobacion_meses) if equipo.frecuencia_comprobacion_meses is not None else '',
-        ]
-        for col_num, value in enumerate(row_data, 1):
-            sheet.cell(row=current_row, column=col_num, value=value)
-        current_row += 1
-
-    # Guardar y retornar
-    excel_buffer = io.BytesIO()
-    workbook.save(excel_buffer)
-    excel_buffer.seek(0)
-    return excel_buffer.getvalue()
-
 
 
 # =============================================================================

@@ -66,7 +66,7 @@ def panel_decisiones(request):
     # Determinar perspectiva: SAM (multi-empresa) vs EMPRESA (single-empresa)
     if user.is_superuser:
         # Si el superusuario seleccionó una empresa específica, mostrar panel completo de esa empresa
-        selected_company_id = request.GET.get('empresa_id')
+        selected_company_id = get_empresa_id_filtro(request)
         if selected_company_id:
             try:
                 empresa = Empresa.objects.get(id=selected_company_id, is_deleted=False)
@@ -737,7 +737,7 @@ def _panel_decisiones_sam(request, today, current_year):
     from django.db.models import Sum, Count, Q
 
     # Filtrado por empresa para superusuarios
-    selected_company_id = request.GET.get('empresa_id')
+    selected_company_id = get_empresa_id_filtro(request)
     empresas_disponibles = Empresa.objects.filter(is_deleted=False).order_by('nombre')
 
     if selected_company_id:

@@ -300,7 +300,7 @@ def dashboard(request):
     current_year = today.year
 
     # Filtrado por empresa para superusuarios (solo empresas activas)
-    selected_company_id = request.GET.get('empresa_id')
+    selected_company_id = get_empresa_id_filtro(request)
 
     # Cache del dashboard (5 min, invalidado por signals vía versioning)
     # El version_key permite invalidar sin delete_pattern ni cache.clear()
@@ -313,7 +313,8 @@ def dashboard(request):
     )
     try:
         _cache_version = cache.get(_version_key, 0)
-        cache_key = f"dashboard_{user.id}_{selected_company_id or 'all'}_v{_cache_version}"
+        # La empresa va en la clave: sin ella, al cambiar de sede se veían los datos de la anterior.
+        cache_key = f"dashboard_{user.id}_{_empresa_id_para_version}_v{_cache_version}"
         cached_context = cache.get(cache_key)
     except Exception:
         _cache_version = 0
@@ -500,11 +501,13 @@ def _get_equipos_queryset(user, selected_company_id, empresas_disponibles, reque
 
 def _get_estadisticas_equipos(equipos_queryset):
     """Obtiene estadísticas agregadas de equipos"""
-    from django.db.models import Count, Case, When, IntegerField
+    from django.db.models import Count, Case, When, IntegerField, Q
+    from ..busqueda_equipos import ESTADOS_FUERA_DE_SERVICIO
 
     estadisticas = equipos_queryset.aggregate(
         total_equipos=Count('id'),
-        equipos_activos=Count(Case(When(estado=ESTADO_ACTIVO, then=1), output_field=IntegerField())),
+        # Igual que el listado: activo = todo lo que no está inactivo ni de baja
+        equipos_activos=Count('id', filter=~Q(estado__in=ESTADOS_FUERA_DE_SERVICIO)),
         equipos_inactivos=Count(Case(When(estado='Inactivo', then=1), output_field=IntegerField())),
         equipos_de_baja=Count(Case(When(estado='De Baja', then=1), output_field=IntegerField()))
     )
@@ -1325,7 +1328,7 @@ def get_chart_details(request):
     data_type = request.GET.get('data_type')  # 'programmed' o 'realized'
 
     # Filtrado por empresa
-    selected_company_id = request.GET.get('empresa_id')
+    selected_company_id = get_empresa_id_filtro(request)
     empresas_disponibles = Empresa.objects.filter(is_deleted=False)
     equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles, request=request)
 
@@ -1769,7 +1772,7 @@ def tortas_rango(request):
     today = date.today()
     user = request.user
 
-    selected_company_id = request.GET.get('empresa_id')
+    selected_company_id = get_empresa_id_filtro(request)
     empresas_disponibles = Empresa.objects.filter(is_deleted=False)
     equipos_queryset = _get_equipos_queryset(user, selected_company_id, empresas_disponibles, request=request)
     equipos_para_dashboard = equipos_queryset.select_related('baja_registro')

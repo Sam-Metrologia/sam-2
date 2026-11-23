@@ -41,9 +41,7 @@
             --color-text-dark: var(--text-primary);
             --color-text-light: var(--text-primary);
             --color-border: var(--border-color);
-            --color-success: var(--color-success);
-            --color-warning: var(--color-warning);
-            --color-error: var(--color-error);
+            /* success, warning y error vienen de themes.css (redefinirlas con su propio nombre las anulaba) */
         }
 
         body {
@@ -344,7 +342,11 @@
 
         .user-dropdown {
             position: absolute;
+            top: 100%; /* Sin esto la lista se centra sobre la barra y se sale por arriba */
             right: 0;
+            max-height: calc(100vh - 100px); /* Con muchas sedes, la lista tiene su propio scroll */
+            overflow-y: auto;
+            max-width: 90vw;
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -413,22 +415,23 @@
         .alert-success {
             background-color: rgba(16, 185, 129, 0.1);
             border-color: var(--color-success);
-            color: var(--color-success);
+            color: #047857; /* tono oscuro: se lee mejor como texto */
         }
         .alert-info {
             background-color: rgba(59, 130, 246, 0.1);
             border-color: var(--color-info);
-            color: var(--color-info);
+            color: #1d4ed8; /* tono oscuro: se lee mejor como texto */
         }
         .alert-warning {
             background-color: rgba(245, 158, 11, 0.1);
             border-color: var(--color-warning);
-            color: var(--color-warning);
+            color: #b45309; /* tono oscuro: se lee mejor como texto */
         }
-        .alert-error {
+        .alert-error,
+        .alert-danger {
             background-color: rgba(239, 68, 68, 0.1);
             border-color: var(--color-error);
-            color: var(--color-error);
+            color: #b91c1c; /* tono oscuro: se lee mejor como texto */
         }
 
         /* Contenedor: forzar ancho completo dentro del main-content */
@@ -604,25 +607,48 @@
             </button>
 
             <div class="user-menu">
+                {% if matriz_para_volver %}
+                <form method="post" action="{% url 'core:cambiar_sede' %}" style="margin: 0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="empresa_id" value="{{ matriz_para_volver.id }}">
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button type="submit" class="user-menu-button" title="Volver a {{ matriz_para_volver.nombre }}">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Volver a matriz</span>
+                    </button>
+                </form>
+                {% endif %}
                 {% if empresas_seleccionables %}
                 <div class="user-menu" style="position: relative;">
                     <button id="sede-menu-button" class="user-menu-button" title="Cambiar de sede">
                         <i class="fas fa-building"></i>
-                        <span>{{ sede_activa.nombre }}</span>
+                        <span>{% if sede_viendo_todas %}Todas las empresas{% else %}{{ sede_activa.nombre }}{% endif %}</span>
                         <i class="fas fa-chevron-down"></i>
                     </button>
                     <div id="sede-dropdown" class="user-dropdown">
+                        {% if user.is_superuser %}
+                        <form method="post" action="{% url 'core:cambiar_sede' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="empresa_id" value="todas">
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" class="sede-dropdown-item{% if sede_viendo_todas %} sede-activa{% endif %}">
+                                Todas las empresas
+                                {% if sede_viendo_todas %}<i class="fas fa-check"></i>{% endif %}
+                            </button>
+                        </form>
+                        {% endif %}
                         {% for empresa in empresas_seleccionables %}
                         <form method="post" action="{% url 'core:cambiar_sede' %}">
                             {% csrf_token %}
                             <input type="hidden" name="empresa_id" value="{{ empresa.id }}">
                             <input type="hidden" name="next" value="{{ request.path }}">
-                            <button type="submit" class="sede-dropdown-item{% if empresa.id == sede_activa.id %} sede-activa{% endif %}">
+                            <button type="submit" class="sede-dropdown-item{% if empresa.id == sede_activa.id and not sede_viendo_todas %} sede-activa{% endif %}">
                                 {{ empresa.nombre }}
-                                {% if empresa.id == sede_activa.id %}<i class="fas fa-check"></i>{% endif %}
+                                {% if empresa.id == sede_activa.id and not sede_viendo_todas %}<i class="fas fa-check"></i>{% endif %}
                             </button>
                         </form>
                         {% endfor %}
+                        <a href="{% url 'core:home' %}?{% if user.is_superuser %}empresa_id=grupo-{{ empresas_seleccionables.0.id }}{% else %}sede=todas{% endif %}"><i class="fas fa-sitemap"></i> Ver equipos de todas las sedes</a>
                         <a href="{% url 'core:transferir_equipos' %}"><i class="fas fa-right-left"></i> Transferir equipos</a>
                     </div>
                 </div>
